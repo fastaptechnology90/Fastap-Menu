@@ -1,0 +1,2722 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: FastapMenu - Digital Restaurant Dining Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: auth
+  - name: superadmin
+  - name: restaurants
+  - name: branches
+  - name: tables
+  - name: menus
+  - name: items
+  - name: orders
+  - name: customers
+  - name: loyalty
+  - name: campaigns
+  - name: reservations
+  - name: feedback
+  - name: staff
+  - name: plans
+  - name: analytics
+  - name: qrcodes
+  - name: public
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new restaurant owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── SUPER ADMIN ─────────────────────────────────────────────────────────────
+  /superadmin/stats:
+    get:
+      operationId: getSuperAdminStats
+      tags: [superadmin]
+      summary: Platform-wide statistics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuperAdminStats"
+
+  /superadmin/restaurants:
+    get:
+      operationId: superAdminListRestaurants
+      tags: [superadmin]
+      summary: List all restaurants (super admin)
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: plan
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RestaurantWithOwner"
+
+  /superadmin/restaurants/{restaurantId}/toggle:
+    post:
+      operationId: toggleRestaurantStatus
+      tags: [superadmin]
+      summary: Activate or deactivate a restaurant
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+
+  /superadmin/restaurants/{restaurantId}/plan:
+    put:
+      operationId: updateRestaurantPlan
+      tags: [superadmin]
+      summary: Change restaurant subscription plan
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+
+  /superadmin/users:
+    get:
+      operationId: superAdminListUsers
+      tags: [superadmin]
+      summary: List all platform users
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /superadmin/plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List subscription plans
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+
+  # ─── RESTAURANTS ─────────────────────────────────────────────────────────────
+  /restaurants:
+    get:
+      operationId: listRestaurants
+      tags: [restaurants]
+      summary: List restaurants for current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Restaurant"
+    post:
+      operationId: createRestaurant
+      tags: [restaurants]
+      summary: Create a restaurant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+
+  /restaurants/{restaurantId}:
+    get:
+      operationId: getRestaurant
+      tags: [restaurants]
+      summary: Get restaurant by ID
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+    put:
+      operationId: updateRestaurant
+      tags: [restaurants]
+      summary: Update restaurant
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+    delete:
+      operationId: deleteRestaurant
+      tags: [restaurants]
+      summary: Delete restaurant
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /restaurants/{restaurantId}/dashboard:
+    get:
+      operationId: getRestaurantDashboard
+      tags: [restaurants]
+      summary: Get restaurant dashboard summary
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  # ─── BRANCHES ────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/branches:
+    get:
+      operationId: listBranches
+      tags: [branches]
+      summary: List branches
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Branch"
+    post:
+      operationId: createBranch
+      tags: [branches]
+      summary: Create branch
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BranchInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+
+  /restaurants/{restaurantId}/branches/{branchId}:
+    put:
+      operationId: updateBranch
+      tags: [branches]
+      summary: Update branch
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BranchInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branch"
+    delete:
+      operationId: deleteBranch
+      tags: [branches]
+      summary: Delete branch
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── TABLES ──────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/tables:
+    get:
+      operationId: listTables
+      tags: [tables]
+      summary: List tables
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Table"
+    post:
+      operationId: createTable
+      tags: [tables]
+      summary: Create table
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TableInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Table"
+
+  /restaurants/{restaurantId}/tables/{tableId}:
+    put:
+      operationId: updateTable
+      tags: [tables]
+      summary: Update table
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TableInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Table"
+    delete:
+      operationId: deleteTable
+      tags: [tables]
+      summary: Delete table
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tableId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── MENU CATEGORIES ─────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/categories:
+    get:
+      operationId: listCategories
+      tags: [menus]
+      summary: List menu categories
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [menus]
+      summary: Create category
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /restaurants/{restaurantId}/categories/{categoryId}:
+    put:
+      operationId: updateCategory
+      tags: [menus]
+      summary: Update category
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: deleteCategory
+      tags: [menus]
+      summary: Delete category
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── MENU ITEMS ──────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/items:
+    get:
+      operationId: listItems
+      tags: [items]
+      summary: List menu items
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MenuItem"
+    post:
+      operationId: createItem
+      tags: [items]
+      summary: Create menu item
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuItemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+
+  /restaurants/{restaurantId}/items/{itemId}:
+    get:
+      operationId: getItem
+      tags: [items]
+      summary: Get menu item
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+    put:
+      operationId: updateItem
+      tags: [items]
+      summary: Update menu item
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuItemInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+    delete:
+      operationId: deleteItem
+      tags: [items]
+      summary: Delete menu item
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── QR CODES ────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/qrcodes:
+    get:
+      operationId: listQrCodes
+      tags: [qrcodes]
+      summary: List QR codes
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QrCode"
+    post:
+      operationId: createQrCode
+      tags: [qrcodes]
+      summary: Create QR code
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrCodeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+
+  /restaurants/{restaurantId}/qrcodes/{qrCodeId}:
+    delete:
+      operationId: deleteQrCode
+      tags: [qrcodes]
+      summary: Delete QR code
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: qrCodeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── ORDERS ──────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders for a restaurant
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /restaurants/{restaurantId}/orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order details
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+    put:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update order status
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  # ─── STAFF ───────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List staff members
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+    post:
+      operationId: createStaff
+      tags: [staff]
+      summary: Add staff member
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+
+  /restaurants/{restaurantId}/staff/{staffId}:
+    put:
+      operationId: updateStaff
+      tags: [staff]
+      summary: Update staff member
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: staffId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+    delete:
+      operationId: deleteStaff
+      tags: [staff]
+      summary: Remove staff member
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: staffId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── CUSTOMERS / CRM ─────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List CRM customers
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: segment
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+
+  /restaurants/{restaurantId}/customers/{customerId}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer profile
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  # ─── LOYALTY ─────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/loyalty:
+    get:
+      operationId: getLoyaltyProgram
+      tags: [loyalty]
+      summary: Get loyalty program settings
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyProgram"
+    put:
+      operationId: updateLoyaltyProgram
+      tags: [loyalty]
+      summary: Update loyalty program settings
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoyaltyProgramInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyProgram"
+
+  /restaurants/{restaurantId}/loyalty/transactions:
+    get:
+      operationId: listLoyaltyTransactions
+      tags: [loyalty]
+      summary: List loyalty transactions
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoyaltyTransaction"
+
+  # ─── CAMPAIGNS ───────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/campaigns:
+    get:
+      operationId: listCampaigns
+      tags: [campaigns]
+      summary: List marketing campaigns
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+    post:
+      operationId: createCampaign
+      tags: [campaigns]
+      summary: Create campaign
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+
+  /restaurants/{restaurantId}/campaigns/{campaignId}:
+    put:
+      operationId: updateCampaign
+      tags: [campaigns]
+      summary: Update campaign
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: campaignId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    delete:
+      operationId: deleteCampaign
+      tags: [campaigns]
+      summary: Delete campaign
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: campaignId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── RESERVATIONS ────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/reservations:
+    get:
+      operationId: listReservations
+      tags: [reservations]
+      summary: List reservations
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+
+  /restaurants/{restaurantId}/reservations/{reservationId}:
+    put:
+      operationId: updateReservation
+      tags: [reservations]
+      summary: Update reservation status
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationStatusUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+
+  # ─── FEEDBACK ────────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/feedback:
+    get:
+      operationId: listFeedback
+      tags: [feedback]
+      summary: List customer feedback
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Feedback"
+
+  # ─── ANALYTICS ───────────────────────────────────────────────────────────────
+  /restaurants/{restaurantId}/analytics/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Analytics summary
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+
+  /restaurants/{restaurantId}/analytics/popular-items:
+    get:
+      operationId: getPopularItems
+      tags: [analytics]
+      summary: Top selling items
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PopularItem"
+
+  /restaurants/{restaurantId}/analytics/daily-sales:
+    get:
+      operationId: getDailySales
+      tags: [analytics]
+      summary: Daily sales for last 30 days
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailySales"
+
+  /restaurants/{restaurantId}/analytics/order-stats:
+    get:
+      operationId: getOrderStats
+      tags: [analytics]
+      summary: Order statistics by type and status
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStats"
+
+  # ─── PUBLIC (Customer Facing) ─────────────────────────────────────────────────
+  /public/menu/{slug}:
+    get:
+      operationId: getPublicMenu
+      tags: [public]
+      summary: Get public menu by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tableId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicMenu"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /public/orders:
+    post:
+      operationId: placeOrder
+      tags: [public]
+      summary: Place an order (customer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /public/orders/{orderId}/status:
+    get:
+      operationId: getOrderStatus
+      tags: [public]
+      summary: Get order status (customer tracking)
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStatusResponse"
+
+  /public/reservations:
+    post:
+      operationId: createReservation
+      tags: [public]
+      summary: Create reservation (customer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+
+  /public/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [public]
+      summary: Submit feedback (customer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+
+  /public/waiter-call:
+    post:
+      operationId: callWaiter
+      tags: [public]
+      summary: Call waiter or request assistance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WaiterCallInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaiterCall"
+
+  /restaurants/{restaurantId}/waiter-calls:
+    get:
+      operationId: listWaiterCalls
+      tags: [orders]
+      summary: List active waiter calls
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WaiterCall"
+
+  /restaurants/{restaurantId}/waiter-calls/{callId}/resolve:
+    post:
+      operationId: resolveWaiterCall
+      tags: [orders]
+      summary: Resolve waiter call
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaiterCall"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    # ─── AUTH ─────────────────────────────────────────────────────────────────
+    RegisterInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [restaurant_owner, super_admin]
+      required: [name, email, password]
+
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required: [user, message]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, restaurant_owner, staff, customer]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, email, name, role, createdAt]
+
+    # ─── SUPER ADMIN ──────────────────────────────────────────────────────────
+    SuperAdminStats:
+      type: object
+      properties:
+        totalRestaurants:
+          type: integer
+        activeRestaurants:
+          type: integer
+        totalUsers:
+          type: integer
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        planBreakdown:
+          type: object
+          properties:
+            free:
+              type: integer
+            starter:
+              type: integer
+            pro:
+              type: integer
+            enterprise:
+              type: integer
+          required: [free, starter, pro, enterprise]
+        recentRestaurants:
+          type: array
+          items:
+            $ref: "#/components/schemas/RestaurantWithOwner"
+      required: [totalRestaurants, activeRestaurants, totalUsers, totalOrders, totalRevenue, planBreakdown, recentRestaurants]
+
+    RestaurantWithOwner:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        logoUrl:
+          type: ["string", "null"]
+        plan:
+          type: string
+        isActive:
+          type: boolean
+        ownerName:
+          type: string
+        ownerEmail:
+          type: string
+        totalOrders:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, slug, plan, isActive, ownerName, ownerEmail, totalOrders, createdAt]
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        maxBranches:
+          type: integer
+        maxItems:
+          type: integer
+        maxStaff:
+          type: integer
+      required: [id, name, price, currency, features, maxBranches, maxItems, maxStaff]
+
+    PlanUpdate:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [free, starter, pro, enterprise]
+      required: [plan]
+
+    # ─── RESTAURANT ───────────────────────────────────────────────────────────
+    Restaurant:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        coverUrl:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        currency:
+          type: string
+        primaryColor:
+          type: string
+        businessType:
+          type: ["string", "null"]
+        timezone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        plan:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, name, slug, currency, primaryColor, isActive, plan, createdAt]
+
+    RestaurantInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        coverUrl:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        currency:
+          type: string
+        primaryColor:
+          type: string
+        businessType:
+          type: ["string", "null"]
+        timezone:
+          type: ["string", "null"]
+      required: [name, currency, primaryColor]
+
+    DashboardSummary:
+      type: object
+      properties:
+        todayOrders:
+          type: integer
+        todayRevenue:
+          type: number
+        activeOrders:
+          type: integer
+        totalCustomers:
+          type: integer
+        qrScansToday:
+          type: integer
+        pendingReservations:
+          type: integer
+        lowStockItems:
+          type: integer
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        activeWaiterCalls:
+          type: integer
+      required: [todayOrders, todayRevenue, activeOrders, totalCustomers, qrScansToday, pendingReservations, lowStockItems, recentOrders, activeWaiterCalls]
+
+    # ─── BRANCH ───────────────────────────────────────────────────────────────
+    Branch:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, name, isActive, createdAt]
+
+    BranchInput:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+      required: [name]
+
+    # ─── TABLE ────────────────────────────────────────────────────────────────
+    Table:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        branchId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        zone:
+          type: ["string", "null"]
+        capacity:
+          type: integer
+        qrCodeUrl:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, name, capacity, isActive, createdAt]
+
+    TableInput:
+      type: object
+      properties:
+        name:
+          type: string
+        branchId:
+          type: ["integer", "null"]
+        zone:
+          type: ["string", "null"]
+        capacity:
+          type: integer
+        isActive:
+          type: boolean
+      required: [name, capacity]
+
+    # ─── CATEGORY ─────────────────────────────────────────────────────────────
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        name:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        isAvailable:
+          type: boolean
+        availableFrom:
+          type: ["string", "null"]
+        availableTo:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, name, sortOrder, isAvailable, createdAt]
+
+    CategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        isAvailable:
+          type: boolean
+        availableFrom:
+          type: ["string", "null"]
+        availableTo:
+          type: ["string", "null"]
+      required: [name]
+
+    # ─── MENU ITEM ────────────────────────────────────────────────────────────
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        categoryId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        price:
+          type: number
+        discountedPrice:
+          type: ["number", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        ingredients:
+          type: ["string", "null"]
+        allergens:
+          type: ["string", "null"]
+        calories:
+          type: ["integer", "null"]
+        prepTime:
+          type: ["integer", "null"]
+        spiceLevel:
+          type: integer
+        dietaryTags:
+          type: array
+          items:
+            type: string
+        isAvailable:
+          type: boolean
+        isFeatured:
+          type: boolean
+        sortOrder:
+          type: integer
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemVariant"
+        addons:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemAddon"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, categoryId, name, price, spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons, createdAt]
+
+    ItemVariant:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        priceDiff:
+          type: number
+      required: [id, name, priceDiff]
+
+    ItemAddon:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+      required: [id, name, price]
+
+    MenuItemInput:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        price:
+          type: number
+        discountedPrice:
+          type: ["number", "null"]
+        imageUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+        ingredients:
+          type: ["string", "null"]
+        allergens:
+          type: ["string", "null"]
+        calories:
+          type: ["integer", "null"]
+        prepTime:
+          type: ["integer", "null"]
+        spiceLevel:
+          type: integer
+        dietaryTags:
+          type: array
+          items:
+            type: string
+        isAvailable:
+          type: boolean
+        isFeatured:
+          type: boolean
+        sortOrder:
+          type: integer
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariantInput"
+        addons:
+          type: array
+          items:
+            $ref: "#/components/schemas/AddonInput"
+      required: [categoryId, name, price]
+
+    VariantInput:
+      type: object
+      properties:
+        name:
+          type: string
+        priceDiff:
+          type: number
+      required: [name, priceDiff]
+
+    AddonInput:
+      type: object
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+      required: [name, price]
+
+    # ─── QR CODE ──────────────────────────────────────────────────────────────
+    QrCode:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        label:
+          type: string
+        type:
+          type: string
+          enum: [table, room, zone, counter, event]
+        url:
+          type: string
+        scans:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, label, type, url, scans, createdAt]
+
+    QrCodeInput:
+      type: object
+      properties:
+        tableId:
+          type: ["integer", "null"]
+        label:
+          type: string
+        type:
+          type: string
+          enum: [table, room, zone, counter, event]
+      required: [label, type]
+
+    # ─── ORDER ────────────────────────────────────────────────────────────────
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        tableName:
+          type: ["string", "null"]
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+        customerEmail:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [dine_in, delivery, takeaway]
+        status:
+          type: string
+          enum: [pending, confirmed, preparing, ready, delivered, completed, cancelled]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        subtotal:
+          type: number
+        tax:
+          type: number
+        total:
+          type: number
+        notes:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+        paymentStatus:
+          type: string
+          enum: [pending, paid, failed]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, type, status, items, subtotal, tax, total, paymentStatus, createdAt]
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        menuItemId:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: integer
+        variant:
+          type: ["string", "null"]
+        addons:
+          type: array
+          items:
+            type: string
+        notes:
+          type: ["string", "null"]
+        subtotal:
+          type: number
+      required: [id, menuItemId, name, price, quantity, addons, subtotal]
+
+    OrderStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, preparing, ready, delivered, completed, cancelled]
+      required: [status]
+
+    PlaceOrderInput:
+      type: object
+      properties:
+        restaurantId:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+        customerEmail:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [dine_in, delivery, takeaway]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlaceOrderItemInput"
+        notes:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        paymentMethod:
+          type: ["string", "null"]
+      required: [restaurantId, type, items]
+
+    PlaceOrderItemInput:
+      type: object
+      properties:
+        menuItemId:
+          type: integer
+        quantity:
+          type: integer
+        variant:
+          type: ["string", "null"]
+        addons:
+          type: array
+          items:
+            type: string
+        notes:
+          type: ["string", "null"]
+      required: [menuItemId, quantity]
+
+    OrderStatusResponse:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        status:
+          type: string
+        estimatedTime:
+          type: ["integer", "null"]
+        updatedAt:
+          type: string
+          format: date-time
+      required: [orderId, status, updatedAt]
+
+    # ─── STAFF ────────────────────────────────────────────────────────────────
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [manager, waiter, kitchen, cashier]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, name, email, role, isActive, createdAt]
+
+    StaffInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [manager, waiter, kitchen, cashier]
+        isActive:
+          type: boolean
+      required: [name, email, role]
+
+    # ─── CUSTOMER / CRM ───────────────────────────────────────────────────────
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        name:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        totalOrders:
+          type: integer
+        totalSpend:
+          type: number
+        loyaltyPoints:
+          type: integer
+        lastVisit:
+          type: ["string", "null"]
+        segment:
+          type: string
+          enum: [new, regular, vip, inactive]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, totalOrders, totalSpend, loyaltyPoints, segment, createdAt]
+
+    # ─── LOYALTY ──────────────────────────────────────────────────────────────
+    LoyaltyProgram:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        isEnabled:
+          type: boolean
+        type:
+          type: string
+          enum: [points, cashback, stamps]
+        pointsPerDollar:
+          type: number
+        cashbackPercent:
+          type: number
+        stampsForReward:
+          type: integer
+        rewardValue:
+          type: number
+        expiryDays:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, isEnabled, type, pointsPerDollar, cashbackPercent, stampsForReward, rewardValue, createdAt]
+
+    LoyaltyProgramInput:
+      type: object
+      properties:
+        isEnabled:
+          type: boolean
+        type:
+          type: string
+          enum: [points, cashback, stamps]
+        pointsPerDollar:
+          type: number
+        cashbackPercent:
+          type: number
+        stampsForReward:
+          type: integer
+        rewardValue:
+          type: number
+        expiryDays:
+          type: ["integer", "null"]
+      required: [isEnabled, type]
+
+    LoyaltyTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: ["string", "null"]
+        orderId:
+          type: ["integer", "null"]
+        type:
+          type: string
+          enum: [earn, redeem, expire]
+        points:
+          type: integer
+        cashback:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, customerId, type, points, cashback, createdAt]
+
+    # ─── CAMPAIGN ─────────────────────────────────────────────────────────────
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [discount, happy_hour, combo, banner, popup, whatsapp, sms]
+        description:
+          type: ["string", "null"]
+        discountPercent:
+          type: ["number", "null"]
+        discountAmount:
+          type: ["number", "null"]
+        triggerType:
+          type: string
+          enum: [manual, scheduled, time_based, customer_action]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        targetSegment:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, name, type, triggerType, isActive, createdAt]
+
+    CampaignInput:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [discount, happy_hour, combo, banner, popup, whatsapp, sms]
+        description:
+          type: ["string", "null"]
+        discountPercent:
+          type: ["number", "null"]
+        discountAmount:
+          type: ["number", "null"]
+        triggerType:
+          type: string
+          enum: [manual, scheduled, time_based, customer_action]
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        targetSegment:
+          type: ["string", "null"]
+      required: [name, type, triggerType]
+
+    # ─── RESERVATION ──────────────────────────────────────────────────────────
+    Reservation:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        date:
+          type: string
+        time:
+          type: string
+        guestCount:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, customerName, customerPhone, date, time, guestCount, status, createdAt]
+
+    ReservationInput:
+      type: object
+      properties:
+        restaurantId:
+          type: integer
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        date:
+          type: string
+        time:
+          type: string
+        guestCount:
+          type: integer
+        notes:
+          type: ["string", "null"]
+      required: [restaurantId, customerName, customerPhone, date, time, guestCount]
+
+    ReservationStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+        tableId:
+          type: ["integer", "null"]
+      required: [status]
+
+    # ─── FEEDBACK ─────────────────────────────────────────────────────────────
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        orderId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        rating:
+          type: integer
+        foodRating:
+          type: ["integer", "null"]
+        serviceRating:
+          type: ["integer", "null"]
+        ambienceRating:
+          type: ["integer", "null"]
+        comment:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, rating, createdAt]
+
+    FeedbackInput:
+      type: object
+      properties:
+        restaurantId:
+          type: integer
+        orderId:
+          type: ["integer", "null"]
+        customerName:
+          type: ["string", "null"]
+        rating:
+          type: integer
+        foodRating:
+          type: ["integer", "null"]
+        serviceRating:
+          type: ["integer", "null"]
+        ambienceRating:
+          type: ["integer", "null"]
+        comment:
+          type: ["string", "null"]
+      required: [restaurantId, rating]
+
+    # ─── WAITER CALL ──────────────────────────────────────────────────────────
+    WaiterCallInput:
+      type: object
+      properties:
+        restaurantId:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        tableName:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [waiter, bill, water, assistance]
+        message:
+          type: ["string", "null"]
+      required: [restaurantId, type]
+
+    WaiterCall:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        tableId:
+          type: ["integer", "null"]
+        tableName:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [waiter, bill, water, assistance]
+        message:
+          type: ["string", "null"]
+        isResolved:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, type, isResolved, createdAt]
+
+    # ─── ANALYTICS ────────────────────────────────────────────────────────────
+    AnalyticsSummary:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        avgOrderValue:
+          type: number
+        totalCustomers:
+          type: integer
+        qrScans:
+          type: integer
+        repeatCustomers:
+          type: integer
+        feedbackAvgRating:
+          type: number
+        topCategory:
+          type: ["string", "null"]
+      required: [totalOrders, totalRevenue, avgOrderValue, totalCustomers, qrScans, repeatCustomers, feedbackAvgRating]
+
+    PopularItem:
+      type: object
+      properties:
+        itemId:
+          type: integer
+        name:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+      required: [itemId, name, totalOrders, totalRevenue]
+
+    DailySales:
+      type: object
+      properties:
+        date:
+          type: string
+        orders:
+          type: integer
+        revenue:
+          type: number
+      required: [date, orders, revenue]
+
+    OrderStats:
+      type: object
+      properties:
+        byStatus:
+          type: object
+          properties:
+            pending: { type: integer }
+            confirmed: { type: integer }
+            preparing: { type: integer }
+            ready: { type: integer }
+            delivered: { type: integer }
+            completed: { type: integer }
+            cancelled: { type: integer }
+          required: [pending, confirmed, preparing, ready, delivered, completed, cancelled]
+        byType:
+          type: object
+          properties:
+            dine_in: { type: integer }
+            delivery: { type: integer }
+            takeaway: { type: integer }
+          required: [dine_in, delivery, takeaway]
+      required: [byStatus, byType]
+
+    # ─── PUBLIC MENU ──────────────────────────────────────────────────────────
+    PublicMenu:
+      type: object
+      properties:
+        restaurant:
+          $ref: "#/components/schemas/Restaurant"
+        table:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+          required: [id, name]
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicCategory"
+        featuredItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+        activeCampaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+      required: [restaurant, categories, featuredItems, activeCampaigns]
+
+    PublicCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+      required: [id, name, items]

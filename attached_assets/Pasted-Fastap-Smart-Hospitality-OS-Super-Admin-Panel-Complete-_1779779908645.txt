@@ -1,0 +1,1356 @@
+Fastap Smart Hospitality OS
+Super Admin Panel — Complete Enterprise Documentation
+Product Overview
+Fastap Smart Hospitality OS ek enterprise-grade SaaS platform hai jo restaurants, hotels, cafés, lounges, resorts, food courts aur hospitality businesses ko fully digital ecosystem me convert karta hai.
+Ye document sirf Company Super Admin Panel ke liye hai.
+Purpose:
+Complete platform control
+Vendor onboarding & management
+Payment & settlement control
+Revenue & finance management
+Compliance & fraud monitoring
+Subscription & SaaS control
+Analytics & reporting
+Security & infrastructure control
+
+1. Super Admin Dashboard
+Dashboard KPIs
+Business Metrics
+Total vendors
+Active vendors
+Inactive vendors
+Suspended vendors
+Trial vendors
+Pending verification vendors
+Churn risk vendors
+Enterprise vendors
+Revenue Metrics
+Total transaction volume
+Today revenue
+Weekly revenue
+Monthly revenue
+Platform commission revenue
+Pending settlements
+Successful settlements
+Failed settlements
+Refund amount
+Chargeback amount
+Subscription Metrics
+Active subscriptions
+Trial conversions
+Expiring subscriptions
+Renewals due
+Cancelled subscriptions
+Failed renewals
+Operational Metrics
+Total orders
+Total bookings
+Total QR scans
+Total customers
+Total hotel requests
+Total support tickets
+Payment success rate
+Live Monitoring Widgets
+Live orders
+Live payments
+Live refunds
+Live disputes
+Live settlements
+API health
+Server status
+Dashboard Buttons
+Refresh dashboard
+Download report
+Export analytics
+View live monitoring
+Open finance dashboard
+Open vendor analytics
+
+2. Vendor Management Module
+Vendor Types
+Restaurants
+Hotels
+Resorts
+Cafés
+Lounges
+Bars
+Cloud kitchens
+Food courts
+Beach clubs
+Vendor Registration Form Fields
+Business name
+Owner name
+Mobile number
+Email address
+GST number
+PAN number
+Business license
+FSSAI details
+Address
+City
+State
+Country
+Bank details
+UPI ID
+Vendor category
+Subscription plan
+Vendor Profile Details
+Vendor ID
+Branch IDs
+Subscription details
+Join date
+Logo
+Contact details
+Tax details
+Payment details
+Last login
+Last transaction
+Last payout
+Health score
+Risk status
+Vendor Control Buttons
+Approve vendor
+Reject vendor
+Suspend vendor
+Activate vendor
+Freeze payouts
+Disable ordering
+Disable QR
+Disable NFC
+Reset password
+Force logout
+Edit vendor
+Delete vendor
+Restore vendor
+Vendor Tags
+VIP
+Enterprise
+High risk
+Priority support
+Fraud alert
+Dormant
+Vendor Notes
+Internal notes
+Risk notes
+Compliance notes
+Sales notes
+Finance notes
+
+3. Payment Gateway Management
+Master Payment Flow
+Customer Payment → Company Escrow Wallet → Settlement Hold → Vendor Settlement
+Payment Transaction Fields
+Transaction ID
+Order ID
+Gateway transaction ID
+UTR number
+Vendor ID
+Branch ID
+Customer ID
+Gross amount
+Tax amount
+Platform commission
+Refund deduction
+Net payout
+Payment mode
+Payment date/time
+Payment status
+Payment Statuses
+Pending
+Success
+Failed
+Refunded
+Partially refunded
+Chargeback
+Settlement pending
+Settled
+Search Filters
+Transaction ID
+UTR number
+Vendor ID
+Date range
+Amount range
+Payment mode
+Branch
+Status
+Payment Buttons
+Retry payment
+Download invoice
+Open dispute
+Initiate refund
+Hold transaction
+Export payment data
+
+4. Refund Management System
+Refund Fields
+Refund ID
+Original transaction ID
+Refund amount
+Refund reason
+Refund date
+Refund status
+Refund completion date
+Refund Actions
+Initiate refund
+Partial refund
+Full refund
+Retry refund
+Cancel refund
+Approve refund
+Reject refund
+Refund Statuses
+Pending
+Processing
+Completed
+Failed
+Cancelled
+
+5. Chargeback Management
+Chargeback Fields
+Chargeback ID
+Transaction ID
+Vendor ID
+Customer ID
+Chargeback amount
+Reason
+Evidence upload
+Status
+Chargeback Actions
+Accept chargeback
+Contest chargeback
+Upload evidence
+Resolve dispute
+Escalate case
+
+6. Settlement Engine
+Settlement Cycles
+Daily
+Weekly
+15 days
+Monthly
+Manual custom
+Settlement Fields
+Gross revenue
+Platform commission
+Refund deductions
+Chargeback deductions
+Tax deductions
+Final payout
+Settlement Buttons
+Release payout
+Hold payout
+Retry payout
+Cancel payout
+Generate report
+Download settlement invoice
+Settlement Hold Rules Engine
+Auto Hold Rules
+Refund pending
+Active chargeback
+KYC incomplete
+Subscription unpaid
+Suspicious activity
+Cash mismatch threshold
+Auto Actions
+Auto hold
+Auto release
+Risk alert
+Finance escalation
+
+7. Escrow Wallet Management
+Wallet Metrics
+Available balance
+Locked balance
+Pending settlements
+Reserve funds
+Refund reserve
+Wallet Buttons
+Add reserve
+Freeze wallet
+Export ledger
+Open reconciliation
+
+8. Vendor Wallet & Reserve Balance
+Vendor Wallet Fields
+Wallet balance
+Locked balance
+Reserve balance
+Negative balance
+Penalty deductions
+Wallet Usage
+Refund adjustment
+Subscription deduction
+Penalty deduction
+Chargeback adjustment
+
+9. Subscription & Package Builder
+Package Fields
+Package name
+Duration
+Pricing
+Vendor type
+Trial availability
+Plan visibility
+Feature Toggles
+Ordering Features
+QR ordering
+NFC ordering
+Delivery
+Takeaway
+Table ordering
+Staff Features
+Waiter app
+Kitchen app
+Housekeeping
+Staff management
+CRM Features
+Loyalty
+Cashback
+Customer database
+WhatsApp marketing
+SMS campaigns
+Analytics Features
+Basic analytics
+Advanced analytics
+AI analytics
+Branding Features
+White label
+Custom domain
+Theme customization
+AI Features
+AI recommendations
+AI insights
+Demand forecasting
+Package Restrictions
+Max branches
+Max tables
+Max rooms
+Max staff
+Max orders/month
+Package Buttons
+Create plan
+Edit plan
+Duplicate plan
+Disable plan
+Publish plan
+
+10. Subscription Lifecycle Automation
+Lifecycle States
+Trial started
+Active
+Grace period
+Expired
+Suspended
+Renewed
+Automation
+Reminder notifications
+Auto suspension
+Auto renewal
+Failed payment retry
+
+11. Commission Management
+Commission Types
+Fixed percentage
+Fixed amount
+Hybrid model
+Apply Commission By
+Vendor
+Plan
+Category
+Region
+Commission Buttons
+Add commission rule
+Override pricing
+Disable commission
+
+12. Invoice Management System
+Invoice Types
+Subscription invoice
+Settlement invoice
+Refund adjustment invoice
+Commission invoice
+Add-on invoice
+Invoice Buttons
+Generate invoice
+Download PDF
+Email invoice
+Regenerate invoice
+
+13. Tax Management Center
+Tax Controls
+GST slabs
+TDS/TCS management
+Tax invoice rules
+Tax percentage controls
+Tax Reports
+Vendor GST summary
+Company GST summary
+Monthly tax report
+Export tax data
+
+14. Coupon & Promo Control
+Coupon Types
+Platform coupon
+Vendor coupon
+Referral coupon
+Cashback coupon
+Coupon Fields
+Coupon code
+Discount amount
+Expiry date
+Usage limit
+Applicable vendors
+Coupon Buttons
+Create coupon
+Disable coupon
+Extend expiry
+Duplicate coupon
+
+15. Support & Ticket System
+Ticket Categories
+Technical
+Payment
+Refund
+Subscription
+Vendor onboarding
+QR issues
+Ticket Fields
+Ticket ID
+Vendor ID
+Priority
+Assigned agent
+SLA deadline
+Ticket status
+Ticket Actions
+Assign ticket
+Resolve ticket
+Escalate ticket
+Add internal note
+Merge duplicate ticket
+
+16. Escalation Workflow Engine
+Escalation Levels
+L1 support
+L2 support
+Finance escalation
+Technical escalation
+Operations escalation
+Automation Rules
+Ticket pending > 24 hr
+Refund pending > 48 hr
+Payment dispute pending
+
+17. SLA Monitoring System
+SLA Types
+Refund SLA
+Support SLA
+Settlement SLA
+Downtime SLA
+SLA Alerts
+SLA breach warning
+Escalation trigger
+Delay alert
+
+18. KYC & Compliance Module
+Verification Documents
+PAN card
+GST certificate
+Bank proof
+Business license
+FSSAI
+KYC Statuses
+Pending
+Verified
+Rejected
+Expired
+Compliance Buttons
+Verify KYC
+Reject KYC
+Request re-upload
+Freeze payouts
+
+19. Document Vault
+Stored Documents
+GST
+PAN
+Agreements
+Licenses
+KYC proofs
+Features
+Expiry alerts
+Secure storage
+Download control
+Audit tracking
+
+20. Agreement Management
+Agreement Fields
+Agreement ID
+Signed date
+Expiry date
+Status
+Uploaded contract
+Agreement Buttons
+Upload agreement
+Renew agreement
+Download PDF
+Mark expired
+
+21. Audit Logs Center
+Log Fields
+User
+Action
+Module
+Date/time
+IP address
+Device
+Logged Actions
+Refund created
+Payout released
+Vendor suspended
+Settings updated
+
+22. Advanced Role Based Access Control (RBAC)
+Company Roles
+Super admin
+Finance admin
+Support admin
+Sales admin
+Operations admin
+Compliance admin
+Permissions
+View only
+Edit only
+Refund approval
+Payout approval
+Delete access
+Export access
+
+23. Multi-Level Approval System
+Approval Cases
+Large refunds
+Payout release
+Vendor reactivation
+Commission override
+Approval Flow
+Admin → Manager → Final approval
+
+24. Notification Center
+Notification Channels
+Push notifications
+Email
+SMS
+WhatsApp
+Alerts
+Failed payment
+Refund request
+Settlement due
+Expiring subscription
+Fraud alert
+
+25. Vendor Communication Center
+Communication Types
+Broadcast messages
+Renewal reminders
+Downtime alerts
+Maintenance notifications
+Marketing campaigns
+Communication Logs
+Emails sent
+SMS sent
+WhatsApp sent
+Call logs
+
+26. Analytics & Reporting Module
+Revenue Reports
+Daily revenue
+Monthly revenue
+Commission revenue
+Refund ratio
+Vendor Reports
+Vendor growth
+Vendor activity
+Churn analytics
+Vendor performance
+Export Formats
+PDF
+Excel
+CSV
+
+27. Revenue Forecast Dashboard
+Forecast Metrics
+Monthly revenue prediction
+Settlement obligation prediction
+Commission forecast
+Vendor growth forecast
+
+28. Vendor Health Score System
+Health Factors
+Refund rate
+Complaint ratio
+Payment failure ratio
+Login activity
+Order volume
+Health Statuses
+Healthy
+Risk
+Critical
+
+29. Dormant Vendor Detection
+Detection Rules
+No login
+No orders
+No payment activity
+Automation
+Reminder
+Sales follow-up
+Auto deactivate
+
+30. Fraud Detection System
+Fraud Detection
+Fake orders
+Refund abuse
+Payment abuse
+Chargeback abuse
+Fake QR scans
+Fraud Actions
+Auto freeze
+Manual review
+Risk escalation
+
+31. AI Fraud Intelligence Dashboard
+AI Detection
+Suspicious refund pattern
+Vendor fraud probability
+Payment anomalies
+Fake traffic detection
+
+32. Risk & Compliance Engine
+Risk Monitoring
+High refund rate
+Failed payment spikes
+Fake transactions
+Unusual order volume
+Risk Actions
+Auto hold payouts
+Freeze vendor
+Compliance review
+
+33. QR/NFC Management
+QR Features
+Bulk QR generation
+Table QR mapping
+Room QR mapping
+QR regeneration
+NFC Features
+NFC assignment
+NFC tracking
+NFC disable
+Status Tracking
+Active
+Disabled
+Lost
+
+34. Reservation System Control
+Reservation Features
+Table reservations
+Capacity management
+Slot management
+Reservation approval
+
+35. API & Integration Control
+Integration Types
+Payment APIs
+POS APIs
+WhatsApp APIs
+SMS APIs
+CRM APIs
+API Controls
+API key generation
+Rate limiting
+Webhook monitoring
+API logs
+
+36. Webhook Management System
+Webhook Features
+Callback tracking
+Failed webhook retry
+Payload logs
+Delivery reports
+
+37. API Usage Analytics
+API Metrics
+Total API calls
+Failed API calls
+Response time
+Abuse detection
+
+38. Feature Flag Engine
+Feature Controls
+Enable feature
+Disable feature
+Beta rollout
+Vendor-specific rollout
+Emergency disable
+
+39. Queue & Job Monitoring Center
+Queues
+Email queue
+SMS queue
+WhatsApp queue
+Settlement jobs
+Invoice jobs
+Queue Status
+Pending
+Running
+Failed
+Retried
+
+40. Server & System Monitoring
+Monitoring Metrics
+Server uptime
+CPU usage
+Memory usage
+Error rate
+Queue delay
+Database health
+System Alerts
+Payment API down
+Notification API failure
+High latency
+
+41. Error Logs Center
+Error Types
+Payment failures
+API failures
+Login failures
+QR failures
+Settlement failures
+Error Actions
+Retry
+Investigate
+Escalate
+
+42. Real-Time Monitoring Panel
+Live Feeds
+Live orders
+Live payments
+Live settlements
+Live disputes
+Live support tickets
+
+43. Global Activity Feed
+Live Activity
+Vendor signup
+Refund created
+Subscription renewed
+Fraud alert
+QR disabled
+
+44. Master Financial Reconciliation Engine
+Reconciliation Features
+Gateway vs bank matching
+Settlement mismatch detection
+Duplicate transaction detection
+Missing transaction alerts
+Reconciliation Actions
+Auto reconciliation
+Manual adjustment
+Generate discrepancy report
+
+45. Revenue Leakage Detection
+Detect
+Missing commission
+Settlement mismatch
+Hidden refunds
+Revenue anomalies
+
+46. Penalty & Fine Management
+Penalty Reasons
+Fake refunds
+Compliance issue
+Cash mismatch
+Fraud activity
+Penalty Actions
+Deduct from wallet
+Deduct from settlement
+Freeze payouts
+
+47. Dynamic Pricing & Billing Engine
+Billing Models
+Subscription billing
+Per order billing
+Usage billing
+Hybrid billing
+
+48. Vendor Lifecycle Intelligence
+Lifecycle Stages
+Trial
+Active
+Growth
+Enterprise
+Dormant
+Churn risk
+
+49. Churn Prediction Dashboard
+Churn Signals
+Low activity
+Low orders
+Subscription overdue
+High complaints
+
+50. Vendor Success CRM
+CRM Features
+Meeting logs
+Follow-ups
+Renewal reminders
+Upsell opportunities
+
+51. Internal Task Management
+Task Types
+Vendor verification
+Compliance review
+Refund review
+Technical review
+Task Status
+Pending
+In progress
+Completed
+
+52. Announcement & Maintenance Broadcast
+Broadcast Types
+Maintenance alerts
+Feature release
+Downtime notice
+Emergency alerts
+
+53. Feature Release Management
+Release Controls
+Beta release
+Limited rollout
+Enterprise only rollout
+Rollback release
+
+54. Data Retention & Archival System
+Archive Types
+Orders archive
+Logs archive
+Transactions archive
+Vendor archive
+Archive Controls
+Restore archive
+Delete archive
+Export archive
+
+55. Export Center
+Export Data
+Vendors
+Payments
+Refunds
+Taxes
+Settlements
+Reports
+Formats
+PDF
+Excel
+CSV
+
+56. Data Export Governance
+Governance Controls
+Export approval
+Export history
+Sensitive data restrictions
+Audit export logs
+
+57. Geo & Region Management
+Region Controls
+Country taxes
+Currency settings
+Language settings
+Timezone management
+
+58. White Label Management
+Branding Controls
+Custom logo
+Custom domain
+Theme colors
+Brand settings
+
+59. System Configuration Center
+Global Settings
+Taxes
+Currency
+Timezone
+Languages
+Maintenance mode
+Platform fees
+
+60. Backup & Recovery System
+Backup Features
+Auto backup
+Manual backup
+Cloud backup
+Recovery points
+Recovery Actions
+Restore backup
+Download backup
+Failover switch
+
+61. Disaster Recovery Control Panel
+DR Features
+Multi-region recovery
+Failover systems
+Recovery status
+Backup integrity checks
+
+62. Platform Incident Management Center
+Incident Fields
+Incident ID
+Severity
+Root cause
+Resolution timeline
+Affected systems
+Incident Actions
+Assign incident
+Escalate incident
+Resolve incident
+
+63. Legal & Compliance Center
+Legal Documents
+Terms & conditions
+Privacy policy
+Refund policy
+GST compliance
+
+64. Legal Hold & Investigation Mode
+Investigation Controls
+Freeze payouts
+Disable vendor edits
+Lock vendor account
+Preserve logs
+
+65. Sandbox/Test Environment Manager
+Sandbox Features
+API testing
+POS integration testing
+Vendor testing environment
+Feature testing
+
+66. Master Search System
+Searchable Modules
+Vendors
+Payments
+Refunds
+Tickets
+QR
+Customers
+Agreements
+Logs
+
+67. Internal Notes & Timeline
+Timeline Features
+Notes history
+Activity timeline
+Action history
+Version logs
+
+68. Hidden Enterprise Features
+Core Hidden Features
+Soft delete
+Restore deleted data
+Bulk actions
+Bulk exports
+Bulk notifications
+Dark mode
+Version logs
+Session tracking
+Device tracking
+OTP login
+IP whitelist
+Session timeout
+
+69. Real-Time Alert Engine
+Alert Types
+Payment gateway failure
+API downtime
+Fraud alert
+Server overload
+Settlement failure spike
+Alert Channels
+Email
+SMS
+WhatsApp
+Push notifications
+
+70. AI Business Insights Engine
+AI Insights
+Vendor sales decline alert
+Smart upselling suggestions
+Demand forecasting
+Revenue improvement suggestions
+Customer behavior prediction
+
+71. Detailed Development-Level Functional Specifications
+Vendor Management — Detailed UI & Functional Flow
+Vendor Listing Page
+Table Columns
+Vendor ID
+Business logo
+Business name
+Vendor type
+Owner name
+Mobile number
+Email
+Subscription plan
+Status
+Health score
+Last login
+Last payout
+Join date
+Top Action Buttons
+Add vendor
+Export vendors
+Bulk actions
+Import vendors
+Generate report
+Open analytics
+Row Action Buttons
+View profile
+Edit vendor
+Suspend vendor
+Activate vendor
+Freeze payout
+Open tickets
+View transactions
+Reset password
+Delete vendor
+Filters
+Vendor type
+Subscription type
+City
+State
+Revenue range
+Health score
+Status
+Risk level
+Vendor Profile Tabs
+Overview
+Financials
+Subscription
+Branches
+Transactions
+Refunds
+Staff
+QR/NFC
+Analytics
+Documents
+Support tickets
+Activity logs
+Internal notes
+
+Payment Management — Detailed Functional System
+Payment Dashboard Widgets
+Today transactions
+Failed payments
+Success ratio
+Refund ratio
+Gateway health
+Live settlements
+Payment Details Page
+Payment Information
+Transaction ID
+Order ID
+Vendor name
+Branch name
+Gateway name
+Payment mode
+Amount
+Tax
+Commission
+Settlement amount
+Customer details
+UTR number
+Gateway response
+Payment Buttons
+Retry callback
+Retry settlement
+Hold transaction
+Refund payment
+Download invoice
+Open dispute
+Add internal note
+Technical Logs
+API request
+API response
+Gateway response time
+Failure reason
+Retry attempts
+
+Settlement Management — Detailed Logic
+Settlement Dashboard
+Metrics
+Pending payout amount
+Total released payout
+Failed settlements
+Hold settlements
+Vendor reserve balance
+Settlement Table
+Settlement ID
+Vendor name
+Settlement cycle
+Gross sales
+Commission
+Refunds
+Penalties
+Final payout
+Settlement status
+Settlement Buttons
+Release payout
+Hold payout
+Retry payout
+Edit payout
+Generate settlement invoice
+Download ledger
+Settlement Hold Logic
+Auto Hold Triggers
+Chargeback active
+Refund spike
+KYC expired
+Fraud alert generated
+High refund ratio
+Manual admin hold
+Auto Release Conditions
+KYC verified
+Dispute resolved
+Refund cleared
+Compliance approved
+
+Refund System — Complete Workflow
+Refund Lifecycle
+Request → Verification → Approval → Gateway Refund → Settlement Adjustment → Closure
+Refund Verification Rules
+Refund limit check
+Duplicate refund check
+Chargeback conflict check
+Settlement conflict check
+Wallet balance validation
+Refund Buttons
+Approve refund
+Reject refund
+Partial refund
+Retry refund
+Escalate refund
+Freeze vendor
+Refund Status Flow
+Requested
+Under review
+Approved
+Processing
+Completed
+Failed
+Cancelled
+
+Fraud Detection — Detailed Engine
+Fraud Indicators
+Same customer multiple refunds
+Unusual order spike
+Multiple failed payments
+QR abuse detection
+Fake order pattern
+High cancellation ratio
+Fraud Actions
+Auto freeze payouts
+Send admin alert
+Generate fraud ticket
+Vendor risk escalation
+Manual review queue
+Fraud Dashboard Buttons
+Freeze vendor
+Investigate
+View evidence
+Escalate case
+Resolve fraud alert
+
+Subscription Management — Detailed SaaS Logic
+Subscription States
+Trial
+Active
+Grace period
+Expired
+Suspended
+Cancelled
+Billing Automation
+Auto invoice generation
+Auto renewal reminders
+Auto suspension after expiry
+Failed payment retry engine
+Subscription Buttons
+Upgrade plan
+Downgrade plan
+Pause subscription
+Renew manually
+Generate invoice
+Add add-ons
+
+QR/NFC Management — Detailed Controls
+QR Management
+Generate table QR
+Generate room QR
+Bulk generate QR
+Download QR ZIP
+Disable QR
+Replace QR
+NFC Controls
+Assign NFC tag
+Disable NFC tag
+Track NFC usage
+Reassign NFC tag
+QR Analytics
+Total scans
+Unique scans
+Failed scans
+Peak scan time
+Conversion rate
+
+Support Ticket System — Enterprise Flow
+Ticket Lifecycle
+Open → Assigned → In Progress → Escalated → Resolved → Closed
+Ticket Priority Levels
+Low
+Medium
+High
+Critical
+Ticket Buttons
+Assign agent
+Escalate ticket
+Merge ticket
+Add note
+Close ticket
+Reopen ticket
+SLA Rules
+Critical issue = 1 hr response
+Payment issue = 4 hr response
+Refund issue = 24 hr response
+
+Analytics Module — Detailed Reports
+Revenue Reports
+Hourly sales
+Daily sales
+Monthly sales
+Vendor revenue
+Branch revenue
+Commission revenue
+Customer Reports
+Returning customers
+New customers
+Average order value
+Customer lifetime value
+Operational Reports
+Peak order hours
+Refund ratio
+Failed payment ratio
+Vendor growth
+Churn prediction
+Export Buttons
+Export PDF
+Export Excel
+Export CSV
+Schedule report
+
+Infrastructure Monitoring — Detailed Admin Controls
+Server Monitoring
+CPU usage
+RAM usage
+Database usage
+Queue latency
+Error rate
+Monitoring Buttons
+Restart queue
+Retry failed jobs
+Open logs
+Trigger backup
+Enable maintenance mode
+Alerts
+High CPU usage
+Payment API failure
+Database overload
+Notification service failure
+
+White Label System — Detailed Controls
+Branding Options
+Upload logo
+Upload favicon
+Change colors
+Custom fonts
+Custom login page
+Domain Mapping
+Add custom domain
+Verify SSL
+DNS verification
+Redirect management
+
+Security System — Enterprise Controls
+Security Features
+2FA login
+OTP verification
+Device tracking
+IP restriction
+Session management
+Forced logout
+Security Buttons
+Force password reset
+Disable account
+Revoke session
+Whitelist IP
+Blacklist device
+
+Audit & Activity System
+Activity Timeline
+Login activity
+Refund actions
+Payout actions
+Settings changes
+Subscription changes
+Audit Filters
+User
+Date
+Module
+Action type
+Severity
+
+Export & Backup Center
+Export Modules
+Vendor export
+Payment export
+Refund export
+Tax export
+Analytics export
+Backup Features
+Auto backup schedule
+Manual backup
+Cloud restore
+Point-in-time restore
+Backup Buttons
+Create backup
+Restore backup
+Download backup
+Verify backup integrity
+
+Final Architecture Summary
+Fastap Smart Hospitality OS Super Admin Panel includes:
+Enterprise SaaS management
+Financial infrastructure
+Escrow wallet system
+Vendor lifecycle management
+AI fraud intelligence
+Subscription automation
+Analytics & forecasting
+Infrastructure monitoring
+Security & compliance
+Multi-level approvals
+Disaster recovery
+API ecosystem
+White-label architecture
+Advanced reporting system
+This architecture is capable of scaling from:
+Single city operations To:
+Multi-country enterprise hospitality infrastructure.

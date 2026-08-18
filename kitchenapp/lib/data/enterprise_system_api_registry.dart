@@ -1,0 +1,106 @@
+import '../core/api/ai_assistant_endpoints.dart';
+import '../core/api/allergy_safety_endpoints.dart';
+import '../core/api/analytics_reporting_endpoints.dart';
+import '../core/api/audit_compliance_endpoints.dart';
+import '../core/api/backup_recovery_endpoints.dart';
+import '../core/api/bakery_dessert_endpoints.dart';
+import '../core/api/banquet_endpoints.dart';
+import '../core/api/bar_beverage_endpoints.dart';
+import '../core/api/batch_cooking_endpoints.dart';
+import '../core/api/chef_task_endpoints.dart';
+import '../core/api/cleaning_hygiene_endpoints.dart';
+import '../core/api/cloud_kitchen_endpoints.dart';
+import '../core/api/course_firing_endpoints.dart';
+import '../core/api/customer_return_endpoints.dart';
+import '../core/api/dashboard_endpoints.dart';
+import '../core/api/delay_escalation_endpoints.dart';
+import '../core/api/delivery_aggregator_endpoints.dart';
+import '../core/api/equipment_endpoints.dart';
+import '../core/api/expeditor_endpoints.dart';
+import '../core/api/future_ai_expansion_endpoints.dart';
+import '../core/api/hardware_integration_endpoints.dart';
+import '../core/api/hidden_enterprise_endpoints.dart';
+import '../core/api/inventory_endpoints.dart';
+import '../core/api/iot_device_endpoints.dart';
+import '../core/api/kds_endpoints.dart';
+import '../core/api/kitchen_communication_endpoints.dart';
+import '../core/api/kitchen_heatmap_endpoints.dart';
+import '../core/api/live_alert_endpoints.dart';
+import '../core/api/modifier_endpoints.dart';
+import '../core/api/multi_branch_endpoints.dart';
+import '../core/api/offline_failover_endpoints.dart';
+import '../core/api/order_priority_endpoints.dart';
+import '../core/api/order_processing_endpoints.dart';
+import '../core/api/packing_endpoints.dart';
+import '../core/api/panic_emergency_endpoints.dart';
+import '../core/api/prep_endpoints.dart';
+import '../core/api/prep_station_endpoints.dart';
+import '../core/api/quality_control_endpoints.dart';
+import '../core/api/recipe_costing_endpoints.dart';
+import '../core/api/room_service_endpoints.dart';
+import '../core/api/sandbox_training_endpoints.dart';
+import '../core/api/section_endpoints.dart';
+import '../core/api/smart_energy_endpoints.dart';
+import '../core/api/smartwatch_support_endpoints.dart';
+import '../core/api/staff_performance_endpoints.dart';
+import '../core/api/staff_shift_endpoints.dart';
+import '../core/api/staff_wellness_endpoints.dart';
+import '../core/api/waiter_auto_assignment_endpoints.dart';
+
+/// Primary read API path for each live enterprise system (2–49).
+class EnterpriseSystemApiRegistry {
+  const EnterpriseSystemApiRegistry._();
+
+  static const Map<int, String> primaryGetPath = {
+    2: DashboardEndpoints.dashboard,
+    3: KdsEndpoints.kds,
+    4: SectionEndpoints.overview,
+    5: OrderProcessingEndpoints.processing,
+    6: CourseFiringEndpoints.sessions,
+    7: PrepEndpoints.board,
+    8: ModifierEndpoints.board,
+    9: AllergySafetyEndpoints.board,
+    10: ChefTaskEndpoints.board,
+    11: AiAssistantEndpoints.assistant,
+    12: OrderPriorityEndpoints.board,
+    13: KitchenCommunicationEndpoints.board,
+    14: InventoryEndpoints.board,
+    15: RecipeCostingEndpoints.board,
+    16: PrepStationEndpoints.board,
+    17: BatchCookingEndpoints.board,
+    18: DelayEscalationEndpoints.board,
+    19: QualityControlEndpoints.board,
+    20: CustomerReturnEndpoints.board,
+    21: ExpeditorEndpoints.board,
+    22: PackingEndpoints.board,
+    23: DeliveryAggregatorEndpoints.board,
+    24: BarBeverageEndpoints.board,
+    25: BakeryDessertEndpoints.board,
+    26: CloudKitchenEndpoints.board,
+    27: BanquetEndpoints.board,
+    28: RoomServiceEndpoints.board,
+    29: CleaningHygieneEndpoints.board,
+    30: EquipmentEndpoints.board,
+    31: SmartEnergyEndpoints.board,
+    32: IotDeviceEndpoints.board,
+    33: StaffPerformanceEndpoints.board,
+    34: StaffShiftEndpoints.board,
+    35: StaffWellnessEndpoints.board,
+    36: LiveAlertEndpoints.board,
+    37: PanicEmergencyEndpoints.board,
+    38: OfflineFailoverEndpoints.board,
+    39: AnalyticsReportingEndpoints.board,
+    40: KitchenHeatmapEndpoints.board,
+    41: HardwareIntegrationEndpoints.board,
+    42: SmartwatchSupportEndpoints.board,
+    43: MultiBranchEndpoints.board,
+    44: AuditComplianceEndpoints.board,
+    45: BackupRecoveryEndpoints.board,
+    46: SandboxTrainingEndpoints.board,
+    47: HiddenEnterpriseEndpoints.board,
+    48: FutureAiExpansionEndpoints.board,
+    49: WaiterAutoAssignmentEndpoints.board,
+  };
+
+  static String? pathForSystem(int systemNumber) => primaryGetPath[systemNumber];
+}

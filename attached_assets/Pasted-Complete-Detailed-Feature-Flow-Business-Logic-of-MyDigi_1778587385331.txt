@@ -1,0 +1,1361 @@
+Complete Detailed Feature Flow & Business Logic of MyDigiMenu
+MyDigiMenu is a complete restaurant digital dining ecosystem designed for restaurants, hotels, cafés, bars, food courts, beach clubs, lounges, and room service operations. The platform combines QR menus, tablet menus, online ordering, CRM, loyalty systems, marketing automation, campaigns, reservations, guest engagement, and payment handling into one system. 
+
+1. Complete System Structure
+The entire platform is divided into multiple connected systems:
+
+
+Customer Ordering System
+
+
+QR Menu System
+
+
+Tablet Menu System
+
+
+Online Delivery System
+
+
+Restaurant Admin System
+
+
+Staff & Kitchen System
+
+
+CRM & Guest Tracking System
+
+
+Loyalty & Cashback System
+
+
+Marketing & Campaign Engine
+
+
+Chat & Communication System
+
+
+Reservation System
+
+
+Payment & Billing System
+
+
+Analytics & Reporting System
+
+
+Multi-language & Multi-currency System
+
+
+All systems are interconnected and continuously share customer behavior, ordering data, and engagement activity.
+
+2. Restaurant Onboarding Flow
+Step 1: Business Registration
+Restaurant owner creates an account.
+System collects:
+
+
+Restaurant name
+
+
+Brand logo
+
+
+Branch details
+
+
+Business category
+
+
+Contact information
+
+
+Currency
+
+
+Primary language
+
+
+Timezone
+
+
+Subscription plan
+
+
+After signup:
+
+
+Restaurant workspace is created
+
+
+Admin dashboard becomes active
+
+
+Trial or subscription begins
+
+
+
+Step 2: Branch Management
+Restaurants can create:
+
+
+Multiple branches
+
+
+Multiple dining areas
+
+
+Multiple floors
+
+
+Different service zones
+
+
+Examples:
+
+
+Indoor dining
+
+
+Outdoor seating
+
+
+Poolside
+
+
+Beach area
+
+
+Hotel rooms
+
+
+Food court counters
+
+
+Each branch gets separate:
+
+
+Orders
+
+
+QR codes
+
+
+Tables
+
+
+Analytics
+
+
+Menus
+
+
+Staff
+
+
+
+Step 3: Menu Building Flow
+Restaurant creates digital menu structure.
+Category Creation
+Admin creates:
+
+
+Starters
+
+
+Main course
+
+
+Drinks
+
+
+Desserts
+
+
+Breakfast
+
+
+Lunch
+
+
+Dinner
+
+
+Happy hour sections
+
+
+Categories support:
+
+
+Images
+
+
+Sorting
+
+
+Availability timings
+
+
+Visibility rules
+
+
+
+Item Creation
+For every menu item:
+Restaurant can add:
+
+
+Item name
+
+
+Description
+
+
+Price
+
+
+Discounted price
+
+
+Food images
+
+
+Food videos
+
+
+Ingredients
+
+
+Allergens
+
+
+Nutrition facts
+
+
+Calories
+
+
+Preparation time
+
+
+Spice indicators
+
+
+Dietary tags
+
+
+Examples:
+
+
+Vegan
+
+
+Gluten-free
+
+
+Halal
+
+
+Keto
+
+
+Vegetarian
+
+
+
+
+Variant & Add-on Logic
+Each item supports:
+
+
+Sizes
+
+
+Flavors
+
+
+Extra toppings
+
+
+Combo upgrades
+
+
+Cooking preferences
+
+
+Examples:
+
+
+Small / Medium / Large
+
+
+Extra cheese
+
+
+Coke upgrade
+
+
+Add fries
+
+
+Extra sauce
+
+
+Logic:
+
+
+Variant changes price dynamically
+
+
+Add-ons increase cart total automatically
+
+
+
+Availability Logic
+Restaurant can configure:
+
+
+Time-based menus
+
+
+Day-based menus
+
+
+Seasonal items
+
+
+Hidden items
+
+
+Limited stock items
+
+
+Examples:
+
+
+Breakfast only 7AM-11AM
+
+
+Friday special menu
+
+
+Happy hour drinks
+
+
+Weekend brunch menu
+
+
+System automatically:
+
+
+Shows or hides items
+
+
+Activates promotions
+
+
+Disables unavailable items
+
+
+
+
+3. QR Menu System Flow
+QR Generation Flow
+System generates:
+
+
+Table QR codes
+
+
+Room QR codes
+
+
+Zone QR codes
+
+
+Counter QR codes
+
+
+Event QR codes
+
+
+Each QR contains:
+
+
+Branch ID
+
+
+Table ID
+
+
+Zone ID
+
+
+Service type
+
+
+
+Customer QR Scan Flow
+Customer:
+
+
+Scans QR
+
+
+Menu opens instantly
+
+
+No app installation required
+
+
+System identifies table automatically
+
+
+Menu loads in customer language
+
+
+
+
+QR Logic
+The QR identifies:
+
+
+Exact table
+
+
+Exact room
+
+
+Exact customer location
+
+
+This removes manual table entry.
+When customer places order:
+
+
+Order automatically routes to correct table
+
+
+Kitchen receives correct location
+
+
+Staff knows where to deliver
+
+
+
+4. Tablet Menu Flow
+Restaurants can place:
+
+
+Android tablets
+
+
+iPads
+
+
+Self-service kiosks
+
+
+at tables.
+
+Tablet Experience Flow
+Customer uses tablet to:
+
+
+Browse immersive menu
+
+
+Watch autoplay food videos
+
+
+Explore offers
+
+
+Customize items
+
+
+Place order
+
+
+Request waiter
+
+
+Pay bill
+
+
+Leave feedback
+
+
+
+
+Tablet Business Logic
+Tablet menu acts as:
+
+
+Digital salesperson
+
+
+Upselling system
+
+
+Interactive ordering device
+
+
+System uses:
+
+
+Full-screen food media
+
+
+Promo banners
+
+
+Suggested items
+
+
+Combo upgrades
+
+
+Goal:
+Increase average order value.
+
+5. Food Video & Visual Selling Logic
+One of the platform’s strongest features is visual selling.
+Instead of static menus:
+
+
+Food videos autoplay
+
+
+Images appear dynamically
+
+
+Signature dishes are highlighted
+
+
+
+
+Upselling Logic
+System promotes:
+
+
+Best-selling items
+
+
+High-margin dishes
+
+
+Add-ons
+
+
+Combos
+
+
+Desserts
+
+
+Drinks
+
+
+Using:
+
+
+Popups
+
+
+Banner sliders
+
+
+Recommended sections
+
+
+Triggered promotions
+
+
+Business goal:
+Increase customer spending.
+
+6. Ordering Flow
+Dine-in Ordering Flow
+Customer:
+
+
+Opens menu
+
+
+Adds items to cart
+
+
+Adds notes
+
+
+Confirms order
+
+
+Order sent instantly
+
+
+Order routing:
+Customer → Restaurant Panel → Kitchen → Waiter
+
+Delivery & Takeaway Flow
+Customer:
+
+
+Opens delivery menu link
+
+
+Selects delivery/pickup
+
+
+Adds address
+
+
+Places order
+
+
+Pays online
+
+
+Restaurant receives:
+
+
+Customer details
+
+
+Address
+
+
+Delivery instructions
+
+
+
+
+Order Status Flow
+Order statuses:
+
+
+Pending
+
+
+Accepted
+
+
+Preparing
+
+
+Ready
+
+
+Served
+
+
+Delivered
+
+
+Completed
+
+
+Customer receives:
+
+
+Real-time updates
+
+
+Notifications
+
+
+Order progress
+
+
+
+7. Kitchen & Staff Flow
+Kitchen Order Routing
+Orders can route to:
+
+
+Kitchen screens
+
+
+Kitchen printers
+
+
+POS
+
+
+Staff mobile devices
+
+
+
+
+Staff App Flow
+Staff can:
+
+
+Accept orders
+
+
+Change order status
+
+
+Receive waiter requests
+
+
+Reply to chats
+
+
+Handle guest issues
+
+
+Useful for:
+
+
+Poolside service
+
+
+Beach clubs
+
+
+Hotels
+
+
+Large dining spaces
+
+
+
+Waiter Assistance Flow
+Customer can:
+
+
+Call waiter
+
+
+Request bill
+
+
+Request water
+
+
+Ask for assistance
+
+
+Staff instantly receives alert.
+
+8. Guest CRM Flow
+Customer Data Capture
+System captures guests through:
+
+
+Google login
+
+
+Facebook login
+
+
+Apple ID
+
+
+WhatsApp OTP
+
+
+SMS OTP
+
+
+
+
+CRM Auto-Build Logic
+Every interaction updates CRM automatically.
+Stored data:
+
+
+Visit history
+
+
+Orders
+
+
+Favorite items
+
+
+Spending habits
+
+
+Last visit
+
+
+Frequency
+
+
+Contact details
+
+
+Even if customer does not order:
+
+
+QR scan still records visit activity
+
+
+
+
+CRM Segmentation Logic
+Restaurant can filter customers by:
+
+
+Frequent visitors
+
+
+High spenders
+
+
+Inactive customers
+
+
+Food preferences
+
+
+Visit frequency
+
+
+Order behavior
+
+
+Used for personalized marketing.
+
+9. Marketing & Campaign Engine
+Campaign Creation Flow
+Restaurant creates:
+
+
+Discounts
+
+
+Happy hour offers
+
+
+Combo deals
+
+
+Video promotions
+
+
+Popup ads
+
+
+Banner campaigns
+
+
+
+
+Trigger-Based Campaign Logic
+Campaigns can trigger:
+
+
+By time
+
+
+By date
+
+
+By weekday
+
+
+By customer action
+
+
+By menu section visit
+
+
+Examples:
+
+
+Dessert popup after mains
+
+
+Friday drinks campaign
+
+
+Lunch combo at noon
+
+
+Weekend brunch promotion
+
+
+
+Banner Routing Logic
+Banner can:
+
+
+Open popup
+
+
+Open video
+
+
+Open menu item
+
+
+Open external URL
+
+
+Open promotion page
+
+
+Goal:
+Push high-profit items.
+
+10. WhatsApp & SMS Marketing Flow
+Restaurants can send:
+
+
+Personalized offers
+
+
+Festival promotions
+
+
+Discount reminders
+
+
+Video campaigns
+
+
+Image campaigns
+
+
+
+
+Marketing Automation Logic
+System filters customers based on:
+
+
+Order history
+
+
+Favorite dishes
+
+
+Visit frequency
+
+
+Spending behavior
+
+
+Examples:
+
+
+Burger lovers get burger offers
+
+
+Inactive customers get comeback offers
+
+
+Coffee buyers get loyalty rewards
+
+
+
+11. Loyalty & Cashback System
+Loyalty Flow
+Customer:
+
+
+Orders food
+
+
+Earns cashback or points
+
+
+Uses rewards next visit
+
+
+
+
+Cashback Logic
+Example:
+
+
+Spend $100
+
+
+Earn $10 cashback
+
+
+Cashback valid for next order
+
+
+Purpose:
+Increase repeat visits.
+
+Digital Stamp Card Flow
+Restaurants create:
+
+
+Coffee cards
+
+
+Burger cards
+
+
+Drink cards
+
+
+Pizza cards
+
+
+Example:
+
+
+Buy 5 coffees
+
+
+Get 1 free
+
+
+No physical card required.
+
+
+Gift Voucher Flow
+Restaurant creates:
+
+
+Digital vouchers
+
+
+Discount gift cards
+
+
+Promotional coupons
+
+
+Example:
+
+
+Pay $75
+
+
+Receive $100 value card
+
+
+Customer can:
+
+
+Gift digitally
+
+
+Share online
+
+
+Redeem later
+
+
+
+
+12. Chat & Communication Flow
+In-Menu Chat System
+Customer opens chat directly from menu.
+Can:
+
+
+Ask questions
+
+
+Request waiter
+
+
+Ask order status
+
+
+Continue on WhatsApp
+
+
+
+
+Staff Communication Logic
+Staff receives messages through:
+
+
+Manager app
+
+
+Order dashboard
+
+
+Mobile device
+
+
+This reduces:
+
+
+Phone calls
+
+
+Delays
+
+
+Wait times
+
+
+
+13. Payment Flow
+Customer can:
+
+
+Pay online
+
+
+Pay at table
+
+
+Pay later
+
+
+Pay on delivery
+
+
+
+
+Payment Flow Logic
+
+
+Customer places order
+
+
+Payment option shown
+
+
+Payment processed
+
+
+Receipt generated
+
+
+Order confirmed
+
+
+After payment:
+
+
+Kitchen notified
+
+
+Staff updated
+
+
+CRM updated
+
+
+Loyalty updated
+
+
+
+14. Reservation System Flow
+Customer:
+
+
+Opens reservation page
+
+
+Selects:
+
+
+Date
+
+
+Time
+
+
+Guest count
+
+
+
+
+Reservation submitted
+
+
+Restaurant receives booking instantly.
+
+
+Reservation Logic
+Supports:
+
+
+Table management
+
+
+Time slots
+
+
+Capacity control
+
+
+Reservation approval
+
+
+Can integrate with external reservation systems.
+
+15. Feedback & Review Flow
+After dining:
+Customer receives feedback form.
+Restaurant can create:
+
+
+Ratings
+
+
+Surveys
+
+
+Custom questions
+
+
+
+
+Feedback Logic
+Responses stored in dashboard.
+Restaurant can:
+
+
+Track satisfaction
+
+
+Identify complaints
+
+
+Improve service
+
+
+Monitor staff performance
+
+
+
+16. Multi-language & Currency Flow
+System supports:
+
+
+50+ languages
+
+
+70+ currencies
+
+
+
+
+Auto Language Logic
+Menu automatically detects:
+
+
+Mobile device language
+
+
+Browser language
+
+
+Menu switches automatically.
+
+Currency Logic
+Prices can:
+
+
+Convert dynamically
+
+
+Display in guest currency
+
+
+Improve tourist experience
+
+
+Useful for:
+
+
+Hotels
+
+
+International restaurants
+
+
+Resorts
+
+
+
+17. Analytics & Reporting Flow
+Dashboard tracks:
+
+
+Sales
+
+
+Revenue
+
+
+Top-selling items
+
+
+Repeat customers
+
+
+Campaign performance
+
+
+Customer behavior
+
+
+Order timings
+
+
+Average order value
+
+
+
+Analytics Business Logic
+Restaurant can identify:
+
+
+Best-selling dishes
+
+
+Slow-selling items
+
+
+Peak hours
+
+
+Customer preferences
+
+
+Campaign ROI
+
+
+Used for:
+
+
+Pricing decisions
+
+
+Marketing optimization
+
+
+Inventory planning
+
+
+
+18. Complete End-to-End Flow
+Restaurant Setup
+→ Branch Creation
+→ Menu Creation
+→ QR/Table Setup
+→ Customer Scan
+→ Language Detection
+→ Menu Browsing
+→ Food Videos & Promotions
+→ Add to Cart
+→ Upselling & Recommendations
+→ Order Placement
+→ Payment
+→ Kitchen Routing
+→ Staff Notification
+→ Order Fulfillment
+→ Feedback Collection
+→ CRM Update
+→ Loyalty Update
+→ WhatsApp/SMS Marketing
+→ Repeat Customer Journey

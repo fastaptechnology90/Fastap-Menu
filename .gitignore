@@ -1,0 +1,82 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# environment secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
+
+# Build artifacts
+server/dist/
+client/dist/
+
+# Local PostgreSQL data (docker-compose / pgserve)
+.pgdata/
+
+# Deploy packages
+fastap-deploy.tar.gz
+*.tar.gz
+
+# ── Production / VPS deploy configs (contain LIVE secrets — NOT for GitHub handover)
+/deploy/
+scripts/vps-*
+scripts/vps_*
+
+# ── Internal audit / AI notes — NOT for client / public repo
+/.agents/
+CODEMAP.md
+SECURITY.md
+CLIENT-BUGS.md
+# Replit-specific (not needed)
+replit.md
+.replit
+.replitignore
+# test / run logs
+*.log

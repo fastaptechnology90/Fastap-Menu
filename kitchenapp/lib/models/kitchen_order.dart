@@ -1,0 +1,90 @@
+import 'package:flutter/material.dart';
+
+import '../core/theme/dashboard_tone.dart';
+
+class KitchenOrder {
+  const KitchenOrder({
+    required this.title,
+    required this.location,
+    required this.section,
+    required this.items,
+    required this.status,
+    required this.timer,
+    required this.progress,
+    required this.color,
+    required this.icon,
+    required this.priorityIcon,
+    this.id,
+    this.vip = false,
+    this.allergy = false,
+  });
+
+  final String? id;
+  final String title;
+  final String location;
+  final String section;
+  final List<String> items;
+  final String status;
+  final String timer;
+  final double progress;
+  final Color color;
+  final IconData icon;
+  final IconData priorityIcon;
+  final bool vip;
+  final bool allergy;
+
+  factory KitchenOrder.fromJson(Map<String, dynamic> json) {
+    final status = json['status'] as String;
+    final priority = json['priority'] as String? ?? 'normal';
+    final vip = json['vip'] as bool? ?? false;
+
+    return KitchenOrder(
+      id: json['id'] as String?,
+      title: json['kotNumber'] as String? ?? json['title'] as String,
+      location: json['location'] as String,
+      section: json['section'] as String,
+      items: (json['items'] as List<dynamic>).map((item) => item.toString()).toList(),
+      status: json['statusLabel'] as String? ?? _statusLabel(status, vip),
+      timer: json['timer'] as String? ?? '00:00',
+      progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
+      color: DashboardTone.colorForOrderStatus(status),
+      icon: DashboardTone.iconForOrderLocation(json['location'] as String),
+      priorityIcon: _priorityIcon(status, priority, vip),
+      vip: vip,
+      allergy: json['allergy'] as bool? ?? false,
+    );
+  }
+
+  static String _statusLabel(String status, bool vip) {
+    if (vip && status == 'preparing') {
+      return 'VIP';
+    }
+    return switch (status) {
+      'new' => 'New order',
+      'accepted' => 'Accepted',
+      'preparing' => 'Preparing',
+      'ready' => 'Ready soon',
+      'served' => 'Served',
+      'delayed' => 'Delayed',
+      'on_hold' => 'On hold',
+      'rejected' => 'Rejected',
+      _ => status,
+    };
+  }
+
+  static IconData _priorityIcon(String status, String priority, bool vip) {
+    if (status == 'delayed') {
+      return Icons.warning_amber_rounded;
+    }
+    if (vip || priority == 'vip') {
+      return Icons.workspace_premium_outlined;
+    }
+    if (priority == 'express') {
+      return Icons.bolt_outlined;
+    }
+    if (status == 'ready') {
+      return Icons.task_alt;
+    }
+    return Icons.timer_outlined;
+  }
+}

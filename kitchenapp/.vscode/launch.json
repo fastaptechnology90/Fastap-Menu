@@ -1,0 +1,48 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kitchen App (Android Emulator · local API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "deviceId": "android",
+      "toolArgs": [
+        "--dart-define=API_MODE=external",
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8080"
+      ]
+    },
+    {
+      "name": "Kitchen App (Chrome · local API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define=API_MODE=external",
+        "--dart-define=API_BASE_URL=http://127.0.0.1:8080"
+      ]
+    },
+    {
+      "name": "Kitchen App (Windows · local API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "toolArgs": [
+        "--dart-define=API_MODE=external",
+        "--dart-define=API_BASE_URL=http://127.0.0.1:8080"
+      ]
+    },
+    {
+      "name": "Kitchen App (Mock API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "toolArgs": ["--dart-define=API_MODE=mock"]
+    }
+  ]
+}

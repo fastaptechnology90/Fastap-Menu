@@ -1,0 +1,89 @@
+export type AdminNavItem = { title: string; href: string; icon: string };
+export type AdminNavGroup = { title: string; items: AdminNavItem[] };
+
+export const adminNavGroups: AdminNavGroup[] = [
+  {
+    title: "OVERVIEW",
+    items: [
+      { title: "Dashboard", href: "/dashboard", icon: "dashboard" },
+      { title: "Live Monitoring", href: "/live-monitoring", icon: "monitoring" },
+      { title: "Master Search", href: "/search", icon: "search" },
+      { title: "AI Insights", href: "/ai-insights", icon: "psychology" },
+      { title: "Revenue Leakage", href: "/revenue-leakage", icon: "trending_down" },
+    ],
+  },
+  {
+    title: "FINANCIAL",
+    items: [
+      { title: "Payments", href: "/payments", icon: "credit_card" },
+      { title: "Refunds", href: "/refunds", icon: "currency_exchange" },
+      { title: "Chargebacks", href: "/chargebacks", icon: "warning" },
+      { title: "Settlements", href: "/settlements", icon: "description" },
+      { title: "Escrow", href: "/escrow", icon: "account_balance_wallet" },
+      { title: "Vendor Wallets", href: "/vendor-wallets", icon: "wallet" },
+      { title: "Billing Engine", href: "/billing-engine", icon: "payments" },
+      { title: "Approvals", href: "/approvals", icon: "verified" },
+      { title: "Invoices", href: "/invoices", icon: "receipt_long" },
+      { title: "Commissions", href: "/commissions", icon: "percent" },
+      { title: "Taxes", href: "/taxes", icon: "calculate" },
+      { title: "Reconciliation", href: "/reconciliation", icon: "sync_alt" },
+      { title: "Penalties", href: "/penalties", icon: "gavel" },
+    ],
+  },
+  {
+    title: "VENDORS",
+    items: [
+      { title: "All Vendors", href: "/vendors", icon: "storefront" },
+      { title: "Dormant Vendors", href: "/dormant-vendors", icon: "bedtime" },
+      { title: "KYC & Compliance", href: "/kyc", icon: "verified_user" },
+      { title: "Subscriptions", href: "/subscriptions", icon: "inventory_2" },
+      { title: "Plan Builder", href: "/plans", icon: "layers" },
+      { title: "Coupons", href: "/coupons", icon: "confirmation_number" },
+      { title: "Agreements", href: "/agreements", icon: "draw" },
+      { title: "Vendor CRM", href: "/vendor-crm", icon: "handshake" },
+      { title: "Document Vault", href: "/document-vault", icon: "folder_open" },
+      { title: "Reservations", href: "/reservations", icon: "event_seat" },
+    ],
+  },
+  {
+    title: "OPERATIONS",
+    items: [
+      { title: "Support & Tickets", href: "/support", icon: "support_agent" },
+      { title: "QR/NFC", href: "/qr-nfc", icon: "qr_code_scanner" },
+      { title: "Fraud & Risk", href: "/fraud", icon: "security" },
+      { title: "Analytics", href: "/analytics", icon: "pie_chart" },
+      { title: "SLA Monitoring", href: "/sla-monitoring", icon: "schedule" },
+      { title: "Tasks", href: "/tasks", icon: "task_alt" },
+      { title: "Incidents", href: "/incidents", icon: "report" },
+      { title: "Alert Engine", href: "/alert-engine", icon: "notifications_active" },
+    ],
+  },
+  {
+    title: "COMMUNICATIONS",
+    items: [
+      { title: "Notifications", href: "/notifications", icon: "notifications" },
+      { title: "Communications", href: "/communications", icon: "forum" },
+      { title: "Announcements", href: "/announcements", icon: "campaign" },
+    ],
+  },
+  {
+    title: "PLATFORM",
+    items: [
+      { title: "Audit Logs", href: "/audit-logs", icon: "history" },
+      { title: "Error Logs", href: "/error-logs", icon: "bug_report" },
+      { title: "Export Center", href: "/export-center", icon: "download" },
+      { title: "Admin Users", href: "/users", icon: "group" },
+      { title: "Roles & RBAC", href: "/roles", icon: "admin_panel_settings" },
+      { title: "Security", href: "/security", icon: "shield" },
+      { title: "Infrastructure", href: "/infrastructure", icon: "dns" },
+      { title: "Disaster Recovery", href: "/disaster-recovery", icon: "backup" },
+      { title: "API Control", href: "/api-control", icon: "api" },
+      { title: "Sandbox", href: "/sandbox", icon: "science" },
+      { title: "Data Archival", href: "/data-archival", icon: "archive" },
+      { title: "Feature Releases", href: "/feature-releases", icon: "new_releases" },
+      { title: "Legal & Compliance", href: "/legal", icon: "gavel" },
+      { title: "White Label", href: "/white-label", icon: "palette" },
+      { title: "Settings", href: "/settings", icon: "settings" },
+    ],
+  },
+];

@@ -1,0 +1,68 @@
+import { Router, type IRouter } from "express";
+import { eq, and, desc } from "drizzle-orm";
+import { db, spaServicesTable, spaBookingsTable } from "@workspace/db";
+import { requireAuth } from "../middlewares/auth";
+
+const router: IRouter = Router();
+
+router.get("/restaurants/:restaurantId/spa/services", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const services = await db.select().from(spaServicesTable).where(eq(spaServicesTable.restaurantId, id));
+  res.json(services.map(s => ({ ...s, price: parseFloat(String(s.price)) })));
+});
+
+router.post("/restaurants/:restaurantId/spa/services", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const { name, category, description, duration, price, therapist, isBar } = req.body;
+  const [service] = await db.insert(spaServicesTable).values({ restaurantId: id, name, category, description, duration: parseInt(duration) || 60, price: String(parseFloat(price) || 0), therapist, isBar: Boolean(isBar) }).returning();
+  res.status(201).json(service);
+});
+
+router.put("/restaurants/:restaurantId/spa/services/:serviceId", requireAuth, async (req, res): Promise<void> => {
+  const serviceId = parseInt(req.params.serviceId, 10);
+  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const { name, category, description, duration, price, therapist, isAvailable } = req.body;
+  const [service] = await db.update(spaServicesTable).set({ name, category, description, duration: duration ? parseInt(duration) : undefined, price: price !== undefined ? String(parseFloat(price)) : undefined, therapist, isAvailable }).where(and(eq(spaServicesTable.id, serviceId), eq(spaServicesTable.restaurantId, restaurantId))).returning();
+  if (!service) { res.status(404).json({ error: "Service not found" }); return; }
+  res.json(service);
+});
+
+router.delete("/restaurants/:restaurantId/spa/services/:serviceId", requireAuth, async (req, res): Promise<void> => {
+  const serviceId = parseInt(req.params.serviceId, 10);
+  const restaurantId = parseInt(req.params.restaurantId, 10);
+  await db.delete(spaServicesTable).where(and(eq(spaServicesTable.id, serviceId), eq(spaServicesTable.restaurantId, restaurantId)));
+  res.json({ message: "Service deleted" });
+});
+
+router.get("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const bookings = await db.select().from(spaBookingsTable).where(eq(spaBookingsTable.restaurantId, id)).orderBy(desc(spaBookingsTable.scheduledAt));
+  res.json(bookings.map(b => ({ ...b, price: parseFloat(String(b.price)) })));
+});
+
+router.post("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const { serviceId, serviceName, guestName, guestPhone, guestEmail, therapist, scheduledAt, duration, price, notes } = req.body;
+  // new Date(undefined) is an Invalid Date, and the ORM then calls toISOString()
+  // on it and throws — the booking is lost with only a 500 to show for it.
+  // A missing or malformed date should be reported, not crash the request.
+  const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+  if (!scheduledDate || Number.isNaN(scheduledDate.getTime())) {
+    res.status(400).json({ error: "A valid scheduledAt date is required" });
+    return;
+  }
+  const parsedPrice = parseFloat(price);
+  const [booking] = await db.insert(spaBookingsTable).values({ restaurantId: id, serviceId: serviceId ? parseInt(serviceId) : null, serviceName, guestName, guestPhone, guestEmail, therapist, scheduledAt: scheduledDate, duration: parseInt(duration) || 60, price: String(Number.isFinite(parsedPrice) ? parsedPrice : 0), notes }).returning();
+  res.status(201).json(booking);
+});
+
+router.put("/restaurants/:restaurantId/spa/bookings/:bookingId", requireAuth, async (req, res): Promise<void> => {
+  const bookingId = parseInt(req.params.bookingId, 10);
+  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const { status, therapist, notes, paymentStatus } = req.body;
+  const [booking] = await db.update(spaBookingsTable).set({ status, therapist, notes, paymentStatus }).where(and(eq(spaBookingsTable.id, bookingId), eq(spaBookingsTable.restaurantId, restaurantId))).returning();
+  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  res.json(booking);
+});
+
+export default router;

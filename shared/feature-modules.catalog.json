@@ -1,0 +1,913 @@
+{
+  "version": 1,
+  "systemCount": 49,
+  "modules": [
+    {
+      "number": 1,
+      "key": "system_1",
+      "title": "Authentication & Security System",
+      "category": "Core",
+      "surfaces": [
+        "mobile",
+        "restaurant"
+      ],
+      "apiPath": null,
+      "restaurantPaths": [
+        "/restaurant/rbac",
+        "/restaurant/settings"
+      ],
+      "linkedSystems": [
+        2
+      ],
+      "requiresSystems": [],
+      "minPlan": "free"
+    },
+    {
+      "number": 2,
+      "key": "system_2",
+      "title": "Kitchen Dashboard System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/dashboard",
+      "restaurantPaths": [
+        "/restaurant/dashboard"
+      ],
+      "linkedSystems": [
+        3,
+        5,
+        36
+      ],
+      "requiresSystems": [],
+      "minPlan": "free"
+    },
+    {
+      "number": 3,
+      "key": "system_3",
+      "title": "Live KDS (Kitchen Display System)",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/kds",
+      "restaurantPaths": [
+        "/restaurant/kitchen"
+      ],
+      "linkedSystems": [
+        2,
+        5,
+        12,
+        18,
+        21
+      ],
+      "requiresSystems": [
+        5
+      ],
+      "minPlan": "free"
+    },
+    {
+      "number": 4,
+      "key": "system_4",
+      "title": "Multi Kitchen Section Management",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/sections/overview",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        2,
+        3,
+        5
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 5,
+      "key": "system_5",
+      "title": "Advanced Order Processing System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/orders/processing",
+      "restaurantPaths": [
+        "/restaurant/orders"
+      ],
+      "linkedSystems": [
+        3,
+        12,
+        21,
+        22,
+        49
+      ],
+      "requiresSystems": [],
+      "minPlan": "free"
+    },
+    {
+      "number": 6,
+      "key": "system_6",
+      "title": "Food Firing & Course Management",
+      "category": "Kitchen",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/course-firing/sessions",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        7
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 7,
+      "key": "system_7",
+      "title": "Food Preparation Management",
+      "category": "Kitchen",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/prep/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        6,
+        16
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 8,
+      "key": "system_8",
+      "title": "Modifier & Customization Management",
+      "category": "Kitchen",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/modifiers/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        9
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 9,
+      "key": "system_9",
+      "title": "Food Allergy & Safety Engine",
+      "category": "Safety",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/allergy-safety/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        8
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 10,
+      "key": "system_10",
+      "title": "Chef Task Management System",
+      "category": "Staff",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/chef-tasks/board",
+      "restaurantPaths": [
+        "/restaurant/tasks-sop"
+      ],
+      "linkedSystems": [
+        7,
+        33
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 11,
+      "key": "system_11",
+      "title": "AI Kitchen Assistant",
+      "category": "AI",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/ai/assistant",
+      "restaurantPaths": [
+        "/restaurant/ai-features"
+      ],
+      "linkedSystems": [
+        2,
+        5,
+        48
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 12,
+      "key": "system_12",
+      "title": "Order Priority Engine",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/order-priority/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        3,
+        5,
+        18
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 13,
+      "key": "system_13",
+      "title": "Kitchen Communication System",
+      "category": "Communication",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/kitchen-communication/board",
+      "restaurantPaths": [
+        "/restaurant/communications"
+      ],
+      "linkedSystems": [
+        3,
+        36
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 14,
+      "key": "system_14",
+      "title": "Inventory & Stock Integration",
+      "category": "Inventory",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/inventory/board",
+      "restaurantPaths": [
+        "/restaurant/inventory"
+      ],
+      "linkedSystems": [
+        15,
+        16,
+        30
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 15,
+      "key": "system_15",
+      "title": "Recipe & Food Costing System",
+      "category": "Inventory",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/recipe-costing/board",
+      "restaurantPaths": [
+        "/restaurant/food-costing"
+      ],
+      "linkedSystems": [
+        14,
+        16
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 16,
+      "key": "system_16",
+      "title": "Prep Station Management System",
+      "category": "Kitchen",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/prep-stations/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        7,
+        14,
+        15
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 17,
+      "key": "system_17",
+      "title": "Advanced Batch Cooking System",
+      "category": "Kitchen",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/batch-cooking/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        7,
+        16
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 18,
+      "key": "system_18",
+      "title": "Delay & Escalation System",
+      "category": "Alerts",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/delay-escalation/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        3,
+        12,
+        36
+      ],
+      "requiresSystems": [],
+      "minPlan": "starter"
+    },
+    {
+      "number": 19,
+      "key": "system_19",
+      "title": "Quality Control System",
+      "category": "Quality",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/quality-control/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        20
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 20,
+      "key": "system_20",
+      "title": "Customer Return & Re-fire System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/customer-return/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        3,
+        19
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 21,
+      "key": "system_21",
+      "title": "Expeditor Management System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/expeditor/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        3,
+        5,
+        22
+      ],
+      "requiresSystems": [
+        3,
+        5
+      ],
+      "minPlan": "pro"
+    },
+    {
+      "number": 22,
+      "key": "system_22",
+      "title": "Packing & Delivery Preparation System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/packing/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        21,
+        23,
+        49
+      ],
+      "requiresSystems": [
+        21
+      ],
+      "minPlan": "pro"
+    },
+    {
+      "number": 23,
+      "key": "system_23",
+      "title": "Delivery Aggregator System",
+      "category": "Delivery",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/delivery-aggregator/board",
+      "restaurantPaths": [
+        "/restaurant/aggregators"
+      ],
+      "linkedSystems": [
+        22
+      ],
+      "requiresSystems": [
+        22
+      ],
+      "minPlan": "pro"
+    },
+    {
+      "number": 24,
+      "key": "system_24",
+      "title": "Bar & Beverage Kitchen System",
+      "category": "Specialty",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/bar-beverage/board",
+      "restaurantPaths": [
+        "/restaurant/spa-bar"
+      ],
+      "linkedSystems": [
+        5
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 25,
+      "key": "system_25",
+      "title": "Bakery & Dessert Management",
+      "category": "Specialty",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/bakery-dessert/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        5,
+        7
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 26,
+      "key": "system_26",
+      "title": "Cloud Kitchen Management",
+      "category": "Enterprise",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/cloud-kitchen/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        43
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 27,
+      "key": "system_27",
+      "title": "Event & Banquet Kitchen System",
+      "category": "Events",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/banquet/board",
+      "restaurantPaths": [
+        "/restaurant/events"
+      ],
+      "linkedSystems": [
+        5,
+        28
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 28,
+      "key": "system_28",
+      "title": "Room Service Kitchen System",
+      "category": "Hotel",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/room-service/board",
+      "restaurantPaths": [
+        "/restaurant/room-service"
+      ],
+      "linkedSystems": [
+        5,
+        27
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 29,
+      "key": "system_29",
+      "title": "Cleaning & Hygiene Management",
+      "category": "Compliance",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/cleaning-hygiene/board",
+      "restaurantPaths": [
+        "/restaurant/housekeeping"
+      ],
+      "linkedSystems": [
+        44
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 30,
+      "key": "system_30",
+      "title": "Equipment Management System",
+      "category": "IoT",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/equipment/board",
+      "restaurantPaths": [
+        "/restaurant/documents"
+      ],
+      "linkedSystems": [
+        14,
+        31,
+        32
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 31,
+      "key": "system_31",
+      "title": "Smart Energy & Gas Monitoring",
+      "category": "IoT",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/smart-energy/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        30,
+        32
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 32,
+      "key": "system_32",
+      "title": "IoT Device Integration System",
+      "category": "IoT",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/iot-devices/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        30,
+        31,
+        41
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 33,
+      "key": "system_33",
+      "title": "Staff Performance System",
+      "category": "Staff",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/staff-performance/board",
+      "restaurantPaths": [
+        "/restaurant/staff"
+      ],
+      "linkedSystems": [
+        10,
+        34,
+        35
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 34,
+      "key": "system_34",
+      "title": "Staff Shift Management",
+      "category": "Staff",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/staff-shift/board",
+      "restaurantPaths": [
+        "/restaurant/staff"
+      ],
+      "linkedSystems": [
+        33,
+        35
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 35,
+      "key": "system_35",
+      "title": "Staff Fatigue & Wellness AI",
+      "category": "Staff",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/staff-wellness/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        33,
+        34
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 36,
+      "key": "system_36",
+      "title": "Live Alert Engine",
+      "category": "Alerts",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/live-alerts/board",
+      "restaurantPaths": [
+        "/restaurant/notifications"
+      ],
+      "linkedSystems": [
+        2,
+        3,
+        18,
+        37
+      ],
+      "requiresSystems": [],
+      "minPlan": "free"
+    },
+    {
+      "number": 37,
+      "key": "system_37",
+      "title": "Panic & Emergency System",
+      "category": "Safety",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/panic-emergency/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        36
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 38,
+      "key": "system_38",
+      "title": "Offline Mode & Failover System",
+      "category": "Technology",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/offline-failover/board",
+      "restaurantPaths": [
+        "/restaurant/offline"
+      ],
+      "linkedSystems": [
+        45
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 39,
+      "key": "system_39",
+      "title": "Analytics & Reporting System",
+      "category": "Reports",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/analytics-reporting/board",
+      "restaurantPaths": [
+        "/restaurant/analytics"
+      ],
+      "linkedSystems": [
+        2,
+        40
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 40,
+      "key": "system_40",
+      "title": "Live Kitchen Heatmap System",
+      "category": "Reports",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/kitchen-heatmap/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        2,
+        39
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 41,
+      "key": "system_41",
+      "title": "Hardware Integration System",
+      "category": "Technology",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/hardware-integration/board",
+      "restaurantPaths": [
+        "/restaurant/documents",
+        "/restaurant/digital-signage"
+      ],
+      "linkedSystems": [
+        32
+      ],
+      "requiresSystems": [],
+      "minPlan": "pro"
+    },
+    {
+      "number": 42,
+      "key": "system_42",
+      "title": "Smartwatch Support",
+      "category": "Technology",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/smartwatch-support/board",
+      "restaurantPaths": [],
+      "linkedSystems": [
+        3,
+        36
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 43,
+      "key": "system_43",
+      "title": "Multi Branch & Central Kitchen System",
+      "category": "Enterprise",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/multi-branch/board",
+      "restaurantPaths": [
+        "/restaurant/branches"
+      ],
+      "linkedSystems": [
+        26
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 44,
+      "key": "system_44",
+      "title": "Audit & Compliance System",
+      "category": "Compliance",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/audit-compliance/board",
+      "restaurantPaths": [
+        "/restaurant/audit"
+      ],
+      "linkedSystems": [
+        29
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 45,
+      "key": "system_45",
+      "title": "Backup & Recovery System",
+      "category": "Technology",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/backup-recovery/board",
+      "restaurantPaths": [
+        "/restaurant/backup"
+      ],
+      "linkedSystems": [
+        38
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 46,
+      "key": "system_46",
+      "title": "Sandbox & Training Mode",
+      "category": "Training",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/sandbox-training/board",
+      "restaurantPaths": [
+        "/restaurant/sandbox"
+      ],
+      "linkedSystems": [
+        1
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 47,
+      "key": "system_47",
+      "title": "Hidden Enterprise Features",
+      "category": "Enterprise",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/hidden-enterprise/board",
+      "restaurantPaths": [],
+      "linkedSystems": [],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 48,
+      "key": "system_48",
+      "title": "Future AI Expansion Features",
+      "category": "AI",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/future-ai-expansion/board",
+      "restaurantPaths": [
+        "/restaurant/ai-features"
+      ],
+      "linkedSystems": [
+        11
+      ],
+      "requiresSystems": [],
+      "minPlan": "enterprise"
+    },
+    {
+      "number": 49,
+      "key": "system_49",
+      "title": "Waiter Auto Assignment System",
+      "category": "Operations",
+      "surfaces": [
+        "mobile"
+      ],
+      "apiPath": "/waiter-auto-assignment/board",
+      "restaurantPaths": [
+        "/restaurant/waiter",
+        "/restaurant/queue"
+      ],
+      "linkedSystems": [
+        5,
+        22
+      ],
+      "requiresSystems": [
+        5
+      ],
+      "minPlan": "starter"
+    }
+  ]
+}

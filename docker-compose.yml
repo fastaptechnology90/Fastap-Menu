@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: fastapmenu
+      POSTGRES_PASSWORD: fastapmenu
+      POSTGRES_DB: fastapmenu
+    volumes:
+      - fastapmenu_pgdata:/var/lib/postgresql/data
+
+volumes:
+  fastapmenu_pgdata:

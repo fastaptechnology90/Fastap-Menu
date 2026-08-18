@@ -1,0 +1,42 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health.js";
+import authRouter from "./auth.js";
+import superadminRouter from "./superadmin.js";
+import restaurantsRouter from "./restaurants.js";
+import branchesRouter from "./branches.js";
+import tablesRouter from "./tables.js";
+import menusRouter from "./menus.js";
+import qrcodesRouter from "./qrcodes.js";
+import analyticsRouter from "./analytics.js";
+import ordersRouter from "./orders.js";
+import staffRouter from "./staff.js";
+import customersRouter from "./customers.js";
+import loyaltyRouter from "./loyalty.js";
+import campaignsRouter from "./campaigns.js";
+import reservationsRouter from "./reservations.js";
+import feedbackRouter from "./feedback.js";
+import waiterCallsRouter from "./waiter_calls.js";
+import eventsRouter from "./events.js";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(authRouter);
+router.use(superadminRouter);
+router.use(restaurantsRouter);
+router.use(branchesRouter);
+router.use(tablesRouter);
+router.use(menusRouter);
+router.use(qrcodesRouter);
+router.use(analyticsRouter);
+router.use(ordersRouter);
+router.use(staffRouter);
+router.use(customersRouter);
+router.use(loyaltyRouter);
+router.use(campaignsRouter);
+router.use(reservationsRouter);
+router.use(feedbackRouter);
+router.use(waiterCallsRouter);
+router.use(eventsRouter);
+
+export default router;

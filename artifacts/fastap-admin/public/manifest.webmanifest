@@ -1,0 +1,71 @@
+{
+  "name": "FastMenu Guest",
+  "short_name": "FastMenu",
+  "description": "Smart hospitality guest web — scan, order, track & pay",
+  "start_url": "/user/menu?slug=spice-garden&table=T-12&entry=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["food", "hospitality", "lifestyle"],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Order Menu",
+      "short_name": "Menu",
+      "url": "/user/menu?slug=spice-garden&table=T-12",
+      "description": "Browse & order from table T-12",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "My Cart",
+      "short_name": "Cart",
+      "url": "/user/cart",
+      "description": "View cart and checkout",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Wallet",
+      "short_name": "Wallet",
+      "url": "/user/wallet",
+      "description": "Wallet balance & recharge",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Room Service",
+      "short_name": "Room",
+      "url": "/user/hotel?slug=spice-garden&room=501",
+      "description": "Hotel room service",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Live Support",
+      "short_name": "Support",
+      "url": "/user/support?slug=spice-garden",
+      "description": "Chat & get help",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Offline Mode",
+      "short_name": "Offline",
+      "url": "/user/offline?slug=spice-garden",
+      "description": "Cached menu & sync",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}
