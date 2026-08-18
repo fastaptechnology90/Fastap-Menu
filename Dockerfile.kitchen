@@ -1,0 +1,16 @@
+# Kitchen app (Flutter web) for Railway. Built from the repo root so it works uniformly
+# with the waiter/housekeeping apps (which need ../kitchenapp). Points at the deployed API.
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+WORKDIR /src
+COPY kitchenapp/ ./kitchenapp/
+WORKDIR /src/kitchenapp
+RUN flutter pub get
+RUN flutter build web --release --no-tree-shake-icons \
+    --dart-define=API_MODE=external \
+    --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app
+
+# Serve the static build on Railway's $PORT.
+FROM node:22-alpine
+RUN npm install -g serve@14
+COPY --from=build /src/kitchenapp/build/web /app/web
+CMD ["sh","-c","serve -s /app/web -l tcp://0.0.0.0:${PORT:-8080}"]

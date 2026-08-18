@@ -1,0 +1,17 @@
+# Housekeeping app (Flutter web) for Railway. It depends on ../kitchenapp (path dependency),
+# so both folders are copied into the build context. Points at the deployed API.
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+WORKDIR /src
+COPY kitchenapp/ ./kitchenapp/
+COPY housekeepingapp/ ./housekeepingapp/
+WORKDIR /src/housekeepingapp
+RUN flutter pub get
+RUN flutter build web --release --no-tree-shake-icons \
+    --dart-define=API_MODE=external \
+    --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app
+
+# Serve the static build on Railway's $PORT.
+FROM node:22-alpine
+RUN npm install -g serve@14
+COPY --from=build /src/housekeepingapp/build/web /app/web
+CMD ["sh","-c","serve -s /app/web -l tcp://0.0.0.0:${PORT:-8080}"]
