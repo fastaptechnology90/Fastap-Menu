@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Fastap Smart Hospitality OS — Super Admin Panel",
   "private": true,
+  "packageManager": "pnpm@11.18.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
