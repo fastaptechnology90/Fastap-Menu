@@ -138,7 +138,12 @@ async function trackGuestDevice(req: Request, guestId: number) {
 
 // ─── Venue context & smart entry ───────────────────────────────────
 router.get("/public/venues", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(restaurantsTable);
+  // Guests must never see a list of every restaurant on the platform — that would leak
+  // each onboarded venue's name to anyone (a privacy breach the client flagged). A guest
+  // always reaches THEIR venue directly by QR slug (/public/scan/:slug, /public/venue/:slug).
+  // This endpoint therefore returns only the single public demo venue.
+  const demoSlug = process.env.DEMO_VENUE_SLUG ?? "spice-garden";
+  const rows = await db.select().from(restaurantsTable).where(eq(restaurantsTable.slug, demoSlug));
   const venues = rows
     .filter(canAccessGuestVenue)
     .map(r => ({
@@ -147,8 +152,7 @@ router.get("/public/venues", async (_req, res): Promise<void> => {
       slug: r.slug,
       businessType: r.businessType,
       publicationStatus: getPublicationStatus(r),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    }));
   res.json({ venues });
 });
 
