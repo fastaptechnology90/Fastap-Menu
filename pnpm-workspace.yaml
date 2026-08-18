@@ -138,9 +138,14 @@ overrides:
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
 
+# Packages allowed to run install/build scripts. The Linux Postgres binary is set to
+# false: on Linux hosts (e.g. Railway) we use a managed database, not the embedded one,
+# so its build is skipped without failing the install. Windows keeps it for local dev.
 allowBuilds:
   '@embedded-postgres/windows-x64': true
+  '@embedded-postgres/linux-x64': false
   '@swc/core': true
+  bcrypt: true
   cpu-features: true
   esbuild: true
   msw: true
