@@ -1,4 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
@@ -72,6 +74,23 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Serve the built website (fastap-admin) from this same service, so the API and the UI
+// share one origin. That keeps the session cookie first-party (it is `sameSite: "lax"`),
+// which is what a platform like Railway needs when there is no separate nginx in front.
+// When the build is absent — local dev, where Vite serves the UI on its own port — this
+// block is skipped and nothing changes.
+const STATIC_DIR = process.env.STATIC_DIR ?? path.resolve(process.cwd(), "artifacts/fastap-admin/dist/public");
+if (fs.existsSync(path.join(STATIC_DIR, "index.html"))) {
+  app.use(express.static(STATIC_DIR));
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === "GET" && !req.path.startsWith("/api")) {
+      res.sendFile(path.join(STATIC_DIR, "index.html"));
+      return;
+    }
+    next();
+  });
+}
 
 /**
  * Last-resort error handler.
