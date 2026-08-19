@@ -138,7 +138,7 @@ export async function getCommissionRate(): Promise<number> {
   return val?.defaultCommission ?? DEFAULT_SETTINGS.defaultCommission;
 }
 
-async function computeVendorSettlement(restaurantId: number, commissionRate: number) {
+export async function computeVendorSettlement(restaurantId: number, commissionRate: number) {
   const vendorOrders = await db.select().from(ordersTable)
     .where(eq(ordersTable.restaurantId, restaurantId));
 

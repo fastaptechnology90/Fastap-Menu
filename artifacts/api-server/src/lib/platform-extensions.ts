@@ -2,10 +2,10 @@ import { eq, desc, count, and, sql, sum } from "drizzle-orm";
 import {
   db, restaurantsTable, ordersTable, reservationsTable,
   platformSettingsTable, platformRefundsTable, platformSettlementsTable,
-  platformPenaltiesTable, platformExportsTable, platformChargebacksTable,
+  platformExportsTable, platformChargebacksTable,
   platformAuditLogsTable, supportTicketsTable,
 } from "@workspace/db";
-import { getEnhancedStats, getExtendedAnalytics, getCommissionRate } from "./platform-admin.js";
+import { getEnhancedStats, getExtendedAnalytics, getCommissionRate, computeVendorSettlement } from "./platform-admin.js";
 import {
   isPaidOrder,
   isRefundedOrder,
@@ -70,21 +70,24 @@ export async function updatePlatformReservation(id: string, status: string) {
 
 export async function listVendorWallets() {
   const restaurants = await db.select().from(restaurantsTable);
+  const commissionRate = await getCommissionRate();
   return Promise.all(restaurants.map(async (r) => {
     const settings = (r.settings ?? {}) as { wallet?: { balance?: number; locked?: number; reserve?: number; frozen?: boolean } };
     const w = settings.wallet ?? {};
-    const [orderSum] = await db.select({ total: sum(ordersTable.total) }).from(ordersTable)
-      .where(and(eq(ordersTable.restaurantId, r.id), eq(ordersTable.paymentStatus, "paid")));
-    const penalties = await db.select().from(platformPenaltiesTable).where(eq(platformPenaltiesTable.restaurantId, r.id));
-    const penaltyTotal = penalties.reduce((s, p) => s + parseFloat(String(p.amount)), 0);
-    const gross = parseFloat(String(orderSum?.total ?? 0));
+    // Order-driven balance from the SAME settlement math the Escrow / Settlements pages
+    // use, so all three agree. finalPayout = paid-order gross − commission − refunds −
+    // penalties, and it grows as paid orders come in. The old code filtered strictly on
+    // paymentStatus = "paid" (missed most orders → 0) and then applied an arbitrary
+    // ×0.15 estimate — both wrong. Now there is one source of truth.
+    const { finalPayout, penalties } = await computeVendorSettlement(r.id, commissionRate);
+    const balance = w.balance ?? finalPayout;
     return {
       vendorId: r.id, vendorName: r.name, plan: r.plan,
-      walletBalance: w.balance ?? Math.round(gross * 0.15),
+      walletBalance: balance,
       lockedBalance: w.locked ?? 0,
       reserveBalance: w.reserve ?? 0,
-      penaltyDeductions: penaltyTotal,
-      negativeBalance: (w.balance ?? 0) < 0,
+      penaltyDeductions: penalties,
+      negativeBalance: balance < 0,
       payoutsFrozen: w.frozen ?? false,
       lastPayout: null,
     };

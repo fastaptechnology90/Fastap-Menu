@@ -14,7 +14,7 @@ import crypto from "crypto";
 import { requireSuperAdmin } from "../middlewares/superadmin-auth";
 import {
   ensurePlatformDefaults, getEnhancedStats, getRevenueTimeSeries, getExtendedAnalytics, getTaxReports,
-  listPayments, listSettlements, listKycRecords, updateKycStatus, detectFraudAlerts, listQrCodes,
+  listPayments, listSettlements, syncPendingSettlements, listKycRecords, updateKycStatus, detectFraudAlerts, listQrCodes,
   logPlatformAudit, getPlatformSettings, getPlatformSettingsRaw, setPlatformSettings, getCommissionRate, hashApiKey,
   getInfrastructureOverview, getSlaMonitoring, countExportRecords, generateExportCsv,
   getPaymentDetail, getLiveFeed, getWebhooks, saveWebhooks, getApiUsageAnalytics, masterSearch,
@@ -994,6 +994,9 @@ router.post("/superadmin/invoices/:id/email", ...admin, async (req, res) => {
 });
 
 router.get("/superadmin/escrow", ...admin, async (_req, res) => {
+  // Refresh settlements from current orders first so Escrow always matches the
+  // Settlements and Vendor Wallets pages (all order-driven, single source of truth).
+  await syncPendingSettlements();
   const settlements = await db.select().from(platformSettlementsTable).orderBy(desc(platformSettlementsTable.createdAt)).limit(30);
   const restaurants = await db.select().from(restaurantsTable);
   const nameMap = Object.fromEntries(restaurants.map(r => [r.id, r.name]));
