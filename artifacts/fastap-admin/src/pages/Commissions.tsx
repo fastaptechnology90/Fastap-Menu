@@ -15,12 +15,22 @@ import { toast } from "sonner";
 
 const defaultForm = { name: "", type: "Fixed %", value: "", unit: "%", applyTo: "All Restaurants" };
 
+function fmtMoney(n: number) {
+  if (n >= 1_000_000) return `₹${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `₹${(n / 1_000).toFixed(1)}K`;
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
 export default function Commissions() {
   const qc = useQueryClient();
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(defaultForm);
 
   const { data: rules = [], isLoading } = useQuery({ queryKey: ["commissions"], queryFn: api.commissions.list });
+  // Real commission earned = order-driven amount from the platform stats (grows as paid
+  // orders come in). The rules below only show the % rate — this KPI shows the ₹ amount.
+  const { data: summary } = useQuery({ queryKey: ["superadmin-analytics-summary"], queryFn: api.analytics.summary });
+  const commissionEarned = Number(summary?.platformCommission ?? 0);
 
   const createMutation = useMutation({
     mutationFn: (data: typeof form) => api.commissions.create(data),
@@ -45,9 +55,10 @@ export default function Commissions() {
         <div><h2 className="text-2xl font-bold tracking-tight">Commission Management</h2><p className="text-muted-foreground">Configure take-rates and transaction fees.</p></div>
         <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> New Rule</Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <KpiCard title="Commission Collected" value={fmtMoney(commissionEarned)} icon={<Percent className="h-4 w-4 text-green-500" />} />
         <KpiCard title="Active Rules" value={rules.filter(r => r.status === "Active").length} icon={<Percent className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Average Rate" value={`${avgRate}%`} icon={<Percent className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Average Rate" value={`${avgRate}%`} icon={<Percent className="h-4 w-4 text-blue-500" />} />
         <KpiCard title="Total Rules" value={rules.length} icon={<Percent className="h-4 w-4 text-muted-foreground" />} />
       </div>
       <Card>

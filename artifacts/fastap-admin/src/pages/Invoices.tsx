@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/shared/KpiCard";
-import { Download, Mail, RefreshCw, Loader2, Receipt } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Download, Mail, RefreshCw, Loader2, Receipt, Eye } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { toast } from "sonner";
 
@@ -12,6 +14,7 @@ const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 export default function Invoices() {
   const { data: invoices = [], isLoading, refetch, isFetching } = useQuery({ queryKey: ["invoices"], queryFn: api.invoices.list });
+  const [viewing, setViewing] = useState<any | null>(null);
 
   const unpaid = invoices.filter((i: any) => i.status === "Unpaid" || i.status === "Overdue");
   const totalUnpaid = unpaid.reduce((s: number, i: any) => s + i.amount, 0);
@@ -50,6 +53,7 @@ export default function Invoices() {
               { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
               { header: "Actions", cell: (row: any) => (
                 <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="View" onClick={() => setViewing(row)}><Eye className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" title="Download" onClick={() => api.invoices.download(row.id).catch(() => toast.error("Download failed"))}><Download className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" title="Email to Vendor" onClick={() => api.invoices.email(row.id).then(() => toast.success(`Invoice ${row.id} emailed`)).catch(() => toast.error("Email failed"))}><Mail className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -58,6 +62,28 @@ export default function Invoices() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!viewing} onOpenChange={(o) => { if (!o) setViewing(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Invoice {viewing?.id}</DialogTitle></DialogHeader>
+          {viewing && (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Vendor</span><span className="font-medium">{viewing.vendorName}</span></div>
+              <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Type</span><span>{viewing.type}</span></div>
+              <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Amount</span><span className="font-bold text-primary">{fmt(viewing.amount)}</span></div>
+              <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Date Issued</span><span>{viewing.date}</span></div>
+              <div className="flex justify-between border-b pb-2"><span className="text-muted-foreground">Due Date</span><span>{viewing.dueDate}</span></div>
+              <div className="flex justify-between items-center"><span className="text-muted-foreground">Status</span><StatusBadge status={viewing.status} /></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewing(null)}>Close</Button>
+            <Button onClick={() => viewing && api.invoices.download(viewing.id).catch(() => toast.error("Download failed"))}>
+              <Download className="mr-2 h-4 w-4" /> Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

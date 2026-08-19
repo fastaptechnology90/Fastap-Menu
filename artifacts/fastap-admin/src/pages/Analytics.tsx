@@ -67,13 +67,15 @@ export default function Analytics() {
     const p = v.plan || "free";
     if (!acc[p]) acc[p] = { value: 0, revenue: 0 };
     acc[p].value += 1;
+    // Revenue per plan = the sum of that plan's vendors' real (paid-order) revenue.
+    // It grows as orders come in — no hard-coded plan prices.
+    acc[p].revenue += Number(v.revenue) || 0;
     return acc;
   }, {});
-  const planPrices: Record<string, number> = { free: 0, starter: 2499, pro: 6999, enterprise: 19999 };
   const planData = Object.entries(planMap).map(([name, data]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value: data.value,
-    revenue: data.value * (planPrices[name] ?? 0),
+    revenue: data.revenue,
   }));
 
   const forecastData = extended?.forecastData ?? [];
@@ -92,7 +94,7 @@ export default function Analytics() {
       lastLogin: "—",
       lastOrder: v.totalOrders ? `${v.totalOrders} orders` : "none",
       plan: v.plan || "free",
-      mrr: planPrices[v.plan] ?? 0,
+      mrr: Number(v.revenue) || 0,
     }));
 
   const dormantCount = vendors.filter((v: any) => !v.isActive || (v.totalOrders ?? 0) === 0).length;

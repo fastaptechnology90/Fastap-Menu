@@ -23,6 +23,7 @@ import {
 } from "../lib/platform-admin";
 import { PLATFORM_CURRENCY } from "../lib/currency.js";
 import { invalidateRestaurantAnalyticsCache } from "../lib/analytics-cache.js";
+import { sumOrderTotals } from "../lib/payment-calculations.js";
 import {
   listApprovals, createApproval, updateApproval, listPlatformReservations, updatePlatformReservation,
   listVendorWallets, getBillingRules, saveBillingRules, getAIInsights, getAlertRules, saveAlertRules,
@@ -106,14 +107,18 @@ router.get("/superadmin/vendors", ...admin, async (req, res): Promise<void> => {
   const includeDeleted = req.query.includeDeleted === "true";
     const restaurants = await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt));
   const filtered = includeDeleted ? restaurants : restaurants.filter(r => !readPlatformControls(r.settings).deletedAt);
+  // Real, order-driven revenue per vendor: the sum of their paid orders (same rule the
+  // dashboard total uses). It grows as orders come in — no hard-coded plan amounts.
+  const allOrders = await db.select().from(ordersTable);
   const result = await Promise.all(filtered.map(async (r) => {
       const [owner] = await db.select({ name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
-      const [orderCnt] = await db.select({ count: count() }).from(ordersTable).where(eq(ordersTable.restaurantId, r.id));
+      const vendorOrders = allOrders.filter(o => o.restaurantId === r.id);
     const settings = (r.settings ?? {}) as { kyc?: { status?: string }; wallet?: { frozen?: boolean } };
     const controls = readPlatformControls(r.settings);
     return {
       ...r, ownerName: owner?.name ?? "", ownerEmail: owner?.email ?? "",
-      totalOrders: orderCnt?.count ?? 0,
+      totalOrders: vendorOrders.length,
+      revenue: sumOrderTotals(vendorOrders),
       kycStatus: settings.kyc?.status ?? "pending",
       payoutsFrozen: settings.wallet?.frozen ?? false,
       platformControls: controls,
