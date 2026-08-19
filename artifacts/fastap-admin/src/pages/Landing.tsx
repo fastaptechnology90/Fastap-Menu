@@ -11,8 +11,12 @@ import {
 import { useState } from "react";
 import { GuestLogo } from "@/components/user/GuestUI";
 import { PhoneMockup } from "@/components/user/PhoneMockup";
+import { DEMO_MENU_URL } from "@/lib/guestDemo";
 
-const GUEST_ENTRY_PATH = "/user/auth";
+// "Try Demo Menu" / smart-entry chips open the demo menu directly (no login). The demo
+// venue loads by slug, so guests never see hotel name / OTP / email+password first — a
+// real sign-in stays available via the separate "Guest Sign In" button (goGuestAuth).
+const GUEST_ENTRY_PATH = DEMO_MENU_URL;
 const smartEntryDemos = [
   { label: "QR Table", path: GUEST_ENTRY_PATH },
   { label: "NFC Tap", path: GUEST_ENTRY_PATH },
@@ -110,7 +114,7 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function goAdmin() { navigate(isAuthenticated ? "/" : "/login"); }
-  function goUserMenu() { navigate("/user/auth"); }
+  function goUserMenu() { navigate(DEMO_MENU_URL); }
   function goGuestAuth() { navigate("/user/auth"); }
   function goRestaurant() { navigate("/restaurant/login"); }
   function goRestaurantRegister() { navigate("/restaurant/register"); }
