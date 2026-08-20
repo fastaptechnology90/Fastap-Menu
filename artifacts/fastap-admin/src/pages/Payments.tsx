@@ -65,7 +65,9 @@ export default function Payments() {
   const total = payments.length || 1;
   const successRate = ((successCount / total) * 100).toFixed(1);
   const failedRate = ((failedCount / total) * 100).toFixed(1);
-  const totalGross = payments.reduce((s, t) => s + t.grossAmount, 0);
+  // Only paid transactions count toward volume/revenue — matches the dashboard,
+  // analytics and settlements figures (failed/pending attempts don't inflate it).
+  const totalGross = payments.reduce((s, t) => s + ((t as any).isPaid ? t.grossAmount : 0), 0);
 
   const exportCsv = () => {
     const header = "id,orderId,vendor,gross,commission,net,mode,status,date\n";
@@ -95,7 +97,7 @@ export default function Payments() {
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Success Rate" value={`${successRate}%`} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
         <KpiCard title="Failed Rate" value={`${failedRate}%`} icon={<XCircle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Total Volume" value={fmtINR(totalGross)} />
+        <KpiCard title="Paid Volume" value={fmtINR(totalGross)} />
         <KpiCard title="Total Txns" value={payments.length.toLocaleString()} />
       </div>
 

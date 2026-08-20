@@ -565,8 +565,9 @@ export async function listPayments(limit = 100, status?: string) {
     .filter(r => !status || r.order.paymentStatus === status || r.order.status === status)
     .map(({ order, restaurantName }) => {
       const gross = orderGrossTotal(order);
+      const paid = isPaidOrder(order);
       const commission = calcCommissionAmount(order, commissionRate);
-      const net = isPaidOrder(order) ? calcNetPayout(gross, commission) : 0;
+      const net = paid ? calcNetPayout(gross, commission) : 0;
       return {
         id: `TXN-${order.id}`,
         orderId: `ORD-${order.id}`,
@@ -574,6 +575,10 @@ export async function listPayments(limit = 100, status?: string) {
         vendorId: String(order.restaurantId),
         vendorName: restaurantName,
         grossAmount: gross,
+        // Whether this transaction counts toward platform revenue (same paid-order rule
+        // the dashboard/settlements use). Lets the UI total only paid volume so every
+        // page shows the same figure — failed/pending attempts don't inflate revenue.
+        isPaid: paid,
         commission,
         netPayout: net,
         paymentMode: order.paymentMethod || "cash",

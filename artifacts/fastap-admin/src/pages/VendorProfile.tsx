@@ -249,7 +249,8 @@ export default function VendorProfile() {
   const planPriceMap = Object.fromEntries((plans as any[]).map(p => [p.id, p.price]));
   const mrr = planPriceMap[vendor.plan] ?? 0;
   const healthScore = vendor.isActive ? Math.min(95, 50 + (vendor.totalOrders > 50 ? 25 : vendor.totalOrders > 10 ? 15 : 5) + (vendor.plan === "enterprise" ? 20 : vendor.plan === "pro" ? 10 : 0)) : 20;
-  const totalRevenue = vendorTx.reduce((s, t) => s + t.grossAmount, 0);
+  // Paid transactions only, so this matches the vendor-list revenue and the dashboard.
+  const totalRevenue = vendorTx.reduce((s, t) => s + ((t as any).isPaid ? t.grossAmount : 0), 0);
   const totalCommission = vendorTx.reduce((s, t) => s + t.commission, 0);
   const openTickets = vendorTickets.filter(t => t.status === "Open" || t.status === "In Progress" || t.status === "open" || t.status === "in_progress").length;
   const lastSettlement = vendorSettlements[0];
@@ -688,9 +689,9 @@ export default function VendorProfile() {
         {/* ANALYTICS TAB */}
         <TabsContent value="analytics" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(vendorTx.reduce((s: number, t: any) => s + (t.grossAmount || 0), 0))}</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(totalRevenue)}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Orders</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{vendor.totalOrders?.toLocaleString() ?? 0}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Avg Order Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(vendor.totalOrders > 0 ? Math.round(vendorTx.reduce((s: number, t: any) => s + (t.grossAmount || 0), 0) / Math.max(vendor.totalOrders, 1)) : 0)}</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Avg Order Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(vendor.totalOrders > 0 ? Math.round(totalRevenue / Math.max(vendor.totalOrders, 1)) : 0)}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Health Score</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${healthScore >= 80 ? "text-green-500" : healthScore >= 60 ? "text-yellow-500" : "text-red-500"}`}>{healthScore}/100</div></CardContent></Card>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
