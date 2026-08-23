@@ -669,7 +669,10 @@ export async function listSettlements() {
 }
 
 export async function listKycRecords() {
-  const restaurants = await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt));
+  const restaurants = (await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt)))
+    // Hide soft-deleted vendors (same rule the Vendors list uses) so a deleted
+    // restaurant doesn't leave a ghost entry in the KYC queue.
+    .filter(r => !readPlatformControls(r.settings).deletedAt);
   const docs = await db.select().from(documentsTable);
 
   return restaurants.map(r => {
