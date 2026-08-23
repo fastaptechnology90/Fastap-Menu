@@ -19,10 +19,15 @@ const DEFAULT_CONFIG = {
 };
 
 const NFC_TAGS = [
-  { id: "nfc-starter", item: "Chicken Tikka", price: 45, menuItemId: 101 },
-  { id: "nfc-main", item: "Butter Chicken", price: 65, menuItemId: 103 },
-  { id: "nfc-pay", item: "Quick Pay", price: 0, menuItemId: 0 },
+  { id: "nfc-starter", label: "Starter Tap", item: "Chicken Tikka", price: 45, menuItemId: 101 },
+  { id: "nfc-main", label: "Main Tap", item: "Butter Chicken", price: 65, menuItemId: 103 },
+  { id: "nfc-pay", label: "Quick Pay", item: "Quick Pay", price: 0, menuItemId: 0 },
 ];
+
+// Exposed to the kiosk config so the guest NFC tab can show the quick-tap shortcuts.
+export function getNfcTags() {
+  return NFC_TAGS.map(t => ({ id: t.id, label: t.label, item: t.item, price: t.price, menuItemId: t.menuItemId }));
+}
 
 let tokenCounter = 40;
 

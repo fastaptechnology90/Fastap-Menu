@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChefHat, Plus, X, TrendingUp, Package, Percent, Edit2, Search } from "lucide-react";
+import { ChefHat, Plus, X, TrendingUp, Package, Percent, Edit2, Search, Trash2 } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { foodCosting as foodCostingApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
+type Ingredient = { name: string; qty: number; unit: string; costPer: string; cost: number; costPerUnit: number };
 type Recipe = {
   id: string;
   name: string;
@@ -11,16 +13,19 @@ type Recipe = {
   sellingPrice: number;
   totalCost: number;
   margin: number;
-  ingredients: { name: string; qty: number; unit: string; costPer: string; cost: number }[];
+  ingredients: Ingredient[];
 };
 
+type EditIngredient = { name: string; quantity: string; unit: string; costPerUnit: string };
+
 function mapRecipe(r: any): Recipe {
-  const ingredients = (Array.isArray(r.ingredients) ? r.ingredients : []).map((ing: any) => ({
+  const ingredients: Ingredient[] = (Array.isArray(r.ingredients) ? r.ingredients : []).map((ing: any) => ({
     name: ing.ingredientName || ing.name,
     qty: parseFloat(String(ing.quantity ?? ing.qty)) || 0,
     unit: ing.unit || "",
     costPer: `₹${ing.costPerUnit ?? 0}/${ing.unit || "unit"}`,
     cost: parseFloat(String(ing.totalCost ?? ing.cost)) || 0,
+    costPerUnit: parseFloat(String(ing.costPerUnit ?? 0)) || 0,
   }));
   return {
     id: String(r.id),
@@ -36,6 +41,7 @@ function mapRecipe(r: any): Recipe {
 
 export default function FoodCosting() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Recipe | null>(null);
@@ -43,6 +49,12 @@ export default function FoodCosting() {
   const [showAdd, setShowAdd] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
   const [newRecipe, setNewRecipe] = useState({ name: "", category: "Main Course", sellingPrice: "" });
+
+  // Ingredient editing modal state
+  const [editRecipe, setEditRecipe] = useState<Recipe | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", category: "", servings: "1", sellingPrice: "" });
+  const [editIngredients, setEditIngredients] = useState<EditIngredient[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadRecipes = useCallback(async () => {
     if (!restaurantId) return;
@@ -52,9 +64,69 @@ export default function FoodCosting() {
       const mapped = (Array.isArray(data) ? data : []).map(mapRecipe);
       setRecipes(mapped);
       setSelected(prev => prev ? mapped.find(r => r.id === prev.id) ?? mapped[0] ?? null : mapped[0] ?? null);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to load recipes", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     finally { setLoading(false); }
-  }, [restaurantId]);
+  }, [restaurantId, toast]);
+
+  function openEdit(recipe: Recipe) {
+    setEditRecipe(recipe);
+    setEditForm({
+      name: recipe.name,
+      category: recipe.category === "Uncategorized" ? "" : recipe.category,
+      servings: String(recipe.servings || 1),
+      sellingPrice: String(recipe.sellingPrice || ""),
+    });
+    setEditIngredients(recipe.ingredients.map(i => ({
+      name: i.name || "",
+      quantity: String(i.qty || ""),
+      unit: i.unit || "",
+      costPerUnit: String(i.costPerUnit || ""),
+    })));
+  }
+
+  function updateIngredient(idx: number, field: keyof EditIngredient, value: string) {
+    setEditIngredients(prev => prev.map((ing, i) => i === idx ? { ...ing, [field]: value } : ing));
+  }
+  function addIngredientRow() {
+    setEditIngredients(prev => [...prev, { name: "", quantity: "", unit: "", costPerUnit: "" }]);
+  }
+  function removeIngredientRow(idx: number) {
+    setEditIngredients(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  const editTotalCost = editIngredients.reduce((s, ing) => s + (parseFloat(ing.quantity) || 0) * (parseFloat(ing.costPerUnit) || 0), 0);
+
+  async function handleSaveEdit() {
+    if (!restaurantId || !editRecipe) return;
+    setSavingEdit(true);
+    try {
+      await foodCostingApi.update(restaurantId, Number(editRecipe.id), {
+        name: editForm.name || editRecipe.name,
+        category: editForm.category || "Uncategorized",
+        servings: parseInt(editForm.servings) || 1,
+        sellingPrice: parseFloat(editForm.sellingPrice) || 0,
+        ingredients: editIngredients
+          .filter(ing => ing.name.trim())
+          .map(ing => ({
+            name: ing.name.trim(),
+            quantity: parseFloat(ing.quantity) || 0,
+            unit: ing.unit.trim(),
+            costPerUnit: parseFloat(ing.costPerUnit) || 0,
+          })),
+      });
+      setEditRecipe(null);
+      await loadRecipes();
+      toast({ title: "Recipe updated", description: "Ingredients and costing were saved." });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to save recipe", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   useEffect(() => { loadRecipes(); }, [loadRecipes]);
 
@@ -79,7 +151,11 @@ export default function FoodCosting() {
       setNewRecipe({ name: "", category: "Main Course", sellingPrice: "" });
       setShowAdd(false);
       await loadRecipes();
-    } catch (e) { console.error(e); }
+      toast({ title: "Recipe created", description: "Open the recipe and use Edit to add ingredients." });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to create recipe", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   if (loading && recipes.length === 0) {
@@ -157,7 +233,7 @@ export default function FoodCosting() {
                   <h2 className="text-base font-bold">{selected.name}</h2>
                   <p className="text-xs text-white/40 mt-0.5">{selected.category} · {selected.servings} serving(s)</p>
                 </div>
-                <button className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/15"><Edit2 className="h-3.5 w-3.5 text-white/60" /></button>
+                <button onClick={() => openEdit(selected)} title="Edit recipe & ingredients" className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/15"><Edit2 className="h-3.5 w-3.5 text-white/60" /></button>
               </div>
 
               {/* Cost Summary */}
@@ -230,6 +306,65 @@ export default function FoodCosting() {
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold">Cancel</button>
                 <button onClick={handleCreateRecipe} disabled={!newRecipe.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40">Create Recipe</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Recipe & Ingredients Modal */}
+      {editRecipe && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold">Edit Recipe & Ingredients</h2>
+              <button onClick={() => setEditRecipe(null)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Dish Name</label>
+                  <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="Dish name" /></div>
+                <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Category</label>
+                  <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="Main Course..." /></div>
+                <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Servings</label>
+                  <input type="number" min={1} value={editForm.servings} onChange={e => setEditForm(p => ({ ...p, servings: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="1" /></div>
+                <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Selling Price (₹)</label>
+                  <input type="number" min={0} value={editForm.sellingPrice} onChange={e => setEditForm(p => ({ ...p, sellingPrice: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="320" /></div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide">Ingredients</label>
+                  <button onClick={addIngredientRow} className="flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300"><Plus className="h-3.5 w-3.5" /> Add ingredient</button>
+                </div>
+                {editIngredients.length === 0 && (
+                  <p className="text-xs text-white/40 py-3 text-center">No ingredients yet. Click "Add ingredient" to start building the recipe cost.</p>
+                )}
+                <div className="space-y-2">
+                  {editIngredients.map((ing, idx) => {
+                    const rowCost = (parseFloat(ing.quantity) || 0) * (parseFloat(ing.costPerUnit) || 0);
+                    return (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <input value={ing.name} onChange={e => updateIngredient(idx, "name", e.target.value)} placeholder="Ingredient" className="col-span-4 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
+                        <input type="number" min={0} value={ing.quantity} onChange={e => updateIngredient(idx, "quantity", e.target.value)} placeholder="Qty" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
+                        <input value={ing.unit} onChange={e => updateIngredient(idx, "unit", e.target.value)} placeholder="Unit" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
+                        <input type="number" min={0} value={ing.costPerUnit} onChange={e => updateIngredient(idx, "costPerUnit", e.target.value)} placeholder="₹/unit" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
+                        <div className="col-span-1 text-right text-xs font-bold text-orange-400">₹{rowCost.toFixed(0)}</div>
+                        <button onClick={() => removeIngredientRow(idx)} className="col-span-1 flex items-center justify-center text-red-400/70 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                <span className="text-xs text-white/50">Total Cost per Plate (auto-calculated)</span>
+                <span className="text-sm font-extrabold text-orange-400">₹{editTotalCost.toFixed(2)}</span>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setEditRecipe(null)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={savingEdit || !editForm.name.trim()} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40">{savingEdit ? "Saving…" : "Save Recipe"}</button>
               </div>
             </div>
           </div>

@@ -166,7 +166,10 @@ export default function ExportCenter() {
         <TabsContent value="governance" className="mt-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> Export Governance Controls</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> Export Governance Controls</CardTitle>
+                <CardDescription>Display-only defaults — no configuration API to change these.</CardDescription>
+              </CardHeader>
               <CardContent className="space-y-4">
                 {[
                   { label: "Require Approval for Bulk Exports", desc: "Exports >10,000 records need manager approval" },
@@ -180,7 +183,8 @@ export default function ExportCenter() {
                       <p className="text-sm font-medium">{ctrl.label}</p>
                       <p className="text-xs text-muted-foreground">{ctrl.desc}</p>
                     </div>
-                    <Badge variant="default" className="text-xs ml-2 shrink-0">Active</Badge>
+                    {/* No governance-settings endpoint — these are fixed defaults, marked static rather than shown as configurable. */}
+                    <Badge variant="secondary" className="text-xs ml-2 shrink-0">Static</Badge>
                   </div>
                 ))}
               </CardContent>

@@ -58,7 +58,9 @@ export default function PurchaseProcurement() {
       const total = poForm.qty * poForm.unitPrice;
       const created = await procurementApi.createPO(restaurantId, {
         supplierName: poForm.supplierName,
-        items: [{ name: poForm.itemName, qty: poForm.qty, unit: "kg", price: poForm.unitPrice, total }],
+        // Backend computes the PO total from item.quantity * item.unitPrice, so send
+        // those field names (keep qty/price too for the optimistic row rendering below).
+        items: [{ name: poForm.itemName, quantity: poForm.qty, qty: poForm.qty, unit: "kg", unitPrice: poForm.unitPrice, price: poForm.unitPrice, total }],
         total,
         status: "pending",
       });
@@ -154,6 +156,18 @@ export default function PurchaseProcurement() {
       }
     } catch {}
     setOrders(o=>o.map(x=>x.id===id?{...x,status}:x));
+  }
+
+  // Mark an invoice paid. Invoices derive from delivered POs (status = paymentStatus),
+  // so update the underlying PO's paymentStatus (optimistic + best-effort persist).
+  async function payInvoice(inv: { po: string }) {
+    if (!restaurantId) return;
+    setOrders(o => o.map(x => x.id === inv.po ? { ...x, paymentStatus: "paid" } : x));
+    try {
+      const raw = await procurementApi.purchaseOrders(restaurantId);
+      const match = (raw as any[]).find((r:any) => (r.poNumber || String(r.id)) === inv.po);
+      if (match?.id) await procurementApi.updatePO(restaurantId, match.id, { paymentStatus: "paid" });
+    } catch {}
   }
 
   return (
@@ -279,8 +293,8 @@ export default function PurchaseProcurement() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    <button className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">New PO</button>
-                    <button className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10">History</button>
+                    <button onClick={()=>{ setPoForm(f=>({...f,supplierName:s.name})); setShowAdd(true); }} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">New PO</button>
+                    <button onClick={()=>{ setSearch(s.name); setTab("purchase-orders"); }} className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10">History</button>
                   </div>
                 </div>
               </div>
@@ -316,8 +330,8 @@ export default function PurchaseProcurement() {
                     <td className="py-3 pr-4 text-white/60">{inv.dueDate}</td>
                     <td className="py-3 pr-4"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span></td>
                     <td className="py-3">
-                      {inv.status!=="paid"&&<button className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Pay Now</button>}
-                      {inv.status==="paid"&&<button className="px-3 py-1 rounded-lg border border-white/10 text-xs text-white/40 hover:bg-white/5">Receipt</button>}
+                      {inv.status!=="paid"&&<button onClick={()=>payInvoice(inv)} className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Pay Now</button>}
+                      {inv.status==="paid"&&<button onClick={()=>window.print()} className="px-3 py-1 rounded-lg border border-white/10 text-xs text-white/40 hover:bg-white/5">Receipt</button>}
                     </td>
                   </tr>
                 );
@@ -377,7 +391,7 @@ export default function PurchaseProcurement() {
                 {selectedPO.status==="pending"&&<button onClick={()=>{updatePO(selectedPO.id,"approved");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-sm hover:bg-emerald-500/30">Approve</button>}
                 {selectedPO.status==="approved"&&<button onClick={()=>{updatePO(selectedPO.id,"in-transit");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-violet-500/20 text-violet-400 font-bold text-sm hover:bg-violet-500/30">Mark Dispatched</button>}
                 {selectedPO.status==="in-transit"&&<button onClick={()=>{updatePO(selectedPO.id,"delivered");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-teal-500/20 text-teal-400 font-bold text-sm hover:bg-teal-500/30">Mark Delivered</button>}
-                <button className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">Print PO</button>
+                <button onClick={()=>window.print()} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">Print PO</button>
               </div>
             </div>
           </div>

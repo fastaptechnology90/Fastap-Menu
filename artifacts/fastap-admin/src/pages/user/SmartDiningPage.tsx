@@ -198,7 +198,7 @@ export default function SmartDiningPage() {
             <p className="text-sm font-semibold">Rahul Kumar · Your Waiter</p>
             <p className="text-xs text-emerald-400 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online</p>
           </div>
-          <button className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center"><Phone className="h-4 w-4 text-emerald-400" /></button>
+          <button onClick={() => sendRequest("Called your waiter", "call_waiter")} title="Call waiter" className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center hover:bg-emerald-500/30"><Phone className="h-4 w-4 text-emerald-400" /></button>
         </div>
 
         {/* Table Interaction — all 9 features */}

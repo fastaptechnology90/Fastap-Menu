@@ -352,7 +352,10 @@ router.post("/public/session/init", async (req, res): Promise<void> => {
 
 router.get("/public/session/restore", async (req, res): Promise<void> => {
   const token = (req.query.token as string) || req.session.guestSessionToken;
-  if (!token) { res.status(400).json({ error: "token required" }); return; }
+  // No token just means "this visitor has no saved guest session yet" — a normal case
+  // (this runs on every page load). Return a clean empty result, not a 400, so it
+  // doesn't spam the console with Bad Request errors app-wide.
+  if (!token) { res.json({ session: null, cart: [], restored: false }); return; }
   const [session] = await db.select().from(guestSessionsTable).where(and(eq(guestSessionsTable.token, token), eq(guestSessionsTable.isActive, true)));
   if (!session) { res.status(404).json({ error: "Session not found" }); return; }
   if (session.expiresAt && session.expiresAt < new Date()) {

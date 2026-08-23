@@ -157,7 +157,18 @@ router.post("/superadmin/vendors/:vendorId/toggle", ...admin, async (req, res): 
     const id = parseInt(req.params.vendorId, 10);
     const [existing] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-    const [updated] = await db.update(restaurantsTable).set({ isActive: !existing.isActive }).where(eq(restaurantsTable.id, id)).returning();
+    const nextActive = !existing.isActive;
+    let [updated] = await db.update(restaurantsTable).set({ isActive: nextActive }).where(eq(restaurantsTable.id, id)).returning();
+    // Owner login is gated on KYC being APPROVED (not just isActive). So activating a
+    // vendor here also clears a stuck "pending" KYC, otherwise the owner still can't
+    // sign in even though the panel shows "Active".
+    if (nextActive) {
+      const kyc = (existing.settings as { kyc?: { status?: string } } | null)?.kyc?.status;
+      if (kyc !== "approved") {
+        const re = await updateKycStatus(id, "approved");
+        if (re) updated = re;
+      }
+    }
   invalidateRestaurantAnalyticsCache(id);
   await logPlatformAudit(req, updated.isActive ? "Vendor Activated" : "Vendor Suspended", "Vendors", String(id));
     res.json(updated);
@@ -317,12 +328,43 @@ router.get("/superadmin/vendors/:vendorId/documents", ...admin, async (req, res)
   const rows = await db.select().from(documentsTable).where(eq(documentsTable.restaurantId, id)).orderBy(desc(documentsTable.createdAt));
   res.json(rows.map(d => ({
     type: d.name || d.category || "Document",
+    docType: d.description || "",           // the real kind: gst_certificate / fssai_license / bank_proof …
     number: d.description || `DOC-${d.id}`,
-    status: d.status === "active" ? "Verified" : d.status === "expired" ? "Expired" : "Pending",
+    status: d.status === "active" ? "Verified" : d.status === "expired" ? "Expired" : d.status === "rejected" ? "Rejected" : "Pending",
     uploaded: d.createdAt ? new Date(d.createdAt).toISOString().split("T")[0] : "—",
     expires: d.expiryDate ? new Date(d.expiryDate).toISOString().split("T")[0] : null,
+    fileUrl: d.fileUrl || null,             // so the admin can preview the document, not just download it
+    fileType: d.fileType || null,
     id: d.id,
   })));
+});
+
+// Approve or reject a SINGLE KYC document (per-document review).
+router.post("/superadmin/documents/:docId/verify", ...admin, async (req, res): Promise<void> => {
+  const docId = parseInt(req.params.docId, 10);
+  const action = String(req.body?.status ?? "").toLowerCase();
+  const dbStatus = action === "verified" || action === "approve" || action === "approved" ? "active"
+    : action === "rejected" || action === "reject" ? "rejected" : null;
+  if (!dbStatus) { res.status(400).json({ error: "status must be 'verified' or 'rejected'" }); return; }
+  const [doc] = await db.update(documentsTable)
+    .set({ status: dbStatus })
+    .where(eq(documentsTable.id, docId)).returning();
+  if (!doc) { res.status(404).json({ error: "Document not found" }); return; }
+
+  // Roll the per-document decisions up into the restaurant's overall KYC status so the
+  // KYC page stops showing "Pending" once everything is approved — and the owner can
+  // then sign in. Any rejected doc flags the whole application as "action required".
+  let overallKyc: string | null = null;
+  const allDocs = await db.select().from(documentsTable).where(eq(documentsTable.restaurantId, doc.restaurantId));
+  if (allDocs.some(d => d.status === "rejected")) {
+    await updateKycStatus(doc.restaurantId, "action_required");
+    overallKyc = "action_required";
+  } else if (allDocs.length > 0 && allDocs.every(d => d.status === "active")) {
+    await updateKycStatus(doc.restaurantId, "approved");
+    overallKyc = "approved";
+  }
+  invalidateRestaurantAnalyticsCache(doc.restaurantId);
+  res.json({ ok: true, id: docId, status: dbStatus, overallKyc });
 });
 
 router.get("/superadmin/vendors/:vendorId/crm-logs", ...admin, async (req, res): Promise<void> => {
@@ -471,8 +513,8 @@ router.post("/superadmin/plans/:id/duplicate", ...admin, async (req, res) => {
   res.status(201).json(plan);
 });
 
-router.get("/superadmin/analytics/summary", ...admin, async (_req, res) => {
-  const stats = await getEnhancedStats();
+router.get("/superadmin/analytics/summary", ...admin, async (req, res) => {
+  const stats = await getEnhancedStats(typeof req.query.period === "string" ? req.query.period : undefined);
   const mrr = await getSubscriptionMrr();
   res.json({
     totalVendors: stats.totalRestaurants,
@@ -1156,6 +1198,22 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
   }));
 
   const allDisc = [...discrepancies, ...refundDisc];
+  // Matched transactions (gateway == bank) — shown so the admin can see the 7 that
+  // reconciled, with vendor name and HOW it was paid (UPI / card / gateway / cash).
+  const matchedList = payments
+    .filter(p => p.status === "completed" || p.status === "paid")
+    .map(p => ({
+      id: p.id,
+      vendorName: p.vendorName,
+      paymentMode: p.paymentMode || "—",
+      gatewayAmount: p.grossAmount,
+      bankAmount: p.grossAmount,
+      amount: p.grossAmount,
+      gatewayTxnId: p.gatewayTxnId,
+      utr: p.utr,
+      status: "Matched",
+      date: (p.dateTime || "").split("T")[0],
+    }));
   res.json({
     summary: {
       matched: payments.filter(p => p.status === "completed" || p.status === "paid").length,
@@ -1164,6 +1222,7 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
       duplicates: 0,
       totalAmount: payments.reduce((s, p) => s + p.grossAmount, 0),
     },
+    matched: matchedList,
     discrepancies: allDisc,
     history: (await db.select().from(platformAuditLogsTable)
       .where(eq(platformAuditLogsTable.module, "Reconciliation"))

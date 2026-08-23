@@ -35,6 +35,7 @@ export default function Agreements() {
   const renewMutation = useMutation({
     mutationFn: (id: string) => api.agreements.renew(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agreements"] }); toast({ title: "Agreement renewal initiated" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const filtered = agreements.filter((a: any) => {
@@ -104,9 +105,11 @@ export default function Agreements() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="border-2 border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground cursor-pointer hover:border-primary/50 transition-colors">
+                {/* No file-upload/storage endpoint exists (POST /superadmin/agreements stores metadata only),
+                    so the dropzone is shown as unavailable rather than faking an upload. */}
+                <div className="border-2 border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground opacity-60">
                   <Upload className="h-6 w-6 mx-auto mb-2" />
-                  Click to upload agreement PDF
+                  PDF upload unavailable — no file storage endpoint
                 </div>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending}>
                   {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Agreement
@@ -160,12 +163,14 @@ export default function Agreements() {
               )},
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Download PDF" onClick={() => toast({ title: `Downloading ${row.id}.pdf` })}><Download className="h-3.5 w-3.5" /></Button>
+                  {/* No agreement PDF download endpoint exists — disabled until an API is added. */}
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="PDF download API not available" disabled><Download className="h-3.5 w-3.5" /></Button>
                   {row.status !== "Expired" && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => renewMutation.mutate(row.id)}>Renew</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={renewMutation.isPending} onClick={() => renewMutation.mutate(row.id)}>Renew</Button>
                   )}
                   {row.status === "Expired" && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => toast({ title: "Marked expired" })}>Mark Expired</Button>
+                    // No agreement status-update endpoint exists to mark expired — disabled until an API is added.
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" title="Mark-expired API not available" disabled>Mark Expired</Button>
                   )}
                 </div>
               )},

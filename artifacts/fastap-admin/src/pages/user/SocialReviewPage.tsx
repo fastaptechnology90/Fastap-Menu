@@ -167,11 +167,19 @@ export default function SocialReviewPage() {
         reviewText: shareTemplate === "review" ? comment : undefined,
         table: activeTable || undefined,
       });
+      // "native" → open the OS share sheet when the Web Share API is available.
+      if (platform === "native" && typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: stats?.restaurantName ?? venue.restaurantName ?? "Restaurant", text: res.message, url: res.url });
+          return;
+        } catch (err) {
+          if ((err as { name?: string })?.name === "AbortError") return; // guest dismissed the share sheet
+          // any other failure → fall through to clipboard copy below
+        }
+      }
       if (platform === "copy" || platform === "native") {
         await navigator.clipboard?.writeText(res.message ?? res.url);
         showToast("Link copied!");
-      } else if (platform === "native" && navigator.share) {
-        await navigator.share({ title: stats?.restaurantName ?? venue.restaurantName ?? "Restaurant", text: res.message, url: res.url });
       } else if (res.url) {
         window.open(res.url, "_blank", "noopener,noreferrer");
         showToast(`Opening ${platform}...`);

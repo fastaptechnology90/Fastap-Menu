@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import { Send, Bell, Plus, X, Users, TrendingUp, Clock, Target, Zap } from "lucide-react";
+import { Send, Bell, Plus, X, Users, TrendingUp, Clock, Target, Zap, Trash2, Pencil } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { marketing as marketingApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { useToast } from "@/hooks/use-toast";
 
 type Tab = "campaigns"|"triggers"|"templates"|"analytics";
 
 type Campaign = {
   id: string; name: string; channel: string; status: string; audience: number;
   sent: number; opened: number; clicks: number; revenue: number; scheduled: string; type: string;
+  description: string; targetSegment: string;
 };
 
 function mapCampaign(c: any): Campaign {
@@ -29,6 +31,8 @@ function mapCampaign(c: any): Campaign {
     revenue: c.revenue ?? 0,
     scheduled: c.startDate || "Manual",
     type: c.type || "promo",
+    description: c.description || "",
+    targetSegment: c.targetSegment || "All Customers",
   };
 }
 
@@ -53,12 +57,19 @@ const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
 
 export default function MarketingAutomation() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("campaigns");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [newCampaign, setNewCampaign] = useState({ name:"", channel:"whatsapp", segment:"All Customers", message:"", scheduledFor:"" });
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Edit campaign modal state
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editCampaign, setEditCampaign] = useState({ name:"", channel:"whatsapp", segment:"All Customers", message:"", scheduledFor:"" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [triggers, setTriggers] = useState<TriggerRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -78,9 +89,12 @@ export default function MarketingAutomation() {
         if (Array.isArray(automation.templates)) setTemplates(automation.templates);
         if (Array.isArray(automation.segments)) setSegments(automation.segments);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to load campaigns", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     finally { setLoading(false); }
-  }, [restaurantId]);
+  }, [restaurantId, toast]);
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
@@ -99,7 +113,114 @@ export default function MarketingAutomation() {
       setNewCampaign({ name:"", channel:"whatsapp", segment:"All Customers", message:"", scheduledFor:"" });
       setShowAdd(false);
       await loadCampaigns();
-    } catch (e) { console.error(e); }
+      toast({ title: launch ? "Campaign launched" : "Draft saved", description: `“${newCampaign.name}” was ${launch ? "launched" : "saved as draft"}.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to create campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
+  }
+
+  // Pause / Resume / Launch — flip isActive on the campaign
+  async function setCampaignActive(c: Campaign, isActive: boolean, verb: string) {
+    if (!restaurantId) return;
+    setBusyId(c.id);
+    try {
+      await marketingApi.updateCampaign(restaurantId, Number(c.id), { isActive });
+      await loadCampaigns();
+      toast({ title: `Campaign ${verb}`, description: `“${c.name}” is now ${isActive ? "active" : "paused"}.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: `Failed to ${verb} campaign`, description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setBusyId(null); }
+  }
+
+  // Send Now — activate a scheduled campaign immediately (clear future start date)
+  async function handleSendNow(c: Campaign) {
+    if (!restaurantId) return;
+    setBusyId(c.id);
+    try {
+      await marketingApi.updateCampaign(restaurantId, Number(c.id), { isActive: true, startDate: new Date().toISOString() });
+      await loadCampaigns();
+      toast({ title: "Campaign sent", description: `“${c.name}” is now sending.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to send campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setBusyId(null); }
+  }
+
+  async function handleDeleteCampaign(c: Campaign) {
+    if (!restaurantId) return;
+    if (typeof window !== "undefined" && !window.confirm(`Delete campaign “${c.name}”? This cannot be undone.`)) return;
+    setBusyId(c.id);
+    try {
+      await marketingApi.deleteCampaign(restaurantId, Number(c.id));
+      await loadCampaigns();
+      toast({ title: "Campaign deleted", description: `“${c.name}” was removed.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to delete campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setBusyId(null); }
+  }
+
+  function openEdit(c: Campaign) {
+    setEditId(c.id);
+    setEditCampaign({
+      name: c.name,
+      channel: c.channel,
+      segment: c.targetSegment || "All Customers",
+      message: c.description || "",
+      scheduledFor: c.scheduled && c.scheduled !== "Manual" ? c.scheduled : "",
+    });
+  }
+
+  async function handleSaveEdit() {
+    if (!restaurantId || !editId) return;
+    setSavingEdit(true);
+    try {
+      await marketingApi.updateCampaign(restaurantId, Number(editId), {
+        name: editCampaign.name,
+        type: editCampaign.channel,
+        description: editCampaign.message,
+        targetSegment: editCampaign.segment,
+        startDate: editCampaign.scheduledFor || undefined,
+      });
+      setEditId(null);
+      await loadCampaigns();
+      toast({ title: "Campaign updated", description: `“${editCampaign.name}” was saved.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to update campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setSavingEdit(false); }
+  }
+
+  // Auto-trigger On/Off — backed by the campaign's isActive flag
+  async function toggleTrigger(t: TriggerRow) {
+    if (!restaurantId) return;
+    const nextActive = t.status !== "active";
+    setBusyId(t.id);
+    try {
+      await marketingApi.updateCampaign(restaurantId, Number(t.id), { isActive: nextActive });
+      await loadCampaigns();
+      toast({ title: nextActive ? "Trigger enabled" : "Trigger paused", description: `“${t.name}” is now ${nextActive ? "on" : "off"}.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to update trigger", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setBusyId(null); }
+  }
+
+  // Template "Use" — prefill the composer with this template's channel + body
+  function useTemplate(t: TemplateRow) {
+    setNewCampaign(p => ({ ...p, name: t.name, channel: t.channel, message: t.body }));
+    setSelectedTemplate(null);
+    setShowAdd(true);
+    setTab("campaigns");
+  }
+
+  // Segment chip — start a new campaign targeted at that segment
+  function composeForSegment(label: string) {
+    setNewCampaign(p => ({ ...p, segment: label }));
+    setShowAdd(true);
+    setTab("campaigns");
   }
 
   const totalSent = campaigns.reduce((s,c)=>s+c.sent,0);
@@ -182,11 +303,12 @@ export default function MarketingAutomation() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    {c.status==="active"&&<button className="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/30">Pause</button>}
-                    {c.status==="paused"&&<button className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Resume</button>}
-                    {c.status==="draft"&&<button className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Launch</button>}
-                    {c.status==="scheduled"&&<button className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Send Now</button>}
-                    <button className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/40 text-xs font-semibold hover:bg-white/10">Edit</button>
+                    {c.status==="active"&&<button onClick={()=>setCampaignActive(c,false,"paused")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/30 disabled:opacity-40">Pause</button>}
+                    {c.status==="paused"&&<button onClick={()=>setCampaignActive(c,true,"resumed")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-40">Resume</button>}
+                    {c.status==="draft"&&<button onClick={()=>setCampaignActive(c,true,"launched")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30 disabled:opacity-40">Launch</button>}
+                    {c.status==="scheduled"&&<button onClick={()=>handleSendNow(c)} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-40">Send Now</button>}
+                    <button onClick={()=>openEdit(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/60 text-xs font-semibold hover:bg-white/10 disabled:opacity-40"><Pencil className="h-3 w-3"/>Edit</button>
+                    <button onClick={()=>handleDeleteCampaign(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold hover:bg-red-500/20 disabled:opacity-40"><Trash2 className="h-3 w-3"/>Delete</button>
                   </div>
                 </div>
               </div>
@@ -221,7 +343,7 @@ export default function MarketingAutomation() {
                         <span className="text-emerald-400 font-semibold">{convRate}% conversion ({t.conversions})</span>
                       </div>
                     </div>
-                    <button className={`h-10 w-16 rounded-xl flex items-center justify-center border transition-all ${t.status==="active"?"bg-emerald-500/20 border-emerald-500/30 text-emerald-400":"bg-yellow-500/20 border-yellow-500/30 text-yellow-400"}`}>
+                    <button onClick={()=>toggleTrigger(t)} disabled={busyId===t.id} title={t.status==="active"?"Turn trigger off":"Turn trigger on"} className={`h-10 w-16 rounded-xl flex items-center justify-center border transition-all disabled:opacity-40 ${t.status==="active"?"bg-emerald-500/20 border-emerald-500/30 text-emerald-400":"bg-yellow-500/20 border-yellow-500/30 text-yellow-400"}`}>
                       {t.status==="active"?"On":"Off"}
                     </button>
                   </div>
@@ -239,7 +361,7 @@ export default function MarketingAutomation() {
             <h3 className="text-sm font-bold text-white/70 mb-3">Audience Segments</h3>
             <div className="flex gap-2 flex-wrap">
               {segments.length === 0 ? <EmptyState title="No segments" /> : segments.map(s=>(
-                <button key={s.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:border-amber-500/30 hover:bg-amber-500/10 transition-all text-xs font-semibold">
+                <button key={s.label} onClick={()=>composeForSegment(s.label)} title={`New campaign for ${s.label}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:border-amber-500/30 hover:bg-amber-500/10 transition-all text-xs font-semibold">
                   <span className={`font-extrabold ${s.color}`}>{s.count}</span>
                   <span className="text-white/50">{s.label}</span>
                 </button>
@@ -266,7 +388,7 @@ export default function MarketingAutomation() {
                         </div>
                       </div>
                     </div>
-                    <button className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Use</button>
+                    <button onClick={(e)=>{e.stopPropagation();useTemplate(t);}} title="Start a campaign from this template" className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Use</button>
                   </div>
                   <div className="text-xs bg-white/5 rounded-lg p-3 text-white/60">{t.body}</div>
                   {selectedTemplate?.id===t.id&&(
@@ -398,6 +520,44 @@ export default function MarketingAutomation() {
                 <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
                 <button onClick={() => handleCreateCampaign(false)} className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold">Save Draft</button>
                 <button onClick={() => handleCreateCampaign(true)} disabled={!newCampaign.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Launch Campaign</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Campaign Modal */}
+      {editId&&(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold">Edit Campaign</h2>
+              <button onClick={()=>setEditId(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="space-y-4">
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Campaign Name</label>
+                <input value={editCampaign.name} onChange={e=>setEditCampaign(p=>({...p,name:e.target.value}))} placeholder="Campaign name" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Channel</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(["whatsapp","sms","email","push"] as const).map(c=>{
+                    const cfg = CHANNEL_CFG[c];
+                    return <button key={c} onClick={()=>setEditCampaign(p=>({...p,channel:c}))} className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold capitalize transition-all ${editCampaign.channel===c?`${cfg.bg} border-white/20 ${cfg.color}`:"border-white/10 bg-white/5 text-white/50"}`}><span className="text-xl">{cfg.icon}</span>{c}</button>;
+                  })}
+                </div>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Target Audience</label>
+                <select value={editCampaign.segment} onChange={e=>setEditCampaign(p=>({...p,segment:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+                  {segments.length===0 && <option value={editCampaign.segment}>{editCampaign.segment}</option>}
+                  {segments.map(s=><option key={s.label} value={s.label}>{s.label} ({s.count})</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Message</label>
+                <textarea value={editCampaign.message} onChange={e=>setEditCampaign(p=>({...p,message:e.target.value}))} rows={4} placeholder="Update the campaign message... Use {name} for personalization" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>setEditId(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={savingEdit || !editCampaign.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
               </div>
             </div>
           </div>

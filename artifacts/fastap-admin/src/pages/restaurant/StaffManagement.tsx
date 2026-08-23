@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
 import { staff as staffApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; performance: number; tablesAssigned?: string[]; }
 import {
   Plus, Search, Phone, Mail, Star, Clock, Shield, Edit2, X, Save,
-  CheckCircle, AlertCircle, TrendingUp, Calendar
+  CheckCircle, AlertCircle, TrendingUp, Calendar, Trash2
 } from "lucide-react";
 
 const ROLE_CONFIG: Record<StaffRole, { label: string; icon: string; color: string }> = {
@@ -31,11 +32,27 @@ export default function StaffManagement() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const mapStaff = (s: any): StaffMember => ({
+    ...s,
+    id: String(s.id),
+    role: (s.role || "waiter") as StaffRole,
+    mobile: s.mobile || s.phone || "",
+    status: (s.isActive ? "active" : "offline") as "active" | "on-break" | "offline",
+    shift: s.shift || "Morning",
+    joinDate: s.createdAt?.split("T")[0] || s.joinDate?.split?.("T")[0] || "",
+    performance: 90, // NOTE: not sourced from API — no per-staff performance metric exists yet
+  });
+
+  const loadStaff = useCallback(() => {
     if (!restaurantId) return;
     setLoading(true);
-    staffApi.list(restaurantId).then(data => setStaff(Array.isArray(data) ? data.map(s => ({ ...s, id: String(s.id), role: (s.role || "waiter") as StaffRole, mobile: s.mobile || "", status: (s.isActive ? "active" : "offline") as "active" | "on-break" | "offline", shift: s.shift || "Morning", joinDate: s.createdAt?.split("T")[0] || "", performance: 90 })) : [])).catch(() => {}).finally(() => setLoading(false));
+    staffApi.list(restaurantId)
+      .then(data => setStaff(Array.isArray(data) ? data.map(mapStaff) : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [restaurantId]);
+
+  useEffect(() => { loadStaff(); }, [loadStaff]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | StaffRole>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | StaffMember["status"]>("all");
@@ -44,6 +61,57 @@ export default function StaffManagement() {
   const [addForm, setAddForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, password: "" });
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "schedule" | "attendance">("list");
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, active: true, password: "" });
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  function openEditStaff() {
+    if (!selected) return;
+    setEditForm({ name: selected.name, email: selected.email, mobile: selected.mobile, role: selected.role, active: selected.status !== "offline", password: "" });
+    setEditMode(true);
+  }
+
+  async function submitEditStaff() {
+    if (!restaurantId || !selected || !editForm.name || !editForm.email) return;
+    setEditSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.mobile,
+        role: editForm.role,
+        isActive: editForm.active,
+      };
+      if (editForm.password) body.password = editForm.password;
+      await staffApi.update(restaurantId, parseInt(selected.id, 10), body);
+      toast({ title: "Profile updated", description: `${editForm.name}'s details were saved.` });
+      setEditMode(false);
+      setSelected(null);
+      loadStaff();
+    } catch (e: any) {
+      toast({ title: "Update failed", description: e?.message || "Could not update staff member.", variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteStaff() {
+    if (!restaurantId || !selected) return;
+    if (!window.confirm(`Remove ${selected.name}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await staffApi.delete(restaurantId, parseInt(selected.id, 10));
+      toast({ title: "Staff removed", description: `${selected.name} was removed from your team.` });
+      setEditMode(false);
+      setSelected(null);
+      loadStaff();
+    } catch (e: any) {
+      toast({ title: "Remove failed", description: e?.message || "Could not remove staff member.", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function submitAddStaff() {
     if (!restaurantId || !addForm.name || !addForm.email || !addForm.password) return;
@@ -69,7 +137,10 @@ export default function StaffManagement() {
       }]);
       setAddMode(false);
       setAddForm({ name: "", email: "", mobile: "", role: "waiter", password: "" });
-    } catch { /* create failed */ }
+      toast({ title: "Staff added", description: `${created.name} can now log in.` });
+    } catch (e: any) {
+      toast({ title: "Could not add staff", description: e?.message || "Please check the details and try again.", variant: "destructive" });
+    }
     finally { setSaving(false); }
   }
 
@@ -320,12 +391,60 @@ export default function StaffManagement() {
                 </div>
               )}
               <div className="flex gap-2">
+                <button onClick={deleteStaff} disabled={deleting} className="py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40" title="Remove staff">
+                  <Trash2 className="h-4 w-4" /> {deleting ? "Removing…" : "Remove"}
+                </button>
                 <button onClick={() => setSelected(null)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Close</button>
-                <button className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold flex items-center justify-center gap-2">
+                <button onClick={openEditStaff} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold flex items-center justify-center gap-2">
                   <Edit2 className="h-4 w-4" /> Edit Profile
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Staff Modal */}
+      {editMode && selected && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2"><Edit2 className="h-4 w-4" /> Edit {selected.name}</h3>
+              <button onClick={() => setEditMode(false)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+            </div>
+            {[
+              { key: "name", label: "Full Name", type: "text" },
+              { key: "email", label: "Email", type: "email" },
+              { key: "mobile", label: "Mobile", type: "tel" },
+              { key: "password", label: "New Password (leave blank to keep current)", type: "password" },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="text-xs text-white/40">{f.label}</label>
+                <input
+                  type={f.type}
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40"
+                />
+              </div>
+            ))}
+            <div>
+              <label className="text-xs text-white/40">Role</label>
+              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+                {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-white/40">Status</label>
+              <div className="flex gap-2 mt-1">
+                {[{ v: true, l: "🟢 Active" }, { v: false, l: "⚫ Offline" }].map(o => (
+                  <button key={String(o.v)} onClick={() => setEditForm(p => ({ ...p, active: o.v }))} className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${editForm.active === o.v ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>{o.l}</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={submitEditStaff} disabled={editSaving || !editForm.name || !editForm.email || (editForm.password.length > 0 && editForm.password.length < 6)} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40">
+              <Save className="h-4 w-4" /> {editSaving ? "Saving…" : "Save Changes"}
+            </button>
           </div>
         </div>
       )}

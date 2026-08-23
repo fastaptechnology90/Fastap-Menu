@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Calendar, Users, MapPin, Plus, X, CheckCircle, Phone } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
+import { useToast } from "@/hooks/use-toast";
+import { ModulePackages } from "@/components/restaurant/ModulePackages";
 import { events as eventsApi, tables as tablesApi, tasksSop } from "@/lib/api";
 
 type EventItem = {
-  id: string; name: string; type: string; date: string; time: string; guests: number;
+  id: string; name: string; type: string; date: string; rawDate: string; time: string; guests: number;
   venue: string; status: string; advance: number; total: number; catering: boolean;
   decor: boolean; staffAssigned: string[]; contact: string; phone: string; menu: string; notes: string;
 };
@@ -18,6 +20,7 @@ function mapEvent(e: any): EventItem {
     name: e.name || e.title || "Event",
     type: e.type || e.eventType || "enquiry_gen",
     date: d ? d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : (e.date || "TBD"),
+    rawDate: d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : "",
     time: e.eventTime || e.time || meta.time || "TBD",
     guests: parseInt(String(e.guestCount ?? e.guests ?? meta.guests)) || 0,
     venue: e.venue || meta.venue || "TBD",
@@ -60,6 +63,7 @@ type Tab = "events"|"venues"|"checklist";
 
 export default function EventBanquet() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("events");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,15 +76,23 @@ export default function EventBanquet() {
   const [venues, setVenues] = useState<VenueRow[]>([]);
   const [checklistItems, setChecklistItems] = useState<string[]>([]);
 
+  // Edit event modal state
+  const [editEvent, setEditEvent] = useState<EventItem | null>(null);
+  const [editForm, setEditForm] = useState({ name:"", type:"wedding", date:"", time:"", guests:"", venue:"", contact:"", phone:"", advance:"", total:"", menu:"", notes:"", status:"enquiry" });
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const loadEvents = useCallback(async () => {
     if (!restaurantId) return;
     setLoading(true);
     try {
       const data = await eventsApi.list(restaurantId);
       setEvents((Array.isArray(data) ? data : []).map(mapEvent));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to load events", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     finally { setLoading(false); }
-  }, [restaurantId]);
+  }, [restaurantId, toast]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -151,7 +163,11 @@ export default function EventBanquet() {
       setEvents(e => [mapEvent(created), ...e]);
       setNewEvent({ name:"", type:"wedding", date:"", time:"", guests:"", venue:"", contact:"", phone:"", advance:"", total:"", notes:"" });
       setShowAdd(false);
-    } catch (e) { console.error(e); }
+      toast({ title: "Event created", description: `“${newEvent.name}” was added as an enquiry.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to create event", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function updateEventStatus(event: EventItem, status: string) {
@@ -161,11 +177,84 @@ export default function EventBanquet() {
       const mapped = mapEvent(updated);
       setEvents(e => e.map(x => x.id === event.id ? mapped : x));
       setSelected(mapped);
-    } catch (e) { console.error(e); }
+      toast({ title: "Event updated", description: `“${event.name}” is now ${status}.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to update event", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
-  function toggleCheck(item:string) {
-    setCheckedItems(prev=>{ const n=new Set(prev); n.has(item)?n.delete(item):n.add(item); return n; });
+  function openEditEvent(ev: EventItem) {
+    setEditForm({
+      name: ev.name,
+      type: ev.type,
+      date: ev.rawDate || "",
+      time: /^\d{1,2}:\d{2}/.test(ev.time) ? ev.time : "",
+      guests: ev.guests ? String(ev.guests) : "",
+      venue: ev.venue === "TBD" ? "" : ev.venue,
+      contact: ev.contact === "—" ? "" : ev.contact,
+      phone: ev.phone === "—" ? "" : ev.phone,
+      advance: ev.advance ? String(ev.advance) : "",
+      total: ev.total ? String(ev.total) : "",
+      menu: ev.menu === "TBD" ? "" : ev.menu,
+      notes: ev.notes,
+      status: ev.status,
+    });
+    setEditEvent(ev);
+  }
+
+  async function handleSaveEditEvent() {
+    if (!restaurantId || !editEvent) return;
+    setSavingEdit(true);
+    try {
+      const updated = await eventsApi.update(restaurantId, Number(editEvent.id), {
+        name: editForm.name,
+        type: editForm.type,
+        eventDate: editForm.date || undefined,
+        eventTime: editForm.time,
+        guestCount: parseInt(editForm.guests) || 0,
+        venue: editForm.venue,
+        contactName: editForm.contact,
+        contactPhone: editForm.phone,
+        advancePaid: parseFloat(editForm.advance) || 0,
+        totalAmount: parseFloat(editForm.total) || 0,
+        menu: editForm.menu,
+        notes: editForm.notes,
+        status: editForm.status,
+      });
+      const mapped = mapEvent(updated);
+      setEvents(e => e.map(x => x.id === editEvent.id ? mapped : x));
+      setSelected(prev => prev && prev.id === editEvent.id ? mapped : prev);
+      setEditEvent(null);
+      toast({ title: "Event updated", description: `“${editForm.name}” was saved.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to save event", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // Open the New-Event enquiry composer pre-filled with the chosen venue
+  function bookVenue(v: VenueRow) {
+    setSelected(null);
+    setNewEvent(p => ({ ...p, venue: v.name }));
+    setShowAdd(true);
+  }
+
+  // Toggle a checklist item and persist to the shared checklist progress store
+  function toggleCheck(item: string) {
+    const wasChecked = checkedItems.has(item);
+    const next = new Set(checkedItems);
+    wasChecked ? next.delete(item) : next.add(item);
+    setCheckedItems(next);
+    if (!restaurantId) return;
+    tasksSop.saveChecklistProgress(restaurantId, "opening", Array.from(next)).catch((e) => {
+      console.error(e);
+      // revert optimistic update on failure
+      setCheckedItems(prev => { const r = new Set(prev); wasChecked ? r.add(item) : r.delete(item); return r; });
+      toast({ title: "Failed to save checklist", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    });
   }
 
   if (loading && events.length === 0) {
@@ -198,6 +287,8 @@ export default function EventBanquet() {
           </div>
         ))}
       </div>
+
+      <ModulePackages restaurantId={restaurantId} module="events" title="Event & Party Packages / Rates" label="Package" />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
@@ -296,7 +387,7 @@ export default function EventBanquet() {
                 ))}
               </div>
               {v.status==="available"&&(
-                <button className="mt-3 w-full py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition-all">Book This Venue</button>
+                <button onClick={()=>bookVenue(v)} className="mt-3 w-full py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition-all">Book This Venue</button>
               )}
             </div>
           ))}
@@ -434,7 +525,7 @@ export default function EventBanquet() {
               )}
 
               <div className="flex gap-2">
-                <button className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">Edit Event</button>
+                <button onClick={()=>openEditEvent(selected)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">Edit Event</button>
                 {selected.status==="tentative"&&<button onClick={()=>updateEventStatus(selected,"confirmed")} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-sm hover:bg-emerald-500/30">Confirm</button>}
                 {selected.status==="confirmed"&&<button onClick={()=>updateEventStatus(selected,"completed")} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Mark Complete</button>}
                 {selected.status==="enquiry"&&<button onClick={()=>updateEventStatus(selected,"tentative")} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Convert to Booking</button>}
@@ -481,6 +572,50 @@ export default function EventBanquet() {
             <div className="flex gap-3 mt-5">
               <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
               <button onClick={handleCreateEvent} disabled={!newEvent.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Save Booking</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {editEvent&&(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold">Edit Event</h2>
+              <button onClick={()=>setEditEvent(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                {label:"Event Name",key:"name",placeholder:"Wedding, Party...",col:"2"},
+                {label:"Event Type",key:"type",type:"select",options:Object.keys(TYPE_CFG),col:"1"},
+                {label:"Status",key:"status",type:"select",options:Object.keys(STATUS_CFG),col:"1"},
+                {label:"Date",key:"date",type:"date",col:"1"},
+                {label:"Time",key:"time",type:"time",col:"1"},
+                {label:"Number of Guests",key:"guests",type:"number",placeholder:"100",col:"1"},
+                {label:"Venue",key:"venue",type:"select",options:venues.length ? venues.map(v=>v.name) : ["Main Hall","Garden","Rooftop"],col:"1"},
+                {label:"Contact Name",key:"contact",placeholder:"Client name",col:"1"},
+                {label:"Contact Phone",key:"phone",placeholder:"+91 XXXXX",col:"1"},
+                {label:"Total Budget (₹)",key:"total",type:"number",placeholder:"50000",col:"1"},
+                {label:"Advance (₹)",key:"advance",type:"number",placeholder:"10000",col:"1"},
+                {label:"Menu",key:"menu",placeholder:"Menu / package",col:"2"},
+                {label:"Special Notes",key:"notes",placeholder:"Dietary, decor requirements...",col:"2"},
+              ].map(f=>(
+                <div key={f.key} className={f.col==="2"?"col-span-2":""}>
+                  <label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  {f.type==="select" ? (
+                    <select value={(editForm as any)[f.key]} onChange={e=>setEditForm(p=>({...p,[f.key]:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white capitalize">
+                      {f.options?.map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input type={f.type||"text"} value={(editForm as any)[f.key]} onChange={e=>setEditForm(p=>({...p,[f.key]:e.target.value}))} placeholder={(f as any).placeholder||""} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={()=>setEditEvent(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+              <button onClick={handleSaveEditEvent} disabled={savingEdit || !editForm.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
             </div>
           </div>
         </div>

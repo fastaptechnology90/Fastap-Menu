@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { rbacApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { Shield, Save, RotateCcw, Check, X, Users, Lock, Plus, ChevronDown } from "lucide-react";
 
 const PERMISSION_GROUPS = [
@@ -70,9 +71,18 @@ const ROLE_CFG: Record<string,{label:string;icon:string;color:string;bg:string}>
   chef:    {label:"Chef",      icon:"👨‍🍳",color:"text-amber-400", bg:"bg-amber-500/15"},
 };
 
+// Config for any role not in ROLE_CFG (loaded backend roles + user-created custom roles),
+// so saved roles remain visible and editable after reload.
+function roleCfg(role: string): { label: string; icon: string; color: string; bg: string } {
+  if (ROLE_CFG[role]) return ROLE_CFG[role];
+  const label = role.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  return { label, icon: "🧩", color: "text-teal-400", bg: "bg-teal-500/15" };
+}
+
 export default function RBACPermissions() {
   const { restaurantId } = useRestaurant();
-  const [roles, setRoles] = useState(DEFAULT_ROLES);
+  const { toast } = useToast();
+  const [roles, setRoles] = useState<Record<string, Record<string, boolean>>>(DEFAULT_ROLES);
   const [selectedRole, setSelectedRole] = useState("manager");
   const [saved, setSaved] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(PERMISSION_GROUPS.map(g=>g.group)));
@@ -109,15 +119,21 @@ export default function RBACPermissions() {
     if(!restaurantId)return;
     try {
       await rbacApi.updateAll(restaurantId, roles);
-    } catch {}
-    setSaved(true); setTimeout(()=>setSaved(false),2000);
+      setSaved(true); setTimeout(()=>setSaved(false),2000);
+      toast({ title: "Permissions saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save permissions." });
+    }
   }
 
   function resetRole() {
     if(selectedRole==="owner")return;
-    setRoles(r=>({...r,[selectedRole]:{...DEFAULT_ROLES[selectedRole]||{}}}));
+    // Built-in roles reset to their defaults; custom roles reset to no access.
+    const allOff = Object.fromEntries(PERMISSION_GROUPS.flatMap(g=>g.permissions.map(p=>[p.key,false])));
+    setRoles(r=>({...r,[selectedRole]:{...(DEFAULT_ROLES[selectedRole]||allOff)}}));
   }
 
+  const allRoles = Object.keys(roles);
   const currentRolePerms = roles[selectedRole] || {};
   const enabledCount = Object.values(currentRolePerms).filter(Boolean).length;
   const totalPerms = PERMISSION_GROUPS.reduce((s,g)=>s+g.permissions.length,0);
@@ -141,7 +157,8 @@ export default function RBACPermissions() {
 
       {/* Role Selector */}
       <div className="flex gap-2 flex-wrap">
-        {Object.entries(ROLE_CFG).map(([role,cfg])=>{
+        {allRoles.map((role)=>{
+          const cfg = roleCfg(role);
           const count = Object.values(roles[role]||{}).filter(Boolean).length;
           return (
             <button key={role} onClick={()=>setSelectedRole(role)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${selectedRole===role?`${cfg.bg} border-white/20 ${cfg.color}`:"border-white/10 bg-white/5 text-white/50 hover:border-white/20"}`}>
@@ -159,9 +176,9 @@ export default function RBACPermissions() {
       {/* Role Info */}
       <div className="flex items-center justify-between bg-white/[0.03] border border-white/8 rounded-2xl p-4">
         <div className="flex items-center gap-3">
-          <div className={`h-12 w-12 rounded-2xl ${ROLE_CFG[selectedRole]?.bg} flex items-center justify-center text-2xl`}>{ROLE_CFG[selectedRole]?.icon}</div>
+          <div className={`h-12 w-12 rounded-2xl ${roleCfg(selectedRole).bg} flex items-center justify-center text-2xl`}>{roleCfg(selectedRole).icon}</div>
           <div>
-            <p className="font-extrabold">{ROLE_CFG[selectedRole]?.label} Role</p>
+            <p className="font-extrabold">{roleCfg(selectedRole).label} Role</p>
             <p className="text-xs text-white/40">{enabledCount} of {totalPerms} permissions enabled</p>
           </div>
         </div>
@@ -231,14 +248,14 @@ export default function RBACPermissions() {
             <thead>
               <tr className="text-left text-white/30 border-b border-white/5">
                 <th className="pb-3 pr-4">Permission</th>
-                {Object.keys(ROLE_CFG).map(r=><th key={r} className="pb-3 px-2 text-center capitalize">{ROLE_CFG[r].icon} {ROLE_CFG[r].label}</th>)}
+                {allRoles.map(r=><th key={r} className="pb-3 px-2 text-center capitalize">{roleCfg(r).icon} {roleCfg(r).label}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {PERMISSION_GROUPS.flatMap(g=>g.permissions).slice(0,12).map(perm=>(
                 <tr key={perm.key} className="hover:bg-white/3">
                   <td className="py-2 pr-4 text-white/60">{perm.label}</td>
-                  {Object.keys(ROLE_CFG).map(r=>(
+                  {allRoles.map(r=>(
                     <td key={r} className="py-2 px-2 text-center">
                       {roles[r]?.[perm.key] ? <Check className="h-3.5 w-3.5 text-emerald-400 mx-auto"/> : <X className="h-3.5 w-3.5 text-white/15 mx-auto"/>}
                     </td>
@@ -263,7 +280,7 @@ export default function RBACPermissions() {
               </div>
               <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Copy permissions from</label>
                 <select value={newRole.copyFrom} onChange={e=>setNewRole(p=>({...p,copyFrom:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
-                  {Object.entries(ROLE_CFG).map(([r,c])=><option key={r} value={r}>{c.label}</option>)}
+                  {allRoles.map((r)=><option key={r} value={r}>{roleCfg(r).label}</option>)}
                 </select>
               </div>
               <div className="flex gap-3">

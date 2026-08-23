@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { RefreshCw, Link2, CheckCircle, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { FEATURES } from "@/lib/featureFlags";
 
 const LOGO: Record<string, string> = { swiggy: "🟠", zomato: "🔴", ondc: "🌐" };
 
@@ -9,6 +10,23 @@ export default function AggregatorIntegrations() {
   const { restaurantId } = useRestaurant();
   const [list, setList] = useState<any[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [ingesting, setIngesting] = useState<string | null>(null);
+
+  // WIP: simulate a Swiggy/Zomato order arriving. Once the partner API keys are wired,
+  // their webhook POSTs to the same ingest endpoint — nothing else changes downstream.
+  async function simulateOrder(id: string) {
+    if (!restaurantId) return;
+    setIngesting(id);
+    try {
+      const res = await platformApi.ingestAggregatorOrder(restaurantId, id, {
+        customerName: `${id} customer`,
+        items: [{ name: "Butter Chicken", qty: 1, price: 320 }, { name: "Garlic Naan", qty: 2, price: 40 }],
+        notes: "Simulated incoming order",
+      });
+      alert(`✅ ${id.toUpperCase()} order #${res?.order?.id ?? ""} ingested — ab Kitchen app + Order Management + Finance sab me dikhega.`);
+    } catch { alert("Ingest failed"); }
+    finally { setIngesting(null); }
+  }
 
   const load = () => {
     if (!restaurantId) return;
@@ -67,6 +85,16 @@ export default function AggregatorIntegrations() {
                 {syncing === agg.id ? <Loader className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 Sync
               </button>
+              {FEATURES.aggregatorIngest && (
+                <button
+                  onClick={() => simulateOrder(agg.id)}
+                  disabled={ingesting === agg.id}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-semibold disabled:opacity-40"
+                >
+                  {ingesting === agg.id ? <Loader className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                  Simulate Order
+                </button>
+              )}
             </div>
           </div>
         ))}

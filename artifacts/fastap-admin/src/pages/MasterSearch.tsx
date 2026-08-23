@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/apiClient";
-import { Search, Store, CreditCard, Ticket, FileText } from "lucide-react";
+import { Search, Store, CreditCard, Ticket, FileText, Undo2 } from "lucide-react";
+import { fmtINRFull } from "@/lib/format";
 
 export default function MasterSearch() {
   const [location] = useLocation();
@@ -44,6 +45,15 @@ export default function MasterSearch() {
         <span className="text-muted-foreground">{p.vendorName}</span>
       </Link>
     )},
+    { key: "refunds", title: "Refunds", icon: Undo2, items: data?.refunds ?? [], render: (r: any) => (
+      <Link href="/refunds" className="flex justify-between items-center text-sm p-3 rounded-xl hover:bg-muted/50">
+        <span className="font-mono text-xs">{r.id}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-muted-foreground">{fmtINRFull(r.amount)}</span>
+          <Badge variant="outline" className="capitalize text-xs">{r.status}</Badge>
+        </span>
+      </Link>
+    )},
     { key: "tickets", title: "Tickets", icon: Ticket, items: data?.tickets ?? [], render: (t: any) => (
       <Link href="/support" className="block text-sm p-3 rounded-xl hover:bg-muted/50">
         <span className="font-mono text-xs text-primary">{t.id}</span>
@@ -53,7 +63,7 @@ export default function MasterSearch() {
     { key: "logs", title: "Audit Logs", icon: FileText, items: data?.logs ?? [], render: (l: any) => (
       <div className="text-sm p-3 rounded-xl bg-muted/30">
         <span className="font-medium">{l.action}</span>
-        <p className="text-xs text-muted-foreground mt-0.5">{l.module} · {l.userName}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{l.module} · {l.user}</p>
       </div>
     )},
   ];

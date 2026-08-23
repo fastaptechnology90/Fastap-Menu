@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import {
   Plus, Search, Calendar, Clock, Users, CheckCircle, XCircle,
-  Phone, MessageSquare, X, Edit2, AlertCircle
+  Phone, MessageSquare, X, Edit2, AlertCircle, BedDouble
 } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { reservations as reservationsApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface Reservation {
   id: string;
@@ -15,6 +16,7 @@ interface Reservation {
   time: string;
   guests: number;
   table?: string;
+  room?: string;
   section: string;
   status: "confirmed" | "pending" | "cancelled" | "seated" | "completed" | "no-show";
   special: string;
@@ -38,6 +40,7 @@ const TYPE_ICON: Record<Reservation["type"], string> = {
 
 export default function RestaurantReservations() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +83,7 @@ export default function RestaurantReservations() {
         time: r.time || r.startTime || "—",
         guests: r.partySize || r.guestCount || r.guests || 1,
         table: r.tableId ? `T-${r.tableId}` : undefined,
+        room: r.roomNumber || r.room || undefined,
         section: r.zone || r.section || "Main Hall",
         status: (r.status || "pending") as Reservation["status"],
         special: r.specialRequest || r.specialRequests || r.notes || "",
@@ -87,8 +91,9 @@ export default function RestaurantReservations() {
         deposit: parseFloat(String(r.depositAmount || 0)),
         createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "—",
       })) : []);
-    } catch {
+    } catch (e: any) {
       setReservations([]);
+      toast({ variant: "destructive", title: "Could not load reservations", description: e?.message || "Failed to fetch reservations." });
     } finally {
       setLoading(false);
     }
@@ -99,10 +104,11 @@ export default function RestaurantReservations() {
     try {
       await reservationsApi.update(restaurantId, parseInt(id, 10), { status });
       await reload();
-    } catch {
-      /* keep UI unchanged on error */
+      setSelected(null);
+      toast({ title: `Reservation ${status}` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update failed", description: e?.message || "Could not update the reservation status." });
     }
-    setSelected(null);
   }
 
   async function handleAddRes() {
@@ -116,16 +122,19 @@ export default function RestaurantReservations() {
         time: newRes.time,
         guestCount: newRes.guests || 2,
         zone: newRes.section,
+        roomNumber: newRes.room || null,
         reservationType: newRes.type || "table",
         status: "pending",
         specialRequest: newRes.special,
         notes: newRes.special,
+        depositAmount: newRes.deposit || 0,
       });
       setAddMode(false);
       setNewRes({ type: "table", status: "pending", guests: 2, section: "Indoor AC", deposit: 0 });
       await reload();
-    } catch {
-      /* error surfaced via empty reload */
+      toast({ title: "Reservation booked" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Booking failed", description: e?.message || "Could not create the reservation." });
     }
   }
 
@@ -178,6 +187,12 @@ export default function RestaurantReservations() {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
               </div>
 
+              <div className="flex items-center gap-2 mb-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1.5">
+                <BedDouble className="h-4 w-4 text-indigo-300 shrink-0" />
+                <span className="text-xs text-white/50">Room</span>
+                <span className="text-sm font-bold text-indigo-200 ml-auto">{res.room || "—"}</span>
+              </div>
+
               <div className="grid grid-cols-2 gap-2 text-xs text-white/50 mb-3">
                 <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{res.date}</div>
                 <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" />{res.time}</div>
@@ -227,7 +242,7 @@ export default function RestaurantReservations() {
               {[
                 ["Guest", selected.guestName], ["Mobile", selected.mobile],
                 ["Date & Time", `${selected.date} at ${selected.time}`], ["Party Size", `${selected.guests} guests`],
-                ["Section", selected.section], ["Type", selected.type],
+                ["Room", selected.room || "—"], ["Section", selected.section], ["Type", selected.type],
                 ["Special", selected.special || "None"], ["Deposit", selected.deposit > 0 ? `₹${selected.deposit}` : "None"],
               ].map(([l, v]) => (
                 <div key={l as string} className="flex justify-between py-1.5 border-b border-white/5">
@@ -267,6 +282,7 @@ export default function RestaurantReservations() {
                 { label: "Date*", field: "date", type: "date" },
                 { label: "Time*", field: "time", type: "time" },
                 { label: "Guests", field: "guests", type: "number" },
+                { label: "Room Number", field: "room", type: "text" },
                 { label: "Deposit (₹)", field: "deposit", type: "number" },
                 { label: "Special Request", field: "special", type: "text" },
               ].map(({ label, field, type }) => (

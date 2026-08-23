@@ -25,13 +25,16 @@ function fmtKpiValue(v: number | string) {
   return typeof v === "number" ? fmt(v) : v;
 }
 
+const REVENUE_PERIODS: [string, string][] = [["all","All time"],["today","Today"],["week","7 Days"],["fortnight","15 Days"],["month","30 Days"],["year","1 Year"]];
+
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState("revenue");
+  const [period, setPeriod] = useState("all");
   const { toast } = useToast();
 
   const { data: summary, isLoading } = useQuery({
-    queryKey: ["superadmin-analytics-summary"],
-    queryFn: api.analytics.summary,
+    queryKey: ["superadmin-analytics-summary", period],
+    queryFn: () => api.analytics.summary(period),
   });
 
   const { data: revenueSeries = [] } = useQuery({
@@ -121,6 +124,15 @@ export default function Analytics() {
           <Button variant="outline" size="sm" onClick={() => handleExport("excel")}><Download className="mr-2 h-4 w-4" /> Excel</Button>
           <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}><Download className="mr-2 h-4 w-4" /> PDF</Button>
         </div>
+      </div>
+
+      {/* Revenue period selector — scopes the revenue/commission KPIs (7/15/30 days …). */}
+      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
+        {REVENUE_PERIODS.map(([p, label]) => (
+          <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (

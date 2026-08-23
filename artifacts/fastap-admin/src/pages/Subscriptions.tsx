@@ -26,13 +26,29 @@ export default function Subscriptions() {
   const actionMutation = useMutation({
     mutationFn: ({ vendorId, action, plan }: { vendorId: number; action: string; plan?: string }) =>
       api.subscriptions.action(vendorId, { action, plan }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["subscriptions"] });
-      qc.invalidateQueries({ queryKey: ["superadmin-vendors"] });
-      toast({ title: "Subscription updated" });
+    // Optimistic: update the affected row instantly instead of waiting for the full
+    // subscriptions + vendors lists to refetch (that round-trip is what made plan
+    // changes / pause / resume feel very slow).
+    onMutate: async ({ vendorId, action, plan }) => {
+      await qc.cancelQueries({ queryKey: ["subscriptions"] });
+      const prev = qc.getQueryData<any[]>(["subscriptions"]);
+      qc.setQueryData<any[]>(["subscriptions"], (old) => (old ?? []).map((s: any) => {
+        if (s.vendorId !== vendorId) return s;
+        const next = { ...s };
+        if (plan) { next.plan = plan; next.amount = (plans as any[]).find((p: any) => p.id === plan)?.price ?? next.amount; }
+        if (action === "pause" || action === "cancel") { next.status = "Canceled"; next.autoRenew = false; }
+        if (action === "resume" || action === "renew") { next.status = "Active"; next.autoRenew = true; }
+        return next;
+      }));
       setActionVendor(null);
+      return { prev };
     },
-    onError: (e: any) => toast({ title: "Action failed", description: e.message, variant: "destructive" }),
+    onError: (e: any, _v, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(["subscriptions"], ctx.prev);
+      toast({ title: "Action failed", description: e?.message, variant: "destructive" });
+    },
+    onSuccess: () => toast({ title: "Subscription updated" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
 
   const planCounts = plans.map((p: any) => ({

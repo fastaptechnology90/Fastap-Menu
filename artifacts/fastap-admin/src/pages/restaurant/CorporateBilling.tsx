@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { corporateApi } from "@/lib/api";
-import { Building2, Plus, CreditCard, X, TrendingUp, DollarSign, AlertCircle, Download, Send, Search } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { Building2, Plus, CreditCard, X, TrendingUp, DollarSign, AlertCircle, Download, Send, Search, Save } from "lucide-react";
 
 type Account = {
   id: string; company: string; contactName: string; email: string; phone: string;
@@ -85,6 +86,14 @@ export default function CorporateBilling() {
   const [selected, setSelected] = useState<Account | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newAccount, setNewAccount] = useState({ company:"", contactName:"", email:"", phone:"", creditLimit:"", gstNo:"", tier:"business" });
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAccount, setEditAccount] = useState({ company:"", contactName:"", email:"", phone:"", creditLimit:"", gstNo:"", tier:"business" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // No corporateApi method exists for this action — surface it clearly instead of faking success.
+  const featureNeedsApi = (feature: string, endpoint: string) =>
+    toast({ title: `${feature} needs an API`, description: `Requires ${endpoint}, which isn't available yet.`, variant: "destructive" });
 
   const loadData = useCallback(async () => {
     if (!restaurantId) return;
@@ -116,10 +125,52 @@ export default function CorporateBilling() {
         gst: newAccount.gstNo,
         employees: 0,
       });
+      toast({ title: "Account created", description: `${newAccount.company} was added.` });
       setNewAccount({ company:"", contactName:"", email:"", phone:"", creditLimit:"", gstNo:"", tier:"business" });
       setShowAdd(false);
       await loadData();
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({ title: "Could not create account", description: e?.message || "Please try again.", variant: "destructive" });
+    }
+  }
+
+  function openEditAccount(acc: Account) {
+    setEditingId(acc.id);
+    setEditAccount({
+      company: acc.company,
+      contactName: acc.contactName === "—" ? "" : acc.contactName,
+      email: acc.email === "—" ? "" : acc.email,
+      phone: acc.phone === "—" ? "" : acc.phone,
+      creditLimit: acc.creditLimit ? String(acc.creditLimit) : "",
+      gstNo: acc.gstNo,
+      tier: acc.tier,
+    });
+    setShowEdit(true);
+  }
+
+  async function submitEditAccount() {
+    if (!editingId || !restaurantId || !editAccount.company) return;
+    setEditSaving(true);
+    try {
+      await corporateApi.updateAccount(restaurantId, parseInt(editingId, 10), {
+        company: editAccount.company,
+        contact: editAccount.contactName,
+        email: editAccount.email,
+        phone: editAccount.phone,
+        credit_limit: parseFloat(editAccount.creditLimit) || 0,
+        gst: editAccount.gstNo,
+        tier: editAccount.tier,
+      });
+      toast({ title: "Account updated", description: `${editAccount.company} was saved.` });
+      setShowEdit(false);
+      setSelected(null);
+      setEditingId(null);
+      await loadData();
+    } catch (e: any) {
+      toast({ title: "Could not update account", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   const totalBilled = invoices.reduce((s,i)=>s+i.total,0);
@@ -235,8 +286,8 @@ export default function CorporateBilling() {
                     <td className="py-3 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${inv.status==="paid"?"bg-emerald-500/15 text-emerald-400":inv.status==="pending"?"bg-yellow-500/15 text-yellow-400":"bg-red-500/15 text-red-400"}`}>{inv.status}</span></td>
                     <td className="py-3">
                       <div className="flex gap-1">
-                        <button className="p-1.5 rounded-lg border border-white/10 text-white/40 hover:text-white hover:bg-white/5"><Download className="h-3.5 w-3.5"/></button>
-                        {inv.status!=="paid"&&<button className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"><Send className="h-3.5 w-3.5"/></button>}
+                        <button onClick={()=>featureNeedsApi("Invoice download", "GET /restaurants/:id/corporate/invoices/:id/download")} title="Download PDF" className="p-1.5 rounded-lg border border-white/10 text-white/40 hover:text-white hover:bg-white/5"><Download className="h-3.5 w-3.5"/></button>
+                        {inv.status!=="paid"&&<button onClick={()=>featureNeedsApi("Send invoice", "POST /restaurants/:id/corporate/invoices/:id/send")} title="Send to client" className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"><Send className="h-3.5 w-3.5"/></button>}
                       </div>
                     </td>
                   </tr>
@@ -279,8 +330,10 @@ export default function CorporateBilling() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1.5 shrink-0">
-                    <button className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Top Up</button>
-                    {w.status==="active"?<button className="px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold hover:bg-red-500/20">Block</button>:<button className="px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-semibold">Unblock</button>}
+                    <button onClick={()=>featureNeedsApi("Wallet top-up", "PUT /restaurants/:id/corporate/wallets/:id")} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Top Up</button>
+                    {w.status==="active"
+                      ? <button onClick={()=>featureNeedsApi("Block card", "PUT /restaurants/:id/corporate/wallets/:id")} className="px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold hover:bg-red-500/20">Block</button>
+                      : <button onClick={()=>featureNeedsApi("Unblock card", "PUT /restaurants/:id/corporate/wallets/:id")} className="px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20">Unblock</button>}
                   </div>
                 </div>
               </div>
@@ -311,8 +364,8 @@ export default function CorporateBilling() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">View Invoices</button>
-                <button className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Edit Account</button>
+                <button onClick={()=>{ setSearch(selected.company); setTab("invoices"); setSelected(null); }} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">View Invoices</button>
+                <button onClick={()=>openEditAccount(selected)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Edit Account</button>
               </div>
             </div>
           </div>
@@ -350,6 +403,42 @@ export default function CorporateBilling() {
             <div className="flex gap-3 mt-5">
               <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
               <button onClick={handleCreateAccount} disabled={!newAccount.company} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Create Account</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEdit&&(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold">Edit Corporate Account</h2>
+              <button onClick={()=>setShowEdit(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                {label:"Company Name",key:"company",placeholder:"e.g. Accenture Ltd",col:"2"},
+                {label:"Contact Person",key:"contactName",placeholder:"HR/Finance manager",col:"1"},
+                {label:"Email",key:"email",placeholder:"billing@company.com",col:"1"},
+                {label:"Phone",key:"phone",placeholder:"+91 XXXXX",col:"1"},
+                {label:"GST Number",key:"gstNo",placeholder:"GSTIN",col:"1"},
+                {label:"Credit Limit (₹)",key:"creditLimit",placeholder:"100000",col:"1"},
+              ].map(f=>(
+                <div key={f.key} className={f.col==="2"?"col-span-2":""}>
+                  <label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  <input value={(editAccount as any)[f.key]} onChange={e=>setEditAccount(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                </div>
+              ))}
+              <div className="col-span-2">
+                <label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Account Tier</label>
+                <div className="flex gap-2">
+                  {Object.entries(TIER_CFG).map(([t,c])=><button key={t} onClick={()=>setEditAccount(p=>({...p,tier:t}))} className={`flex-1 py-2 rounded-lg text-xs font-semibold border capitalize transition-all ${editAccount.tier===t?`${c.bg} border-white/20 ${c.color}`:"border-white/10 bg-white/5 text-white/50"}`}>{c.label}</button>)}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={()=>setShowEdit(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+              <button onClick={submitEditAccount} disabled={editSaving||!editAccount.company} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40"><Save className="h-4 w-4"/>{editSaving?"Saving…":"Save Changes"}</button>
             </div>
           </div>
         </div>

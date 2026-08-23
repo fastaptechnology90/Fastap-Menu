@@ -9,6 +9,7 @@ import { DataTable } from "@/components/shared/DataTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
+import { downloadCsv } from "@/lib/download";
 import { AlertTriangle, RefreshCw, Loader2, Search, Download, XCircle, CreditCard, Key, Smartphone, FileText, RotateCcw } from "lucide-react";
 
 export default function ErrorLogs() {
@@ -36,6 +37,21 @@ export default function ErrorLogs() {
   const qrErrors = errorLogs.filter((l: any) => l.errorType === "QR Failure").length;
   const criticalErrors = errorLogs.filter((l: any) => l.severity === "critical").length;
 
+  const handleExport = () => {
+    if (!filtered.length) { toast({ title: "Nothing to export", description: "No error logs loaded." }); return; }
+    downloadCsv(filtered.map((l: any) => ({
+      "Log ID": l.id,
+      Type: l.errorType ?? "",
+      Message: l.message ?? "",
+      Source: l.source ?? "",
+      Vendor: l.vendorName ?? "",
+      "Retry #": l.retryCount ?? 0,
+      Severity: l.severity ?? "",
+      Timestamp: l.timestamp ? new Date(l.timestamp).toLocaleString() : "",
+    })), `error-logs-${new Date().toISOString().split("T")[0]}.csv`);
+    toast({ title: "Error logs exported" });
+  };
+
   const errorTypeIcon: Record<string, React.ReactNode> = {
     "Payment Failure": <CreditCard className="h-3.5 w-3.5" />,
     "API Failure": <Key className="h-3.5 w-3.5" />,
@@ -59,7 +75,7 @@ export default function ErrorLogs() {
           <p className="text-muted-foreground">Payment failures, API errors, login failures, QR errors, settlement failures.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => toast({ title: "Exporting error logs..." })}><Download className="mr-2 h-4 w-4" /> Export</Button>
+          <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
           <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
@@ -114,12 +130,13 @@ export default function ErrorLogs() {
                 <Badge variant={severityVariant[row.severity] ?? "secondary"} className="text-[10px] uppercase">{row.severity}</Badge>
               )},
               { header: "Timestamp", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.timestamp).toLocaleString()}</span> },
-              { header: "Actions", cell: (row: any) => (
+              { header: "Actions", cell: (_row: any) => (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toast({ title: `Retrying ${row.id}...` })}>
+                  {/* No backend endpoint for error-log retry/escalate — disabled until an API exists. */}
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" disabled title="Retry API not available">
                     <RotateCcw className="h-3 w-3 mr-1" /> Retry
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-400" onClick={() => toast({ title: "Escalating to engineering..." })}>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-400" disabled title="Escalate API not available">
                     Escalate
                   </Button>
                 </div>

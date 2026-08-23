@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
+import { useToast } from "@/hooks/use-toast";
 import { buildScanUrl } from "@/lib/smartEntry";
 import { QrCode, Plus, Download, RefreshCw, Eye, Copy, Smartphone, Wifi, Trash2, Edit2, Check, Table2, BedDouble } from "lucide-react";
 import QRCode from "qrcode";
@@ -38,6 +39,7 @@ function QRCodeSVG({ value, size = 120 }: { value: string; size?: number }) {
 
 export default function QRManagement() {
   const { restaurantId, restaurant } = useRestaurant();
+  const { toast } = useToast();
   const [qrcodes, setQrcodes] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
   const [rooms, setRooms] = useState<{ number: string }[]>([]);
@@ -72,6 +74,28 @@ export default function QRManagement() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [restaurantId]);
 
+  // Render the QR for a URL to a high-res PNG and trigger a real file download.
+  async function handleDownload(value: string, filename: string) {
+    try {
+      const url = await QRCode.toDataURL(value, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 512,
+        color: { dark: "#1e1b4b", light: "#ffffff" },
+      });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast({ title: "QR downloaded", description: filename });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Download failed", description: e instanceof Error ? e.message : "Could not render the QR image.", variant: "destructive" });
+    }
+  }
+
   async function handleGenerate(tableId?: number, tableName?: string, roomNumber?: string) {
     if (!restaurantId) return;
     const normalizedRoom = roomNumber?.trim();
@@ -80,19 +104,31 @@ export default function QRManagement() {
       return;
     }
     const name = tableName || normalizedRoom || newName || "General QR";
-    await apiFetch(`/restaurants/${restaurantId}/qrcodes`, {
-      method: "POST",
-      body: JSON.stringify({ tableId, label: name, type: normalizedRoom ? "room" : newType, roomNumber: normalizedRoom }),
-    });
-    const updated = await apiFetch(`/restaurants/${restaurantId}/qrcodes`);
-    setQrcodes(Array.isArray(updated) ? updated : []);
-    setShowAdd(false); setNewName("");
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/qrcodes`, {
+        method: "POST",
+        body: JSON.stringify({ tableId, label: name, type: normalizedRoom ? "room" : newType, roomNumber: normalizedRoom }),
+      });
+      const updated = await apiFetch(`/restaurants/${restaurantId}/qrcodes`);
+      setQrcodes(Array.isArray(updated) ? updated : []);
+      setShowAdd(false); setNewName("");
+      toast({ title: "QR code saved", description: `“${name}” is ready.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to generate QR", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleDelete(id: number) {
     if (!restaurantId) return;
-    await apiFetch(`/restaurants/${restaurantId}/qrcodes/${id}`, { method: "DELETE" });
-    setQrcodes(prev => prev.filter(q => q.id !== id));
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/qrcodes/${id}`, { method: "DELETE" });
+      setQrcodes(prev => prev.filter(q => q.id !== id));
+      toast({ title: "QR code deleted" });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to delete QR", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   function handleCopy(url: string, id: number) {
@@ -148,7 +184,7 @@ export default function QRManagement() {
               <button onClick={() => handleCopy(baseUrl, 0)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
                 {copied === 0 ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied === 0 ? "Copied!" : "Copy URL"}
               </button>
-              <button onClick={() => handleGenerate()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
+              <button onClick={() => handleDownload(baseUrl, `${venueSlug || "restaurant"}-menu-qr.png`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
                 <Download className="h-3 w-3" /> Download
               </button>
             </div>
@@ -159,7 +195,7 @@ export default function QRManagement() {
       <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg w-fit border border-slate-700/50">
         {(["table", "room", "general"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${tab === t ? "bg-violet-600 text-white" : "text-slate-400 hover:text-white"}`}>
-            {t === "table" ? `Tables (${tableQRs.length})` : t === "room" ? `Rooms (${roomQRs.length})` : `General (${generalQRs.length})`}
+            {t === "table" ? `Tables (${tables.length || tableQRs.length})` : t === "room" ? `Rooms (${rooms.length || roomQRs.length})` : `General (${generalQRs.length})`}
           </button>
         ))}
       </div>
@@ -183,6 +219,9 @@ export default function QRManagement() {
                     </button>
                     <button onClick={() => handleGenerate(table.id, table.name)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
                       <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Create"}
+                    </button>
+                    <button title="Download QR" onClick={() => handleDownload(url, `${venueSlug || "restaurant"}-table-${table.name}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                      <Download className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
@@ -220,6 +259,9 @@ export default function QRManagement() {
                     <button onClick={() => handleGenerate(undefined, undefined, roomNum)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
                       <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Create"}
                     </button>
+                    <button title="Download QR" onClick={() => handleDownload(qr?.url || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -243,6 +285,9 @@ export default function QRManagement() {
               <div className="flex gap-2 w-full">
                 <button onClick={() => handleCopy(qr.url || baseUrl, qr.id)} className="flex-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors text-sm">
                   {copied === qr.id ? "Copied!" : "Copy Link"}
+                </button>
+                <button title="Download QR" onClick={() => handleDownload(qr.url || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                  <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => handleDelete(qr.id)} className="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors">
                   <Trash2 className="h-3.5 w-3.5" />

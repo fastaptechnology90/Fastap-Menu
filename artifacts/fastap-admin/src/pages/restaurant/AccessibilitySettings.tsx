@@ -1,24 +1,52 @@
 import { useState, useEffect } from "react";
-import { Accessibility, Languages, Save, Check, Loader } from "lucide-react";
+import { Accessibility, Languages, Save, Check, Loader, AlertCircle } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AccessibilitySettings() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [settings, setSettings] = useState<any>(null);
+  const [loadError, setLoadError] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!restaurantId) return;
-    platformApi.accessibility(restaurantId).then(setSettings).catch(() => {});
+    setLoadError(false);
+    platformApi.accessibility(restaurantId).then(setSettings).catch((e: any) => {
+      // Don't leave the page stuck on the spinner forever — surface an error state.
+      setLoadError(true);
+      toast({ variant: "destructive", title: "Could not load settings", description: e?.message || "Failed to load accessibility settings." });
+    });
   }, [restaurantId]);
 
   async function save() {
     if (!restaurantId || !settings) return;
     const { catalog, ...payload } = settings;
-    await platformApi.updateAccessibility(restaurantId, payload).catch(() => {});
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      await platformApi.updateAccessibility(restaurantId, payload);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast({ title: "Accessibility settings saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save accessibility settings." });
+    }
+  }
+
+  if (loadError && !settings) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-5 flex items-start gap-3 max-w-lg">
+          <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-200">Couldn't load accessibility settings</p>
+            <p className="text-xs text-white/50 mt-1">Check your connection and try again.</p>
+            <button onClick={() => { setLoadError(false); if (restaurantId) platformApi.accessibility(restaurantId).then(setSettings).catch(() => setLoadError(true)); }} className="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-black text-sm font-bold">Retry</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!settings) {

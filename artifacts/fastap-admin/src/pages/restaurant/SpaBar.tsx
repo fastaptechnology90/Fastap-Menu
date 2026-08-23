@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Leaf, Wine, Calendar, Clock, Users, Plus, X, CheckCircle, Star, Package, Droplets, FlaskConical, Scissors, Dumbbell } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { spa as spaApi, barApi, staff as staffApi } from "@/lib/api";
+import { spa as spaApi, barApi, staff as staffApi, roomService as roomServiceApi } from "@/lib/api";
+import { FEATURES } from "@/lib/featureFlags";
+import { ModulePackages } from "@/components/restaurant/ModulePackages";
 
 type SpaBooking = {
   id: string; guest: string; room: string; service: string; therapist: string;
@@ -39,8 +41,12 @@ export default function SpaBar() {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [catFilter, setCatFilter] = useState("all");
   const [showBook, setShowBook] = useState(false);
-  const [newBook, setNewBook] = useState({ guest:"", room:"", serviceId:"", therapist:"", time:"", notes:"" });
+  const [newBook, setNewBook] = useState({ guest:"", room:"", serviceId:"", therapist:"", time:"", notes:"", discount:"" });
   const [selectedRecipe, setSelectedRecipe] = useState<CocktailRecipe | null>(null);
+  // Bar → room charge (WIP — gated)
+  const [barCart, setBarCart] = useState<{ id:string; name:string; price:number; qty:number }[]>([]);
+  const [barRoom, setBarRoom] = useState("");
+  const [chargingBar, setChargingBar] = useState(false);
 
   const todayLabel = new Date().toLocaleDateString();
 
@@ -56,7 +62,7 @@ export default function SpaBar() {
       const mappedBookings = (Array.isArray(bookingRows) ? bookingRows : []).map((b: any) => ({
         id: String(b.id),
         guest: b.customerName || b.guestName || "Guest",
-        room: b.roomNumber || "—",
+        room: b.roomNumber || b.metadata?.roomNumber || "—",
         service: b.serviceName || b.notes || "Spa Service",
         therapist: b.therapist || "",
         time: b.scheduledAt ? new Date(b.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
@@ -130,6 +136,29 @@ export default function SpaBar() {
     }
   }
 
+  function addBarItem(item: BarItem) {
+    setBarCart(c => {
+      const ex = c.find(x => x.id === item.id);
+      if (ex) return c.map(x => x.id === item.id ? { ...x, qty: x.qty + 1 } : x);
+      return [...c, { id: item.id, name: item.name, price: item.price, qty: 1 }];
+    });
+  }
+  const barCartTotal = barCart.reduce((s, c) => s + c.price * c.qty, 0);
+  async function chargeBarToRoom() {
+    if (!restaurantId || !barRoom.trim() || barCart.length === 0 || chargingBar) return;
+    setChargingBar(true);
+    try {
+      await roomServiceApi.createRequest(restaurantId, {
+        roomNumber: barRoom.trim(), type: "bar",
+        items: barCart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+        notes: `Bar: ${barCart.map(c => `${c.qty}x ${c.name}`).join(", ")}`,
+        total: barCartTotal, paymentMethod: "room_bill",
+      });
+      setBarCart([]); setBarRoom("");
+    } catch (e) { console.error(e); }
+    finally { setChargingBar(false); }
+  }
+
   const spaRevenue = bookings.reduce((s,b)=>s+b.amount,0);
   const spaToday = bookings.filter(b => b.date === todayLabel).length;
   const spaPending = bookings.filter(b=>b.status==="pending").length;
@@ -165,6 +194,8 @@ export default function SpaBar() {
           </div>
         ))}
       </div>
+
+      <ModulePackages restaurantId={restaurantId} module="spa" title="Spa & Bar Packages / Plans" label="Plan" />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit overflow-x-auto no-scrollbar">
@@ -277,11 +308,24 @@ export default function SpaBar() {
               <button key={c} onClick={()=>setCatFilter(c)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border capitalize transition-all ${catFilter===c?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/40"}`}>{c==="all"?"All Categories":c}</button>
             ))}
           </div>
+          {FEATURES.hotelReception && (
+            <div className="bg-[#0e1520] border border-amber-500/20 rounded-2xl p-4">
+              <p className="text-sm font-bold mb-1 flex items-center gap-2"><Wine className="h-4 w-4 text-amber-400"/>Charge to Room</p>
+              <p className="text-xs text-white/30 mb-3">Neeche items pe click karke cart me daalo, room number bharo, phir Charge — bill us room ke folio me chala jayega.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input value={barRoom} onChange={e=>setBarRoom(e.target.value)} placeholder="Room No." className="w-28 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                <div className="flex-1 min-w-0 text-xs text-white/50 truncate">{barCart.length ? barCart.map(c=>`${c.qty}x ${c.name}`).join(", ") : "No items yet — tap items below"}</div>
+                <span className="text-sm font-bold text-amber-400">₹{barCartTotal}</span>
+                {barCart.length>0 && <button onClick={()=>setBarCart([])} className="text-xs text-white/40 hover:text-white px-2">Clear</button>}
+                <button onClick={chargeBarToRoom} disabled={!barRoom.trim()||barCart.length===0||chargingBar} className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">{chargingBar?"…":"Charge"}</button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredBar.map(item=>{
               const cfg = CATEGORY_CFG[item.category]||CATEGORY_CFG.cocktail;
               return (
-                <button key={item.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 text-left hover:border-white/10 transition-all">
+                <button key={item.id} onClick={FEATURES.hotelReception ? ()=>addBarItem(item) : undefined} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 text-left hover:border-white/10 transition-all">
                   <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center mb-3 ${cfg.color}`}><cfg.icon className="h-5 w-5"/></div>
                   <p className="text-sm font-bold">{item.name}</p>
                   <p className="text-xs text-amber-400 font-extrabold mt-0.5">₹{item.price}</p>
@@ -396,25 +440,42 @@ export default function SpaBar() {
               <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Special Notes</label>
                 <textarea value={newBook.notes} onChange={e=>setNewBook(p=>({...p,notes:e.target.value}))} rows={2} placeholder="Allergies, preferences..." className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
               </div>
+              {FEATURES.hotelReception && (
+                <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Discount ₹ (in-house guest)</label>
+                  <input type="number" value={newBook.discount} onChange={e=>setNewBook(p=>({...p,discount:e.target.value}))} placeholder="0" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                  <p className="text-[11px] text-white/30 mt-1">Room number bharoge to bill us room ke folio me add ho jayega.</p>
+                </div>
+              )}
               <div className="flex gap-3">
                 <button onClick={()=>setShowBook(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
                 <button onClick={async ()=>{
                   const svc = packages.find(p=>p.id===newBook.serviceId);
                   if(!newBook.guest || !restaurantId) return;
+                  // Build a full datetime from the time input (today + HH:MM); default to now.
+                  const scheduledAt = (() => {
+                    if (!newBook.time) return new Date().toISOString();
+                    const [h, m] = newBook.time.split(":");
+                    const d = new Date(); d.setHours(parseInt(h) || 0, parseInt(m) || 0, 0, 0);
+                    return d.toISOString();
+                  })();
+                  const room = FEATURES.hotelReception && newBook.room && !/walk/i.test(newBook.room) ? newBook.room.trim() : undefined;
                   try {
                     await spaApi.createBooking(restaurantId, {
-                      guestName: newBook.guest, room: newBook.room || "Walk-in",
-                      serviceName: svc?.name || "Spa Service", therapist: newBook.therapist,
-                      scheduledTime: newBook.time, notes: newBook.notes, amount: svc?.price || 0,
+                      serviceId: newBook.serviceId ? Number(newBook.serviceId) : undefined,
+                      serviceName: svc?.name || "Spa Service",
+                      guestName: newBook.guest, therapist: newBook.therapist,
+                      scheduledAt, duration: 60, price: svc?.price || 0, notes: newBook.notes,
+                      ...(room ? { roomNumber: room, discount: Number(newBook.discount) || 0 } : {}),
                     });
                     const refreshed = await spaApi.bookings(restaurantId);
                     setBookings((Array.isArray(refreshed) ? refreshed : []).map((b: any) => ({
-                      id: String(b.id), guest: b.guestName || b.guest, room: b.room || "—",
-                      service: b.serviceName || b.service, therapist: b.therapist || "—",
-                      time: b.scheduledTime || b.time || "—", status: b.status || "pending",
-                      amount: parseFloat(String(b.amount ?? 0)), date: todayLabel, notes: b.notes || "",
+                      id: String(b.id), guest: b.guestName || "—", room: b.roomNumber || b.metadata?.roomNumber || "—",
+                      service: b.serviceName || "—", therapist: b.therapist || "—",
+                      time: b.scheduledAt ? new Date(b.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+                      status: b.status || "pending",
+                      amount: parseFloat(String(b.price ?? 0)), date: todayLabel, notes: b.notes || "",
                     })));
-                    setNewBook({guest:"",room:"",serviceId:packages[0]?.id || "",therapist:therapists[0]?.name || "",time:"",notes:""});
+                    setNewBook({guest:"",room:"",serviceId:packages[0]?.id || "",therapist:therapists[0]?.name || "",time:"",notes:"",discount:""});
                     setShowBook(false);
                   } catch (e) { console.error(e); }
                 }} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Book Now</button>

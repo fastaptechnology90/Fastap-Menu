@@ -264,7 +264,9 @@ export default function Vendors() {
             { header: "Plan", cell: (row) => <Badge variant="outline" className="capitalize text-xs">{row.plan}</Badge> },
             { header: "Status", cell: (row) => {
               const deleted = Boolean((row as any).platformControls?.deletedAt);
-              return <StatusBadge status={deleted ? "Deleted" : row.isActive ? "Active" : "Suspended"} />;
+              // A not-yet-approved registration is "Pending Approval", not "Suspended".
+              const pending = !row.isActive && (row as any).kycStatus === "pending";
+              return <StatusBadge status={deleted ? "Deleted" : row.isActive ? "Active" : pending ? "Pending Approval" : "Suspended"} />;
             } },
             { header: "Health", cell: (row) => { const s = getHealthScore(row); return <span className={`font-bold text-sm ${getHealthColor(s)}`}>{s}</span>; } },
             { header: "Orders", cell: (row) => <span className="font-medium">{row.totalOrders}</span> },

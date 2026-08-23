@@ -8,10 +8,12 @@ import { IMAGES } from "@/lib/media";
 type Step = 1 | 2 | 3 | 4;
 
 const REQUIRED_BUSINESS_DOCS = [
-  { id: "gst_certificate", label: "GST registration certificate", required: true },
-  { id: "fssai_license", label: "FSSAI license copy", required: true },
-  { id: "business_registration", label: "Business registration / Shop Act license", required: true },
-  { id: "bank_proof", label: "Bank proof (cancelled cheque or statement)", required: true },
+  // ALL KYC documents are OPTIONAL at registration. If the owner uploads them, the Fastap
+  // team verifies them; if not, the super admin can still approve the venue manually.
+  { id: "gst_certificate", label: "GST registration certificate", required: false },
+  { id: "fssai_license", label: "FSSAI license copy", required: false },
+  { id: "business_registration", label: "Business registration / Shop Act license", required: false },
+  { id: "bank_proof", label: "Bank proof (cancelled cheque or statement)", required: false },
 ] as const;
 
 type RegDocument = {
@@ -32,6 +34,39 @@ const BUSINESS_TYPES = [
 ];
 
 const STEPS = ["Account", "Business", "KYC", "Review"];
+
+// Auto-fill State/City from a 6-digit Indian PIN. Uses the free India Post API, and
+// falls back to a first-2-digit → state map so State still fills when offline.
+const PIN2_STATE: Record<string, string> = {
+  "11": "Delhi", "12": "Haryana", "13": "Haryana", "14": "Punjab", "15": "Punjab", "16": "Punjab",
+  "17": "Himachal Pradesh", "18": "Jammu & Kashmir", "19": "Jammu & Kashmir",
+  "20": "Uttar Pradesh", "21": "Uttar Pradesh", "22": "Uttar Pradesh", "23": "Uttar Pradesh",
+  "24": "Uttar Pradesh", "25": "Uttar Pradesh", "26": "Uttar Pradesh", "27": "Uttar Pradesh", "28": "Uttar Pradesh",
+  "30": "Rajasthan", "31": "Rajasthan", "32": "Rajasthan", "33": "Rajasthan", "34": "Rajasthan",
+  "36": "Gujarat", "37": "Gujarat", "38": "Gujarat", "39": "Gujarat",
+  "40": "Maharashtra", "41": "Maharashtra", "42": "Maharashtra", "43": "Maharashtra", "44": "Maharashtra",
+  "45": "Madhya Pradesh", "46": "Madhya Pradesh", "47": "Madhya Pradesh", "48": "Madhya Pradesh", "49": "Chhattisgarh",
+  "50": "Telangana", "51": "Andhra Pradesh", "52": "Andhra Pradesh", "53": "Andhra Pradesh",
+  "56": "Karnataka", "57": "Karnataka", "58": "Karnataka", "59": "Karnataka",
+  "60": "Tamil Nadu", "61": "Tamil Nadu", "62": "Tamil Nadu", "63": "Tamil Nadu", "64": "Tamil Nadu",
+  "67": "Kerala", "68": "Kerala", "69": "Kerala",
+  "70": "West Bengal", "71": "West Bengal", "72": "West Bengal", "73": "West Bengal", "74": "West Bengal",
+  "75": "Odisha", "76": "Odisha", "77": "Odisha", "78": "Assam", "79": "North East",
+  "80": "Bihar", "81": "Bihar", "82": "Bihar", "83": "Jharkhand", "84": "Bihar", "85": "Bihar",
+};
+function stateFromPin(pin: string): string {
+  return PIN2_STATE[pin.slice(0, 2)] ?? "";
+}
+async function lookupPincode(pin: string): Promise<{ city?: string; state?: string } | null> {
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+    const data = await res.json();
+    const po = data?.[0]?.PostOffice?.[0];
+    if (po?.State) return { city: po.District || po.Block || po.Name || "", state: po.State };
+  } catch { /* offline / blocked → fall back to the prefix map below */ }
+  const st = stateFromPin(pin);
+  return st ? { state: st } : null;
+}
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 1600;
@@ -110,19 +145,6 @@ function compressImage(file: File): Promise<{ blob: Blob; mime: string }> {
     };
     img.src = url;
   });
-}
-
-function hasDoc(docs: RegDocument[], type: string) {
-  return docs.some(d => d.type === type && d.fileUrl?.trim());
-}
-
-function validateOwnerDocuments(docs: RegDocument[]): string | null {
-  for (const req of REQUIRED_BUSINESS_DOCS) {
-    if (req.required && !hasDoc(docs, req.id)) {
-      return `Upload required document: ${req.label}`;
-    }
-  }
-  return null;
 }
 
 function DocUploadField({
@@ -210,6 +232,7 @@ export default function RestaurantRegister() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
   const [restaurantPhone, setRestaurantPhone] = useState("");
   const [restaurantEmail, setRestaurantEmail] = useState("");
   const [website, setWebsite] = useState("");
@@ -235,6 +258,21 @@ export default function RestaurantRegister() {
 
   function getDoc(type: string) {
     return documents.find(d => d.type === type);
+  }
+
+  // Auto-fill City + State once the PIN is 6 digits.
+  async function handlePincode(v: string) {
+    const digits = v.replace(/\D/g, "").slice(0, 6);
+    setPincode(digits);
+    if (digits.length === 6) {
+      setPinLoading(true);
+      const r = await lookupPincode(digits);
+      if (r) {
+        if (r.state) setState(r.state);
+        if (r.city) setCity(r.city);
+      }
+      setPinLoading(false);
+    }
   }
 
   async function submitRegistration() {
@@ -290,25 +328,8 @@ export default function RestaurantRegister() {
       setError("Restaurant name and address are required");
       return false;
     }
-    if (step === 3) {
-      if (!gstNumber.trim() || !fssaiNumber.trim()) {
-        setError("GST and FSSAI numbers are both required");
-        return false;
-      }
-      if (!panNumber.trim()) {
-        setError("Business PAN number is required");
-        return false;
-      }
-      if (!bankAccount.trim() || !ifsc.trim()) {
-        setError("Bank account and IFSC are required");
-        return false;
-      }
-      const docErr = validateOwnerDocuments(documents);
-      if (docErr) {
-        setError(docErr);
-        return false;
-      }
-    }
+    // Step 3 (KYC & compliance) is fully OPTIONAL — no field or document blocks the flow.
+    // Whatever the owner provides is verified by the team; the super admin approves.
     return true;
   }
 
@@ -317,10 +338,24 @@ export default function RestaurantRegister() {
     if (step < STEPS.length) setStep((step + 1) as Step);
   }
 
+  // Full cross-step validation for final submit. Only the owner account (step 1) and the
+  // basic business details (step 2) are required. KYC & compliance (step 3) — bank details
+  // and all documents — is OPTIONAL: the super admin verifies/approves after submission.
+  function firstIncompleteStep(): { step: Step; msg: string } | null {
+    if (!ownerName || !ownerEmail || ownerPassword.length < 6 || ownerPhone.replace(/\D/g, "").length < 10) {
+      return { step: 1, msg: "Complete name, email, mobile, and password (6+ chars)" };
+    }
+    if (!restaurantName || !address) {
+      return { step: 2, msg: "Restaurant name and address are required" };
+    }
+    return null;
+  }
+
   function handleSubmit() {
-    const docErr = validateOwnerDocuments(documents);
-    if (docErr) {
-      setError(docErr);
+    const bad = firstIncompleteStep();
+    if (bad) {
+      setStep(bad.step);
+      setError(bad.msg);
       return;
     }
     void submitRegistration();
@@ -336,7 +371,7 @@ export default function RestaurantRegister() {
             </div>
             <h1 className="text-2xl font-bold">Registration submitted</h1>
             <p className="text-white/60 text-sm leading-relaxed">
-              <span className="text-amber-400 font-semibold">{submittedVenue}</span> has been sent to the super admin panel for KYC review.
+              <span className="text-amber-400 font-semibold">{submittedVenue}</span> has been sent to the Fastap team for KYC review.
               You will be able to sign in to the restaurant dashboard only after your documents are approved.
             </p>
             <p className="text-xs text-white/40">
@@ -386,14 +421,22 @@ export default function RestaurantRegister() {
 
           <div className="flex gap-1 mb-6 overflow-x-auto">
             {STEPS.map((label, i) => (
-              <div
+              <button
+                type="button"
                 key={label}
-                className={`flex-shrink-0 flex-1 min-w-[4rem] text-center text-[10px] sm:text-xs py-2 px-1 rounded-lg border ${
+                onClick={() => {
+                  // Free navigation — clicking any tab opens that step directly.
+                  // Data integrity is still enforced by the Continue button and the
+                  // final "Submit for approval" (which jumps to the first incomplete step).
+                  setError("");
+                  setStep((i + 1) as Step);
+                }}
+                className={`flex-shrink-0 flex-1 min-w-[4rem] text-center text-[10px] sm:text-xs py-2 px-1 rounded-lg border transition-colors cursor-pointer hover:border-white/30 ${
                   step === i + 1 ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : step > i + 1 ? "border-emerald-500/30 text-emerald-400" : "border-white/10 text-white/30"
                 }`}
               >
                 {label}
-              </div>
+              </button>
             ))}
           </div>
 
@@ -415,11 +458,14 @@ export default function RestaurantRegister() {
                 {BUSINESS_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
               <input className="field" placeholder="Street address" value={address} onChange={e => setAddress(e.target.value)} />
+              <div className="relative">
+                <input className="field w-full" placeholder="PIN code (auto-fills city & state)" value={pincode} onChange={e => handlePincode(e.target.value)} inputMode="numeric" maxLength={6} />
+                {pinLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-amber-400">…</span>}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input className="field" placeholder="City" value={city} onChange={e => setCity(e.target.value)} />
                 <input className="field" placeholder="State" value={state} onChange={e => setState(e.target.value)} />
               </div>
-              <input className="field" placeholder="PIN code" value={pincode} onChange={e => setPincode(e.target.value)} />
               <input className="field" placeholder="Business phone" value={restaurantPhone} onChange={e => setRestaurantPhone(e.target.value)} />
               <input className="field" placeholder="Business email (optional)" type="email" value={restaurantEmail} onChange={e => setRestaurantEmail(e.target.value)} />
               <input className="field" placeholder="Website (optional)" value={website} onChange={e => setWebsite(e.target.value)} />
@@ -429,17 +475,20 @@ export default function RestaurantRegister() {
           {step === 3 && (
             <div className="space-y-3">
               <h2 className="text-xl font-bold mb-4">KYC & compliance</h2>
-              <input className="field" placeholder="Legal business name" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
-              <input className="field" placeholder="GST number" value={gstNumber} onChange={e => setGstNumber(e.target.value)} />
-              <input className="field" placeholder="FSSAI license number" value={fssaiNumber} onChange={e => setFssaiNumber(e.target.value)} />
-              <input className="field" placeholder="PAN number" value={panNumber} onChange={e => setPanNumber(e.target.value)} />
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-200/90">
+                This whole step is optional. Fill in whatever you have — our team verifies it. You can also submit now and the admin will approve your venue.
+              </div>
+              <input className="field" placeholder="Legal business name (optional)" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
+              <input className="field" placeholder="GST number (optional)" value={gstNumber} onChange={e => setGstNumber(e.target.value)} />
+              <input className="field" placeholder="FSSAI license number (optional)" value={fssaiNumber} onChange={e => setFssaiNumber(e.target.value)} />
+              <input className="field" placeholder="PAN number (optional)" value={panNumber} onChange={e => setPanNumber(e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
-                <input className="field" placeholder="Bank account" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
-                <input className="field" placeholder="IFSC code" value={ifsc} onChange={e => setIfsc(e.target.value)} />
+                <input className="field" placeholder="Bank account (optional)" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
+                <input className="field" placeholder="IFSC code (optional)" value={ifsc} onChange={e => setIfsc(e.target.value)} />
               </div>
               <div className="border border-white/10 rounded-xl p-4 space-y-3 mt-2">
                 <p className="text-xs text-white/50 font-semibold uppercase">Business & compliance documents</p>
-                <p className="text-[11px] text-white/40">GST certificate, FSSAI license, business registration, and bank proof are mandatory.</p>
+                <p className="text-[11px] text-white/40">All documents are optional. Upload what you have (GST, FSSAI, business registration, bank proof) — the team will verify them during KYC review.</p>
                 {REQUIRED_BUSINESS_DOCS.map(def => (
                   <DocUploadField
                     key={def.id}
@@ -461,7 +510,7 @@ export default function RestaurantRegister() {
               <p><span className="text-white/40">Venue:</span> {restaurantName} ({businessType})</p>
               <p><span className="text-white/40">Address:</span> {[address, city, state, pincode].filter(Boolean).join(", ")}</p>
               <p><span className="text-white/40">GST:</span> {gstNumber || "—"} · <span className="text-white/40">FSSAI:</span> {fssaiNumber || "—"}</p>
-              <p><span className="text-white/40">Documents:</span> {documents.length} attached ({REQUIRED_BUSINESS_DOCS.filter(d => d.required && hasDoc(documents, d.id)).length}/{REQUIRED_BUSINESS_DOCS.filter(d => d.required).length} business)</p>
+              <p><span className="text-white/40">Documents:</span> {documents.length} attached <span className="text-white/30">(optional — admin verifies)</span></p>
               <p className="text-xs text-white/40 pt-2">
                 By submitting you confirm the business information is accurate. Your venue will be activated after super admin verification.
               </p>

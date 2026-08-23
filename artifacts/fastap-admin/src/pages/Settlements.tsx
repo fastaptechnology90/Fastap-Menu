@@ -49,8 +49,9 @@ export default function Settlements() {
   const heldTotal = held.reduce((sum, s) => sum + s.finalPayout, 0);
 
   function fmtMoney(n: number) {
-    if (n >= 1_000_000) return `₹${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `₹${(n / 1_000).toFixed(0)}K`;
+    if (n >= 1_000_000) return `₹${(Math.floor(n / 100_000) / 10).toFixed(1)}M`;
+    // One-decimal, truncated (not rounded up) — so ₹4,678 shows as ₹4.6K, not ₹5K.
+    if (n >= 1_000) return `₹${(Math.floor(n / 100) / 10).toFixed(1)}K`;
     return `₹${n.toLocaleString("en-IN")}`;
   }
 

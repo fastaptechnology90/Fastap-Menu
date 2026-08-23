@@ -7,15 +7,64 @@ import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, 
 
 const CATEGORIES = ["All", "Starters", "Main Course", "Desserts", "Beverages", "Breads", "Special"];
 
+// Backend stores diet as a `dietaryTags` array (not an `isVeg` flag) and category as a
+// `categoryId` FK (not a name) — map both ways so add/edit actually persist.
+function dietaryFromTags(tags: any): "veg" | "non-veg" {
+  const arr = (Array.isArray(tags) ? tags : []).map((t: any) => String(t).toLowerCase());
+  return arr.some(t => /non|egg|chicken|mutton|meat|fish|prawn/.test(t)) ? "non-veg" : "veg";
+}
+function mapItem(i: any, nameOf: (id: any) => string): any {
+  return {
+    ...i, id: String(i.id),
+    category: nameOf(i.categoryId),
+    subcategory: i.subcategory || "",
+    price: parseFloat(i.price) || 0,
+    cost: parseFloat(i.cost) || 0,
+    dietary: dietaryFromTags(i.dietaryTags),
+    available: i.isAvailable ?? true,
+    featured: i.isFeatured ?? false,
+    spiceLevel: i.spiceLevel || 0,
+    prepTime: i.prepTime || 15,
+    calories: i.calories || 0,
+    description: i.description || "",
+    ingredients: [], allergens: [],
+  };
+}
+
 export default function MenuManagement() {
   const { restaurantId } = useRestaurant();
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    if (!restaurantId) return;
+    const [data, cats] = await Promise.all([
+      menuApi.items(restaurantId).catch(() => []),
+      menuApi.categories(restaurantId).catch(() => []),
+    ]);
+    const catList = Array.isArray(cats) ? cats : [];
+    setCategories(catList.map((c: any) => ({ id: c.id, name: c.name })));
+    const nameOf = (id: any) => catList.find((c: any) => c.id === id)?.name || "Uncategorized";
+    setItems(Array.isArray(data) ? data.map((i: any) => mapItem(i, nameOf)) : []);
+  }
+
+  // Resolve a category name → its id, creating the category if it doesn't exist yet.
+  async function resolveCategoryId(name: string): Promise<number | undefined> {
+    if (!name || !restaurantId) return undefined;
+    const found = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
+    if (found) return found.id;
+    try {
+      const c = await menuApi.createCategory(restaurantId, { name });
+      setCategories(prev => [...prev, { id: c.id, name: c.name }]);
+      return c.id;
+    } catch { return undefined; }
+  }
 
   useEffect(() => {
     if (!restaurantId) return;
     setLoading(true);
-    menuApi.items(restaurantId).then(data => setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), category: i.category || "Main Course", subcategory: i.subcategory || "", price: parseFloat(i.price) || 0, cost: parseFloat(i.cost) || 0, dietary: i.isVeg ? "veg" : "non-veg", available: i.isAvailable ?? true, featured: i.isFeatured ?? false, spiceLevel: i.spiceLevel || 0, prepTime: i.preparationTime || 15, calories: i.calories || 0, description: i.description || "", ingredients: [], allergens: [] })) : [])).catch(() => {}).finally(() => setLoading(false));
+    reload().finally(() => setLoading(false));
   }, [restaurantId]);
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
@@ -40,39 +89,38 @@ export default function MenuManagement() {
 
   async function handleSaveEdit() {
     if (!editItem || !restaurantId) return;
-    await menuApi.updateItem(restaurantId, parseInt(editItem.id), { name: editItem.name, price: String(editItem.price), description: editItem.description, isAvailable: editItem.available }).catch(() => {});
+    const categoryId = await resolveCategoryId(editItem.category);
+    await menuApi.updateItem(restaurantId, parseInt(editItem.id), {
+      name: editItem.name, price: String(editItem.price), description: editItem.description,
+      categoryId, dietaryTags: [editItem.dietary || "veg"],
+      spiceLevel: editItem.spiceLevel ?? 0, prepTime: editItem.prepTime ?? 15,
+      calories: editItem.calories ?? 0, isFeatured: editItem.featured ?? false,
+      isAvailable: editItem.available,
+    }).catch(() => {});
     setItems(prev => prev.map(i => i.id === editItem.id ? editItem : i));
     setEditItem(null);
   }
 
   async function handleAddItem() {
     if (!newItem.name || !newItem.price || !restaurantId) return;
-    await menuApi.createItem(restaurantId, { name: newItem.name, price: String(newItem.price), category: newItem.category || "Main Course", description: newItem.description || "", isVeg: newItem.dietary === "veg" });
-    const data = await menuApi.items(restaurantId);
-    setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), dietary: i.isVeg ? "veg" : "non-veg", available: i.isAvailable ?? true, featured: i.isFeatured ?? false, price: parseFloat(i.price) || 0 })) : []);
+    const categoryId = await resolveCategoryId(newItem.category || "Main Course");
+    await menuApi.createItem(restaurantId, {
+      name: newItem.name, price: String(newItem.price), description: newItem.description || "",
+      categoryId, dietaryTags: [newItem.dietary || "veg"],
+      spiceLevel: newItem.spiceLevel ?? 0, prepTime: newItem.prepTime ?? 15,
+      calories: newItem.calories ?? 0, isFeatured: newItem.featured ?? false,
+      isAvailable: newItem.available ?? true,
+    }).catch(() => {});
+    await reload();
     setAddMode(false);
     setNewItem({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
-    return;
-    const item: MenuItem = {
-      id: `m${Date.now()}`,
-      name: newItem.name!,
-      category: newItem.category || "Main Course",
-      subcategory: newItem.subcategory || "",
-      price: newItem.price!,
-      cost: newItem.cost || 0,
-      dietary: newItem.dietary || "veg",
-      available: true,
-      featured: newItem.featured || false,
-      spiceLevel: newItem.spiceLevel || 0,
-      prepTime: newItem.prepTime || 15,
-      calories: newItem.calories || 0,
-      description: newItem.description || "",
-      ingredients: [],
-      allergens: [],
-    };
-    setItems(prev => [...prev, item]);
-    setAddMode(false);
-    setNewItem({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
+  }
+
+  async function handleDelete(id: string) {
+    if (!restaurantId) return;
+    if (!confirm("Delete this menu item?")) return;
+    setItems(prev => prev.filter(i => i.id !== id));
+    await menuApi.deleteItem(restaurantId, parseInt(id)).catch(() => {});
   }
 
   return (
@@ -184,7 +232,7 @@ export default function MenuManagement() {
                         </button>
                         </PermissionGate>
                         <PermissionGate permission="add_menu">
-                        <button onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))} className="h-7 w-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all">
+                        <button onClick={() => handleDelete(item.id)} className="h-7 w-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all">
                           <Trash2 className="h-3 w-3" />
                         </button>
                         </PermissionGate>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Sparkles, Wand2, Image, TrendingUp, Brain, BarChart3, MessageSquare, Star, Zap, ChevronRight, Loader, CheckCircle } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { aiApi, feedbackApi } from "@/lib/api";
+import { aiApi, feedbackApi, menu } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 
@@ -14,10 +15,13 @@ type MenuOpt = { action: string; item: string; reason: string; urgency: string }
 
 export default function AIFeatures() {
   const { restaurantId, restaurant, isRestaurantPublished } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("menu-gen");
   const [dishName, setDishName] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<any>(null);
+  const [addingToMenu, setAddingToMenu] = useState(false);
+  const [addedToMenu, setAddedToMenu] = useState(false);
   const [question, setQuestion] = useState("");
   const [answers, setAnswers] = useState<{ q: string; a: string }[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
@@ -55,6 +59,7 @@ export default function AIFeatures() {
   async function generateDish() {
     if (!dishName || !restaurantId) return;
     setGenerating(true);
+    setAddedToMenu(false);
     try {
       const data = await aiApi.generateMenu(restaurantId, dishName);
       setGenerated(data);
@@ -62,6 +67,30 @@ export default function AIFeatures() {
       setGenerated(null);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function addGeneratedToMenu() {
+    if (!restaurantId || !generated) return;
+    setAddingToMenu(true);
+    try {
+      await menu.createItem(restaurantId, {
+        name: generated.name,
+        description: generated.description || "",
+        price: Number(generated.suggestedPrice) || 0,
+        category: generated.category || undefined,
+        cuisine: generated.cuisine || undefined,
+        calories: Number(generated.calories) || undefined,
+        allergens: Array.isArray(generated.allergens) ? generated.allergens : undefined,
+        ingredients: Array.isArray(generated.ingredients) ? generated.ingredients : undefined,
+        isAvailable: true,
+      });
+      setAddedToMenu(true);
+      toast({ title: "Added to menu", description: `${generated.name} was created as a menu item.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Could not add to menu", description: e?.message || "Failed to create the menu item." });
+    } finally {
+      setAddingToMenu(false);
     }
   }
 
@@ -169,8 +198,8 @@ export default function AIFeatures() {
                     ))}
                   </div>
                 </div>
-                <button className="w-full mt-2 py-2 rounded-xl bg-violet-500 text-white text-xs font-bold hover:bg-violet-600 transition-all">
-                  Add to Menu
+                <button onClick={addGeneratedToMenu} disabled={addingToMenu || addedToMenu} className="w-full mt-2 py-2 rounded-xl bg-violet-500 text-white text-xs font-bold hover:bg-violet-600 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
+                  {addingToMenu ? <><Loader className="h-3.5 w-3.5 animate-spin" /> Adding…</> : addedToMenu ? <><CheckCircle className="h-3.5 w-3.5" /> Added to Menu</> : "Add to Menu"}
                 </button>
               </div>
             )}
@@ -189,7 +218,7 @@ export default function AIFeatures() {
                 { label: "Menu Card", icon: "📋", desc: "Digital menu card design" },
                 { label: "Festival Offer", icon: "🎉", desc: "Seasonal campaign visual" },
               ].map(a => (
-                <button key={a.label} className="p-3 bg-white/5 hover:bg-white/8 border border-white/5 hover:border-violet-500/30 rounded-xl text-left transition-all group">
+                <button key={a.label} onClick={() => toast({ title: "Not available yet", description: `${a.label} generation is coming soon (NEEDS API).` })} className="p-3 bg-white/5 hover:bg-white/8 border border-white/5 hover:border-violet-500/30 rounded-xl text-left transition-all group">
                   <p className="text-xl mb-1">{a.icon}</p>
                   <p className="text-sm font-semibold group-hover:text-violet-300 transition-colors">{a.label}</p>
                   <p className="text-xs text-white/40">{a.desc}</p>
@@ -198,7 +227,7 @@ export default function AIFeatures() {
             </div>
             <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-400 shrink-0" />
-              <p className="text-xs text-amber-300">AI generates captions, hashtags & designs automatically</p>
+              <p className="text-xs text-amber-300"><strong>NEEDS API</strong> — asset generation is not wired to a backend yet; these buttons are placeholders.</p>
             </div>
           </div>
         </div>

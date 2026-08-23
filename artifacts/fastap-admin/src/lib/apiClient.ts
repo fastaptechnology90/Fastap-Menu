@@ -118,7 +118,7 @@ export const api = {
       request<Settlement>(`/superadmin/settlements/${id}/retry`, { method: "POST" }),
   },
   analytics: {
-    summary: () => request<AnalyticsSummary>("/superadmin/analytics/summary"),
+    summary: (period?: string) => request<AnalyticsSummary>(`/superadmin/analytics/summary${period ? `?period=${period}` : ""}`),
     revenueSeries: () => request<{ name: string; value: number; commission: number; orders: number }[]>("/superadmin/analytics/revenue-series"),
     extended: () => request<any>("/superadmin/analytics/extended"),
   },
@@ -171,6 +171,9 @@ export const api = {
     approve: (id: string) => request<any>(`/superadmin/kyc/${id}/approve`, { method: "POST" }),
     reject: (id: string, reason: string) => request<any>(`/superadmin/kyc/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
     requestMore: (id: string) => request<any>(`/superadmin/kyc/${id}/request-more`, { method: "POST" }),
+    documents: (vendorId: string | number) => request<any[]>(`/superadmin/vendors/${vendorId}/documents`),
+    verifyDocument: (docId: number, status: "verified" | "rejected", reason?: string) =>
+      request<any>(`/superadmin/documents/${docId}/verify`, { method: "POST", body: JSON.stringify({ status, reason }) }),
   },
   refunds: {
     list: () => request<Refund[]>("/superadmin/refunds"),

@@ -388,10 +388,10 @@ export default function WaitlistQueue() {
             )}
 
             <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4 flex gap-3">
-              <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-semibold">
+              <button onClick={() => navigate("/user/support")} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-semibold hover:bg-blue-500/30">
                 <MessageSquare className="h-4 w-4" /> Message Host
               </button>
-              <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-semibold">
+              <button onClick={() => navigate("/user/support")} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30">
                 <Phone className="h-4 w-4" /> Call Reception
               </button>
             </div>

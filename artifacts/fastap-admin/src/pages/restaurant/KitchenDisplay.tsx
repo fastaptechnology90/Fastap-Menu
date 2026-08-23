@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
-import { ChefHat, Volume2, VolumeX, Flame, Bell, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play } from "lucide-react";
+import { ChefHat, Volume2, VolumeX, Flame, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play } from "lucide-react";
 
 function Timer({ start, targetMins = 20 }: { start: Date; targetMins?: number }) {
   const [elapsed, setElapsed] = useState(Math.floor((Date.now() - new Date(start).getTime()) / 1000));
@@ -90,6 +90,14 @@ export default function KitchenDisplay() {
     }
     prevCount.current = newCount;
   }, [liveOrders, soundOn]);
+
+  // Auto-accept: when enabled, freshly-arrived pending ("new") orders are advanced
+  // to "accepted" automatically so the kitchen doesn't have to acknowledge each one.
+  useEffect(() => {
+    if (!autoAccept) return;
+    const pending = liveOrders.filter(o => o.status === "new" && isKitchenActive(o));
+    pending.forEach(o => updateOrderStatus(o.id, "accepted"));
+  }, [autoAccept, liveOrders]);
 
   const target = targetTimes[station] || 20;
 
@@ -242,7 +250,7 @@ export default function KitchenDisplay() {
                               <button onClick={()=>bump(order,"preparing")} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/30 transition-all flex items-center justify-center gap-1">
                                 <Play className="h-3 w-3"/>Start Cooking
                               </button>
-                              <button className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"><Printer className="h-3.5 w-3.5"/></button>
+                              <button onClick={() => window.print()} title="Print KOT" className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"><Printer className="h-3.5 w-3.5"/></button>
                             </>
                           )}
                           {col.key==="preparing"&&(
@@ -251,12 +259,9 @@ export default function KitchenDisplay() {
                             </button>
                           )}
                           {col.key==="ready"&&(
-                            <>
-                              <button onClick={()=>bump(order,"served")} className="flex-1 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-all flex items-center justify-center gap-1">
-                                <Bell className="h-3 w-3"/>Notify Waiter
-                              </button>
-                              <button onClick={()=>bump(order,"served")} className="flex-1 py-2 rounded-lg bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold hover:bg-teal-500/30 transition-all">✓ Served</button>
-                            </>
+                            <button onClick={()=>bump(order,"served")} className="flex-1 py-2 rounded-lg bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold hover:bg-teal-500/30 transition-all flex items-center justify-center gap-1">
+                              <CheckCircle className="h-3 w-3"/>Serve
+                            </button>
                           )}
                         </div>
                       </div>

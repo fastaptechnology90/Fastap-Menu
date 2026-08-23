@@ -2,33 +2,42 @@ import { useState, useEffect, useCallback } from "react";
 import { Building2, Users, MapPin, Plus, X, ChevronRight, Truck, DollarSign, CheckCircle } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { branches as branchesApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 
 type Branch = {
   id: string; name: string; city: string; manager: string; status: string;
-  tables: number; revenue: number; orders: number; rating: number; staff: number;
+  tables: number | null; revenue: number | null; orders: number | null; rating: number | null; staff: number | null;
   openSince: string; type: string;
 };
 
 function mapBranch(b: any): Branch {
   const created = b.createdAt ? new Date(b.createdAt).toLocaleDateString([], { month: "short", year: "numeric" }) : "—";
+  // Per-branch operational metrics aren't returned by the branches API — keep them null
+  // so the UI shows "—"/"N/A" instead of fabricated zeros. Use real values if present.
+  const num = (v: any): number | null => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
   return {
     id: String(b.id),
     name: b.name,
     city: b.address || "—",
     manager: b.phone || "—",
     status: b.isActive === false ? "inactive" : "active",
-    tables: 0,
-    revenue: 0,
-    orders: 0,
-    rating: 0,
-    staff: 0,
+    tables: num(b.tableCount ?? b.tables),
+    revenue: num(b.revenue ?? b.totalRevenue),
+    orders: num(b.orders ?? b.orderCount),
+    rating: num(b.rating ?? b.avgRating),
+    staff: num(b.staffCount ?? b.staff),
     openSince: created,
     type: "company-owned",
   };
 }
+
+// Display helpers for possibly-missing per-branch metrics.
+const revenueLabel = (v: number | null) => (v == null ? "N/A" : `₹${(v / 1000).toFixed(0)}K`);
+const metricLabel = (v: number | null) => (v == null ? "—" : String(v));
+const ratingLabel = (v: number | null) => (v == null ? "—" : `${v}★`);
 
 type FranchiseeRow = { id: string; name: string; branch: string; owner: string; royalty: number; status: string; dueDate: string; contract: string; phone: string };
 type TransferRow = { id: string; from: string; to: string; items: string; status: string; date: string; requestedBy: string; value: number };
@@ -38,12 +47,15 @@ type Tab = "branches"|"franchise"|"transfers"|"analytics";
 
 export default function MultiBranchFranchise() {
   const { restaurantId, restaurant, isRestaurantPublished } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("branches");
   const [branchList, setBranchList] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Branch | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newBranch, setNewBranch] = useState({ name:"", city:"", manager:"", type:"company-owned" });
+  const [editBranch, setEditBranch] = useState<{ id: string; name: string; city: string; manager: string } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [franchisees, setFranchisees] = useState<FranchiseeRow[]>([]);
   const [transfers, setTransfers] = useState<TransferRow[]>([]);
@@ -81,24 +93,62 @@ export default function MultiBranchFranchise() {
       setNewBranch({ name:"", city:"", manager:"", type:"company-owned" });
       setShowAdd(false);
       await loadBranches();
-    } catch (e) { console.error(e); }
+      toast({ title: "Branch added" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Could not add branch", description: e?.message || "Failed to create the branch." });
+    }
+  }
+
+  function openManageBranch(branch: Branch) {
+    setSelected(null);
+    setEditBranch({ id: branch.id, name: branch.name, city: branch.city === "—" ? "" : branch.city, manager: branch.manager === "—" ? "" : branch.manager });
+  }
+
+  async function handleUpdateBranch() {
+    if (!editBranch || !editBranch.name || !restaurantId) return;
+    setSavingEdit(true);
+    try {
+      await branchesApi.update(restaurantId, parseInt(editBranch.id, 10), {
+        name: editBranch.name,
+        address: editBranch.city,
+        phone: editBranch.manager,
+      });
+      setEditBranch(null);
+      await loadBranches();
+      toast({ title: "Branch updated" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Could not update branch", description: e?.message || "Failed to save branch changes." });
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function markFranchisePaid(id: string) {
     if (!restaurantId) return;
     const updated = franchisees.map(f => f.id === id ? { ...f, status: "paid" as const } : f);
-    await branchesApi.updateFranchise(restaurantId, updated);
-    setFranchisees(updated);
+    try {
+      await branchesApi.updateFranchise(restaurantId, updated);
+      setFranchisees(updated);
+      toast({ title: "Marked as paid" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Could not update franchise", description: e?.message || "Failed to record payment." });
+    }
   }
 
   async function approveTransfer(id: string) {
     if (!restaurantId) return;
     const updated = transfers.map(t => t.id === id ? { ...t, status: "in-transit" as const } : t);
-    await branchesApi.updateStockTransfers(restaurantId, updated);
-    setTransfers(updated);
+    try {
+      await branchesApi.updateStockTransfers(restaurantId, updated);
+      setTransfers(updated);
+      toast({ title: "Transfer approved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Could not approve transfer", description: e?.message || "Failed to update the transfer." });
+    }
   }
 
-  const totalRevenue = isRestaurantPublished ? branchList.reduce((s,b)=>s+b.revenue,0) : 0;
+  const totalRevenue = isRestaurantPublished ? branchList.reduce((s,b)=>s+(b.revenue||0),0) : 0;
   const active = branchList.filter(b=>b.status==="active").length;
   const royaltyDue = isRestaurantPublished ? franchisees.filter(f => f.status !== "paid").reduce((s, f) => s + (f.royalty || 0), 0) : 0;
   const royaltyPaid = isRestaurantPublished ? franchisees.filter(f => f.status === "paid").reduce((s, f) => s + (f.royalty || 0), 0) : 0;
@@ -164,14 +214,14 @@ export default function MultiBranchFranchise() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${branch.type==="franchise"?"bg-violet-500/20 text-violet-400":"bg-blue-500/20 text-blue-400"}`}>{branch.type}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-white/40 mb-3">
-                    <MapPin className="h-3 w-3"/>{branch.city} · Manager: {branch.manager} · {branch.tables} tables
+                    <MapPin className="h-3 w-3"/>{branch.city} · Manager: {branch.manager} · {metricLabel(branch.tables)} tables
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      {label:"Revenue",value:`₹${(branch.revenue/1000).toFixed(0)}K`,color:"text-amber-400"},
-                      {label:"Orders",value:branch.orders,color:"text-blue-400"},
-                      {label:"Rating",value:`${branch.rating}★`,color:"text-yellow-400"},
-                      {label:"Staff",value:branch.staff,color:"text-violet-400"},
+                      {label:"Revenue",value:revenueLabel(branch.revenue),color:"text-amber-400"},
+                      {label:"Orders",value:metricLabel(branch.orders),color:"text-blue-400"},
+                      {label:"Rating",value:ratingLabel(branch.rating),color:"text-yellow-400"},
+                      {label:"Staff",value:metricLabel(branch.staff),color:"text-violet-400"},
                     ].map(m=>(
                       <div key={m.label} className="bg-white/5 rounded-xl p-2 text-center">
                         <p className={`text-base font-extrabold ${m.color}`}>{m.value}</p>
@@ -219,7 +269,7 @@ export default function MultiBranchFranchise() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <button onClick={() => f.status !== "paid" && markFranchisePaid(f.id)} disabled={f.status === "paid"} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${f.status!=="paid"?"bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30":"bg-white/5 text-white/30"}`}>{f.status==="paid"?"Receipt":"Mark Paid"}</button>
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-white/50 hover:bg-white/10">Message</button>
+                  <button disabled title="NEEDS API — franchisee messaging endpoint not available" className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-white/30 opacity-50 cursor-not-allowed">Message</button>
                 </div>
               </div>
             </div>
@@ -230,7 +280,7 @@ export default function MultiBranchFranchise() {
       {tab==="transfers"&&(
         <div className="space-y-3">
           <div className="flex justify-end">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-semibold">
+            <button disabled title="NEEDS API — no endpoint to create a stock transfer request" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold opacity-50 cursor-not-allowed">
               <Truck className="h-4 w-4 text-amber-400"/>Request Transfer
             </button>
           </div>
@@ -273,7 +323,9 @@ export default function MultiBranchFranchise() {
           <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
             <h3 className="font-bold mb-4">Branch Performance Comparison</h3>
             <div className="space-y-4">
-              {branchList.filter(b=>b.status==="active").sort((a,b)=>b.revenue-a.revenue).map((branch,i)=>(
+              {branchList.filter(b=>b.status==="active").sort((a,b)=>(b.revenue||0)-(a.revenue||0)).map((branch,i)=>{
+                const pct = totalRevenue > 0 ? ((branch.revenue||0)/totalRevenue)*100 : 0;
+                return (
                 <div key={branch.id}>
                   <div className="flex items-center justify-between text-xs mb-1.5">
                     <div className="flex items-center gap-2">
@@ -281,15 +333,16 @@ export default function MultiBranchFranchise() {
                       <span className="font-semibold">{branch.name}, {branch.city}</span>
                     </div>
                     <div className="flex items-center gap-3 text-white/50">
-                      <span className="text-amber-400 font-bold">₹{(branch.revenue/1000).toFixed(0)}K</span>
-                      <span>{branch.rating}★</span>
+                      <span className="text-amber-400 font-bold">{revenueLabel(branch.revenue)}</span>
+                      <span>{ratingLabel(branch.rating)}</span>
                     </div>
                   </div>
                   <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-500 transition-all" style={{width:`${(branch.revenue/totalRevenue)*100}%`}}/>
+                    <div className="h-full rounded-full bg-amber-500 transition-all" style={{width:`${pct}%`}}/>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -306,10 +359,10 @@ export default function MultiBranchFranchise() {
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  {label:"Revenue",value:`₹${(selected.revenue/1000).toFixed(0)}K`,color:"text-amber-400"},
-                  {label:"Orders",value:selected.orders,color:"text-blue-400"},
-                  {label:"Rating",value:`${selected.rating}★`,color:"text-yellow-400"},
-                  {label:"Staff",value:selected.staff,color:"text-violet-400"},
+                  {label:"Revenue",value:revenueLabel(selected.revenue),color:"text-amber-400"},
+                  {label:"Orders",value:metricLabel(selected.orders),color:"text-blue-400"},
+                  {label:"Rating",value:ratingLabel(selected.rating),color:"text-yellow-400"},
+                  {label:"Staff",value:metricLabel(selected.staff),color:"text-violet-400"},
                 ].map(m=>(
                   <div key={m.label} className="bg-white/5 rounded-xl p-3 text-center border border-white/8">
                     <p className={`text-xl font-extrabold ${m.color}`}>{m.value}</p>
@@ -320,7 +373,7 @@ export default function MultiBranchFranchise() {
               <div className="bg-white/5 rounded-xl p-3 space-y-2 text-sm">
                 {[
                   {label:"Manager",value:selected.manager},
-                  {label:"Tables",value:selected.tables},
+                  {label:"Tables",value:metricLabel(selected.tables)},
                   {label:"Open Since",value:selected.openSince},
                   {label:"Type",value:selected.type==="franchise"?"Franchise Partner":"Company Owned"},
                 ].map(r=>(
@@ -331,8 +384,8 @@ export default function MultiBranchFranchise() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">View Reports</button>
-                <button className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Manage Branch</button>
+                <button disabled title="NEEDS API — per-branch reports endpoint not available" className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold opacity-50 cursor-not-allowed">View Reports</button>
+                <button onClick={() => selected && openManageBranch(selected)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Manage Branch</button>
               </div>
             </div>
           </div>
@@ -365,6 +418,33 @@ export default function MultiBranchFranchise() {
               <div className="flex gap-3">
                 <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
                 <button onClick={handleAddBranch} disabled={!newBranch.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Add Branch</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage / Edit Branch Modal */}
+      {editBranch&&(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold">Manage Branch</h2>
+              <button onClick={()=>setEditBranch(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="space-y-4">
+              {[
+                {label:"Branch Name",key:"name",placeholder:"e.g. Powai"},
+                {label:"Address / City",key:"city",placeholder:"e.g. Mumbai"},
+                {label:"Contact Phone",key:"manager",placeholder:"Branch contact number"},
+              ].map(f=>(
+                <div key={f.key}><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  <input value={(editBranch as any)[f.key]} onChange={e=>setEditBranch(p=>p?{...p,[f.key]:e.target.value}:p)} placeholder={f.placeholder} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                </div>
+              ))}
+              <div className="flex gap-3">
+                <button onClick={()=>setEditBranch(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+                <button onClick={handleUpdateBranch} disabled={!editBranch.name||savingEdit} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
               </div>
             </div>
           </div>

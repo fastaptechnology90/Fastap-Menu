@@ -44,7 +44,7 @@ export default function Fraud() {
         <KpiCard title="Active Alerts" value={active.length} icon={<ShieldAlert className="h-4 w-4 text-destructive" />} />
         <KpiCard title="High Risk (≥75)" value={highRisk.length} icon={<ShieldBan className="h-4 w-4 text-orange-500" />} />
         <KpiCard title="Blocked Amount" value={fmtINRFull(alerts.reduce((s, a) => s + a.amount, 0))} icon={<FileSearch className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="AI Accuracy" value="94.2%" icon={<ShieldCheck className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="AI Accuracy" value="—" icon={<ShieldCheck className="h-4 w-4 text-green-500" />} />
       </div>
       <Card>
         <CardHeader className="pb-3">

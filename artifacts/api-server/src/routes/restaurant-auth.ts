@@ -454,7 +454,9 @@ const STAFF_ROLES = new Set([
 ]);
 const VENUE_CREATOR_ROLES = new Set(["owner", "franchise"]);
 
-const REQUIRED_BUSINESS_DOC_TYPES = ["gst_certificate", "fssai_license", "business_registration", "bank_proof"] as const;
+// ALL KYC documents are OPTIONAL at registration. Whatever the owner uploads is verified
+// by the Fastap team; if nothing is uploaded, the super admin approves the venue manually.
+const REQUIRED_BUSINESS_DOC_TYPES: readonly string[] = [];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   gst_certificate: "GST registration certificate",
@@ -605,18 +607,9 @@ router.post("/restaurant-auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Restaurant name and address are required" });
     return;
   }
-  if (!gstNumber?.trim() || !fssaiNumber?.trim()) {
-    res.status(400).json({ error: "GST and FSSAI numbers are both required" });
-    return;
-  }
-  if (!panNumber?.trim()) {
-    res.status(400).json({ error: "Business PAN number is required" });
-    return;
-  }
-  if (!bankAccount?.trim() || !ifsc?.trim()) {
-    res.status(400).json({ error: "Bank account and IFSC are required" });
-    return;
-  }
+  // KYC & compliance (bank account, IFSC, GST/FSSAI/PAN, documents) is OPTIONAL now.
+  // Registration always goes through as "pending"; the super admin verifies whatever was
+  // provided and approves — or approves manually when nothing was uploaded.
   const docError = validateRegistrationDocuments(documents);
   if (docError) {
     res.status(400).json({ error: docError });

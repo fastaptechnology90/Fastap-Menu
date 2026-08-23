@@ -8,10 +8,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Eye, FileCheck, XCircle, RotateCcw, Search, Loader2 } from "lucide-react";
+import { Eye, FileCheck, XCircle, RotateCcw, Search, Loader2, FileText } from "lucide-react";
 import { api, type KYCRecord } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
+
+// Renders a KYC document preview. A real uploaded image has a long base64 payload;
+// dummy / truncated uploads (e.g. "data:image/png;base64,iVBOR") or broken files can't
+// render — so instead of a blank box we show a clear "re-upload needed" message.
+function DocPreview({ d }: { d: any }) {
+  const [imgError, setImgError] = useState(false);
+  const url: string = d.fileUrl || "";
+  if (!url) return <p className="text-xs text-muted-foreground">No file uploaded.</p>;
+  const isImg = String(d.fileType || "").startsWith("image") || /\.(png|jpe?g|webp|gif)$/i.test(url) || url.startsWith("data:image");
+  const isPdf = String(d.fileType || "").includes("pdf") || /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
+  // A usable data-URL image needs real base64 after the comma. Anything tiny is a dummy/truncated upload.
+  const looksBroken = url.startsWith("data:") && (url.split(",")[1]?.length ?? 0) < 100;
+
+  if (isImg && !imgError && !looksBroken) {
+    return <img src={url} alt={d.type} onError={() => setImgError(true)} className="max-h-64 w-full rounded border object-contain bg-black/20" />;
+  }
+  if (isImg) {
+    return (
+      <div className="rounded border border-dashed border-yellow-500/40 bg-yellow-500/5 p-4 text-center">
+        <p className="text-xs font-medium text-yellow-600">Image preview not available</p>
+        <p className="text-[11px] text-muted-foreground mt-1">The uploaded file looks empty or corrupted. Reject it and ask the vendor to re-upload a clear photo/scan.</p>
+        <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-blue-500 underline mt-2">Try opening it ↗</a>
+      </div>
+    );
+  }
+  if (isPdf) return <iframe src={url} title={d.type} className="w-full h-64 rounded border bg-white" />;
+  return <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-blue-500 underline">Open document ↗</a>;
+}
 
 export default function KYC() {
   const [, setLocation] = useLocation();
@@ -19,6 +47,23 @@ export default function KYC() {
   const [search, setSearch] = useState("");
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
   const [rejectReason, setRejectReason] = useState("");
+  const [docsVendor, setDocsVendor] = useState<{ id: string; name: string } | null>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+
+  async function openDocs(vendorId: string, name: string) {
+    setDocsVendor({ id: vendorId, name }); setDocs([]); setDocsLoading(true);
+    try { setDocs(await api.kyc.documents(vendorId)); } catch { setDocs([]); }
+    setDocsLoading(false);
+  }
+  async function verifyDoc(docId: number, status: "verified" | "rejected") {
+    try {
+      await api.kyc.verifyDocument(docId, status);
+      setDocs(prev => prev.map(d => d.id === docId ? { ...d, status: status === "verified" ? "Verified" : "Rejected" } : d));
+      qc.invalidateQueries({ queryKey: ["kyc"] });
+      toast.success(status === "verified" ? "Document approved" : "Document rejected");
+    } catch { toast.error("Failed to update document"); }
+  }
 
   const { data: kycData = [], isLoading } = useQuery({ queryKey: ["kyc"], queryFn: api.kyc.list, refetchInterval: 30000 });
 
@@ -79,6 +124,7 @@ export default function KYC() {
               { header: "Status", cell: (row: KYCRecord) => <StatusBadge status={row.status} /> },
               { header: "Actions", cell: (row: KYCRecord) => (
                 <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" title="View documents" onClick={() => openDocs(row.vendorId, row.vendorName)}><FileText className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" title="View application" onClick={() => setLocation(`/vendors/${row.vendorId}`)}><Eye className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" className="text-green-500" title="Approve All" disabled={row.status === "Approved"} onClick={() => approveMutation.mutate(row.id)}><FileCheck className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" className="text-red-500" title="Reject" onClick={() => { setRejectDialog({ open: true, id: row.id, name: row.vendorName }); setRejectReason(""); }}><XCircle className="h-4 w-4" /></Button>
@@ -100,6 +146,36 @@ export default function KYC() {
               {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Reject & Notify
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!docsVendor} onOpenChange={o => !o && setDocsVendor(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>KYC Documents — {docsVendor?.name}</DialogTitle></DialogHeader>
+          {docsLoading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div> : docs.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No documents uploaded by this vendor.</p>
+          ) : (
+            <div className="space-y-4">
+              {docs.map((d) => {
+                return (
+                  <div key={d.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm capitalize">{String(d.docType || d.type).replace(/_/g, " ")}</p>
+                        <p className="text-xs text-muted-foreground truncate">{d.type}</p>
+                      </div>
+                      <StatusBadge status={d.status} />
+                    </div>
+                    <DocPreview d={d} />
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="text-green-600 border-green-500/30" disabled={d.status === "Verified"} onClick={() => verifyDoc(d.id, "verified")}><FileCheck className="h-3.5 w-3.5 mr-1" /> Approve</Button>
+                      <Button size="sm" variant="outline" className="text-red-500 border-red-500/30" disabled={d.status === "Rejected"} onClick={() => verifyDoc(d.id, "rejected")}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

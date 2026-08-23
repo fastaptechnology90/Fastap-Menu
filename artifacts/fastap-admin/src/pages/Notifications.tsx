@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,14 +64,16 @@ export default function Notifications() {
   const activeAlerts = notifications.filter((n: any) => n.status === "Active" || n.status === "Sent").length;
   const failedCount = notifications.filter((n: any) => n.status === "Failed").length;
 
-  const alertTypeConfig = [
+  // There is no backend endpoint to persist per-alert-type routing config, so these
+  // toggles are kept as local (session-only) preferences and clearly labelled as such.
+  const [alertTypeConfig, setAlertTypeConfig] = useState([
     { type: "Failed Payment", channel: "email", enabled: true },
     { type: "Refund Request", channel: "push", enabled: true },
     { type: "Settlement Due", channel: "email", enabled: true },
     { type: "Expiring Subscription", channel: "sms", enabled: false },
     { type: "Fraud Alert", channel: "push", enabled: true },
     { type: "KYC Rejected", channel: "email", enabled: true },
-  ];
+  ]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -162,7 +164,10 @@ export default function Notifications() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Alert Type Configuration</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Alert Type Configuration</CardTitle>
+            <CardDescription>Local preferences only — not persisted (no settings API).</CardDescription>
+          </CardHeader>
           <CardContent className="space-y-3">
             {alertTypeConfig.map((cfg, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
@@ -170,7 +175,13 @@ export default function Notifications() {
                   <p className="text-sm font-medium">{cfg.type}</p>
                   <p className="text-xs text-muted-foreground capitalize">via {cfg.channel}</p>
                 </div>
-                <Switch defaultChecked={cfg.enabled} onCheckedChange={v => toast({ title: `${cfg.type} alerts ${v ? "enabled" : "disabled"}` })} />
+                <Switch
+                  checked={cfg.enabled}
+                  onCheckedChange={v => {
+                    setAlertTypeConfig(prev => prev.map((c, idx) => idx === i ? { ...c, enabled: v } : c));
+                    toast({ title: `${cfg.type} alerts ${v ? "enabled" : "disabled"} (local only — not saved)` });
+                  }}
+                />
               </div>
             ))}
           </CardContent>

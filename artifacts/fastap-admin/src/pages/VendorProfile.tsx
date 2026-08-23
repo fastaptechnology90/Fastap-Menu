@@ -133,7 +133,15 @@ export default function VendorProfile() {
 
   const updatePlanMutation = useMutation({
     mutationFn: (plan: string) => api.vendors.updatePlan(id, plan),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor", id] }); toast({ title: "Plan updated" }); },
+    onMutate: async (plan: string) => {
+      await qc.cancelQueries({ queryKey: ["vendor", id] });
+      const prev = qc.getQueryData<any>(["vendor", id]);
+      qc.setQueryData<any>(["vendor", id], (old: any) => old ? { ...old, plan } : old);
+      return { prev };
+    },
+    onError: (_e: any, _v: any, ctx: any) => { if (ctx?.prev) qc.setQueryData(["vendor", id], ctx.prev); toast({ title: "Failed to update plan", variant: "destructive" }); },
+    onSuccess: () => toast({ title: "Plan updated" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["vendor", id] }),
   });
 
   const freezePayoutMutation = useMutation({
@@ -214,7 +222,20 @@ export default function VendorProfile() {
 
   const controlsMutation = useMutation({
     mutationFn: (controls: Record<string, boolean>) => api.vendors.setControls(id, controls),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor", id] }); toast({ title: "Vendor controls updated" }); },
+    // Optimistic: flip the switch instantly instead of waiting for the whole (heavy)
+    // vendor profile to refetch — that round-trip was what made the toggle feel slow.
+    onMutate: async (controls) => {
+      await qc.cancelQueries({ queryKey: ["vendor", id] });
+      const prev = qc.getQueryData<any>(["vendor", id]);
+      qc.setQueryData<any>(["vendor", id], (old: any) =>
+        old ? { ...old, platformControls: { ...(old.platformControls ?? {}), ...controls } } : old);
+      return { prev };
+    },
+    onError: (_e, _v, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(["vendor", id], ctx.prev);
+      toast({ title: "Failed to update controls", variant: "destructive" });
+    },
+    onSettled: () => { qc.invalidateQueries({ queryKey: ["vendor", id] }); },
   });
 
   const forceLogoutMutation = useMutation({
@@ -495,7 +516,20 @@ export default function VendorProfile() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="kitchen-features" className="mt-4">
+        <TabsContent value="kitchen-features" className="mt-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg border p-3">
+            <div className="text-sm">
+              <p className="font-medium">Full control (all features)</p>
+              <p className="text-xs text-muted-foreground">Turn on every module for this vendor regardless of plan — e.g. give a free-plan restaurant full access.</p>
+            </div>
+            <Button size="sm" disabled={featuresMutation.isPending || featuresLoading} onClick={() => {
+              const all: Record<string, boolean> = {};
+              for (const m of ((vendorFeatures?.modules ?? []) as any[])) all[m.key] = true;
+              if (Object.keys(all).length) featuresMutation.mutate(all);
+            }}>
+              Grant Full Control
+            </Button>
+          </div>
           <FeatureControlPanel
             title="Kitchen app & module entitlements"
             description="Control all 49 enterprise kitchen systems for this vendor. Overrides apply on top of the subscription plan and sync to the mobile kitchen app and restaurant panel."

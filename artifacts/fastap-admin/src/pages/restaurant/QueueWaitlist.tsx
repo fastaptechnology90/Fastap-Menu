@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Clock, Plus, Check, X, Bell, Users, Timer, Phone, Search, BarChart3, Settings, MessageSquare, ChevronDown, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { queue as queueApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 const PREFS = ["No preference","Window seat","Non-AC","Outdoor","VIP area","Rooftop","Booth","Corner table","High chair needed","Wheelchair accessible","Conference","Near kitchen"];
 
@@ -66,7 +67,9 @@ export default function QueueWaitlist() {
 
   const waiting = queue.filter(q=>q.status==="waiting");
   const notified = queue.filter(q=>q.status==="notified");
-  const seated = queue.filter(q=>q.status==="seated");
+  // Seated guests live in `history` (active `queue` excludes seated/cancelled), so
+  // derive the real "seated today" count from there.
+  const seated = history.filter(q=>q.status==="seated");
   const avgWait = waiting.length ? Math.round(waiting.reduce((s,q)=>s+q.estimatedWait,0)/waiting.length) : 0;
 
   const filtered = queue.filter(q => {
@@ -78,23 +81,39 @@ export default function QueueWaitlist() {
   async function updateStatus(id: string, status: string) {
     if (!restaurantId) return;
     const apiStatus = status === "notified" ? "called" : status;
-    await queueApi.update(restaurantId, parseInt(id, 10), { status: apiStatus }).catch(() => {});
-    await reload();
+    try {
+      await queueApi.update(restaurantId, parseInt(id, 10), { status: apiStatus });
+      await reload();
+      toast({ title: status === "seated" ? "Guest seated" : status === "notified" ? "Guest notified" : status === "cancelled" ? "Removed from queue" : "Queue updated" });
+    } catch (e: any) {
+      toast({ title: "Failed to update queue", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function addToQueue() {
     if (!restaurantId || !form.name) return;
-    await queueApi.add(restaurantId, {
-      guestName: form.name,
-      guestPhone: form.mobile,
-      partySize: parseInt(form.guests) || 2,
-      tablePreference: form.preference,
-      specialRequests: form.note,
-      estimatedWait: waiting.length * avgWaitBuffer + avgWaitBuffer,
-    }).catch(() => {});
-    setForm({ name:"", guests:"2", mobile:"", preference:"No preference", note:"" });
-    setShowAdd(false);
-    await reload();
+    // Enforce the configured max queue capacity.
+    if (queue.length >= maxQueue) {
+      toast({ title: "Queue is full", description: `Maximum capacity of ${maxQueue} reached. Seat or remove a guest first.`, variant: "destructive" });
+      return;
+    }
+    const guestName = form.name;
+    try {
+      await queueApi.add(restaurantId, {
+        guestName: form.name,
+        guestPhone: form.mobile,
+        partySize: parseInt(form.guests) || 2,
+        tablePreference: form.preference,
+        specialRequests: form.note,
+        estimatedWait: waiting.length * avgWaitBuffer + avgWaitBuffer,
+      });
+      setForm({ name:"", guests:"2", mobile:"", preference:"No preference", note:"" });
+      setShowAdd(false);
+      await reload();
+      toast({ title: "Added to queue", description: guestName });
+    } catch (e: any) {
+      toast({ title: "Failed to add to queue", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function notify(id: string) {
@@ -103,8 +122,13 @@ export default function QueueWaitlist() {
 
   async function cancelEntry(id: string) {
     if (!restaurantId) return;
-    await queueApi.update(restaurantId, parseInt(id, 10), { status: "cancelled" }).catch(() => {});
-    await reload();
+    try {
+      await queueApi.update(restaurantId, parseInt(id, 10), { status: "cancelled" });
+      await reload();
+      toast({ title: "Removed from queue" });
+    } catch (e: any) {
+      toast({ title: "Failed to update queue", description: e?.message, variant: "destructive" });
+    }
   }
 
   return (
@@ -124,7 +148,7 @@ export default function QueueWaitlist() {
         {[
           {label:"Waiting",value:waiting.length,icon:Users,color:"text-yellow-400",bg:"bg-yellow-500/10"},
           {label:"Notified",value:notified.length,icon:Bell,color:"text-blue-400",bg:"bg-blue-500/10"},
-          {label:"Seated Today",value:seated.length+12,icon:Check,color:"text-emerald-400",bg:"bg-emerald-500/10"},
+          {label:"Seated Today",value:seated.length,icon:Check,color:"text-emerald-400",bg:"bg-emerald-500/10"},
           {label:"Avg Wait (min)",value:avgWait||"—",icon:Timer,color:"text-amber-400",bg:"bg-amber-500/10"},
         ].map(s=>(
           <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4 flex items-center gap-3`}>
@@ -228,8 +252,8 @@ export default function QueueWaitlist() {
         <div className="rounded-2xl border border-white/8 overflow-hidden">
           <div className="bg-white/[0.02] px-4 py-3 border-b border-white/5 grid grid-cols-3 gap-4">
             {[
-              {label:"Seated Today",value:seated.length+12,color:"text-emerald-400"},
-              {label:"Avg Wait Today",value:`${avgWait||18}m`,color:"text-amber-400"},
+              {label:"Seated Today",value:seated.length,color:"text-emerald-400"},
+              {label:"Avg Wait Today",value:avgWait?`${avgWait}m`:"—",color:"text-amber-400"},
               {label:"No-shows",value:queue.filter(q=>q.status==="cancelled").length,color:"text-red-400"},
             ].map(s=>(
               <div key={s.label} className="text-center">

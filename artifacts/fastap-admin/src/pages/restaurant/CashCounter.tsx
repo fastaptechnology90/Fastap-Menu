@@ -3,16 +3,18 @@ import { Banknote, Lock, Unlock, AlertTriangle, Plus, Minus, CheckCircle, Clock,
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { finance as financeApi } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
+import { toast } from "@/hooks/use-toast";
 
+// Start every count from zero so the cashier physically counts the drawer — no pre-filled fake amounts.
 const DEFAULT_DENOMINATION = [
-  { note: "₹2000", qty: 3, value: 6000 },
-  { note: "₹500", qty: 8, value: 4000 },
-  { note: "₹200", qty: 5, value: 1000 },
-  { note: "₹100", qty: 12, value: 1200 },
-  { note: "₹50", qty: 10, value: 500 },
-  { note: "₹20", qty: 15, value: 300 },
-  { note: "₹10", qty: 20, value: 200 },
-  { note: "Coins", qty: 1, value: 50 },
+  { note: "₹2000", qty: 0, value: 0 },
+  { note: "₹500", qty: 0, value: 0 },
+  { note: "₹200", qty: 0, value: 0 },
+  { note: "₹100", qty: 0, value: 0 },
+  { note: "₹50", qty: 0, value: 0 },
+  { note: "₹20", qty: 0, value: 0 },
+  { note: "₹10", qty: 0, value: 0 },
+  { note: "Coins", qty: 0, value: 0 },
 ];
 
 type ShiftRow = { id: string; cashier: string; role: string; opened: string; closed: string | null; openingBalance: number; closingBalance: number | null; expectedBalance: number; sales: number; refunds: number; status: string };
@@ -96,9 +98,12 @@ export default function CashCounter() {
         staffRole: currentStaff?.role || "cashier",
         openingBalance: parseFloat(openBalance) || 0,
       });
+      toast({ title: "Shift opened", description: `Opening float ₹${(parseFloat(openBalance) || 0).toLocaleString()}.` });
       setShowOpen(false);
       await loadShifts();
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({ title: "Could not open shift", description: e?.message || "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleCloseShift() {
@@ -109,9 +114,12 @@ export default function CashCounter() {
         closingBalance: totalDeclared,
         notes: Math.abs(mismatch) > 50 ? `Mismatch: ₹${mismatch}` : undefined,
       });
+      toast({ title: "Shift closed", description: `Declared ₹${totalDeclared.toLocaleString()}${Math.abs(mismatch) > 50 ? ` · mismatch ₹${mismatch}` : ""}.` });
       setShowClose(false);
       await loadShifts();
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      toast({ title: "Could not close shift", description: e?.message || "Please try again.", variant: "destructive" });
+    }
     finally { setClosing(false); }
   }
 

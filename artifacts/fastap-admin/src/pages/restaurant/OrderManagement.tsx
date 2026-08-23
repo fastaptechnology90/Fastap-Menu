@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, menu as menuApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import {
   Plus, Filter, Search, CheckCircle, XCircle, Clock, ChefHat,
   Truck, RefreshCw, Eye, Printer, Phone, AlertCircle, X, Loader2
@@ -59,8 +60,11 @@ export default function OrderManagement() {
       setNewOrderForm(false);
       setNewOrder({ tableName: "", type: "dine_in", customerName: "", menuItemId: "", qty: 1 });
       await refreshOrders();
-    } catch (e) {
+      toast({ title: "Order created" });
+    } catch (e: any) {
       console.error(e);
+      // Keep the modal open so the user can retry.
+      toast({ title: "Failed to create order", description: e?.message, variant: "destructive" });
     } finally {
       setCreating(false);
     }
@@ -279,7 +283,7 @@ export default function OrderManagement() {
                   Mark as {STATUS_CFG[detailCfg.next!]?.label ?? detailCfg.next}
                 </button>
               )}
-              <button className="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold flex items-center justify-center gap-2">
+              <button onClick={() => window.print()} className="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold flex items-center justify-center gap-2">
                 <Printer className="h-4 w-4" /> Print KOT
               </button>
               {selectedOrder.status !== "cancelled" && (

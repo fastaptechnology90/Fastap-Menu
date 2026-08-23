@@ -141,7 +141,7 @@ export default function Settings() {
                 ))}
                 <div className="space-y-1 pt-2 border-t">
                   <Label>Default Language</Label>
-                  <Select defaultValue="en">
+                  <Select value={(form as any).defaultLanguage || "en"} onValueChange={v => set("defaultLanguage" as any, v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="en">English</SelectItem>
@@ -174,7 +174,7 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1"><Label>Settlement Hold Period (days)</Label><Input type="number" defaultValue={3} /></div>
+                <div className="space-y-1"><Label>Settlement Hold Period (days)</Label><Input type="number" value={(form as any).settlementHoldPeriod ?? 3} onChange={e => set("settlementHoldPeriod" as any, Number(e.target.value))} /></div>
                 <div className="space-y-1"><Label>Settlement Cycle</Label>
                   <Select value={settlementRules?.defaultCycle || form.payoutCycle || "weekly"} onValueChange={v => api.settlementRules.save({ ...settlementRules, defaultCycle: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -208,11 +208,11 @@ export default function Settings() {
                   <Input value={currencyDisplayLabel()} readOnly disabled />
                   <p className="text-xs text-muted-foreground">All panels and apps display amounts in Indian Rupees (₹).</p>
                 </div>
-                <div className="space-y-1"><Label>Default GST Rate (%)</Label><Input type="number" defaultValue={18} /></div>
-                <div className="space-y-1"><Label>TDS Rate (%)</Label><Input type="number" defaultValue={2} /></div>
+                <div className="space-y-1"><Label>Default GST Rate (%)</Label><Input type="number" value={(form as any).defaultGstRate ?? 18} onChange={e => set("defaultGstRate" as any, Number(e.target.value))} /></div>
+                <div className="space-y-1"><Label>TDS Rate (%)</Label><Input type="number" value={(form as any).tdsRate ?? 2} onChange={e => set("tdsRate" as any, Number(e.target.value))} /></div>
                 <div className="flex items-center justify-between pt-2">
                   <div><p className="font-medium text-sm">Tax Invoice Auto-generate</p><p className="text-xs text-muted-foreground">Auto-create invoice on every transaction</p></div>
-                  <Switch defaultChecked />
+                  <Switch checked={(form as any).taxInvoiceAutoGenerate ?? true} onCheckedChange={v => set("taxInvoiceAutoGenerate" as any, v)} />
                 </div>
               </CardContent>
             </Card>
@@ -319,7 +319,7 @@ export default function Settings() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />Data Retention</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />Data Retention</CardTitle><CardDescription>Display-only defaults — no retention-policy API to change these.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
                 {[
                   { label: "Transaction Log Retention", value: "365 days" },

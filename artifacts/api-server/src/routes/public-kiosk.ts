@@ -5,7 +5,7 @@ import {
 } from "@workspace/db";
 import {
   getKioskCatalog, getKioskConfig, generateTokenNumber, buildKioskBill,
-  buildQrPaymentPayload, processNfcTap, tokenStatusLabel,
+  buildQrPaymentPayload, processNfcTap, tokenStatusLabel, getNfcTags,
   type KioskCartItem,
 } from "../lib/smartKioskLogic.js";
 
@@ -63,7 +63,7 @@ router.get("/public/kiosk/catalog", (_req, res) => {
 router.get("/public/kiosk/config/:slug", async (req, res): Promise<void> => {
   const restaurant = await loadRestaurant(req.params.slug);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
-  res.json({ ...getSettings(restaurant.id), restaurantId: restaurant.id, restaurantName: restaurant.name });
+  res.json({ ...getSettings(restaurant.id), nfcTags: getNfcTags(), restaurantId: restaurant.id, restaurantName: restaurant.name });
 });
 
 router.get("/public/kiosk/menu/:slug", async (req, res): Promise<void> => {

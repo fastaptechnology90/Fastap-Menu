@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { Monitor, Save, Check, ShoppingCart, CreditCard, Settings, BarChart3, Smartphone, Clock, TrendingUp, Plus, Minus, RefreshCw, X, Zap, QrCode, Bell } from "lucide-react";
 import { kioskApi, hardwareApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import { QRCodeSVG, downloadQrSvg } from "@/components/restaurant/QRCodeSVG";
@@ -39,6 +40,7 @@ type Tab = "overview"|"settings"|"units"|"preview";
 
 export default function SelfOrderingKiosk() {
   const { restaurantId, restaurant, isRestaurantPublished } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("overview");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
@@ -64,15 +66,28 @@ export default function SelfOrderingKiosk() {
     if (!restaurantId) return;
     kioskApi.settings(restaurantId).then((d:any) => {
       if (d && typeof d === "object" && !d.error) {
+        // Read camelCase FIRST (what we save), falling back to the backend's snake_case
+        // defaults — so saved toggles round-trip consistently across reload.
         setSettings(s=>({
           ...s,
           enabled: d.enabled ?? s.enabled,
-          showAllergens: d.show_allergens ?? d.showAllergens ?? s.showAllergens,
-          showCalories: d.show_calories ?? d.showCalories ?? s.showCalories,
-          defaultLanguage: d.language ?? s.defaultLanguage,
-          idleTimeout: d.idle_timeout ?? d.idleTimeout ?? s.idleTimeout,
-          customBanner: d.welcome_message ?? d.customBanner ?? s.customBanner,
-          themeColor: d.theme_color ?? d.themeColor ?? s.themeColor,
+          showAllergens: d.showAllergens ?? d.show_allergens ?? s.showAllergens,
+          showCalories: d.showCalories ?? d.show_calories ?? s.showCalories,
+          showNutri: d.showNutri ?? s.showNutri,
+          multiLanguage: d.multiLanguage ?? s.multiLanguage,
+          defaultLanguage: d.defaultLanguage ?? d.language ?? s.defaultLanguage,
+          upiEnabled: d.upiEnabled ?? s.upiEnabled,
+          cardEnabled: d.cardEnabled ?? s.cardEnabled,
+          cashEnabled: d.cashEnabled ?? s.cashEnabled,
+          nfcEnabled: d.nfcEnabled ?? s.nfcEnabled,
+          idleTimeout: d.idleTimeout ?? d.idle_timeout ?? s.idleTimeout,
+          receiptPrint: d.receiptPrint ?? s.receiptPrint,
+          receiptSms: d.receiptSms ?? s.receiptSms,
+          showRecommended: d.showRecommended ?? s.showRecommended,
+          upsell: d.upsell ?? s.upsell,
+          tipPrompt: d.tipPrompt ?? s.tipPrompt,
+          customBanner: d.customBanner ?? d.welcome_message ?? s.customBanner,
+          themeColor: d.themeColor ?? d.theme_color ?? s.themeColor,
         }));
       }
     }).catch(()=>{});
@@ -136,8 +151,14 @@ export default function SelfOrderingKiosk() {
 
   async function saveSettings() {
     if (!restaurantId) return;
-    await kioskApi.updateSettings(restaurantId, settings).catch(()=>{});
-    setSaved(true); setTimeout(()=>setSaved(false),2000);
+    try {
+      // Save camelCase keys (same style the loader reads first) so toggles persist on reload.
+      await kioskApi.updateSettings(restaurantId, settings);
+      setSaved(true); setTimeout(()=>setSaved(false),2000);
+      toast({ title: "Kiosk settings saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save kiosk settings." });
+    }
   }
 
   const previewItems = [

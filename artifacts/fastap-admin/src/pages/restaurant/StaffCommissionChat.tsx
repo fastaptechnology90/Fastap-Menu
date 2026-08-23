@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { DollarSign, MessageSquare, Send, CheckSquare, Plus, X, TrendingUp, Award, Users, ChevronRight, Star, Clock, Wallet, Target } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { commissionsApi, tasksSop as tasksApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { toast } from "@/hooks/use-toast";
 
 type CommissionRow = { id: string; name: string; role: string; avatar: string; sales: number; commission: number; tips: number; orders: number; avg: number; rating: number; target: number; shift: string };
 type MessageRow = { id: string; from: string; role: string; body: string; time: string; type: string };
@@ -114,13 +115,76 @@ export default function StaffCommissionChat() {
       type: "message" as const,
     };
     setMessages(m => [...m, optimistic]);
-    await commissionsApi.sendChat(restaurantId, {
-      senderName: currentStaff?.name || "Manager",
-      senderRole: currentStaff?.role || "manager",
-      message: body,
-      messageType: "message",
-      channel: "general",
-    }).catch(() => {});
+    try {
+      await commissionsApi.sendChat(restaurantId, {
+        senderName: currentStaff?.name || "Manager",
+        senderRole: currentStaff?.role || "manager",
+        message: body,
+        messageType: "message",
+        channel: "general",
+      });
+    } catch (e: any) {
+      setMessages(m => m.filter(x => x.id !== optimistic.id));
+      setMsg(body);
+      toast({ title: "Message not sent", description: e?.message || "Could not reach the server.", variant: "destructive" });
+    }
+  }
+
+  const reloadTasks = useCallback(async () => {
+    if (!restaurantId) return;
+    try {
+      const rows: any[] = await tasksApi.tasks(restaurantId);
+      if (Array.isArray(rows)) {
+        setTasks(rows.map(t => ({
+          id: String(t.id),
+          title: t.title || t.name || "Task",
+          assignedTo: t.assignedTo || t.assignee || "Unassigned",
+          priority: t.priority || "normal",
+          status: t.status || "pending",
+          dueBy: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        })));
+      }
+    } catch { /* keep current list */ }
+  }, [restaurantId]);
+
+  async function submitTask() {
+    if (!newTask.title || !restaurantId) return;
+    // Only forward a parseable date to the API; free-text (e.g. "End of shift") is display-only.
+    const parsedDue = newTask.dueBy && !isNaN(Date.parse(newTask.dueBy)) ? newTask.dueBy : undefined;
+    const optimistic: TaskRow = {
+      id: `TK${Date.now()}`,
+      title: newTask.title,
+      assignedTo: newTask.assignedTo || "All Staff",
+      priority: newTask.priority,
+      status: "active",
+      dueBy: newTask.dueBy || "—",
+    };
+    setTasks(t => [optimistic, ...t]);
+    setShowAddTask(false);
+    const payload = { title: optimistic.title, assignedTo: optimistic.assignedTo, priority: newTask.priority, dueDate: parsedDue };
+    setNewTask({ title: "", assignedTo: "", dueBy: "", priority: "normal" });
+    try {
+      await tasksApi.createTask(restaurantId, payload);
+      toast({ title: "Task assigned", description: payload.title });
+      await reloadTasks();
+    } catch (e: any) {
+      setTasks(t => t.filter(x => x.id !== optimistic.id));
+      toast({ title: "Could not assign task", description: e?.message || "Please try again.", variant: "destructive" });
+    }
+  }
+
+  async function toggleTask(task: TaskRow) {
+    if (!restaurantId) return;
+    const newStatus = task.status === "completed" ? "pending" : "completed";
+    const prev = tasks;
+    setTasks(t => t.map(x => x.id === task.id ? { ...x, status: newStatus } : x));
+    try {
+      await tasksApi.updateTask(restaurantId, parseInt(task.id, 10), { status: newStatus });
+      toast({ title: newStatus === "completed" ? "Task completed" : "Task reopened", description: task.title });
+    } catch (e: any) {
+      setTasks(prev);
+      toast({ title: "Could not update task", description: e?.message || "Please try again.", variant: "destructive" });
+    }
   }
 
   const totalSales = commissions.reduce((s,c)=>s+c.sales,0);
@@ -297,7 +361,7 @@ export default function StaffCommissionChat() {
           {tasks.map(task=>(
             <div key={task.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
               <div className="flex items-start gap-3">
-                <button onClick={()=>setTasks(t=>t.map(x=>x.id===task.id?{...x,status:x.status==="completed"?"active":"completed"}:x))} className={`h-6 w-6 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-all ${task.status==="completed"?"bg-emerald-500 border-emerald-500":"border-white/25 hover:border-white/50"}`}>
+                <button onClick={()=>toggleTask(task)} className={`h-6 w-6 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-all ${task.status==="completed"?"bg-emerald-500 border-emerald-500":"border-white/25 hover:border-white/50"}`}>
                   {task.status==="completed"&&<CheckSquare className="h-4 w-4 text-white"/>}
                 </button>
                 <div className="flex-1">
@@ -340,11 +404,7 @@ export default function StaffCommissionChat() {
               </div>
               <div className="flex gap-3">
                 <button onClick={()=>setShowAddTask(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={()=>{
-                  if(!newTask.title)return;
-                  setTasks(t=>[{id:`TK${String(t.length+1).padStart(3,"0")}`,title:newTask.title,assignedTo:newTask.assignedTo||"All Staff",priority:newTask.priority,status:"active",dueBy:newTask.dueBy||"Today"},...t]);
-                  setNewTask({title:"",assignedTo:"",dueBy:"",priority:"normal"});setShowAddTask(false);
-                }} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Assign Task</button>
+                <button onClick={submitTask} disabled={!newTask.title} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Assign Task</button>
               </div>
             </div>
           </div>

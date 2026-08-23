@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { Megaphone, Send, MessageSquare, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CommunicationsCenter() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [history, setHistory] = useState<any[]>([]);
   const [channels, setChannels] = useState<string[]>([]);
   const [form, setForm] = useState({ title: "", message: "", channel: "internal", target: "all-staff" });
@@ -15,7 +17,9 @@ export default function CommunicationsCenter() {
     platformApi.communications(restaurantId).then(d => {
       setHistory(Array.isArray(d.history) ? d.history : []);
       setChannels(d.channels || ["push", "email", "sms", "whatsapp", "internal"]);
-    }).catch(() => {});
+    }).catch((e: any) => {
+      toast({ variant: "destructive", title: "Could not load communications", description: e?.message || "Failed to load broadcast history." });
+    });
   };
 
   useEffect(load, [restaurantId]);
@@ -23,10 +27,16 @@ export default function CommunicationsCenter() {
   async function sendBroadcast() {
     if (!restaurantId || !form.title.trim() || !form.message.trim()) return;
     setSending(true);
-    await platformApi.broadcast(restaurantId, form).catch(() => {});
-    setForm({ title: "", message: "", channel: "internal", target: "all-staff" });
-    load();
-    setSending(false);
+    try {
+      await platformApi.broadcast(restaurantId, form);
+      setForm({ title: "", message: "", channel: "internal", target: "all-staff" });
+      load();
+      toast({ title: "Broadcast sent" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Broadcast failed", description: e?.message || "Could not send the broadcast." });
+    } finally {
+      setSending(false);
+    }
   }
 
   return (

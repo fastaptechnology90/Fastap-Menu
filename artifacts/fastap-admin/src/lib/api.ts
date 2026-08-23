@@ -311,6 +311,8 @@ export const roomService = {
   createRequest: (rid: number, body: any) => post<any>(`/restaurants/${rid}/room-service`, body),
   updateRequest: (rid: number, id: number, body: any) => put<any>(`/restaurants/${rid}/room-service/${id}`, body),
   minibar: (rid: number) => get<any[]>(`/restaurants/${rid}/minibar`),
+  folio: (rid: number, roomNumber: string) => get<any>(`/restaurants/${rid}/rooms/${encodeURIComponent(roomNumber)}/folio`),
+  checkout: (rid: number, roomNumber: string) => post<any>(`/restaurants/${rid}/rooms/${encodeURIComponent(roomNumber)}/checkout`, {}),
 };
 
 // ─── Spa & Bar ────────────────────────────────────────────────────
@@ -322,6 +324,15 @@ export const spa = {
   bookings: (rid: number) => get<any[]>(`/restaurants/${rid}/spa/bookings`),
   createBooking: (rid: number, body: any) => post<any>(`/restaurants/${rid}/spa/bookings`, body),
   updateBooking: (rid: number, id: number, body: any) => put<any>(`/restaurants/${rid}/spa/bookings/${id}`, body),
+};
+
+// ─── Custom module packages / rate cards (events, spa, housekeeping …) ─────────
+export const modulePackages = {
+  list: (rid: number, module: string) => get<any[]>(`/restaurants/${rid}/module-packages/${module}`),
+  create: (rid: number, module: string, body: { name: string; price: number; description?: string; duration?: string }) =>
+    post<any>(`/restaurants/${rid}/module-packages/${module}`, body),
+  remove: (rid: number, module: string, pkgId: string) =>
+    del<any>(`/restaurants/${rid}/module-packages/${module}/${pkgId}`),
 };
 
 // ─── Queue / Waitlist ─────────────────────────────────────────────
@@ -922,6 +933,8 @@ export const platformApi = {
   aggregators: (rid: number) => get<any[]>(`/restaurants/${rid}/platform/aggregators`),
   updateAggregator: (rid: number, id: string, body: any) => put<any>(`/restaurants/${rid}/platform/aggregators/${id}`, body),
   syncAggregator: (rid: number, id: string) => post<any>(`/restaurants/${rid}/platform/aggregators/${id}/sync`, {}),
+  ingestAggregatorOrder: (rid: number, id: string, body: any) => post<any>(`/restaurants/${rid}/platform/aggregators/${id}/ingest-order`, body),
+  ingestOtaBooking: (rid: number, provider: string, body: any) => post<any>(`/restaurants/${rid}/platform/ota/${provider}/ingest-booking`, body),
   sandbox: (rid: number) => get<any>(`/restaurants/${rid}/platform/sandbox`),
   updateSandbox: (rid: number, body: any) => put<any>(`/restaurants/${rid}/platform/sandbox`, body),
   accessibility: (rid: number) => get<any>(`/restaurants/${rid}/platform/accessibility`),

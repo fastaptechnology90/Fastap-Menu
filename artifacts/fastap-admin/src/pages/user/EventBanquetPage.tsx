@@ -7,7 +7,7 @@ import { useUser } from "@/contexts/UserContext";
 import { publicApi } from "@/lib/api";
 import {
   EVENT_TYPES, EVENT_HALLS, SEATING_LAYOUTS, CATERING_PACKAGES, DECORATION_PACKAGES,
-  hallsForEventType, recommendedDecor, computeQuotation,
+  computeQuotation,
   type EventTypeId, type GuestInvitation, type EventQuotation,
 } from "@/lib/eventBanquetCatalog";
 import {
@@ -18,8 +18,42 @@ import {
 type Step = "type" | "hall" | "layout" | "catering" | "decor" | "quote" | "invites" | "success";
 type Tab = "plan" | "my";
 
-function SeatingPreview({ layoutId, guestCount }: { layoutId: string; guestCount: number }) {
-  const layout = SEATING_LAYOUTS.find(l => l.id === layoutId) ?? SEATING_LAYOUTS[0];
+// ── Live-catalog shapes (superset of the local fallback constants) ────────────
+type CatalogHall = { id: string; name: string; capacity: number; area: string; rate: number; image: string; features: readonly string[] | string[]; preview: string };
+type CatalogCatering = { id: string; label: string; icon: string; perGuest: number; desc: string; items: readonly string[] | string[] };
+type CatalogDecor = { id: string; label: string; icon: string; price: number; desc: string };
+type CatalogLayout = { id: string; label: string; icon: string; capacityFactor?: number; desc: string; rows: number; cols: number };
+type CatalogEventType = { id: string; label: string; icon: string; desc?: string; hallTypes: readonly string[] | string[] };
+type EventCatalog = {
+  eventTypes: CatalogEventType[];
+  halls: CatalogHall[];
+  seatingLayouts: CatalogLayout[];
+  cateringPackages: CatalogCatering[];
+  decorationPackages: CatalogDecor[];
+};
+
+// Local constants act as the fallback whenever the live catalog is unavailable/empty.
+const LOCAL_CATALOG: EventCatalog = {
+  eventTypes: EVENT_TYPES as unknown as CatalogEventType[],
+  halls: EVENT_HALLS as unknown as CatalogHall[],
+  seatingLayouts: SEATING_LAYOUTS as unknown as CatalogLayout[],
+  cateringPackages: CATERING_PACKAGES as unknown as CatalogCatering[],
+  decorationPackages: DECORATION_PACKAGES as unknown as CatalogDecor[],
+};
+
+const DECOR_RECOMMENDATIONS: Record<string, string[]> = {
+  wedding: ["wedding", "floral", "theme"],
+  birthday: ["theme", "floral", "minimal"],
+  engagement: ["floral", "theme", "wedding"],
+  corporate: ["corporate", "minimal", "theme"],
+  conference: ["corporate", "minimal"],
+  cocktail: ["minimal", "theme", "floral"],
+  pool_party: ["pool_party", "theme"],
+  live_music: ["live_music", "theme", "minimal"],
+};
+
+function SeatingPreview({ layoutId, guestCount, layouts }: { layoutId: string; guestCount: number; layouts: CatalogLayout[] }) {
+  const layout = layouts.find(l => l.id === layoutId) ?? layouts[0] ?? SEATING_LAYOUTS[0];
   const cells = layout.rows * layout.cols;
   const filled = Math.min(guestCount, cells);
   return (
@@ -70,9 +104,45 @@ export default function EventBanquetPage() {
   const [myEvents, setMyEvents] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const halls = useMemo(() => hallsForEventType(eventType), [eventType]);
-  const decorOptions = useMemo(() => recommendedDecor(eventType), [eventType]);
-  const selectedHall = EVENT_HALLS.find(h => h.id === hallId) ?? halls[0];
+  const [catalog, setCatalog] = useState<EventCatalog>(LOCAL_CATALOG);
+
+  // Fetch the live event catalog for this venue; the local constants stay as the
+  // fallback whenever the endpoint fails or returns an empty section.
+  useEffect(() => {
+    if (!venue.restaurantId) return;
+    let cancelled = false;
+    publicApi.events.catalog(venue.restaurantId)
+      .then((res: Partial<EventCatalog> | null) => {
+        if (cancelled || !res) return;
+        const liveTypes = Array.isArray(res.eventTypes) && res.eventTypes.length
+          ? res.eventTypes.map(t => ({ ...t, desc: t.desc ?? EVENT_TYPES.find(e => e.id === t.id)?.desc ?? "" }))
+          : LOCAL_CATALOG.eventTypes;
+        setCatalog({
+          eventTypes: liveTypes,
+          halls: Array.isArray(res.halls) && res.halls.length ? res.halls : LOCAL_CATALOG.halls,
+          seatingLayouts: Array.isArray(res.seatingLayouts) && res.seatingLayouts.length ? res.seatingLayouts : LOCAL_CATALOG.seatingLayouts,
+          cateringPackages: Array.isArray(res.cateringPackages) && res.cateringPackages.length ? res.cateringPackages : LOCAL_CATALOG.cateringPackages,
+          decorationPackages: Array.isArray(res.decorationPackages) && res.decorationPackages.length ? res.decorationPackages : LOCAL_CATALOG.decorationPackages,
+        });
+      })
+      .catch(() => { /* keep local fallback */ });
+    return () => { cancelled = true; };
+  }, [venue.restaurantId]);
+
+  const halls = useMemo(() => {
+    const t = catalog.eventTypes.find(e => e.id === eventType);
+    if (!t || !Array.isArray(t.hallTypes) || t.hallTypes.length === 0) return catalog.halls;
+    const filtered = catalog.halls.filter(h => t.hallTypes.includes(h.id));
+    return filtered.length ? filtered : catalog.halls;
+  }, [catalog, eventType]);
+
+  const decorOptions = useMemo(() => {
+    const ids = DECOR_RECOMMENDATIONS[eventType] ?? [];
+    const filtered = catalog.decorationPackages.filter(d => ids.includes(d.id));
+    return filtered.length ? filtered : catalog.decorationPackages;
+  }, [catalog, eventType]);
+
+  const selectedHall = catalog.halls.find(h => h.id === hallId) ?? halls[0];
 
   useEffect(() => {
     if (halls.length && !halls.find(h => h.id === hallId)) setHallId(halls[0].id);
@@ -83,9 +153,9 @@ export default function EventBanquetPage() {
   }, [decorOptions, decorId]);
 
   const refreshQuote = useCallback(async () => {
-    const hall = EVENT_HALLS.find(h => h.id === hallId);
-    const catering = CATERING_PACKAGES.find(c => c.id === cateringId);
-    const decor = DECORATION_PACKAGES.find(d => d.id === decorId);
+    const hall = catalog.halls.find(h => h.id === hallId);
+    const catering = catalog.cateringPackages.find(c => c.id === cateringId);
+    const decor = catalog.decorationPackages.find(d => d.id === decorId);
     if (!hall || !catering || !decor) return;
     const local = computeQuotation(hall.rate, guestCount, catering.perGuest, decor.price);
     setQuotation(local);
@@ -95,7 +165,7 @@ export default function EventBanquetPage() {
         setQuotation(res.quotation);
       } catch { /* local quote still shown */ }
     }
-  }, [hallId, guestCount, cateringId, decorId, venue.restaurantId]);
+  }, [hallId, guestCount, cateringId, decorId, venue.restaurantId, catalog]);
 
   useEffect(() => {
     if (step === "quote" || step === "invites") refreshQuote();
@@ -127,11 +197,11 @@ export default function EventBanquetPage() {
 
   async function submitEnquiry() {
     setSubmitting(true);
-    const hall = EVENT_HALLS.find(h => h.id === hallId);
+    const hall = catalog.halls.find(h => h.id === hallId);
     try {
       const res = await publicApi.events.enquiry({
         restaurantId: venue.restaurantId ?? 1,
-        name: eventName || `${EVENT_TYPES.find(t => t.id === eventType)?.label} Event`,
+        name: eventName || `${catalog.eventTypes.find(t => t.id === eventType)?.label} Event`,
         type: eventType,
         eventDate,
         eventTime,
@@ -218,7 +288,7 @@ export default function EventBanquetPage() {
                       <p className="font-semibold">{ev.name}</p>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300">{ev.status}</span>
                     </div>
-                    <p className="text-sm text-white/50">{EVENT_TYPES.find(t => t.id === ev.type)?.icon} {ev.type} · {ev.guestCount} guests</p>
+                    <p className="text-sm text-white/50">{catalog.eventTypes.find(t => t.id === ev.type)?.icon} {ev.type} · {ev.guestCount} guests</p>
                     {quote && <p className="text-sm text-violet-300 mt-1">Quote: ₹{quote.total?.toLocaleString()}</p>}
                     {Array.isArray(meta.guestInvitations) && (
                       <p className="text-xs text-white/40 mt-2">{(meta.guestInvitations as unknown[]).length} invitations sent</p>
@@ -233,8 +303,8 @@ export default function EventBanquetPage() {
             <div className="px-4 mt-4 space-y-4">
               <p className="text-xs text-white/40 uppercase">Select event type</p>
               <div className="grid grid-cols-2 gap-2">
-                {EVENT_TYPES.map(t => (
-                  <button key={t.id} onClick={() => { setEventType(t.id); setStep("hall"); }} className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left ${eventType === t.id ? "bg-violet-500/20 border-violet-500/50" : "bg-white/5 border-white/10"}`}>
+                {catalog.eventTypes.map(t => (
+                  <button key={t.id} onClick={() => { setEventType(t.id as EventTypeId); setStep("hall"); }} className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left ${eventType === t.id ? "bg-violet-500/20 border-violet-500/50" : "bg-white/5 border-white/10"}`}>
                     <span className="text-2xl">{t.icon}</span>
                     <span className="text-sm font-semibold">{t.label}</span>
                     <span className="text-[10px] text-white/40">{t.desc}</span>
@@ -271,7 +341,7 @@ export default function EventBanquetPage() {
           {tab === "plan" && step === "layout" && (
             <div className="px-4 mt-4 space-y-4">
               <p className="text-xs text-white/40 uppercase flex items-center gap-1"><LayoutGrid className="h-3 w-3" /> Seating layout preview</p>
-              {SEATING_LAYOUTS.map(l => (
+              {catalog.seatingLayouts.map(l => (
                 <button key={l.id} onClick={() => setLayoutId(l.id)} className={`w-full rounded-xl border p-3 text-left ${layoutId === l.id ? "border-violet-500/50 bg-violet-500/10" : "border-white/10 bg-white/5"}`}>
                   <p className="font-semibold text-sm">{l.icon} {l.label}</p>
                   <p className="text-xs text-white/40">{l.desc}</p>
@@ -282,7 +352,7 @@ export default function EventBanquetPage() {
                 <span className="text-xl font-bold">{guestCount} guests</span>
                 <button onClick={() => setGuestCount(g => Math.min(selectedHall?.capacity ?? 300, g + 10))} className="h-10 w-10 rounded-xl bg-violet-500">+</button>
               </div>
-              <SeatingPreview layoutId={layoutId} guestCount={guestCount} />
+              <SeatingPreview layoutId={layoutId} guestCount={guestCount} layouts={catalog.seatingLayouts} />
               <button onClick={() => setStep("catering")} className="w-full py-3.5 rounded-xl bg-violet-500 font-semibold">Continue</button>
             </div>
           )}
@@ -290,7 +360,7 @@ export default function EventBanquetPage() {
           {tab === "plan" && step === "catering" && (
             <div className="px-4 mt-4 space-y-3">
               <p className="text-xs text-white/40 uppercase">Catering package</p>
-              {CATERING_PACKAGES.map(c => (
+              {catalog.cateringPackages.map(c => (
                 <button key={c.id} onClick={() => setCateringId(c.id)} className={`w-full rounded-xl border p-4 text-left ${cateringId === c.id ? "bg-violet-500/15 border-violet-500/40" : "bg-white/5 border-white/10"}`}>
                   <div className="flex justify-between">
                     <span className="font-semibold">{c.icon} {c.label}</span>

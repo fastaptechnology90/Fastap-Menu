@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
+import { useToast } from "@/hooks/use-toast";
 import { Star, MessageSquare, ThumbsUp, ThumbsDown, Minus, Send, RefreshCw, Filter, Globe, ExternalLink, Reply } from "lucide-react";
 
 const API_BASE = "/api";
@@ -29,6 +30,7 @@ function Stars({ rating }: { rating: number }) {
 
 export default function ReviewManagement() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [data, setData] = useState<any>({ reviews: [], stats: {} });
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState("all");
@@ -45,7 +47,10 @@ export default function ReviewManagement() {
     if (source !== "all") params.set("source", source);
     if (sentiment !== "all") params.set("sentiment", sentiment);
     if (replied !== "all") params.set("replied", replied);
-    apiFetch(`/restaurants/${restaurantId}/reviews?${params}`).then(setData).catch(() => {}).finally(() => setLoading(false));
+    apiFetch(`/restaurants/${restaurantId}/reviews?${params}`).then(setData).catch((e) => {
+      console.error(e);
+      toast({ title: "Failed to load reviews", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [restaurantId, source, sentiment, replied]);
@@ -57,7 +62,11 @@ export default function ReviewManagement() {
       await apiFetch(`/restaurants/${restaurantId}/reviews/${reviewId}/reply`, { method: "POST", body: JSON.stringify({ reply: replyText }) });
       setReplyText(""); setReplyingTo(null);
       load();
-    } catch {}
+      toast({ title: "Reply posted", description: "Your response was published to the review." });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to post reply", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     setSending(false);
   }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
-import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
+import { GuestLoading, GuestError } from "@/components/user/GuestApiState";
 import { useLocaleAccessibility } from "@/contexts/LocaleAccessibilityContext";
 import { useUser } from "@/contexts/UserContext";
 import { publicApi } from "@/lib/api";
@@ -283,21 +283,24 @@ export default function LanguageAccessibilityPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <p className="text-sm font-semibold">Try individual items</p>
-              {voiceItems.length === 0 ? (
-                <GuestEmpty message="No menu items for voice playback." />
-              ) : voiceItems.map(item => (
-                <button key={item.name}
-                  onClick={() => speak(`${language === "hi" && item.nameHi ? item.nameHi : item.name}. ${t("price")} ${item.price} rupees`)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:border-violet-500/30">
-                  <span>{language === "hi" && item.nameHi ? item.nameHi : item.name}</span>
-                  <span className="flex items-center gap-2 text-orange-400 text-sm">
-                    ₹{item.price} <Volume2 className="h-4 w-4" />
-                  </span>
-                </button>
-              ))}
-            </div>
+            {/* Per-item playback only renders when the voice-menu endpoint returns items.
+                Today it returns { language, script, itemCount } only — see NEEDS API — so
+                this section stays hidden rather than showing an empty-state error. */}
+            {voiceItems.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">Try individual items</p>
+                {voiceItems.map(item => (
+                  <button key={item.name}
+                    onClick={() => speak(`${language === "hi" && item.nameHi ? item.nameHi : item.name}. ${t("price")} ${item.price} rupees`)}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:border-violet-500/30">
+                    <span>{language === "hi" && item.nameHi ? item.nameHi : item.name}</span>
+                    <span className="flex items-center gap-2 text-orange-400 text-sm">
+                      ₹{item.price} <Volume2 className="h-4 w-4" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             </>
             )}
           </>

@@ -51,6 +51,24 @@ export default function VendorCRM() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // Follow-up rows carry no dedicated phone field from the backend, so dial when a
+  // contact number is present and otherwise record the outreach via the CRM log API.
+  const callFollowUp = (fu: any) => {
+    const phone = fu.phone || fu.contactPhone || fu.vendorPhone || fu.ownerPhone;
+    if (phone) {
+      window.location.href = `tel:${String(phone).replace(/[^\d+]/g, "")}`;
+      return;
+    }
+    createLog.mutate({
+      vendorName: fu.vendorName,
+      type: "Phone Call",
+      notes: `Call logged for follow-up: ${fu.notes || "—"}`,
+      outcome: "Pending Follow-up",
+      followUpDate: "",
+      vendorId: fu.restaurantId ?? fu.vendorId,
+    });
+  };
+
   const logs = crm?.logs || [];
   const followUps = crm?.followUps || [];
   const upsellOpportunities = crm?.upsellOpportunities || [];
@@ -211,7 +229,7 @@ export default function VendorCRM() {
                         <p className="text-xs text-yellow-400 mt-1">Due: {fu.followUpDate ? new Date(fu.followUpDate).toLocaleDateString() : "—"}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs"><Phone className="h-3 w-3 mr-1" /> Call</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={createLog.isPending} onClick={() => callFollowUp(fu)}><Phone className="h-3 w-3 mr-1" /> Call</Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" disabled={completeFollowUp.isPending} onClick={() => completeFollowUp.mutate(fu.id)}>Done</Button>
                       </div>
                     </div>

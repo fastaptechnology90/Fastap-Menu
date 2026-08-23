@@ -7,8 +7,8 @@ import { useGuestNavigate } from "@/hooks/useGuestNavigate";
 import { publicApi } from "@/lib/api";
 import {
   ChevronLeft, ChevronRight, Wallet, Star, Gift, Crown,
-  History, Heart, Settings, LogOut, Plus, ArrowUpRight, ArrowDownLeft,
-  QrCode, Bell, Shield, Globe, Headphones, Award, Zap, Brain, Wifi, Smartphone, Monitor, Film,
+  History, Heart, LogOut, Plus, ArrowUpRight, ArrowDownLeft,
+  Bell, Shield, Globe, Headphones, Award, Zap, Brain, Wifi, Smartphone, Monitor, Film,
 } from "lucide-react";
 
 const TIER_CONFIG = {
@@ -102,7 +102,7 @@ export default function UserProfile() {
         <div className="relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="text-white/70 text-xs mb-0.5">Member since 2024</p>
+              <p className="text-white/70 text-xs mb-0.5">Loyalty member</p>
               <h2 className="text-xl font-extrabold">{profile.name}</h2>
               <p className="text-white/70 text-sm">{profile.mobile}</p>
             </div>
@@ -176,8 +176,7 @@ export default function UserProfile() {
                 { icon: Brain, label: "AI Personalization", sub: "Menu, combos, dietary & spending AI", action: () => goGuest("/user/ai") },
                 { icon: Star, label: "Loyalty & Membership", sub: "Tiers, points & birthday rewards", action: () => goGuest("/user/loyalty") },
                 { icon: Wallet, label: "Customer Wallet", sub: "Recharge, cashback & transfer", action: () => goGuest("/user/wallet") },
-                { icon: QrCode, label: "My QR Code", sub: "Show at checkout", action: () => goGuest("/user/menu") },
-                { icon: Heart, label: "Favourites", sub: "Saved items & restaurants", action: () => goGuest("/user/menu") },
+                { icon: Heart, label: "Browse Menu", sub: "Explore dishes & place an order", action: () => goGuest("/user/menu") },
                 { icon: Bell, label: "Orders & Tracking", sub: "View order history & live status", action: () => setActiveTab("orders") },
                 { icon: Headphones, label: "Live Support", sub: "Chat, WhatsApp, voice, tickets & emergency", action: () => goGuest("/user/support") },
                 { icon: Globe, label: "Language & Accessibility", sub: "Hindi, English, regional languages & a11y", action: () => goGuest("/user/language") },
@@ -372,7 +371,6 @@ export default function UserProfile() {
               { icon: Brain, label: "Future AI Roadmap", sub: "Voice ordering, virtual waiter & more", action: () => goGuest("/user/future-ai") },
               { icon: Bell, label: "Notification Preferences", sub: "Push, SMS, WhatsApp", action: () => goGuest("/user/pwa") },
               { icon: Globe, label: "Language & Region", sub: "English · India (IST)", action: () => goGuest("/user/language") },
-              { icon: Settings, label: "Account Settings", sub: "Edit profile, password", action: () => navigate("/user/auth") },
             ].map(item => (
               <button key={item.label} onClick={"action" in item ? item.action : undefined} className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-all">
                 <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center">

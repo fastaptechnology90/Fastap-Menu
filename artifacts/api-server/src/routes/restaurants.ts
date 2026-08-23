@@ -62,12 +62,36 @@ router.put("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
 
-  // Staff sessions may only patch JSON settings, not core restaurant fields
+  // Staff sessions may only patch JSON settings, not core restaurant fields —
+  // EXCEPT owners/managers/franchise, who may also edit the restaurant profile.
   if (req.session.staffSession && !req.session.userId) {
-    const { whiteLabelSettings, settings } = req.body as Record<string, unknown>;
+    const body = req.body as Record<string, any>;
+    const { whiteLabelSettings, settings } = body;
     if (whiteLabelSettings) await setSettingsSection(id, "whiteLabel", whiteLabelSettings);
     if (settings && typeof settings === "object") {
       await setSettingsSection(id, "appSettings", settings);
+    }
+    const role = req.session.staffSession.staffRole;
+    if (["owner", "manager", "franchise"].includes(role)) {
+      // Persist the core profile columns that actually exist on the table. (Not via
+      // UpdateRestaurantBody — that requires currency/primaryColor the profile form
+      // doesn't send, so validation would fail and drop everything.)
+      const core: Record<string, any> = {};
+      for (const k of ["name", "address", "phone", "email", "description", "website"]) {
+        if (body[k] !== undefined && body[k] !== null) core[k] = body[k];
+      }
+      if (Object.keys(core).length) {
+        await db.update(restaurantsTable).set(core).where(eq(restaurantsTable.id, id));
+      }
+      // Extra profile fields that aren't restaurant columns → keep them in settings.
+      const extras: Record<string, any> = {};
+      for (const k of ["branch", "gstNumber", "fssaiNumber", "cuisineType", "totalTables", "totalSeats"]) {
+        if (body[k] !== undefined) extras[k] = body[k];
+      }
+      if (Object.keys(extras).length) {
+        const cur = await getSettingsSection(id, "profileExtras", {} as Record<string, unknown>);
+        await setSettingsSection(id, "profileExtras", { ...cur, ...extras });
+      }
     }
     const updated = await getAccessibleRestaurant(req, id);
     const whiteLabel = await getSettingsSection(id, "whiteLabel", {});
@@ -140,12 +164,14 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   const now = new Date();
   const today = new Date(now); today.setHours(0, 0, 0, 0);
   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - 7);
+  const fortnightStart = new Date(today); fortnightStart.setDate(fortnightStart.getDate() - 15);
   const monthStart = new Date(today); monthStart.setDate(1);
 
   const allOrders = await db.select().from(ordersTable).where(eq(ordersTable.restaurantId, id)).orderBy(desc(ordersTable.createdAt));
   const orderAt = (o: typeof allOrders[0]) => new Date(o.createdAt);
   const todayOrders = allOrders.filter(o => orderAt(o) >= today);
   const weekOrders = allOrders.filter(o => orderAt(o) >= weekStart);
+  const fortnightOrders = allOrders.filter(o => orderAt(o) >= fortnightStart);
   const monthOrders = allOrders.filter(o => orderAt(o) >= monthStart);
   const sumTotal = (list: typeof allOrders) => list.reduce((s, o) => s + parseFloat(String(o.total || 0)), 0);
 
@@ -189,8 +215,12 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     isPublished: true,
     publicationStatus: "Published",
     todayOrders: todayOrders.length,
+    weekOrders: weekOrders.length,
+    fortnightOrders: fortnightOrders.length,
+    monthOrders: monthOrders.length,
     todayRevenue: sumTotal(todayOrders),
     weekRevenue: sumTotal(weekOrders),
+    fortnightRevenue: sumTotal(fortnightOrders),
     monthRevenue: sumTotal(monthOrders),
     netRevenue: sumTotal(monthOrders),
     grossRevenue: sumTotal(monthOrders),

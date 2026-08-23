@@ -191,7 +191,7 @@ export default function BackupRecovery() {
                         <button onClick={()=>setConfirmRestore(backup)} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Restore</button>
                       </>
                     )}
-                    {backup.type==="manual"&&<button className="h-8 w-8 rounded-lg border border-red-500/20 bg-red-500/10 flex items-center justify-center text-red-400/60 hover:text-red-400 transition-all"><Trash2 className="h-3.5 w-3.5"/></button>}
+                    {backup.type==="manual"&&<button onClick={async()=>{ if(!restaurantId) return; if(!confirm("Delete this backup?")) return; setBackups(b=>b.filter(x=>x.id!==backup.id)); await backupApi.delete(restaurantId, parseInt(backup.id,10)||0).catch(()=>{}); }} className="h-8 w-8 rounded-lg border border-red-500/20 bg-red-500/10 flex items-center justify-center text-red-400/60 hover:text-red-400 transition-all"><Trash2 className="h-3.5 w-3.5"/></button>}
                   </div>
                 </div>
               </div>

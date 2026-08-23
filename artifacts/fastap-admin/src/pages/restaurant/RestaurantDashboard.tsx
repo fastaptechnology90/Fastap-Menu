@@ -16,10 +16,13 @@ function formatRevenue(n: number) {
   return `₹${Math.round(n).toLocaleString()}`;
 }
 
+type RevPeriod = "today" | "week" | "fortnight" | "month";
+
 export default function RestaurantDashboard() {
   const [, navigate] = useLocation();
   const { liveOrders, tables, restaurant, currentStaff, staffList, restaurantId, isRestaurantPublished } = useRestaurant();
   const [dashboard, setDashboard] = useState<any>(null);
+  const [revPeriod, setRevPeriod] = useState<RevPeriod>("month");
   const [revenueData, setRevenueData] = useState<{ time: string; revenue: number }[]>([]);
   const [topItems, setTopItems] = useState<{ name: string; orders: number; revenue: number; trend: string }[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -67,7 +70,11 @@ export default function RestaurantDashboard() {
 
   const todayRevenue = published ? (dashboard?.todayRevenue ?? 0) : 0;
   const weekRevenue = published ? (dashboard?.weekRevenue ?? 0) : 0;
+  const fortnightRevenue = published ? (dashboard?.fortnightRevenue ?? 0) : 0;
   const monthRevenue = published ? (dashboard?.monthRevenue ?? 0) : 0;
+  const weekOrderCount = published ? (dashboard?.weekOrders ?? 0) : 0;
+  const fortnightOrderCount = published ? (dashboard?.fortnightOrders ?? 0) : 0;
+  const monthOrderCount = published ? (dashboard?.monthOrders ?? 0) : 0;
   const occupiedTables = tables.filter(t => t.status === "occupied" || t.status === "billing").length;
   const activeOrders = published
     ? (dashboard?.activeOrders ?? 0)
@@ -99,9 +106,20 @@ export default function RestaurantDashboard() {
   const loyaltyCustomers = published ? (dashboard?.loyaltyCustomers ?? 0) : 0;
   const pendingReservations = published ? (dashboard?.pendingReservations ?? 0) : 0;
 
+  // Revenue period selector (dropdown on the Revenue card): 1 day / 7 days / 15 days / month.
+  // All values come from the SAME dashboard endpoint (same sumTotal logic) so there is no
+  // amount mismatch versus the rest of the app.
+  const REV_PERIODS: Record<RevPeriod, { label: string; value: number; orders: number }> = {
+    today: { label: "Today", value: todayRevenue, orders: todayOrders },
+    week: { label: "7 Days", value: weekRevenue, orders: weekOrderCount },
+    fortnight: { label: "15 Days", value: fortnightRevenue, orders: fortnightOrderCount },
+    month: { label: "This Month", value: monthRevenue, orders: monthOrderCount },
+  };
+  const rev = REV_PERIODS[revPeriod];
+
   const KPI_CARDS = [
     { label: "Today's Revenue", value: formatRevenue(todayRevenue), sub: `${todayOrders} orders · Week ${formatRevenue(weekRevenue)}`, icon: TrendingUp, color: "from-emerald-500/20 to-emerald-600/10", iconColor: "text-emerald-400" },
-    { label: "Monthly Revenue", value: formatRevenue(monthRevenue), sub: `AOV ₹${Math.round(avgOrderValue).toLocaleString()}`, icon: ShoppingBag, color: "from-orange-500/20 to-orange-600/10", iconColor: "text-orange-400" },
+    { label: "Revenue", value: formatRevenue(rev.value), sub: `${rev.label} · ${rev.orders} orders`, icon: ShoppingBag, color: "from-orange-500/20 to-orange-600/10", iconColor: "text-orange-400", isRevenue: true },
     { label: "Table Occupancy", value: `${occupiedTables}/${restaurant.totalTables || tables.length}`, sub: `${restaurant.totalTables || tables.length ? Math.round(occupiedTables / (restaurant.totalTables || tables.length) * 100) : 0}% occupied`, icon: Grid3x3, color: "from-blue-500/20 to-blue-600/10", iconColor: "text-blue-400" },
     { label: "Active Orders", value: activeOrders, sub: `${newOrders} new · ${readyOrders} ready`, icon: Clock, color: "from-violet-500/20 to-violet-600/10", iconColor: "text-violet-400" },
     { label: "Wallet Balance", value: formatRevenue(walletBalance), sub: `Pending settlement ${formatRevenue(pendingSettlements)}`, icon: TrendingUp, color: "from-amber-500/20 to-amber-600/10", iconColor: "text-amber-400" },
@@ -140,8 +158,21 @@ export default function RestaurantDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
         {KPI_CARDS.map(card => (
           <div key={card.label} className={`rounded-2xl bg-gradient-to-br ${card.color} border border-white/8 p-4`}>
-            <div className="flex items-start justify-between mb-3">
-              <card.icon className={`h-5 w-5 ${card.iconColor}`} />
+            <div className="flex items-start justify-between mb-3 gap-1">
+              <card.icon className={`h-5 w-5 shrink-0 ${card.iconColor}`} />
+              {(card as any).isRevenue && (
+                <select
+                  value={revPeriod}
+                  onChange={e => setRevPeriod(e.target.value as RevPeriod)}
+                  className="text-[10px] font-semibold bg-white/10 border border-white/15 rounded-md px-1 py-0.5 text-white/70 focus:outline-none focus:border-orange-400/50 cursor-pointer hover:bg-white/15 transition-colors"
+                  title="Change revenue period"
+                >
+                  <option value="today">1D</option>
+                  <option value="week">7D</option>
+                  <option value="fortnight">15D</option>
+                  <option value="month">1M</option>
+                </select>
+              )}
             </div>
             <p className="text-2xl font-extrabold mb-1">{card.value}</p>
             <p className="text-xs text-white/40 leading-tight">{card.label}</p>

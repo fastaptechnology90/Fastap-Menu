@@ -1,6 +1,6 @@
 import "./load-env.js";
 import { eq } from "drizzle-orm";
-import { db, restaurantsTable } from "@workspace/db";
+import { db, pool, restaurantsTable } from "@workspace/db";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runSeed } from "./seed.js";
@@ -40,7 +40,28 @@ async function ensureDemoData() {
   }
 }
 
+// Idempotent, additive schema guards. Runs on every boot so newly-added columns work
+// on any environment (Railway / VPS / local) even when `db:push` wasn't run at deploy.
+// Only ADD COLUMN IF NOT EXISTS — never drops or alters existing data.
+async function ensureSchemaColumns() {
+  const guards = [
+    `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS room_number text`,
+  ];
+  for (const sql of guards) {
+    try {
+      await pool.query(sql);
+    } catch (err) {
+      logger.warn({ err, sql }, "ensureSchemaColumns guard skipped");
+    }
+  }
+}
+
 async function start() {
+  try {
+    await ensureSchemaColumns();
+  } catch (err) {
+    logger.warn({ err }, "Schema column ensure skipped");
+  }
   try {
     await ensurePlatformDefaults();
   } catch (err) {

@@ -22,6 +22,8 @@ export default function FinanceWallet() {
   const [onlineTxns, setOnlineTxns] = useState<OnlineTxnRow[]>([]);
   const [cashLedger, setCashLedger] = useState<CashLedgerRow[]>([]);
   const [pnl, setPnl] = useState({ revenue: 0, cogs: 0, grossProfit: 0, staffCost: 0, utilities: 0, rent: 0, marketing: 0, misc: 0, netProfit: 0, margin: 0 });
+  // True only when the finance API actually returns an expense breakdown; otherwise the expense lines are shown as "—" instead of a fabricated ₹0.
+  const [expensesTracked, setExpensesTracked] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -38,6 +40,7 @@ export default function FinanceWallet() {
       setOnlineTxns([]);
       setCashLedger([]);
       setPnl({ revenue: 0, cogs: 0, grossProfit: 0, staffCost: 0, utilities: 0, rent: 0, marketing: 0, misc: 0, netProfit: 0, margin: 0 });
+      setExpensesTracked(false);
       return;
     }
     financeApi.wallet(restaurantId).then((data) => {
@@ -56,14 +59,29 @@ export default function FinanceWallet() {
       if (Array.isArray(data.onlineTxns)) setOnlineTxns(data.onlineTxns);
       if (Array.isArray(data.cashLedger)) setCashLedger(data.cashLedger);
       if (data.pnl) {
-        const revenue = data.pnl.revenue ?? 0;
-        setPnl(prev => ({
-          ...prev,
+        const p: any = data.pnl;
+        const revenue = p.revenue ?? 0;
+        // Read expense lines from the API if it provides them; otherwise they stay 0 (not fabricated).
+        const cogs = p.cogs ?? p.costOfGoodsSold ?? 0;
+        const staffCost = p.staffCost ?? p.staff ?? 0;
+        const utilities = p.utilities ?? 0;
+        const rent = p.rent ?? 0;
+        const marketing = p.marketing ?? 0;
+        const misc = p.misc ?? p.miscellaneous ?? 0;
+        setPnl({
           revenue,
-          grossProfit: revenue - prev.cogs,
-          netProfit: data.pnl.netProfit ?? 0,
-          margin: data.pnl.margin ?? 0,
-        }));
+          cogs,
+          staffCost,
+          utilities,
+          rent,
+          marketing,
+          misc,
+          grossProfit: p.grossProfit ?? (revenue - cogs),
+          netProfit: p.netProfit ?? 0,
+          margin: p.margin ?? 0,
+        });
+        const expenseKeys = ["cogs", "costOfGoodsSold", "staffCost", "staff", "utilities", "rent", "marketing", "misc", "miscellaneous"];
+        setExpensesTracked(expenseKeys.some(k => p[k] != null) || [cogs, staffCost, utilities, rent, marketing, misc].some(v => v > 0));
       }
     }).catch(() => {});
   }, [restaurantId, isRestaurantPublished]);
@@ -123,7 +141,10 @@ export default function FinanceWallet() {
       {tab === "overview" && (
         <div className="grid lg:grid-cols-2 gap-4">
           <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
-            <h2 className="text-sm font-bold mb-4 text-white/70">Profit & Loss (MTD)</h2>
+            <h2 className="text-sm font-bold mb-1 text-white/70">Profit & Loss (MTD)</h2>
+            {!expensesTracked && (
+              <p className="text-xs text-white/30 mb-3">Expense breakdown (COGS, staff, rent…) isn't returned by the finance API yet — showing revenue &amp; net profit only.</p>
+            )}
             <div className="space-y-2">
               {[
                 { label: "Gross Revenue", value: pnl.revenue, type: "revenue" },
@@ -137,9 +158,13 @@ export default function FinanceWallet() {
               ].map(r => (
                 <div key={r.label} className={`flex justify-between items-center py-2 border-b border-white/5 last:border-0 ${r.bold ? "font-bold" : ""}`}>
                   <span className={`text-sm ${r.bold ? "text-white" : "text-white/50"}`}>{r.label}</span>
-                  <span className={`text-sm font-semibold ${r.type === "revenue" || r.type === "profit" ? "text-emerald-400" : "text-red-400"}`}>
-                    {r.value > 0 ? "+" : ""}₹{Math.abs(r.value).toLocaleString()}
-                  </span>
+                  {r.type === "expense" && r.value === 0 && !expensesTracked ? (
+                    <span className="text-sm font-semibold text-white/25" title="Not provided by the finance API">—</span>
+                  ) : (
+                    <span className={`text-sm font-semibold ${r.type === "revenue" || r.type === "profit" ? "text-emerald-400" : "text-red-400"}`}>
+                      {r.value > 0 ? "+" : ""}₹{Math.abs(r.value).toLocaleString()}
+                    </span>
+                  )}
                 </div>
               ))}
               <div className="flex justify-between items-center py-3 border-t-2 border-amber-500/30 mt-2">

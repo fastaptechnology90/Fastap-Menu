@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { BedDouble, Wrench, CheckCircle, Clock, Plus, X, Search } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { housekeeping as housekeepingApi, staff as staffApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 type HKTask = {
   id: string; room: string; type: string; assignedTo: string; status: string;
@@ -138,7 +139,11 @@ export default function HousekeepingMaintenance() {
     try {
       await housekeepingApi.updateTask(restaurantId, Number(id), { status: apiStatus });
       setHkTasks(t => t.map(x => x.id === id ? { ...x, status, endTime: status === "completed" ? fmtTime(new Date()) : x.endTime } : x));
-    } catch (e) { console.error(e); }
+      toast({ title: status === "completed" ? "Task completed" : status === "in-progress" ? "Task started" : "Task updated" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Failed to update task", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function updateMT(id: string, status: string, assignee?: string) {
@@ -147,7 +152,11 @@ export default function HousekeepingMaintenance() {
     try {
       await housekeepingApi.updateMaintenance(restaurantId, Number(id), { status: apiStatus, assignedTo: assignee || undefined });
       setMainTasks(t => t.map(x => x.id === id ? { ...x, status, assignedTo: assignee || x.assignedTo } : x));
-    } catch (e) { console.error(e); }
+      toast({ title: assignee ? `Assigned to ${assignee}` : status === "completed" ? "Ticket resolved" : status === "in-progress" ? "Ticket started" : "Ticket updated" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Failed to update ticket", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function createHK() {
@@ -166,7 +175,32 @@ export default function HousekeepingMaintenance() {
       setHkTasks(t => [mapHK(created), ...t]);
       setNewHK({ room:"", type:"daily-clean", assignedTo:"", priority:"normal", notes:"" });
       setShowNewHK(false);
-    } catch (e) { console.error(e); }
+      toast({ title: "Housekeeping task created" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Failed to create task", description: e?.message, variant: "destructive" });
+    }
+  }
+
+  async function createMT() {
+    if (!newMT.issue || !restaurantId) return;
+    try {
+      const created = await housekeepingApi.createMaintenance(restaurantId, {
+        title: newMT.issue,
+        category: newMT.type,
+        location: newMT.room,
+        priority: newMT.priority,
+        description: newMT.notes,
+        assignedTo: newMT.assignedTo || undefined,
+      });
+      setMainTasks(t => [mapMT(created), ...t]);
+      setNewMT({ room:"", issue:"", type:"general", assignedTo:"", priority:"medium", estimatedTime:"", notes:"" });
+      setShowNewMT(false);
+      toast({ title: "Maintenance ticket created" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Failed to create ticket", description: e?.message, variant: "destructive" });
+    }
   }
 
   const filteredHK = hkTasks.filter(t=>
@@ -410,6 +444,49 @@ export default function HousekeepingMaintenance() {
               <div className="flex gap-3">
                 <button onClick={()=>setShowNewHK(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
                 <button onClick={createHK} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Create Task</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Maintenance Ticket Modal */}
+      {showNewMT&&(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold">New Maintenance Ticket</h2>
+              <button onClick={()=>setShowNewMT(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="space-y-4">
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Room / Area</label>
+                <input value={newMT.room} onChange={e=>setNewMT(p=>({...p,room:e.target.value}))} placeholder="e.g. 204, Lobby, Kitchen" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Issue / Title *</label>
+                <input value={newMT.issue} onChange={e=>setNewMT(p=>({...p,issue:e.target.value}))} placeholder="e.g. AC not cooling" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Category</label>
+                <select value={newMT.type} onChange={e=>setNewMT(p=>({...p,type:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+                  {Object.entries(MAINT_TYPE_CFG).map(([k,v])=><option key={k} value={k}>{v.icon} {k.replace("-"," ").replace(/\b\w/g, c=>c.toUpperCase())}</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Assign To</label>
+                <select value={newMT.assignedTo} onChange={e=>setNewMT(p=>({...p,assignedTo:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+                  <option value="">-- Select Staff --</option>
+                  {staffList.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Priority</label>
+                <div className="flex gap-2">
+                  {["low","medium","high","critical"].map(p=><button key={p} onClick={()=>setNewMT(pr=>({...pr,priority:p}))} className={`flex-1 py-2 rounded-lg text-xs font-semibold border capitalize transition-all ${newMT.priority===p?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/50"}`}>{p}</button>)}
+                </div>
+              </div>
+              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Description</label>
+                <textarea value={newMT.notes} onChange={e=>setNewMT(p=>({...p,notes:e.target.value}))} rows={2} placeholder="Describe the problem..." className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>setShowNewMT(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+                <button onClick={createMT} disabled={!newMT.issue} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Create Ticket</button>
               </div>
             </div>
           </div>

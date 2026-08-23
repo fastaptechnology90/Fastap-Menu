@@ -13,7 +13,7 @@ import {
 
 export default function Analytics() {
   const { restaurantId, restaurant, isRestaurantPublished } = useRestaurant();
-  const [period, setPeriod] = useState<"today" | "week" | "month" | "year">("week");
+  const [period, setPeriod] = useState<"today" | "week" | "fortnight" | "month" | "year">("week");
   const [summary, setSummary] = useState<any>(null);
   const [topItems, setTopItems] = useState<any[]>([]);
   const [dailySales, setDailySales] = useState<any[]>([]);
@@ -97,9 +97,9 @@ export default function Analytics() {
         </div>
         <div className="flex gap-2">
           <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
-            {(["today", "week", "month", "year"] as const).map(p => (
-              <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${period === p ? "bg-amber-500 text-white" : "text-white/50 hover:text-white"}`}>
-                {p}
+            {([["today","Today"],["week","7 Days"],["fortnight","15 Days"],["month","30 Days"],["year","Year"]] as const).map(([p,label]) => (
+              <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${period === p ? "bg-amber-500 text-white" : "text-white/50 hover:text-white"}`}>
+                {label}
               </button>
             ))}
           </div>

@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
+import { useLocation } from "wouter";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { restaurantApi, restaurantSettingsApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import {
   Store, Clock, Bell, Shield, Printer, Wifi, CreditCard,
   Globe, Palette, ChevronRight, Save, CheckCircle, QrCode
@@ -21,8 +23,12 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 
 export default function RestaurantSettings() {
   const { restaurant, restaurantId } = useRestaurant();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [activeSection, setActiveSection] = useState("profile");
   const [saved, setSaved] = useState(false);
+  const [branding, setBranding] = useState<{ brandColor: string; logo: string }>({ brandColor: "#f59e0b", logo: "" });
   const [profile, setProfile] = useState({
     name: restaurant.name,
     branch: restaurant.branch,
@@ -53,18 +59,42 @@ export default function RestaurantSettings() {
       if (data?.notifications) setNotifs(data.notifications);
       if (data?.security) setSecurity(data.security);
       if (data?.payments) setPayments(data.payments);
+      if (data?.branding) setBranding((prev) => ({
+        brandColor: data.branding.brandColor || prev.brandColor,
+        logo: data.branding.logo || prev.logo,
+      }));
     }).catch(() => {});
   }, [restaurantId]);
 
-  async function handleSave() {
-    if (restaurantId) {
-      await Promise.all([
-        restaurantApi.update(restaurantId, profile).catch(() => {}),
-        restaurantSettingsApi.updateApp(restaurantId, { hours, notifications: notifs, security, payments }).catch(() => {}),
-      ]);
+  function handleLogoUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "Logo too large", description: "Please choose an image under 2 MB." });
+      e.target.value = "";
+      return;
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    const reader = new FileReader();
+    reader.onload = () => setBranding((p) => ({ ...p, logo: String(reader.result || "") }));
+    reader.onerror = () => toast({ variant: "destructive", title: "Could not read image" });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function handleSave() {
+    if (!restaurantId) return;
+    try {
+      // Owner profile persists name/address/phone/email; app settings persist the rest incl. branding.
+      await Promise.all([
+        restaurantApi.update(restaurantId, profile),
+        restaurantSettingsApi.updateApp(restaurantId, { hours, notifications: notifs, security, payments, branding }),
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+      toast({ title: "Settings saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save settings. Please try again." });
+    }
   }
 
   const activeSec = SETTING_SECTIONS.find(s => s.id === activeSection);
@@ -264,14 +294,25 @@ export default function RestaurantSettings() {
           {activeSection === "branding" && (
             <div className="space-y-4">
               <div className="rounded-xl bg-white/[0.03] border border-white/8 p-5 text-center">
-                <div className="h-20 w-20 rounded-2xl bg-amber-500/20 border-2 border-dashed border-amber-500/40 flex items-center justify-center text-3xl mx-auto mb-3">🍽️</div>
-                <button className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Upload Logo</button>
+                {branding.logo ? (
+                  <img src={branding.logo} alt="Restaurant logo" className="h-20 w-20 rounded-2xl object-cover border border-white/10 mx-auto mb-3" />
+                ) : (
+                  <div className="h-20 w-20 rounded-2xl bg-amber-500/20 border-2 border-dashed border-amber-500/40 flex items-center justify-center text-3xl mx-auto mb-3">🍽️</div>
+                )}
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                <div className="flex items-center justify-center gap-2">
+                  <button type="button" onClick={() => logoInputRef.current?.click()} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Upload Logo</button>
+                  {branding.logo && (
+                    <button type="button" onClick={() => setBranding(p => ({ ...p, logo: "" }))} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold text-white/50">Remove</button>
+                  )}
+                </div>
+                <p className="text-xs text-white/30 mt-2">Saved with Save Changes below.</p>
               </div>
               <div>
                 <label className="block text-xs text-white/40 mb-1.5">Brand Color</label>
                 <div className="flex gap-2">
                   {["#f59e0b", "#f97316", "#3b82f6", "#8b5cf6", "#10b981", "#ef4444"].map(color => (
-                    <button key={color} className="h-8 w-8 rounded-xl border-2 border-white/20 hover:border-white/50 transition-all" style={{ backgroundColor: color }} />
+                    <button key={color} type="button" onClick={() => setBranding(p => ({ ...p, brandColor: color }))} className={`h-8 w-8 rounded-xl border-2 transition-all ${branding.brandColor === color ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ backgroundColor: color }} aria-label={`Brand color ${color}`} />
                   ))}
                 </div>
               </div>
@@ -283,7 +324,7 @@ export default function RestaurantSettings() {
                     <p className="text-xs text-white/40">Generate table QR codes</p>
                   </div>
                 </div>
-                <button className="px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-semibold hover:bg-amber-500/30">Generate</button>
+                <button type="button" onClick={() => navigate("/restaurant/qr-management")} className="px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-semibold hover:bg-amber-500/30">Generate</button>
               </div>
             </div>
           )}
@@ -291,6 +332,9 @@ export default function RestaurantSettings() {
           {/* Integrations */}
           {activeSection === "integrations" && (
             <div className="space-y-3">
+              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-300">
+                Static preview — connection status shown below is sample data. <strong>NEEDS API</strong>: no integrations endpoint is wired yet, so Connect / Disconnect are not functional.
+              </div>
               {[
                 { name: "Zomato", icon: "🔴", status: "connected", desc: "Menu sync & online orders" },
                 { name: "Swiggy", icon: "🟠", status: "disconnected", desc: "Delivery integration" },
@@ -305,7 +349,7 @@ export default function RestaurantSettings() {
                     <p className="text-sm font-semibold">{int.name}</p>
                     <p className="text-xs text-white/40">{int.desc}</p>
                   </div>
-                  <button className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${int.status === "connected" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30" : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"}`}>
+                  <button disabled title="NEEDS API — integrations endpoint not available" className={`px-3 py-1.5 rounded-lg text-xs font-semibold border opacity-60 cursor-not-allowed ${int.status === "connected" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" : "border-white/10 bg-white/5 text-white/50"}`}>
                     {int.status === "connected" ? "✓ Connected" : "Connect"}
                   </button>
                 </div>
@@ -316,6 +360,9 @@ export default function RestaurantSettings() {
           {/* Printer */}
           {activeSection === "printer" && (
             <div className="space-y-4">
+              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-300">
+                Static preview — printer list below is sample data. <strong>NEEDS API</strong>: no printer/KOT configuration endpoint is wired yet.
+              </div>
               {[
                 { label: "Receipt Printer", icon: "🖨️", status: "connected", model: "Epson TM-T82III" },
                 { label: "Kitchen Printer", icon: "🍳", status: "connected", model: "Star SP742" },

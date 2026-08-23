@@ -51,7 +51,7 @@ export default function DormantVendors() {
                 <Switch checked={!!rules[key]} onCheckedChange={v => setRules(r => ({ ...r, [key]: v }))} />
               </div>
             ))}
-            <p className="text-xs text-muted-foreground pt-2 border-t">Auto-deactivate after <Badge variant="outline">{String(rules.autoDeactivateDays ?? 90)}</Badge> days</p>
+            <div className="text-xs text-muted-foreground pt-2 border-t">Auto-deactivate after <Badge variant="outline">{String(rules.autoDeactivateDays ?? 90)}</Badge> days</div>
           </div>
         </PanelCard>
         <PanelCard title="Dormant Vendors" className="lg:col-span-2">

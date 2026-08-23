@@ -42,7 +42,7 @@ export default function Inventory() {
 
   const filtered = items.filter(i => {
     const catMatch = category === "All" || i.category === category;
-    const searchMatch = !search || i.name.toLowerCase().includes(search.toLowerCase()) || i.supplier.toLowerCase().includes(search.toLowerCase());
+    const searchMatch = !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.supplier ?? "").toLowerCase().includes(search.toLowerCase());
     const alertMatch = !filterAlert || i.currentStock < i.minStock;
     return catMatch && searchMatch && alertMatch;
   });

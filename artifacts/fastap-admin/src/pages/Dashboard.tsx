@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Users, CreditCard, ShoppingCart, AlertTriangle, Building2, Activity,
   Server, Database, Cpu, Loader2, RefreshCw, Download, QrCode, Ticket,
-  TrendingUp, Wallet, RotateCcw,
+  TrendingUp, Wallet, RotateCcw, IndianRupee,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +62,14 @@ export default function Dashboard() {
     refetchInterval: 20_000,
   });
 
+  // New restaurant registrations waiting for KYC review — surfaced as a banner below.
+  const { data: kycData = [] } = useQuery({
+    queryKey: ["kyc"],
+    queryFn: api.kyc.list,
+    refetchInterval: 30_000,
+  });
+  const pendingRegistrations = kycData.filter((k: any) => k.status === "Pending Review").length;
+
   const refreshAll = () => {
     refetch();
     qc.invalidateQueries();
@@ -82,6 +90,25 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {pendingRegistrations > 0 && (
+        <Link href="/kyc">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 cursor-pointer hover:bg-amber-500/15 transition-colors animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-amber-500">
+                  {pendingRegistrations} new restaurant {pendingRegistrations === 1 ? "request" : "requests"} pending KYC review
+                </p>
+                <p className="text-xs text-muted-foreground">Review documents and approve so the owner can sign in.</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="border-amber-500/40 text-amber-500 hover:bg-amber-500/15">Review now</Button>
+          </div>
+        </Link>
+      )}
       <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 sm:p-6 shadow-sm">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -111,6 +138,7 @@ export default function Dashboard() {
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
             <KpiCard title="Total Vendors" value={stats?.totalRestaurants.toLocaleString() ?? "—"} icon={<Building2 className="h-4 w-4" />} subtitle={`${stats?.activeRestaurants ?? 0} active · ${stats?.trialVendors ?? 0} trial`} />
             <KpiCard title="Enterprise" value={String(stats?.enterpriseVendors ?? 0)} icon={<TrendingUp className="h-4 w-4 text-purple-500" />} subtitle={`${stats?.inactiveRestaurants ?? 0} inactive`} />
+            <KpiCard title="Total Sales" value={fmtINR(stats?.totalRevenue ?? 0)} icon={<IndianRupee className="h-4 w-4 text-emerald-500" />} subtitle="Platform lifetime (all vendors)" />
             <KpiCard title="Today Revenue" value={fmtINR(stats?.todayRevenue ?? 0)} icon={<CreditCard className="h-4 w-4" />} subtitle={`Week: ${fmtINR(stats?.weekRevenue ?? 0)} · Month: ${fmtINR(stats?.monthRevenue ?? 0)}`} />
             <KpiCard title="Commission" value={fmtINR(stats?.platformCommission ?? 0)} icon={<Wallet className="h-4 w-4 text-green-500" />} subtitle="Platform lifetime" />
             <KpiCard title="Orders" value={stats?.totalOrders.toLocaleString() ?? "—"} icon={<ShoppingCart className="h-4 w-4" />} subtitle={`${stats?.totalBookings ?? 0} bookings`} />

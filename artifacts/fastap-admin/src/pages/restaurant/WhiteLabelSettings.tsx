@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { restaurantApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { Palette, Save, Check, Globe, Smartphone, Type, Image, Monitor } from "lucide-react";
 
 const THEME_PRESETS = [
@@ -16,6 +17,7 @@ const FONT_OPTIONS = ["Inter (Default)", "Poppins", "Roboto", "Montserrat", "Pla
 
 export default function WhiteLabelSettings() {
   const { restaurantId, restaurant } = useRestaurant();
+  const { toast } = useToast();
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,14 +47,23 @@ export default function WhiteLabelSettings() {
         splash_bg: r.splash_bg || "#7c3aed",
         ...r,
       });
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch((e: any) => {
+      toast({ variant: "destructive", title: "Could not load settings", description: e?.message || "Failed to load white-label settings." });
+    }).finally(() => setLoading(false));
   }, [restaurantId]);
 
   async function handleSave() {
     if (!restaurantId) return;
     setSaving(true);
-    await restaurantApi.saveWhiteLabel(restaurantId, settings).catch(() => {});
-    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    try {
+      await restaurantApi.saveWhiteLabel(restaurantId, settings);
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+      toast({ title: "White-label settings saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save white-label settings." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   function applyPreset(preset: typeof THEME_PRESETS[0]) {

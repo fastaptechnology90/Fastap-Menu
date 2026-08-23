@@ -11,7 +11,7 @@ import {
 
 const router: IRouter = Router();
 
-type Period = "today" | "week" | "month" | "year" | "all";
+type Period = "today" | "week" | "fortnight" | "month" | "year" | "all";
 
 function periodStart(period: string): Date | null {
   const now = new Date();
@@ -23,6 +23,11 @@ function periodStart(period: string): Date | null {
   if (period === "week") {
     const d = new Date(now);
     d.setDate(d.getDate() - 7);
+    return d;
+  }
+  if (period === "fortnight") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 15);
     return d;
   }
   if (period === "month") {
@@ -40,7 +45,7 @@ function periodStart(period: string): Date | null {
 
 function parsePeriod(raw: unknown): Period {
   const p = String(raw || "all");
-  if (p === "today" || p === "week" || p === "month" || p === "year") return p;
+  if (p === "today" || p === "week" || p === "fortnight" || p === "month" || p === "year") return p;
   return "all";
 }
 
@@ -71,7 +76,7 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
   const period = parsePeriod(req.query.period);
-  const periodLabel = period === "today" ? "Today" : period === "week" ? "Last 7 days" : period === "month" ? "Last 30 days" : period === "year" ? "Last 12 months" : "All time";
+  const periodLabel = period === "today" ? "Today" : period === "week" ? "Last 7 days" : period === "fortnight" ? "Last 15 days" : period === "month" ? "Last 30 days" : period === "year" ? "Last 12 months" : "All time";
 
   if (access.kind === "unpublished") {
     res.json(emptyAnalyticsSummary(period, periodLabel));

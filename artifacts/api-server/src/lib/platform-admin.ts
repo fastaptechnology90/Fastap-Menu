@@ -426,7 +426,17 @@ export async function listSubscriptionInvoices() {
   return items;
 }
 
-export async function getEnhancedStats() {
+/** Optional period → the start Date to filter revenue from (null = all time). */
+function statsPeriodStart(period?: string): Date | null {
+  if (!period || period === "all") return null;
+  const d = new Date();
+  if (period === "today") { d.setHours(0, 0, 0, 0); return d; }
+  const days: Record<string, number> = { week: 7, fortnight: 15, month: 30, year: 365 };
+  if (days[period]) { d.setDate(d.getDate() - days[period]); return d; }
+  return null;
+}
+
+export async function getEnhancedStats(period?: string) {
   const now = new Date();
   const today = new Date(now); today.setHours(0, 0, 0, 0);
   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - 7);
@@ -454,8 +464,13 @@ export async function getEnhancedStats() {
     .reduce((s, o) => s + orderGrossTotal(o), 0);
 
   const commissionRate = await getCommissionRate();
-  const totalRevenue = sumOrderTotals(paidOrdersList);
-  const platformCommission = sumOrderCommissions(paidOrdersList, commissionRate);
+  // Revenue/commission can be scoped to a period (for the Analytics page's 7/15/30-day
+  // view). With no period it's all-time — so the Dashboard stays consistent with the
+  // vendor list / settlements (which are all-time).
+  const periodSince = statsPeriodStart(period);
+  const revenueOrders = periodSince ? paidOrdersList.filter(o => new Date(o.createdAt) >= periodSince) : paidOrdersList;
+  const totalRevenue = sumOrderTotals(revenueOrders);
+  const platformCommission = sumOrderCommissions(revenueOrders, commissionRate);
 
   const [pendingSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "pending"));
   const [releasedSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "released"));
@@ -662,10 +677,17 @@ export async function listKycRecords() {
     const kyc = settings.kyc ?? {};
     const vendorDocs = docs.filter(d => d.restaurantId === r.id);
     const docStatus = (cat: string) => {
-      const d = vendorDocs.find(x => x.category === cat || x.name?.toLowerCase().includes(cat));
+      // Registration stores the real doc kind in `description` (gst_certificate, fssai_license,
+      // bank_proof …); match on that first, then fall back to category / filename.
+      const d = vendorDocs.find(x =>
+        (x.description ?? "").toLowerCase().includes(cat) ||
+        x.category === cat ||
+        (x.name ?? "").toLowerCase().includes(cat),
+      );
       if (!d) return "Not Uploaded";
       if (d.status === "active") return "Verified";
       if (d.status === "expired") return "Expired";
+      if (d.status === "rejected") return "Rejected";
       return "Pending";
     };
     const status = String(kyc.status ?? "pending");
@@ -1134,8 +1156,8 @@ export async function getPaymentDetail(txnId: string) {
 
 export async function getLiveFeed() {
   const [recentOrders, recentPayments, recentRefunds, recentSettlements, recentTickets, recentAudit] = await Promise.all([
-    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, total: ordersTable.total, status: ordersTable.status, createdAt: ordersTable.createdAt })
-      .from(ordersTable).orderBy(desc(ordersTable.createdAt)).limit(8),
+    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, restaurantName: restaurantsTable.name, tableName: ordersTable.tableName, total: ordersTable.total, status: ordersTable.status, createdAt: ordersTable.createdAt })
+      .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id)).orderBy(desc(ordersTable.createdAt)).limit(8),
     db.select({ order: ordersTable, restaurantName: restaurantsTable.name })
       .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
       .orderBy(desc(ordersTable.createdAt)).limit(8),
@@ -1151,8 +1173,8 @@ export async function getLiveFeed() {
 
   return {
     orders: recentOrders.map(o => ({
-      type: "order", id: `ORD-${o.id}`, vendorId: o.restaurantId,
-      amount: parseMoney(o.total), status: o.status, at: o.createdAt.toISOString(),
+      type: "order", id: `ORD-${o.id}`, vendorId: o.restaurantId, vendor: o.restaurantName,
+      tableName: o.tableName, amount: parseMoney(o.total), status: o.status, at: o.createdAt.toISOString(),
     })),
     payments: recentPayments.map(({ order, restaurantName }) => ({
       type: "payment", id: `TXN-${order.id}`, vendor: restaurantName,

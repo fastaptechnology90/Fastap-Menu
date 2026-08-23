@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { tables as tablesApi, staff as staffApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import {
   Plus, RefreshCw, Clock, Users, X, Edit2, Trash2, Star, Lock,
   Unlock, Link2, Unlink, ChevronRight, CheckCircle2, Settings,
@@ -178,9 +179,10 @@ interface ActionModalProps {
   onMerge: (secondaryId: number) => void;
   onUnmerge: () => void;
   onVipToggle: () => void;
+  onMove: (zone: string) => void;
 }
 
-function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onEdit, onDelete, onMerge, onUnmerge, onVipToggle }: ActionModalProps) {
+function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onEdit, onDelete, onMerge, onUnmerge, onVipToggle, onMove }: ActionModalProps) {
   const cfg = STATUS_CFG[table.status] || STATUS_CFG.free;
   const [tab, setTab] = useState<"status" | "assign" | "merge" | "move">("status");
   const [guests, setGuests] = useState(table.currentGuestCount || 0);
@@ -326,8 +328,9 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
               <p className="text-xs text-white/40">Move <strong className="text-white">{table.name}</strong> to a different zone</p>
               <div className="space-y-1.5">
                 {PREDEFINED_ZONES.map(zone => (
-                  <button key={zone} onClick={() => { /* handled by parent via onEdit with new zone */ }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm transition-all ${table.zone === zone ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/70 hover:border-white/20"}`}>
+                  <button key={zone} onClick={() => { if (table.zone !== zone) onMove(zone); }}
+                    disabled={table.zone === zone}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm transition-all disabled:cursor-default ${table.zone === zone ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/70 hover:border-white/20"}`}>
                     <span>{zone}</span>
                     {table.zone === zone && <CheckCircle2 className="h-4 w-4" />}
                   </button>
@@ -433,7 +436,24 @@ export default function TableManagement() {
       const updated = await tablesApi.updateStatus(restaurantId, table.id, { status, ...extra });
       setTableRows(prev => prev.map(t => t.id === updated.id ? mapRow(updated) : t));
       setActionModal(null);
-    } catch { } finally { setSaving(false); }
+      toast({ title: `${table.name} updated` });
+    } catch (e: any) {
+      toast({ title: "Failed to update table", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  async function handleMoveZone(table: TableRow, zone: string) {
+    if (!restaurantId || table.zone === zone) return;
+    setSaving(true);
+    try {
+      const updated = await tablesApi.update(restaurantId, table.id, { zone });
+      const mapped = mapRow(updated);
+      setTableRows(prev => prev.map(t => t.id === mapped.id ? mapped : t));
+      setActionModal(prev => prev ? mapped : null);
+      toast({ title: `Moved ${table.name} to ${zone}` });
+    } catch (e: any) {
+      toast({ title: "Failed to move table", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
   }
 
   async function handleSaveTable(data: any) {
@@ -443,12 +463,16 @@ export default function TableManagement() {
       if (addEditModal.table) {
         const updated = await tablesApi.update(restaurantId, addEditModal.table.id, data);
         setTableRows(prev => prev.map(t => t.id === updated.id ? mapRow(updated) : t));
+        toast({ title: "Table updated" });
       } else {
         const created = await tablesApi.create(restaurantId, data);
         setTableRows(prev => [...prev, mapRow(created)]);
+        toast({ title: "Table added" });
       }
       setAddEditModal({ open: false, table: null });
-    } catch { } finally { setSaving(false); }
+    } catch (e: any) {
+      toast({ title: "Failed to save table", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
   }
 
   async function handleDelete(table: TableRow) {
@@ -459,17 +483,23 @@ export default function TableManagement() {
       setTableRows(prev => prev.filter(t => t.id !== table.id));
       setDeleteConfirm(null);
       setActionModal(null);
-    } catch { } finally { setSaving(false); }
+      toast({ title: `${table.name} deleted` });
+    } catch (e: any) {
+      toast({ title: "Failed to delete table", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
   }
 
   async function handleMerge(primaryTable: TableRow, secondaryId: number) {
     if (!restaurantId) return;
     setSaving(true);
     try {
-      const result = await tablesApi.merge(restaurantId, { primaryId: primaryTable.id, secondaryIds: [secondaryId] });
+      await tablesApi.merge(restaurantId, { primaryId: primaryTable.id, secondaryIds: [secondaryId] });
       await load();
       setActionModal(null);
-    } catch { } finally { setSaving(false); }
+      toast({ title: "Tables merged" });
+    } catch (e: any) {
+      toast({ title: "Failed to merge tables", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
   }
 
   async function handleUnmerge(table: TableRow) {
@@ -479,14 +509,22 @@ export default function TableManagement() {
       await tablesApi.unmerge(restaurantId, table.id);
       await load();
       setActionModal(null);
-    } catch { } finally { setSaving(false); }
+      toast({ title: "Tables unmerged" });
+    } catch (e: any) {
+      toast({ title: "Failed to unmerge tables", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
   }
 
   async function handleVipToggle(table: TableRow) {
     if (!restaurantId) return;
-    const updated = await tablesApi.updateStatus(restaurantId, table.id, { isVip: !table.isVip });
-    setTableRows(prev => prev.map(t => t.id === updated.id ? mapRow(updated) : t));
-    setActionModal(prev => prev ? mapRow(updated) : null);
+    try {
+      const updated = await tablesApi.updateStatus(restaurantId, table.id, { isVip: !table.isVip });
+      setTableRows(prev => prev.map(t => t.id === updated.id ? mapRow(updated) : t));
+      setActionModal(prev => prev ? mapRow(updated) : null);
+      toast({ title: table.isVip ? "VIP removed" : "Marked as VIP" });
+    } catch (e: any) {
+      toast({ title: "Failed to update VIP status", description: e?.message, variant: "destructive" });
+    }
   }
 
   const total = tableRows.filter(t => t.isActive).length;
@@ -693,6 +731,7 @@ export default function TableManagement() {
           onMerge={(secondaryId) => handleMerge(actionModal, secondaryId)}
           onUnmerge={() => handleUnmerge(actionModal)}
           onVipToggle={() => handleVipToggle(actionModal)}
+          onMove={(zone) => handleMoveZone(actionModal, zone)}
         />
       )}
 

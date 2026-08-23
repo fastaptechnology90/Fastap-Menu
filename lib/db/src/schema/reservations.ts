@@ -13,6 +13,7 @@ export const reservationsTable = pgTable("reservations", {
   time: text("time").notNull(),
   guestCount: integer("guest_count").notNull().default(2),
   tableId: integer("table_id"),
+  roomNumber: text("room_number"),
   zone: text("zone"),
   reservationType: text("reservation_type").notNull().default("table"),
   depositAmount: numeric("deposit_amount", { precision: 10, scale: 2 }).default("0"),

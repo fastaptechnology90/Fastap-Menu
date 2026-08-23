@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db, spaServicesTable, spaBookingsTable } from "@workspace/db";
+import { db, spaServicesTable, spaBookingsTable, roomServiceRequestsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { parseMoney } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
 
@@ -42,7 +43,7 @@ router.get("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, r
 
 router.post("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(req.params.restaurantId, 10);
-  const { serviceId, serviceName, guestName, guestPhone, guestEmail, therapist, scheduledAt, duration, price, notes } = req.body;
+  const { serviceId, serviceName, guestName, guestPhone, guestEmail, therapist, scheduledAt, duration, price, notes, roomNumber, discount } = req.body;
   // new Date(undefined) is an Invalid Date, and the ORM then calls toISOString()
   // on it and throws — the booking is lost with only a 500 to show for it.
   // A missing or malformed date should be reported, not crash the request.
@@ -52,7 +53,29 @@ router.post("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, 
     return;
   }
   const parsedPrice = parseFloat(price);
-  const [booking] = await db.insert(spaBookingsTable).values({ restaurantId: id, serviceId: serviceId ? parseInt(serviceId) : null, serviceName, guestName, guestPhone, guestEmail, therapist, scheduledAt: scheduledDate, duration: parseInt(duration) || 60, price: String(Number.isFinite(parsedPrice) ? parsedPrice : 0), notes }).returning();
+  const basePrice = Number.isFinite(parsedPrice) ? parsedPrice : 0;
+  // Discount is auto-applied when a spa guest gives their room number (in-house perk).
+  const room = typeof roomNumber === "string" && roomNumber.trim() ? roomNumber.trim() : null;
+  const discountAmt = Math.min(basePrice, Math.max(0, parseMoney(discount)));
+  const netPrice = Math.max(0, basePrice - discountAmt);
+  const [booking] = await db.insert(spaBookingsTable).values({
+    restaurantId: id, serviceId: serviceId ? parseInt(serviceId) : null, serviceName,
+    guestName, guestPhone, guestEmail, therapist, scheduledAt: scheduledDate,
+    duration: parseInt(duration) || 60, price: String(netPrice), notes,
+    metadata: { roomNumber: room, discount: discountAmt, basePrice },
+  }).returning();
+
+  // If tied to a room, post the (discounted) charge to that room's folio.
+  if (room) {
+    try {
+      await db.insert(roomServiceRequestsTable).values({
+        restaurantId: id, roomNumber: room, guestName, guestPhone, type: "spa",
+        items: [{ name: serviceName, qty: 1, price: netPrice }],
+        notes: `Spa: ${serviceName}${discountAmt > 0 ? ` (₹${discountAmt} off)` : ""}`,
+        total: String(netPrice), paymentMethod: "room_bill", status: "completed",
+      });
+    } catch (e) { console.error("spa folio charge failed", e); }
+  }
   res.status(201).json(booking);
 });
 

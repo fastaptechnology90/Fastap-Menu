@@ -113,7 +113,11 @@ export default function Landing() {
   const { isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  function goAdmin() { navigate(isAuthenticated ? "/" : "/login"); }
+  // Always open the admin login. `user` is the single source of truth: if a valid
+  // super-admin session exists, the Login page itself forwards to /dashboard; if not,
+  // it shows the login form. (Branching on the possibly-stale `isAuthenticated` flag
+  // was sending the button to "/" / "/dashboard" and making it look like nothing opened.)
+  function goAdmin() { navigate("/login"); }
   function goUserMenu() { navigate(DEMO_MENU_URL); }
   function goGuestAuth() { navigate("/user/auth"); }
   function goRestaurant() { navigate("/restaurant/login"); }

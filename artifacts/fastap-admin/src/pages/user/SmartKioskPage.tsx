@@ -16,10 +16,30 @@ import {
 
 type Tab = "order" | "checkout" | "nfc" | "qr" | "token";
 
+type KioskMenuItem = {
+  id: number;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  dietaryTags?: string[] | null;
+};
+
 const TAB_MAP: Record<Tab, string> = {
   order: "self_ordering", checkout: "self_checkout", nfc: "nfc_tap_ordering",
   qr: "qr_self_payment", token: "token_display",
 };
+
+// The kiosk-menu endpoint returns `dietaryTags` (not a `veg` flag) — mirror the
+// menu-card convention so items aren't all rendered as "Non-Veg".
+// Returns true (veg), false (non-veg) or null (unknown → no indicator shown).
+function vegFromTags(tags?: string[] | null): boolean | null {
+  if (!Array.isArray(tags) || tags.length === 0) return null;
+  const lower = tags.map(t => String(t).toLowerCase());
+  if (lower.some(t => t.includes("non-veg") || t.includes("nonveg"))) return false;
+  if (lower.some(t => t.includes("vegetarian") || t.includes("vegan") || t.includes("jain") || t === "veg")) return true;
+  return null;
+}
 
 export default function SmartKioskPage() {
   const [, navigate] = useAppLocation();
@@ -29,7 +49,7 @@ export default function SmartKioskPage() {
 
   const { toast: pushToast } = useToast();
   const [tab, setTab] = useState<Tab>("order");
-  const [menu, setMenu] = useState<{ id: number; name: string; price: number; category: string; spice: number; veg: boolean }[]>([]);
+  const [menu, setMenu] = useState<KioskMenuItem[]>([]);
   const [cart, setCart] = useState<KioskCartItem[]>([]);
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -218,18 +238,23 @@ export default function SmartKioskPage() {
             <GuestEmpty message="No kiosk menu items available." />
           ) : (
           <div className="grid grid-cols-2 gap-3">
-            {menu.map(item => (
+            {menu.map(item => {
+              const veg = vegFromTags(item.dietaryTags);
+              return (
               <button key={item.id} onClick={() => addItem(item)}
                 className="rounded-2xl bg-white/5 border border-white/10 p-4 text-left hover:border-violet-500/40 active:scale-95 transition-all min-h-[120px]">
                 <p className="font-bold text-sm leading-tight">{item.name}</p>
                 <p className="text-[10px] text-white/40 mt-1">{item.category}</p>
                 <p className="text-lg font-extrabold text-orange-400 mt-2">₹{item.price}</p>
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[10px] text-white/30">{item.veg ? "🟢 Veg" : "🔴 Non-Veg"}</span>
+                  <span className="text-[10px] text-white/30">
+                    {veg === null ? "" : veg ? "🟢 Veg" : "🔴 Non-Veg"}
+                  </span>
                   <Plus className="h-5 w-5 text-violet-400" />
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
           )
         )}
@@ -297,21 +322,25 @@ export default function SmartKioskPage() {
               <p className="font-bold text-lg">Tap NFC Tag Here</p>
               <p className="text-xs text-white/40 mt-1">Hold phone near kiosk NFC reader</p>
             </div>
-            <div className="space-y-2">
-              {nfcTags.length === 0 ? (
-                <GuestEmpty message="No NFC tags configured." />
-              ) : nfcTags.map(tag => (
-                <button key={tag.id} onClick={() => handleNfcTap(tag.id)}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 text-left">
-                  <Nfc className="h-6 w-6 text-emerald-400" />
-                  <div className="flex-1">
-                    <p className="font-semibold">{tag.label}</p>
-                    <p className="text-xs text-white/40">{tag.item}{tag.price > 0 ? ` · ₹${tag.price}` : " · Pay"}</p>
-                  </div>
-                  <span className="text-xs text-emerald-400">Simulate tap</span>
-                </button>
-              ))}
-            </div>
+            {nfcTags.length > 0 ? (
+              <div className="space-y-2">
+                {nfcTags.map(tag => (
+                  <button key={tag.id} onClick={() => handleNfcTap(tag.id)}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 text-left">
+                    <Nfc className="h-6 w-6 text-emerald-400" />
+                    <div className="flex-1">
+                      <p className="font-semibold">{tag.label}</p>
+                      <p className="text-xs text-white/40">{tag.item}{tag.price > 0 ? ` · ₹${tag.price}` : " · Pay"}</p>
+                    </div>
+                    <span className="text-xs text-emerald-400">Simulate tap</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-xs text-white/30 py-2">
+                Hold your phone near the kiosk reader to tap and order. Quick-tap shortcuts appear here when the kiosk has NFC tags configured.
+              </p>
+            )}
           </>
         )}
 

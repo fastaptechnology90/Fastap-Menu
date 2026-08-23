@@ -3,6 +3,7 @@ import { Gift, Wallet, Star, Crown, Plus, Tag, CreditCard, Repeat, Users, Trendi
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { loyalty as loyaltyApi, customers as customersApi, promoCodesApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { useToast } from "@/hooks/use-toast";
 
 type Tab = "loyalty" | "wallet" | "coupons" | "gift-cards";
 
@@ -21,6 +22,7 @@ const TIER_CFG: Record<string, { label: string; icon: string; color: string; bg:
 
 export default function LoyaltyWallet() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("loyalty");
   const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -30,6 +32,10 @@ export default function LoyaltyWallet() {
   const [walletTxns, setWalletTxns] = useState<WalletTxnRow[]>([]);
   const [giftCards, setGiftCards] = useState<GiftCardRow[]>([]);
   const [newCoupon, setNewCoupon] = useState({ code: "", discountValue: "", minOrder: "", expiry: "" });
+  const [program, setProgram] = useState<any>(null);
+  const [pointsFor, setPointsFor] = useState<MemberRow | null>(null);
+  const [pointsToAdd, setPointsToAdd] = useState("");
+  const [savingPoints, setSavingPoints] = useState(false);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -75,7 +81,7 @@ export default function LoyaltyWallet() {
       }
       if (Array.isArray(giftData) && giftData.length > 0) setGiftCards(giftData);
     });
-    loyaltyApi.program(restaurantId).catch(() => {});
+    loyaltyApi.program(restaurantId).then(p => setProgram(p)).catch(() => setProgram(null));
   }, [restaurantId]);
 
   const totalPoints = members.reduce((s, m) => s + m.points, 0);
@@ -86,29 +92,68 @@ export default function LoyaltyWallet() {
   async function handleCreateCoupon() {
     if (!restaurantId || !newCoupon.code) return;
     const val = parseFloat(newCoupon.discountValue) || 0;
-    await promoCodesApi.create(restaurantId, {
-      code: newCoupon.code.toUpperCase(),
-      discountType: newCoupon.discountValue.includes("%") ? "percent" : "fixed",
-      discountValue: val,
-      minOrderAmount: parseFloat(newCoupon.minOrder) || 0,
-      expiresAt: newCoupon.expiry || undefined,
-    });
-    const rows = await promoCodesApi.list(restaurantId);
-    if (Array.isArray(rows)) {
-      setCoupons(rows.map((p: any) => ({
-        code: p.code,
-        discount: p.discountType === "percent" ? `${p.discountValue}% off` : `₹${p.discountValue} off`,
-        type: p.discountType || "percent",
-        minOrder: parseFloat(String(p.minOrderAmount ?? 0)),
-        maxDiscount: parseFloat(String(p.maxDiscount ?? p.discountValue ?? 0)),
-        used: p.usageCount ?? 0,
-        total: p.usageLimit ?? 100,
-        expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "No expiry",
-        status: p.status || (p.isActive ? "active" : "inactive"),
-      })));
+    try {
+      await promoCodesApi.create(restaurantId, {
+        code: newCoupon.code.toUpperCase(),
+        discountType: newCoupon.discountValue.includes("%") ? "percent" : "fixed",
+        discountValue: val,
+        minOrderAmount: parseFloat(newCoupon.minOrder) || 0,
+        expiresAt: newCoupon.expiry || undefined,
+      });
+      const rows = await promoCodesApi.list(restaurantId);
+      if (Array.isArray(rows)) {
+        setCoupons(rows.map((p: any) => ({
+          code: p.code,
+          discount: p.discountType === "percent" ? `${p.discountValue}% off` : `₹${p.discountValue} off`,
+          type: p.discountType || "percent",
+          minOrder: parseFloat(String(p.minOrderAmount ?? 0)),
+          maxDiscount: parseFloat(String(p.maxDiscount ?? p.discountValue ?? 0)),
+          used: p.usageCount ?? 0,
+          total: p.usageLimit ?? 100,
+          expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "No expiry",
+          status: p.status || (p.isActive ? "active" : "inactive"),
+        })));
+      }
+      setNewCoupon({ code: "", discountValue: "", minOrder: "", expiry: "" });
+      setShowAdd(false);
+      toast({ title: "Coupon created", description: `“${newCoupon.code.toUpperCase()}” is now available.` });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to create coupon", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
     }
-    setNewCoupon({ code: "", discountValue: "", minOrder: "", expiry: "" });
-    setShowAdd(false);
+  }
+
+  // Add loyalty points to a member — backed by PUT /customers/:id (loyaltyPoints)
+  async function handleAddPoints() {
+    if (!restaurantId || !pointsFor) return;
+    const add = parseInt(pointsToAdd, 10);
+    if (!add || Number.isNaN(add)) {
+      toast({ title: "Enter a point value", description: "Type how many points to add (or a negative number to deduct).", variant: "destructive" });
+      return;
+    }
+    const newTotal = Math.max(0, pointsFor.points + add);
+    setSavingPoints(true);
+    try {
+      await customersApi.update(restaurantId, Number(pointsFor.id), { loyaltyPoints: newTotal });
+      setMembers(prev => prev.map(m => m.id === pointsFor.id ? { ...m, points: newTotal } : m));
+      setSelectedMember(prev => prev && prev.id === pointsFor.id ? { ...prev, points: newTotal } : prev);
+      toast({ title: "Points updated", description: `${pointsFor.name} now has ${newTotal.toLocaleString()} pts.` });
+      setPointsFor(null);
+      setPointsToAdd("");
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to update points", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingPoints(false);
+    }
+  }
+
+  // No per-member wallet-balance endpoint exists (customers PUT does not accept walletBalance).
+  function handleAddWallet() {
+    toast({
+      title: "Wallet top-up unavailable",
+      description: "There's no per-member wallet API yet. Guests recharge their own wallet from the customer app.",
+    });
   }
 
   const filtered = members.filter(m =>
@@ -159,6 +204,20 @@ export default function LoyaltyWallet() {
         ))}
       </div>
 
+      {tab === "loyalty" && program && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-xs">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <Star className="h-3.5 w-3.5 text-amber-400" />
+            Loyalty Program
+            <span className={`px-2 py-0.5 rounded-full font-semibold ${program.isEnabled ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/40"}`}>{program.isEnabled ? "Enabled" : "Disabled"}</span>
+          </span>
+          {program.type && <span className="text-white/50">Type: <span className="text-white/80 font-semibold capitalize">{String(program.type)}</span></span>}
+          {program.pointsPerDollar != null && <span className="text-white/50">Earn <span className="text-amber-400 font-semibold">{Number(program.pointsPerDollar)}</span> pts / ₹</span>}
+          {program.cashbackPercent != null && Number(program.cashbackPercent) > 0 && <span className="text-white/50">Cashback <span className="text-emerald-400 font-semibold">{Number(program.cashbackPercent)}%</span></span>}
+          {program.expiryDays != null && Number(program.expiryDays) > 0 && <span className="text-white/50">Points expire in <span className="text-white/80 font-semibold">{Number(program.expiryDays)}d</span></span>}
+        </div>
+      )}
+
       {tab === "loyalty" && (
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-3">
@@ -208,8 +267,8 @@ export default function LoyaltyWallet() {
                   </div>
                 ))}
                 <div className="grid grid-cols-2 gap-2 pt-2">
-                  <button className="py-2 rounded-xl bg-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-all">Add Points</button>
-                  <button className="py-2 rounded-xl bg-blue-500/20 text-blue-400 text-xs font-bold hover:bg-blue-500/30 transition-all">Add Wallet</button>
+                  <button onClick={() => { setPointsFor(selectedMember); setPointsToAdd(""); }} className="py-2 rounded-xl bg-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-all">Add Points</button>
+                  <button onClick={handleAddWallet} title="No per-member wallet API yet" className="py-2 rounded-xl bg-blue-500/20 text-blue-400 text-xs font-bold hover:bg-blue-500/30 transition-all">Add Wallet</button>
                 </div>
               </div>
             ) : (
@@ -310,6 +369,33 @@ export default function LoyaltyWallet() {
                 <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold">Cancel</button>
                 <button onClick={handleCreateCoupon} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm">Create Coupon</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pointsFor && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold">Adjust Loyalty Points</h2>
+              <button onClick={() => setPointsFor(null)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="text-xs text-white/50 mb-4">{pointsFor.name} currently has <span className="text-amber-400 font-semibold">{pointsFor.points.toLocaleString()} pts</span>.</p>
+            <label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Points to add (use negative to deduct)</label>
+            <input
+              type="number"
+              value={pointsToAdd}
+              onChange={e => setPointsToAdd(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"
+              placeholder="e.g. 100 or -50"
+            />
+            {pointsToAdd && !Number.isNaN(parseInt(pointsToAdd, 10)) && (
+              <p className="text-xs text-white/40 mt-2">New balance: <span className="text-amber-400 font-semibold">{Math.max(0, pointsFor.points + parseInt(pointsToAdd, 10)).toLocaleString()} pts</span></p>
+            )}
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => setPointsFor(null)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold">Cancel</button>
+              <button onClick={handleAddPoints} disabled={savingPoints || !pointsToAdd} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40">{savingPoints ? "Saving…" : "Update Points"}</button>
             </div>
           </div>
         </div>

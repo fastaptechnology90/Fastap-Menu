@@ -51,7 +51,11 @@ export default function LiveMonitoring() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <FeedSection title="Live Orders" items={data?.orders ?? []} render={o => (
           <>
-            <div><span className="font-mono text-xs text-primary">{o.id}</span><p className="text-xs text-muted-foreground">{rel(o.at)}</p></div>
+            <div>
+              <span className="font-mono text-xs text-primary">{o.id}</span>
+              {o.vendor && <p className="text-xs font-medium text-foreground truncate max-w-[9rem]">{o.vendor}</p>}
+              <p className="text-xs text-muted-foreground">{o.tableName ? `${o.tableName} · ` : ""}{rel(o.at)}</p>
+            </div>
             <div className="text-right"><p className="font-semibold">{fmtINRFull(o.amount)}</p><StatusBadge status={o.status} /></div>
           </>
         )} />
