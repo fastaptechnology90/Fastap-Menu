@@ -1156,7 +1156,7 @@ export async function getPaymentDetail(txnId: string) {
 
 export async function getLiveFeed() {
   const [recentOrders, recentPayments, recentRefunds, recentSettlements, recentTickets, recentAudit] = await Promise.all([
-    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, restaurantName: restaurantsTable.name, tableName: ordersTable.tableName, total: ordersTable.total, status: ordersTable.status, createdAt: ordersTable.createdAt })
+    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, restaurantName: restaurantsTable.name, tableName: ordersTable.tableName, total: ordersTable.total, status: ordersTable.status, paymentMethod: ordersTable.paymentMethod, createdAt: ordersTable.createdAt })
       .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id)).orderBy(desc(ordersTable.createdAt)).limit(8),
     db.select({ order: ordersTable, restaurantName: restaurantsTable.name })
       .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
@@ -1174,12 +1174,13 @@ export async function getLiveFeed() {
   return {
     orders: recentOrders.map(o => ({
       type: "order", id: `ORD-${o.id}`, vendorId: o.restaurantId, vendor: o.restaurantName,
-      tableName: o.tableName, amount: parseMoney(o.total), status: o.status, at: o.createdAt.toISOString(),
+      tableName: o.tableName, amount: parseMoney(o.total), status: o.status,
+      mode: o.paymentMethod || "cash", at: o.createdAt.toISOString(),
     })),
     payments: recentPayments.map(({ order, restaurantName }) => ({
       type: "payment", id: `TXN-${order.id}`, vendor: restaurantName,
       amount: parseMoney(order.total), status: order.paymentStatus || order.status,
-      at: order.createdAt.toISOString(),
+      mode: order.paymentMethod || "cash", at: order.createdAt.toISOString(),
     })),
     refunds: recentRefunds.map(({ refund, restaurantName }) => ({
       type: "refund", id: `REF-${refund.id}`, vendor: restaurantName,

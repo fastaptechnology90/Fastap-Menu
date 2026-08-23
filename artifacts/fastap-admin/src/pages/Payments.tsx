@@ -20,6 +20,7 @@ export default function Payments() {
   const qc = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all"); // all | 7 | 15 | 30 (days)
   const [detailId, setDetailId] = useState<string | null>(null);
   const [holdReason, setHoldReason] = useState("");
 
@@ -52,13 +53,38 @@ export default function Payments() {
     onError: () => toast.error("Refund failed"),
   });
 
+  const nowMs = Date.now();
   const filtered = payments.filter(t => {
-    const matchSearch = t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.orderId.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase();
+    const matchSearch = t.id.toLowerCase().includes(q) ||
+      t.vendorName.toLowerCase().includes(q) ||
+      t.orderId.toLowerCase().includes(q) ||
+      String((t as any).utr ?? "").toLowerCase().includes(q) ||
+      String(t.paymentMode ?? "").toLowerCase().includes(q);
     const matchStatus = statusFilter === "all" || t.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPeriod = periodFilter === "all" ||
+      (nowMs - new Date(t.dateTime).getTime()) <= Number(periodFilter) * 86_400_000;
+    return matchSearch && matchStatus && matchPeriod;
   });
+
+  const PERIODS: [string, string][] = [["all", "All"], ["7", "7 Days"], ["15", "15 Days"], ["30", "30 Days"]];
+
+  // Payment-method chip — UPI / Cash / Card / Gateway clearly labelled + colour-coded.
+  const modeBadge = (mode?: string) => {
+    const m = (mode || "").toLowerCase();
+    const label = m === "upi" ? "UPI" : m === "cash" ? "Cash" : m === "card" ? "Card"
+      : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway"
+      : m === "aggregator" ? "Aggregator" : m === "wallet" ? "Wallet"
+      : (m === "room_bill" || m === "room") ? "Room Bill" : m === "netbanking" ? "Netbanking" : (mode || "—");
+    const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-500"
+      : m === "cash" ? "bg-amber-500/15 text-amber-500"
+      : m === "card" ? "bg-blue-500/15 text-blue-500"
+      : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-500"
+      : m === "aggregator" ? "bg-pink-500/15 text-pink-500"
+      : (m === "room_bill" || m === "room") ? "bg-cyan-500/15 text-cyan-500"
+      : "bg-muted text-muted-foreground";
+    return <span className={`text-xs font-semibold px-2 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
+  };
 
   const successCount = payments.filter(t => t.status === "success" || t.status === "paid").length;
   const failedCount = payments.filter(t => t.status === "failed").length;
@@ -74,9 +100,10 @@ export default function Payments() {
     const rows = filtered.map(t => [t.id, t.orderId, t.vendorName, t.grossAmount, t.commission, t.netPayout, t.paymentMode, t.status, t.dateTime].join(","));
     const blob = new Blob([header + rows.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "payments.csv"; a.click();
+    const suffix = periodFilter === "all" ? "all" : `last-${periodFilter}d`;
+    const a = document.createElement("a"); a.href = url; a.download = `payments-${suffix}.csv`; a.click();
     URL.revokeObjectURL(url);
-    toast.success("Payments exported");
+    toast.success(`Exported ${filtered.length} transactions${periodFilter === "all" ? "" : ` (last ${periodFilter} days)`}`);
   };
 
   return (
@@ -105,10 +132,21 @@ export default function Payments() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <CardTitle>Transactions</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <div className="relative w-56">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search TXN, UTR, vendor…" className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <Input placeholder="Search TXN, UTR, vendor, mode…" className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div className="flex rounded-lg border p-0.5">
+                {PERIODS.map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setPeriodFilter(val)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${periodFilter === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
@@ -136,7 +174,7 @@ export default function Payments() {
                 { header: "Gross", cell: (row: Payment) => <span className="font-medium">{fmtINRFull(row.grossAmount)}</span> },
                 { header: "Commission", cell: (row: Payment) => <span className="text-muted-foreground text-sm">-{fmtINRFull(row.commission)}</span> },
                 { header: "Net", cell: (row: Payment) => <span className="font-bold text-green-400">{fmtINRFull(row.netPayout)}</span> },
-                { header: "Mode", cell: (row: Payment) => <span className="text-sm">{row.paymentMode}</span> },
+                { header: "Mode", cell: (row: Payment) => modeBadge(row.paymentMode) },
                 { header: "Date", cell: (row: Payment) => <span className="text-xs text-muted-foreground">{new Date(row.dateTime).toLocaleDateString()}</span> },
                 { header: "Status", cell: (row: Payment) => <StatusBadge status={row.status} /> },
                 { header: "", cell: (row: Payment) => (

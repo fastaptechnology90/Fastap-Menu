@@ -8,6 +8,24 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
+// Payment-method chip — so you can tell how each payment came in (UPI / Cash / Gateway…).
+function PayMode({ mode }: { mode?: string }) {
+  if (!mode) return null;
+  const m = mode.toLowerCase();
+  const label = m === "upi" ? "UPI" : m === "cash" ? "Cash" : m === "card" ? "Card"
+    : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway"
+    : m === "aggregator" ? "Aggregator" : m === "wallet" ? "Wallet"
+    : (m === "room_bill" || m === "room") ? "Room Bill" : m === "netbanking" ? "Netbanking" : mode;
+  const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-500"
+    : m === "cash" ? "bg-amber-500/15 text-amber-500"
+    : m === "card" ? "bg-blue-500/15 text-blue-500"
+    : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-500"
+    : m === "aggregator" ? "bg-pink-500/15 text-pink-500"
+    : (m === "room_bill" || m === "room") ? "bg-cyan-500/15 text-cyan-500"
+    : "bg-muted text-muted-foreground";
+  return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
+}
+
 function FeedSection({ title, items, render }: { title: string; items: any[]; render: (item: any) => React.ReactNode }) {
   return (
     <PanelCard title={title} action={<Badge variant="secondary" className="text-xs">{items.length} live</Badge>}>
@@ -54,14 +72,14 @@ export default function LiveMonitoring() {
             <div>
               <span className="font-mono text-xs text-primary">{o.id}</span>
               {o.vendor && <p className="text-xs font-medium text-foreground truncate max-w-[9rem]">{o.vendor}</p>}
-              <p className="text-xs text-muted-foreground">{o.tableName ? `${o.tableName} · ` : ""}{rel(o.at)}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">{o.tableName ? `${o.tableName} · ` : ""}{rel(o.at)} <PayMode mode={o.mode} /></p>
             </div>
             <div className="text-right"><p className="font-semibold">{fmtINRFull(o.amount)}</p><StatusBadge status={o.status} /></div>
           </>
         )} />
         <FeedSection title="Live Payments" items={data?.payments ?? []} render={p => (
           <>
-            <div><span className="font-mono text-xs">{p.id}</span><p className="text-xs text-muted-foreground">{p.vendor}</p></div>
+            <div><span className="font-mono text-xs">{p.id}</span><p className="text-xs text-muted-foreground flex items-center gap-1.5">{p.vendor} <PayMode mode={p.mode} /></p></div>
             <div className="text-right"><p className="font-semibold text-emerald-500">{fmtINRFull(p.amount)}</p><StatusBadge status={p.status} /></div>
           </>
         )} />
