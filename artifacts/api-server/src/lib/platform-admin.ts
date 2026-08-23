@@ -442,16 +442,40 @@ export async function getEnhancedStats(period?: string) {
   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - 7);
   const monthStart = new Date(today); monthStart.setDate(1);
 
-  const [restaurantCount] = await db.select({ count: count() }).from(restaurantsTable);
-  const [activeCount] = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.isActive, true));
-  const [userCount] = await db.select({ count: count() }).from(usersTable);
-  const [orderCount] = await db.select({ count: count() }).from(ordersTable);
-  const [customerCount] = await db.select({ count: count() }).from(customersTable);
-  const [ticketCount] = await db.select({ count: count() }).from(supportTicketsTable);
-  const [reservationCount] = await db.select({ count: count() }).from(reservationsTable);
-  const [qrScanTotal] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable);
+  // Every DB round-trip below is independent — run them in parallel instead of ~25
+  // sequential awaits. On a remote (Railway) database that serialization was the single
+  // biggest reason the Dashboard took ~10s; in parallel it's one round-trip's worth.
+  const [
+    restaurantCount, activeCount, userCount, orderCount, customerCount, ticketCount,
+    reservationCount, qrScanTotal, allOrders,
+    pendingSettlements, releasedSettlements, failedSettlements, heldSettlements,
+    chargebackTotal, allRestaurantsForKyc, free, starter, pro, enterprise,
+    recentRests, plans, commissionRate,
+  ] = await Promise.all([
+    db.select({ count: count() }).from(restaurantsTable).then(r => r[0]),
+    db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.isActive, true)).then(r => r[0]),
+    db.select({ count: count() }).from(usersTable).then(r => r[0]),
+    db.select({ count: count() }).from(ordersTable).then(r => r[0]),
+    db.select({ count: count() }).from(customersTable).then(r => r[0]),
+    db.select({ count: count() }).from(supportTicketsTable).then(r => r[0]),
+    db.select({ count: count() }).from(reservationsTable).then(r => r[0]),
+    db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).then(r => r[0]),
+    db.select().from(ordersTable),
+    db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "pending")).then(r => r[0]),
+    db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "released")).then(r => r[0]),
+    db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "failed")).then(r => r[0]),
+    db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "held")).then(r => r[0]),
+    db.select({ total: sum(platformChargebacksTable.amount) }).from(platformChargebacksTable).then(r => r[0]),
+    db.select({ settings: restaurantsTable.settings }).from(restaurantsTable),
+    db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "free")).then(r => r[0]),
+    db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "starter")).then(r => r[0]),
+    db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "pro")).then(r => r[0]),
+    db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "enterprise")).then(r => r[0]),
+    db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt)).limit(20),
+    db.select().from(platformPlansTable),
+    getCommissionRate(),
+  ]);
 
-  const allOrders = await db.select().from(ordersTable);
   const paidOrdersList = allOrders.filter(isPaidOrder);
   const sumTotal = (list: typeof allOrders) => list.filter(isPaidOrder).reduce((s, o) => s + orderGrossTotal(o), 0);
   const todayOrders = paidOrdersList.filter(o => new Date(o.createdAt) >= today);
@@ -460,10 +484,8 @@ export async function getEnhancedStats(period?: string) {
 
   const paidOrders = paidOrdersList;
   const failedPayments = allOrders.filter(o => String(o.paymentStatus ?? "").toLowerCase() === "failed").length;
-  const refundAmount = allOrders.filter(isRefundedOrder)
-    .reduce((s, o) => s + orderGrossTotal(o), 0);
+  const refundAmount = allOrders.filter(isRefundedOrder).reduce((s, o) => s + orderGrossTotal(o), 0);
 
-  const commissionRate = await getCommissionRate();
   // Revenue/commission can be scoped to a period (for the Analytics page's 7/15/30-day
   // view). With no period it's all-time — so the Dashboard stays consistent with the
   // vendor list / settlements (which are all-time).
@@ -472,41 +494,31 @@ export async function getEnhancedStats(period?: string) {
   const totalRevenue = sumOrderTotals(revenueOrders);
   const platformCommission = sumOrderCommissions(revenueOrders, commissionRate);
 
-  const [pendingSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "pending"));
-  const [releasedSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "released"));
-  const [failedSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "failed"));
-  const [heldSettlements] = await db.select({ count: count() }).from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "held"));
-  const [chargebackTotal] = await db.select({ total: sum(platformChargebacksTable.amount) }).from(platformChargebacksTable);
-  const allRestaurantsForKyc = await db.select({ settings: restaurantsTable.settings }).from(restaurantsTable);
   const pendingKyc = allRestaurantsForKyc.filter(r => {
     const kyc = (r.settings as { kyc?: { status?: string } } | null)?.kyc;
     return !kyc?.status || kyc.status === "pending";
   }).length;
 
-  const [free] = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "free"));
-  const [starter] = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "starter"));
-  const [pro] = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "pro"));
-  const [enterprise] = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "enterprise"));
+  // Recent restaurants: skip soft-deleted, keep 10; fetch all owners in ONE query and
+  // derive per-restaurant order counts from allOrders (already loaded) — no N+1.
+  const recentActive = recentRests.filter(r => !readPlatformControls(r.settings).deletedAt).slice(0, 10);
+  const ownerIds = [...new Set(recentActive.map(r => r.userId).filter((id): id is number => typeof id === "number"))];
+  const owners = ownerIds.length
+    ? await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, ownerIds))
+    : [];
+  const recentWithOwners = recentActive.map(r => {
+    const owner = owners.find(o => o.id === r.userId);
+    return { ...r, ownerName: owner?.name ?? "", ownerEmail: owner?.email ?? "", totalOrders: allOrders.filter(o => o.restaurantId === r.id).length };
+  });
 
-  const recentRests = await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt)).limit(10);
-  const recentWithOwners = await Promise.all(recentRests.map(async (r) => {
-    const [owner] = await db.select({ name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
-    const [orderCnt] = await db.select({ count: count() }).from(ordersTable).where(eq(ordersTable.restaurantId, r.id));
-    return { ...r, ownerName: owner?.name ?? "", ownerEmail: owner?.email ?? "", totalOrders: orderCnt?.count ?? 0 };
-  }));
-
-  const plans = await db.select().from(platformPlansTable);
   const planPrices = Object.fromEntries(plans.map(p => [p.id, parseMoney(p.price)]));
-
-  const activeSubscriptions = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.isActive, true));
-  const trialVendors = await db.select({ count: count() }).from(restaurantsTable).where(eq(restaurantsTable.plan, "free"));
 
   return {
     totalRestaurants: restaurantCount?.count ?? 0,
     activeRestaurants: activeCount?.count ?? 0,
     inactiveRestaurants: (restaurantCount?.count ?? 0) - (activeCount?.count ?? 0),
     suspendedVendors: (restaurantCount?.count ?? 0) - (activeCount?.count ?? 0),
-    trialVendors: trialVendors[0]?.count ?? 0,
+    trialVendors: free?.count ?? 0,
     enterpriseVendors: enterprise?.count ?? 0,
     totalUsers: userCount?.count ?? 0,
     totalOrders: orderCount?.count ?? 0,
@@ -527,7 +539,7 @@ export async function getEnhancedStats(period?: string) {
     heldSettlements: heldSettlements?.count ?? 0,
     chargebackAmount: parseMoney(chargebackTotal?.total ?? 0),
     pendingKycVendors: pendingKyc,
-    activeSubscriptions: activeSubscriptions[0]?.count ?? 0,
+    activeSubscriptions: activeCount?.count ?? 0,
     paymentSuccessRate: paidOrders.length ? Math.round((paidOrders.length / Math.max(paidOrders.length + failedPayments, 1)) * 100) : 100,
     failedPayments,
     planBreakdown: {
@@ -669,11 +681,23 @@ export async function listSettlements() {
 }
 
 export async function listKycRecords() {
-  const restaurants = (await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt)))
-    // Hide soft-deleted vendors (same rule the Vendors list uses) so a deleted
-    // restaurant doesn't leave a ghost entry in the KYC queue.
-    .filter(r => !readPlatformControls(r.settings).deletedAt);
-  const docs = await db.select().from(documentsTable);
+  // Fetch restaurants + docs in parallel, and select only the doc columns the list needs
+  // — NOT the large base64 `fileUrl` blobs (which can be tens of KB each). Pulling every
+  // document's file data was the main reason this list was slow.
+  const [allRestaurants, docs] = await Promise.all([
+    db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt)),
+    db.select({
+      id: documentsTable.id,
+      restaurantId: documentsTable.restaurantId,
+      name: documentsTable.name,
+      description: documentsTable.description,
+      category: documentsTable.category,
+      status: documentsTable.status,
+    }).from(documentsTable),
+  ]);
+  // Hide soft-deleted vendors (same rule the Vendors list uses) so a deleted restaurant
+  // doesn't leave a ghost entry in the KYC queue.
+  const restaurants = allRestaurants.filter(r => !readPlatformControls(r.settings).deletedAt);
 
   return restaurants.map(r => {
     const settings = (r.settings ?? {}) as { kyc?: Record<string, unknown> };
