@@ -328,11 +328,17 @@ export default function RestaurantRegister() {
       setError("Restaurant name and address are required");
       return false;
     }
-    // Step 3: bank account + IFSC are REQUIRED (needed for payouts). GST/FSSAI/PAN and all
+    // Step 3: legal business name + bank account + IFSC are REQUIRED. GST/FSSAI/PAN and all
     // document uploads stay OPTIONAL — the super admin verifies/approves those later.
-    if (step === 3 && (!bankAccount.trim() || !ifsc.trim())) {
-      setError("Bank account and IFSC are required");
-      return false;
+    if (step === 3) {
+      if (!legalBusinessName.trim()) {
+        setError("Legal business name is required");
+        return false;
+      }
+      if (!bankAccount.trim() || !ifsc.trim()) {
+        setError("Bank account and IFSC are required");
+        return false;
+      }
     }
     return true;
   }
@@ -351,6 +357,9 @@ export default function RestaurantRegister() {
     }
     if (!restaurantName || !address) {
       return { step: 2, msg: "Restaurant name and address are required" };
+    }
+    if (!legalBusinessName.trim()) {
+      return { step: 3, msg: "Legal business name is required" };
     }
     if (!bankAccount.trim() || !ifsc.trim()) {
       return { step: 3, msg: "Bank account and IFSC are required" };
@@ -483,9 +492,9 @@ export default function RestaurantRegister() {
             <div className="space-y-3">
               <h2 className="text-xl font-bold mb-4">KYC & compliance</h2>
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-200/90">
-                Bank account & IFSC are required (needed for payouts). GST/FSSAI/PAN and document uploads are optional — our team verifies those, and the admin approves your venue.
+                Legal business name, bank account & IFSC are required. GST/FSSAI/PAN and document uploads are optional — our team verifies those, and the admin approves your venue.
               </div>
-              <input className="field" placeholder="Legal business name (optional)" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
+              <input className="field" placeholder="Legal business name *" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
               <input className="field" placeholder="GST number (optional)" value={gstNumber} onChange={e => setGstNumber(e.target.value)} />
               <input className="field" placeholder="FSSAI license number (optional)" value={fssaiNumber} onChange={e => setFssaiNumber(e.target.value)} />
               <input className="field" placeholder="PAN number (optional)" value={panNumber} onChange={e => setPanNumber(e.target.value)} />

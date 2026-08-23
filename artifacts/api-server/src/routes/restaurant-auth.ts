@@ -607,8 +607,12 @@ router.post("/restaurant-auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Restaurant name and address are required" });
     return;
   }
-  // Bank account + IFSC are REQUIRED (needed for payouts). GST/FSSAI/PAN numbers and all
+  // Legal business name + bank account + IFSC are REQUIRED. GST/FSSAI/PAN numbers and all
   // document uploads stay OPTIONAL — the super admin verifies/approves those after signup.
+  if (!legalBusinessName?.trim()) {
+    res.status(400).json({ error: "Legal business name is required" });
+    return;
+  }
   if (!bankAccount?.trim() || !ifsc?.trim()) {
     res.status(400).json({ error: "Bank account and IFSC are required" });
     return;
