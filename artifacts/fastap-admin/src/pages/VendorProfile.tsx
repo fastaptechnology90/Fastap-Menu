@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable } from "@/components/shared/DataTable";
 import { KpiCard } from "@/components/shared/KpiCard";
-import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart } from "lucide-react";
+import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart, Eye } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { FeatureControlPanel } from "@/components/features/FeatureControlPanel";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,7 @@ export default function VendorProfile() {
   const { toast } = useToast();
   const [note, setNote] = useState("");
   const [noteType, setNoteType] = useState("Internal Note");
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const [branchOpen, setBranchOpen] = useState(false);
   const [editBranchOpen, setEditBranchOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
@@ -166,8 +167,22 @@ export default function VendorProfile() {
   });
 
   const kycApproveMutation = useMutation({
-    mutationFn: () => api.kyc.approve(String(vendorKyc?.id || vendor!.id)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["kyc"] }); toast({ title: "KYC approved" }); },
+    mutationFn: async () => {
+      await api.kyc.approve(String(vendorKyc?.id || vendor!.id));
+      // Also mark each uploaded document verified so they don't stay "Pending" after
+      // the overall KYC is approved.
+      await Promise.all(
+        (vendorDocuments as any[])
+          .filter(d => d?.id && d.status !== "Verified")
+          .map(d => api.kyc.verifyDocument(d.id, "verified").catch(() => {})),
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["kyc"] });
+      qc.invalidateQueries({ queryKey: ["vendor-documents", id] });
+      qc.invalidateQueries({ queryKey: ["vendor", id] });
+      toast({ title: "KYC approved — documents verified" });
+    },
   });
 
   const kycRequestMutation = useMutation({
@@ -686,7 +701,10 @@ export default function VendorProfile() {
                     </div>
                     <div className="flex items-center gap-3">
                       <StatusBadge status={doc.status} />
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
+                      {(doc as any).fileUrl && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="View document" onClick={() => setPreviewDoc(doc)}><Eye className="h-3.5 w-3.5" /></Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Download" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                 ))}
@@ -842,6 +860,28 @@ export default function VendorProfile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Document preview */}
+      <Dialog open={!!previewDoc} onOpenChange={o => !o && setPreviewDoc(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle className="capitalize">{String(previewDoc?.docType || previewDoc?.type || "Document").replace(/_/g, " ")}</DialogTitle></DialogHeader>
+          {(() => {
+            const url: string = previewDoc?.fileUrl || "";
+            const isImg = String(previewDoc?.fileType || "").startsWith("image") || /\.(png|jpe?g|webp|gif)$/i.test(url) || url.startsWith("data:image");
+            const isPdf = String(previewDoc?.fileType || "").includes("pdf") || /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
+            const broken = url.startsWith("data:") && (url.split(",")[1]?.length ?? 0) < 100;
+            if (!url) return <p className="text-sm text-muted-foreground py-6 text-center">No file uploaded.</p>;
+            if (isImg && !broken) return <img src={url} alt="document" className="max-h-[60vh] w-full rounded border object-contain bg-black/20" />;
+            if (isPdf) return <iframe src={url} title="document" className="w-full h-[60vh] rounded border bg-white" />;
+            return (
+              <div className="rounded border border-dashed border-yellow-500/40 bg-yellow-500/5 p-4 text-center">
+                <p className="text-xs font-medium text-yellow-600">Preview not available</p>
+                <p className="text-[11px] text-muted-foreground mt-1">The uploaded file looks empty or corrupt — ask the vendor to re-upload.</p>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={branchOpen} onOpenChange={setBranchOpen}>
         <DialogContent>
