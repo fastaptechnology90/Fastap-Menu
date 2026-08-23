@@ -1198,10 +1198,16 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
   }));
 
   const allDisc = [...discrepancies, ...refundDisc];
-  // Matched transactions (gateway == bank) — shown so the admin can see the 7 that
-  // reconciled, with vendor name and HOW it was paid (UPI / card / gateway / cash).
+  // A transaction is "matched" (gateway == bank) when it is genuinely PAID. Use the same
+  // isPaid rule the dashboard / payments / settlements use — NOT the raw status string —
+  // so an order that is paid but still shows paymentStatus "pending" (e.g. cash confirmed)
+  // is counted here too, and every page agrees on what "paid" means.
+  const isMatchedTxn = (p: typeof payments[number]) =>
+    (p as { isPaid?: boolean }).isPaid === true || p.status === "completed" || p.status === "paid";
+  // Matched transactions — shown so the admin can see the ones that reconciled, with
+  // vendor name and HOW it was paid (UPI / card / gateway / cash).
   const matchedList = payments
-    .filter(p => p.status === "completed" || p.status === "paid")
+    .filter(isMatchedTxn)
     .map(p => ({
       id: p.id,
       vendorName: p.vendorName,
@@ -1216,7 +1222,7 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
     }));
   res.json({
     summary: {
-      matched: payments.filter(p => p.status === "completed" || p.status === "paid").length,
+      matched: payments.filter(isMatchedTxn).length,
       mismatched: allDisc.length,
       missing: failedOrders.length,
       duplicates: 0,
