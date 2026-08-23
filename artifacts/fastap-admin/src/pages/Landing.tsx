@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Zap, ArrowRight, Play, ChevronRight, QrCode, BarChart3, Users,
+  Zap, ArrowRight, ChevronRight, QrCode, BarChart3, Users,
   Shield, CreditCard, Utensils, Star, MapPin, Building2,
   Coffee, Waves, ChefHat, Menu, X, Smartphone, Calendar, Clock,
   Headphones, Wallet, Hotel, Sparkles, Wine, Languages, Wifi, Monitor, Film,
@@ -14,8 +14,7 @@ import { PhoneMockup } from "@/components/user/PhoneMockup";
 import { DEMO_MENU_URL } from "@/lib/guestDemo";
 
 // "Try Demo Menu" / smart-entry chips open the demo menu directly (no login). The demo
-// venue loads by slug, so guests never see hotel name / OTP / email+password first — a
-// real sign-in stays available via the separate "Guest Sign In" button (goGuestAuth).
+// menu is VIEW-ONLY — guests can browse but cannot order or sign in (handled in MenuPage).
 const GUEST_ENTRY_PATH = DEMO_MENU_URL;
 const smartEntryDemos = [
   { label: "QR Table", path: GUEST_ENTRY_PATH },
@@ -119,7 +118,6 @@ export default function Landing() {
   // was sending the button to "/" / "/dashboard" and making it look like nothing opened.)
   function goAdmin() { navigate("/login"); }
   function goUserMenu() { navigate(DEMO_MENU_URL); }
-  function goGuestAuth() { navigate("/user/auth"); }
   function goRestaurant() { navigate("/restaurant/login"); }
   function goRestaurantRegister() { navigate("/restaurant/register"); }
   function scrollTo(id: string) {
@@ -171,7 +169,6 @@ export default function Landing() {
               ))}
               <div className="pt-3 flex flex-col gap-2">
                 <button onClick={goUserMenu} className="guest-btn-primary w-full py-2.5 text-sm">Open Guest Web</button>
-                <button onClick={goGuestAuth} className="guest-btn-secondary w-full py-2 text-sm">Guest Sign In</button>
                 <button onClick={goRestaurant} className="guest-btn-secondary w-full py-2 text-sm">Restaurant Login</button>
               </div>
             </div>
@@ -204,10 +201,6 @@ export default function Landing() {
                   <QrCode className="h-5 w-5" />
                   Try Demo Menu
                   <ArrowRight className="h-4 w-4" />
-                </button>
-                <button onClick={goGuestAuth} className="guest-btn-secondary px-8 py-3.5 text-base w-full sm:w-auto">
-                  <Play className="h-4 w-4 fill-white/60" />
-                  Guest Sign In
                 </button>
               </div>
 
@@ -423,7 +416,6 @@ export default function Landing() {
             </div>
             <div className="flex flex-wrap justify-center gap-6 text-xs text-white/30">
               <button onClick={goUserMenu} className="hover:text-orange-400 transition-colors font-medium">Guest Menu</button>
-              <button onClick={goGuestAuth} className="hover:text-white/60 transition-colors">Guest Sign In</button>
               <button onClick={goRestaurant} className="hover:text-white/60 transition-colors">Restaurant</button>
               <button onClick={goAdmin} className="hover:text-white/60 transition-colors">Admin</button>
             </div>

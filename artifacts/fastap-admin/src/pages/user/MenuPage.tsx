@@ -9,7 +9,7 @@ import { DEFAULT_CUSTOMIZATION } from "@/lib/digitalMenuCatalog";
 import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestEmpty } from "@/components/user/GuestApiState";
-import { resolveGuestSlug } from "@/lib/guestDemo";
+import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
 import { MenuGridCard } from "@/components/user/MenuGridCard";
 import { ServiceHubSheet } from "@/components/user/ServiceHubSheet";
 import { MenuFilterSheet } from "@/components/user/MenuFilterSheet";
@@ -153,9 +153,10 @@ interface ItemDetailProps {
   item: MenuDisplayItem;
   onClose: () => void;
   onAdd: (customizations: string[], addons: MenuDisplayItem["addons"], instructions?: string, unitPrice?: number) => void;
+  readOnly?: boolean;
 }
 
-function ItemDetail({ item, onClose, onAdd }: ItemDetailProps) {
+function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
   const [qty, setQty] = useState(1);
   const [selectedCustom, setSelectedCustom] = useState<string[]>([]);
   const [selectedAddons, setSelectedAddons] = useState<{ name: string; price: number }[]>([]);
@@ -415,22 +416,30 @@ function ItemDetail({ item, onClose, onAdd }: ItemDetailProps) {
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <div className="flex items-center gap-3 bg-white/5 rounded-xl p-1">
-              <button onClick={() => setQty(q => Math.max(1, q - 1))} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center">
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="w-6 text-center font-bold">{qty}</span>
-              <button onClick={() => setQty(q => q + 1)} className="h-9 w-9 rounded-lg bg-orange-500 hover:bg-orange-400 flex items-center justify-center">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <button
-              onClick={() => { onAdd(allCustomizations, selectedAddons, instructions, unitPrice); onClose(); }}
-              className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Add to Order · ₹{total}
-            </button>
+            {readOnly ? (
+              <div className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-center text-sm font-semibold text-white/50">
+                🔒 Demo menu — view only
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 bg-white/5 rounded-xl p-1">
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-6 text-center font-bold">{qty}</span>
+                  <button onClick={() => setQty(q => q + 1)} className="h-9 w-9 rounded-lg bg-orange-500 hover:bg-orange-400 flex items-center justify-center">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <button
+                  onClick={() => { onAdd(allCustomizations, selectedAddons, instructions, unitPrice); onClose(); }}
+                  className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Add to Order · ₹{total}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -441,6 +450,10 @@ function ItemDetail({ item, onClose, onAdd }: ItemDetailProps) {
 export default function MenuPage() {
   const [, navigate] = useAppLocation();
   const { addToCart, cartCount, cartTotal, activeRestaurant, activeTable, activeSection, dietaryFilter, setDietaryFilter, setActiveRestaurant, setActiveTable, loadVenue, venue, user, favorites } = useUser();
+  // Demo menu (the marketing "spice-garden" venue) is VIEW-ONLY: no login, no ordering —
+  // visitors can browse the menu but cannot add to cart or check out.
+  const urlSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("slug") : null;
+  const isDemo = (urlSlug ?? (venue as { restaurantSlug?: string })?.restaurantSlug) === DEMO_SLUG;
   const { t, speakMenuItem, accessibility, announce } = useLocaleAccessibility();
   const { loadMenuWithCache, isOnline, connectionStatus, settings, pendingOrders } = useOffline();
   const { canInstall, isStandalone, installApp } = usePwa();
@@ -564,6 +577,7 @@ export default function MenuPage() {
     });
 
   function handleAdd(item: MenuDisplayItem, customizations: string[], addons: { name: string; price: number }[], instructions?: string, unitPrice?: number) {
+    if (isDemo) return; // demo menu is view-only — ordering disabled
     const linePrice = unitPrice ?? item.price + addons.reduce((s, a) => s + a.price, 0);
     const beverageSlugs = ["soft-drinks", "coffee", "tea", "mocktails", "cocktails", "premium-liquor", "wine-menu", "beer-menu"];
     addToCart({
@@ -798,30 +812,38 @@ export default function MenuPage() {
         </div>
       )}
 
-      <footer className="menu-app__cart">
-        <div className="flex gap-2.5 max-w-lg mx-auto">
-          <button
-            type="button"
-            onClick={() => setShowWaiterPanel(true)}
-            className="guest-btn-secondary h-12 w-12 shrink-0 p-0"
-            aria-label="Call waiter"
-          >
-            <Bell className="h-5 w-5 text-orange-400" />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/user/cart")}
-            disabled={cartCount === 0}
-            className="guest-btn-primary flex-1 h-12 justify-between px-4 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            <span className="flex items-center gap-2 text-sm font-bold">
-              <ShoppingCart className="h-4 w-4" />
-              {cartCount} {cartCount === 1 ? "item" : "items"}
-            </span>
-            <span className="text-sm font-bold">₹{cartTotal}</span>
-          </button>
-        </div>
-      </footer>
+      {isDemo ? (
+        <footer className="menu-app__cart">
+          <div className="max-w-lg mx-auto text-center text-xs font-semibold text-white/50 py-1">
+            🔒 This is a demo menu — for viewing only. Ordering is disabled.
+          </div>
+        </footer>
+      ) : (
+        <footer className="menu-app__cart">
+          <div className="flex gap-2.5 max-w-lg mx-auto">
+            <button
+              type="button"
+              onClick={() => setShowWaiterPanel(true)}
+              className="guest-btn-secondary h-12 w-12 shrink-0 p-0"
+              aria-label="Call waiter"
+            >
+              <Bell className="h-5 w-5 text-orange-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/user/cart")}
+              disabled={cartCount === 0}
+              className="guest-btn-primary flex-1 h-12 justify-between px-4 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              <span className="flex items-center gap-2 text-sm font-bold">
+                <ShoppingCart className="h-4 w-4" />
+                {cartCount} {cartCount === 1 ? "item" : "items"}
+              </span>
+              <span className="text-sm font-bold">₹{cartTotal}</span>
+            </button>
+          </div>
+        </footer>
+      )}
 
       <MenuFilterSheet
         open={showFilterSheet}
@@ -849,6 +871,7 @@ export default function MenuPage() {
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
           onAdd={(c, a, instr, unitPrice) => { handleAdd(selectedItem, c, a, instr, unitPrice); setSelectedItem(null); }}
+          readOnly={isDemo}
         />
       )}
     </div>
