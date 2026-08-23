@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, count, and, sql } from "drizzle-orm";
+import { eq, desc, count, and, sql, inArray } from "drizzle-orm";
 import {
   db, restaurantsTable, usersTable, ordersTable, documentsTable, supportTicketsTable, staffTable, branchesTable,
   platformAuditLogsTable, platformSettlementsTable, platformRefundsTable, platformChargebacksTable,
@@ -109,10 +109,18 @@ router.get("/superadmin/vendors", ...admin, async (req, res): Promise<void> => {
   const filtered = includeDeleted ? restaurants : restaurants.filter(r => !readPlatformControls(r.settings).deletedAt);
   // Real, order-driven revenue per vendor: the sum of their paid orders (same rule the
   // dashboard total uses). It grows as orders come in — no hard-coded plan amounts.
-  const allOrders = await db.select().from(ordersTable);
-  const result = await Promise.all(filtered.map(async (r) => {
-      const [owner] = await db.select({ name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
-      const vendorOrders = allOrders.filter(o => o.restaurantId === r.id);
+  // Owners fetched in ONE query (not one per vendor) to avoid an N+1 round-trip storm.
+  const ownerIds = [...new Set(filtered.map(r => r.userId).filter((id): id is number => typeof id === "number"))];
+  const [allOrders, owners] = await Promise.all([
+    db.select().from(ordersTable),
+    ownerIds.length
+      ? db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, ownerIds))
+      : Promise.resolve([]),
+  ]);
+  const ownerById = new Map(owners.map(o => [o.id, o]));
+  const result = filtered.map((r) => {
+    const owner = ownerById.get(r.userId as number);
+    const vendorOrders = allOrders.filter(o => o.restaurantId === r.id);
     const settings = (r.settings ?? {}) as { kyc?: { status?: string }; wallet?: { frozen?: boolean } };
     const controls = readPlatformControls(r.settings);
     return {
@@ -123,8 +131,8 @@ router.get("/superadmin/vendors", ...admin, async (req, res): Promise<void> => {
       payoutsFrozen: settings.wallet?.frozen ?? false,
       platformControls: controls,
     };
-    }));
-    res.json(result);
+  });
+  res.json(result);
 });
 
 router.get("/superadmin/restaurants", ...admin, async (_req, res) => {
