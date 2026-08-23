@@ -424,7 +424,7 @@ export default function VendorProfile() {
                 <div key={key} className="flex items-center justify-between rounded-lg border p-3">
                   <div className="flex items-center gap-2 text-sm"><Icon className="h-4 w-4 text-muted-foreground" />{label}</div>
                   <Switch
-                    checked={!!platformControls[key]}
+                    checked={!!(platformControls as Record<string, unknown>)[key]}
                     onCheckedChange={v => controlsMutation.mutate({ [key]: v })}
                   />
                 </div>
