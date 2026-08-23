@@ -495,6 +495,7 @@ export async function getEnhancedStats(period?: string) {
   const platformCommission = sumOrderCommissions(revenueOrders, commissionRate);
 
   const pendingKyc = allRestaurantsForKyc.filter(r => {
+    if (readPlatformControls(r.settings).deletedAt) return false; // skip soft-deleted (matches KYC list)
     const kyc = (r.settings as { kyc?: { status?: string } } | null)?.kyc;
     return !kyc?.status || kyc.status === "pending";
   }).length;
