@@ -328,8 +328,12 @@ export default function RestaurantRegister() {
       setError("Restaurant name and address are required");
       return false;
     }
-    // Step 3 (KYC & compliance) is fully OPTIONAL — no field or document blocks the flow.
-    // Whatever the owner provides is verified by the team; the super admin approves.
+    // Step 3: bank account + IFSC are REQUIRED (needed for payouts). GST/FSSAI/PAN and all
+    // document uploads stay OPTIONAL — the super admin verifies/approves those later.
+    if (step === 3 && (!bankAccount.trim() || !ifsc.trim())) {
+      setError("Bank account and IFSC are required");
+      return false;
+    }
     return true;
   }
 
@@ -338,15 +342,18 @@ export default function RestaurantRegister() {
     if (step < STEPS.length) setStep((step + 1) as Step);
   }
 
-  // Full cross-step validation for final submit. Only the owner account (step 1) and the
-  // basic business details (step 2) are required. KYC & compliance (step 3) — bank details
-  // and all documents — is OPTIONAL: the super admin verifies/approves after submission.
+  // Full cross-step validation for final submit. Required: owner account (step 1), basic
+  // business details (step 2), and bank account + IFSC (step 3, for payouts). Documents and
+  // GST/FSSAI/PAN stay OPTIONAL — the super admin verifies/approves those after submission.
   function firstIncompleteStep(): { step: Step; msg: string } | null {
     if (!ownerName || !ownerEmail || ownerPassword.length < 6 || ownerPhone.replace(/\D/g, "").length < 10) {
       return { step: 1, msg: "Complete name, email, mobile, and password (6+ chars)" };
     }
     if (!restaurantName || !address) {
       return { step: 2, msg: "Restaurant name and address are required" };
+    }
+    if (!bankAccount.trim() || !ifsc.trim()) {
+      return { step: 3, msg: "Bank account and IFSC are required" };
     }
     return null;
   }
@@ -476,15 +483,15 @@ export default function RestaurantRegister() {
             <div className="space-y-3">
               <h2 className="text-xl font-bold mb-4">KYC & compliance</h2>
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-200/90">
-                This whole step is optional. Fill in whatever you have — our team verifies it. You can also submit now and the admin will approve your venue.
+                Bank account & IFSC are required (needed for payouts). GST/FSSAI/PAN and document uploads are optional — our team verifies those, and the admin approves your venue.
               </div>
               <input className="field" placeholder="Legal business name (optional)" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
               <input className="field" placeholder="GST number (optional)" value={gstNumber} onChange={e => setGstNumber(e.target.value)} />
               <input className="field" placeholder="FSSAI license number (optional)" value={fssaiNumber} onChange={e => setFssaiNumber(e.target.value)} />
               <input className="field" placeholder="PAN number (optional)" value={panNumber} onChange={e => setPanNumber(e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
-                <input className="field" placeholder="Bank account (optional)" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
-                <input className="field" placeholder="IFSC code (optional)" value={ifsc} onChange={e => setIfsc(e.target.value)} />
+                <input className="field" placeholder="Bank account *" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
+                <input className="field" placeholder="IFSC code *" value={ifsc} onChange={e => setIfsc(e.target.value)} />
               </div>
               <div className="border border-white/10 rounded-xl p-4 space-y-3 mt-2">
                 <p className="text-xs text-white/50 font-semibold uppercase">Business & compliance documents</p>

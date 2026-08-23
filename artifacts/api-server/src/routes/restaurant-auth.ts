@@ -607,9 +607,12 @@ router.post("/restaurant-auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Restaurant name and address are required" });
     return;
   }
-  // KYC & compliance (bank account, IFSC, GST/FSSAI/PAN, documents) is OPTIONAL now.
-  // Registration always goes through as "pending"; the super admin verifies whatever was
-  // provided and approves — or approves manually when nothing was uploaded.
+  // Bank account + IFSC are REQUIRED (needed for payouts). GST/FSSAI/PAN numbers and all
+  // document uploads stay OPTIONAL — the super admin verifies/approves those after signup.
+  if (!bankAccount?.trim() || !ifsc?.trim()) {
+    res.status(400).json({ error: "Bank account and IFSC are required" });
+    return;
+  }
   const docError = validateRegistrationDocuments(documents);
   if (docError) {
     res.status(400).json({ error: docError });
