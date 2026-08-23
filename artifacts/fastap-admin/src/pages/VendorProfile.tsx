@@ -190,6 +190,33 @@ export default function VendorProfile() {
     onSuccess: () => toast({ title: "Re-upload request sent" }),
   });
 
+  // Approve a single document.
+  const docApproveMutation = useMutation({
+    mutationFn: (docId: number) => api.kyc.verifyDocument(docId, "verified"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendor-documents", id] });
+      qc.invalidateQueries({ queryKey: ["kyc"] });
+      toast({ title: "Document approved" });
+    },
+    onError: () => toast({ title: "Approve failed", variant: "destructive" }),
+  });
+
+  // Ask the vendor to re-upload ONLY the documents that aren't approved yet — verified
+  // ones are left untouched.
+  const reuploadUnapprovedMutation = useMutation({
+    mutationFn: async () => {
+      const pending = (vendorDocuments as any[]).filter(d => d?.id && d.status !== "Verified");
+      await Promise.all(pending.map(d => api.kyc.verifyDocument(d.id, "rejected", "Re-upload requested").catch(() => {})));
+      return pending.length;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["vendor-documents", id] });
+      qc.invalidateQueries({ queryKey: ["kyc"] });
+      toast({ title: `Re-upload requested for ${n} unapproved document${n === 1 ? "" : "s"}` });
+    },
+    onError: () => toast({ title: "Request failed", variant: "destructive" }),
+  });
+
   const resetPasswordMutation = useMutation({
     mutationFn: () => api.vendors.resetPassword(id),
     onSuccess: (data) => toast({ title: "Password reset", description: `Temporary password: ${data.temporaryPassword}` }),
@@ -704,14 +731,18 @@ export default function VendorProfile() {
                       {(doc as any).fileUrl && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" title="View document" onClick={() => setPreviewDoc(doc)}><Eye className="h-3.5 w-3.5" /></Button>
                       )}
+                      {doc.id && doc.status !== "Verified" && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" title="Approve this document" disabled={docApproveMutation.isPending} onClick={() => docApproveMutation.mutate(doc.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Download" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-4 flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => kycApproveMutation.mutate()} disabled={!vendorKyc}><CheckCircle className="mr-2 h-3.5 w-3.5 text-green-400" /> Approve KYC</Button>
-                <Button variant="outline" size="sm" onClick={() => kycRequestMutation.mutate()} disabled={!vendorKyc}><Shield className="mr-2 h-3.5 w-3.5" /> Request Re-upload</Button>
+                <Button variant="outline" size="sm" onClick={() => kycRequestMutation.mutate()} disabled={!vendorKyc}><Shield className="mr-2 h-3.5 w-3.5" /> Request Re-upload (all)</Button>
+                <Button variant="outline" size="sm" className="text-amber-500 border-amber-500/30" disabled={reuploadUnapprovedMutation.isPending || !(vendorDocuments as any[]).some(d => d?.id && d.status !== "Verified")} onClick={() => reuploadUnapprovedMutation.mutate()}><RefreshCw className="mr-2 h-3.5 w-3.5" /> Re-upload Unapproved Only</Button>
               </div>
             </CardContent>
           </Card>
