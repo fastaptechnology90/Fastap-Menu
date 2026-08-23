@@ -16,7 +16,10 @@ export default function Invoices() {
   const { data: invoices = [], isLoading, refetch, isFetching } = useQuery({ queryKey: ["invoices"], queryFn: api.invoices.list });
   const [viewing, setViewing] = useState<any | null>(null);
 
-  const unpaid = invoices.filter((i: any) => i.status === "Unpaid" || i.status === "Overdue");
+  // Anything not yet paid is outstanding — "Pending" (e.g. unpaid commission invoices)
+  // counts too, not only "Unpaid"/"Overdue". Otherwise the Outstanding total showed ₹0
+  // even when a pending invoice was clearly owed.
+  const unpaid = invoices.filter((i: any) => i.status !== "Paid");
   const totalUnpaid = unpaid.reduce((s: number, i: any) => s + i.amount, 0);
 
   return (
@@ -35,7 +38,7 @@ export default function Invoices() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <KpiCard title="Total Invoices" value={invoices.length} icon={<Receipt className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Unpaid / Overdue" value={unpaid.length} icon={<Receipt className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Unpaid / Pending" value={unpaid.length} icon={<Receipt className="h-4 w-4 text-red-500" />} />
         <KpiCard title="Outstanding Amount" value={fmt(totalUnpaid)} icon={<Receipt className="h-4 w-4 text-orange-500" />} />
       </div>
 
