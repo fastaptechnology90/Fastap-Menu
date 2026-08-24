@@ -16,6 +16,23 @@ function formatRevenue(n: number) {
   return `₹${Math.round(n).toLocaleString()}`;
 }
 
+// Small payment-method chip so the dashboard's Live Orders show how each order was paid.
+const PAY_CHIP: Record<string, { label: string; cls: string }> = {
+  upi: { label: "UPI", cls: "bg-emerald-500/15 text-emerald-400" },
+  cash: { label: "Cash", cls: "bg-amber-500/15 text-amber-400" },
+  card: { label: "Card", cls: "bg-blue-500/15 text-blue-400" },
+  room_bill: { label: "Room", cls: "bg-cyan-500/15 text-cyan-400" },
+  aggregator: { label: "Aggr", cls: "bg-pink-500/15 text-pink-400" },
+  wallet: { label: "Wallet", cls: "bg-pink-500/15 text-pink-400" },
+};
+function payChip(mode?: string) {
+  const m = (mode || "cash").toLowerCase();
+  const c = PAY_CHIP[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor"))
+    ? { label: "Gateway", cls: "bg-violet-500/15 text-violet-400" }
+    : { label: mode || "Cash", cls: "bg-white/10 text-white/50" });
+  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${c.cls}`}>{c.label}</span>;
+}
+
 type RevPeriod = "today" | "week" | "fortnight" | "month";
 
 export default function RestaurantDashboard() {
@@ -227,11 +244,12 @@ export default function RestaurantDashboard() {
               <div key={order.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/8 transition-all cursor-pointer" onClick={() => navigate("/restaurant/orders")}>
                 <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${order.status === "new" ? "bg-orange-400 animate-pulse" : order.status === "ready" ? "bg-emerald-400 animate-pulse" : order.status === "preparing" ? "bg-blue-400" : "bg-white/30"}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-semibold">{order.tableNo}</span>
+                    {payChip(order.paymentMethod)}
                     <span className="text-xs text-white/30">{order.id}</span>
                   </div>
-                  <p className="text-xs text-white/40 truncate">{order.items.map(i => i.name).join(", ")}</p>
+                  <p className="text-xs text-white/40 truncate">{order.customerName ? `${order.customerName} · ` : ""}{order.items.map(i => i.name).join(", ")}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold text-amber-400">₹{order.total}</p>
