@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
+    <script>
+      // Default theme is dark (the <html class="dark"> above). If the admin saved "light",
+      // drop the dark class before paint so there's no flash.
+      try { if (localStorage.getItem("fastap-theme") === "light") document.documentElement.classList.remove("dark"); } catch (e) {}
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>FastMenu — Smart Hospitality OS</title>

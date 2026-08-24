@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Icon } from "@/components/shared/Icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,16 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try { localStorage.setItem("fastap-theme", next ? "dark" : "light"); } catch { /* ignore */ }
+  }
 
   async function handleLogout() {
     await logout();
@@ -61,6 +72,10 @@ export function Header({ onMenuClick }: HeaderProps) {
           </div>
         </form>
 
+        <Button variant="ghost" size="icon" className="shrink-0 rounded-xl" onClick={toggleTheme} title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+          <Icon name={isDark ? "light_mode" : "dark_mode"} size={22} />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
         <Button variant="ghost" size="icon" className="relative shrink-0 rounded-xl" onClick={() => navigate("/notifications")}>
           <Icon name="notifications" size={22} />
           <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive admin-glow-dot" />
