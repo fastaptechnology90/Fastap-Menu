@@ -23,6 +23,14 @@ export default function Settings() {
   const [addRegionOpen, setAddRegionOpen] = useState(false);
   const [newRegion, setNewRegion] = useState<GeoRegion>({ country: "", currency: "INR", taxRate: "18%", timezone: "Asia/Kolkata", active: true });
   const { toast } = useToast();
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+  function applyTheme(dark: boolean) {
+    setIsDark(dark);
+    document.documentElement.classList.toggle("dark", dark);
+    try { localStorage.setItem("fastap-theme", dark ? "dark" : "light"); } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (settings) {
@@ -118,6 +126,18 @@ export default function Settings() {
         {/* GENERAL */}
         <TabsContent value="general" className="mt-4">
           <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle>Appearance</CardTitle><CardDescription>Switch the admin panel between light and dark.</CardDescription></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Dark mode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">{isDark ? "Dark theme is on" : "Light theme is on"}</p>
+                  </div>
+                  <Switch checked={isDark} onCheckedChange={applyTheme} />
+                </div>
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader><CardTitle>Platform Identity</CardTitle><CardDescription>Core branding and contact information.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
