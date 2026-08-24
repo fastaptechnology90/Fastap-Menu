@@ -57,6 +57,11 @@ export interface LiveOrder {
   total: number;
   guests: number;
   specialReq?: string;
+  // Payment tracking: how it was paid, who, and whether it's a room order.
+  paymentMethod: string;
+  paymentStatus?: string;
+  customerName?: string;
+  roomNumber?: string;
 }
 
 export interface TableInfo {
@@ -181,11 +186,15 @@ function mapApiOrder(o: any): LiveOrder {
     waiter: o.waiterName || o.waiter_name || o.customerName || "Staff",
     items,
     status: normalizeOrderStatus(o.status),
-    type: (o.type === "dine_in" ? "dine-in" : o.type === "takeaway" ? "takeaway" : o.type === "delivery" ? "delivery" : "dine-in") as LiveOrder["type"],
+    type: (o.type === "dine_in" ? "dine-in" : o.type === "takeaway" ? "takeaway" : o.type === "delivery" ? "delivery" : o.type === "room_service" ? "room-service" : "dine-in") as LiveOrder["type"],
     placedAt: new Date(o.createdAt),
     total: parseFloat(String(o.total)),
     guests: o.guestCount ?? o.guest_count ?? 1,
     specialReq: o.notes || undefined,
+    paymentMethod: o.paymentMethod || o.payment_method || "cash",
+    paymentStatus: o.paymentStatus || o.payment_status || undefined,
+    customerName: o.customerName || o.customer_name || undefined,
+    roomNumber: (o.metadata && (o.metadata.roomNumber || o.metadata.room_number)) || o.roomNumber || undefined,
   };
 }
 

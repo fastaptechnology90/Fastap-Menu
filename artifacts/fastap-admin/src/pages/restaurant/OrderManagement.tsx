@@ -21,6 +21,24 @@ const TYPE_ICON: Record<string, string> = {
   "dine-in": "🍽️", "takeaway": "🛍️", "room-service": "🏨", "delivery": "🛵",
 };
 
+// How the payment was made — colour-coded so the owner can track UPI vs cash vs room bill.
+const PAY_LABEL: Record<string, string> = {
+  upi: "UPI", cash: "Cash", card: "Card", netbanking: "Netbanking",
+  wallet: "Wallet", room_bill: "Room Bill", aggregator: "Aggregator",
+};
+function payMethodBadge(mode?: string) {
+  const m = (mode || "cash").toLowerCase();
+  const label = PAY_LABEL[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway" : (mode || "Cash"));
+  const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-400"
+    : m === "cash" ? "bg-amber-500/15 text-amber-400"
+    : m === "card" ? "bg-blue-500/15 text-blue-400"
+    : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-400"
+    : m === "room_bill" ? "bg-cyan-500/15 text-cyan-400"
+    : m === "aggregator" ? "bg-pink-500/15 text-pink-400"
+    : "bg-white/10 text-white/50";
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
+}
+
 function getElapsed(date: Date) {
   const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
   return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
@@ -73,7 +91,14 @@ export default function OrderManagement() {
   const filtered = liveOrders.filter(o => {
     const statusMatch = filter === "all" || o.status === filter;
     const typeMatch = typeFilter === "all" || o.type === typeFilter;
-    const searchMatch = !search || String(o.id).toLowerCase().includes(search.toLowerCase()) || String(o.tableNo ?? "").toLowerCase().includes(search.toLowerCase()) || String(o.waiter ?? "").toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const searchMatch = !search
+      || String(o.id).toLowerCase().includes(q)
+      || String(o.tableNo ?? "").toLowerCase().includes(q)
+      || String(o.waiter ?? "").toLowerCase().includes(q)
+      || String(o.customerName ?? "").toLowerCase().includes(q)
+      || String(o.roomNumber ?? "").toLowerCase().includes(q)
+      || String(o.paymentMethod ?? "").toLowerCase().includes(q);
     return statusMatch && typeMatch && searchMatch;
   });
 
@@ -154,12 +179,14 @@ export default function OrderManagement() {
                 {/* Order Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-base">{TYPE_ICON[order.type]}</span>
                       <span className="font-bold text-sm">{order.tableNo}</span>
+                      {order.roomNumber && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300">Room {order.roomNumber}</span>}
+                      {payMethodBadge(order.paymentMethod)}
                       <span className="text-xs text-white/30">{order.id}</span>
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5">{order.waiter} · {order.guests} guests</p>
+                    <p className="text-xs text-white/40 mt-0.5">{order.customerName || order.waiter} · {order.guests} guests</p>
                   </div>
                   <div className="text-right">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
@@ -244,9 +271,13 @@ export default function OrderManagement() {
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs text-white/50">
-                <div>Type: <span className="text-white">{selectedOrder.type}</span></div>
+                <div>Type: <span className="text-white capitalize">{selectedOrder.type}</span></div>
                 <div>Guests: <span className="text-white">{selectedOrder.guests}</span></div>
-                <div>Waiter: <span className="text-white">{selectedOrder.waiter}</span></div>
+                <div>Customer: <span className="text-white">{selectedOrder.customerName || "—"}</span></div>
+                <div>Table: <span className="text-white">{selectedOrder.tableNo}</span></div>
+                {selectedOrder.roomNumber && <div>Room: <span className="text-white">{selectedOrder.roomNumber}</span></div>}
+                <div className="flex items-center gap-1.5">Payment: {payMethodBadge(selectedOrder.paymentMethod)}</div>
+                {selectedOrder.paymentStatus && <div>Pay status: <span className="text-white capitalize">{selectedOrder.paymentStatus}</span></div>}
                 <div>Time: <span className="text-white">{getElapsed(selectedOrder.placedAt)}</span></div>
               </div>
             </div>
