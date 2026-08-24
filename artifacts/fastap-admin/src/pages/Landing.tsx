@@ -255,7 +255,7 @@ export default function Landing() {
             </p>
             <button onClick={goUserMenu} className="guest-btn-primary px-6 py-3 text-sm">
               <QrCode className="h-4 w-4" />
-              Open Guest Sign-In
+              Try Demo Menu
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
