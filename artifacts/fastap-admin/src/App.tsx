@@ -50,6 +50,9 @@ import SmartDiningPage from "@/pages/user/SmartDiningPage";
 import UserSecurityPage from "@/pages/user/UserSecurityPage";
 import FutureAIPage from "@/pages/user/FutureAIPage";
 import Login from "@/pages/Login";
+import ResetPassword from "@/pages/ResetPassword";
+import Blog from "@/pages/Blog";
+import RestaurantRevenues from "@/pages/RestaurantRevenues";
 import Dashboard from "@/pages/Dashboard";
 import Vendors from "@/pages/Vendors";
 import VendorProfile from "@/pages/VendorProfile";
@@ -66,7 +69,7 @@ import Coupons from "@/pages/Coupons";
 import Support from "@/pages/Support";
 import KYC from "@/pages/KYC";
 import AuditLogs from "@/pages/AuditLogs";
-import Roles from "@/pages/Roles";
+import Roles from "@/pages/RolesPermissions";
 import Analytics from "@/pages/Analytics";
 import Fraud from "@/pages/Fraud";
 import QRNFC from "@/pages/QRNFC";
@@ -120,6 +123,7 @@ import RestaurantAnalytics from "@/pages/restaurant/Analytics";
 import Inventory from "@/pages/restaurant/Inventory";
 import CustomerCRM from "@/pages/restaurant/CustomerCRM";
 import RestaurantReservations from "@/pages/restaurant/RestaurantReservations";
+import Reception from "@/pages/restaurant/Reception";
 import BillingPOS from "@/pages/restaurant/BillingPOS";
 import RestaurantSettings from "@/pages/restaurant/RestaurantSettings";
 import QueueWaitlist from "@/pages/restaurant/QueueWaitlist";
@@ -300,6 +304,7 @@ function AppRoutes() {
       <Route path="/restaurant/analytics">{() => <RestaurantProtectedRoute><RestaurantAnalytics /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/inventory">{() => <RestaurantProtectedRoute><Inventory /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/customers">{() => <RestaurantProtectedRoute><CustomerCRM /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/reception">{() => <RestaurantProtectedRoute><Reception /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/reservations">{() => <RestaurantProtectedRoute><RestaurantReservations /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/billing">{() => <RestaurantProtectedRoute><BillingPOS /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/settings">{() => <RestaurantProtectedRoute><RestaurantSettings /></RestaurantProtectedRoute>}</Route>
@@ -309,6 +314,8 @@ function AppRoutes() {
       <Route path="/restaurant/ai-features">{() => <RestaurantProtectedRoute><AIFeatures /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/room-service">{() => <RestaurantProtectedRoute><RoomService /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/housekeeping">{() => <RestaurantProtectedRoute><HousekeepingMaintenance /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/spa">{() => <RestaurantProtectedRoute><SpaBar mode="spa" /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/bar">{() => <RestaurantProtectedRoute><SpaBar mode="bar" /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/spa-bar">{() => <RestaurantProtectedRoute><SpaBar /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/loyalty">{() => <RestaurantProtectedRoute><LoyaltyWallet /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/marketing">{() => <RestaurantProtectedRoute><MarketingAutomation /></RestaurantProtectedRoute>}</Route>
@@ -341,6 +348,7 @@ function AppRoutes() {
 
       {/* ── Super-Admin routes ─────────────────────────────────── */}
       <Route path="/login" component={Login} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/dashboard">{() => <ProtectedRoute><Dashboard /></ProtectedRoute>}</Route>
       <Route path="/live-monitoring">{() => <ProtectedRoute><LiveMonitoring /></ProtectedRoute>}</Route>
       <Route path="/search">{() => <ProtectedRoute><MasterSearch /></ProtectedRoute>}</Route>
@@ -376,6 +384,7 @@ function AppRoutes() {
       <Route path="/penalties">{() => <ProtectedRoute><Penalties /></ProtectedRoute>}</Route>
       <Route path="/tasks">{() => <ProtectedRoute><Tasks /></ProtectedRoute>}</Route>
       <Route path="/announcements">{() => <ProtectedRoute><Announcements /></ProtectedRoute>}</Route>
+      <Route path="/blog">{() => <ProtectedRoute><Blog /></ProtectedRoute>}</Route>
       <Route path="/error-logs">{() => <ProtectedRoute><ErrorLogs /></ProtectedRoute>}</Route>
       <Route path="/export-center">{() => <ProtectedRoute><ExportCenter /></ProtectedRoute>}</Route>
       <Route path="/sla-monitoring">{() => <ProtectedRoute><SLAMonitoring /></ProtectedRoute>}</Route>
@@ -395,6 +404,7 @@ function AppRoutes() {
       <Route path="/data-archival">{() => <ProtectedRoute><DataArchival /></ProtectedRoute>}</Route>
       <Route path="/feature-releases">{() => <ProtectedRoute><FeatureReleases /></ProtectedRoute>}</Route>
       <Route path="/revenue-leakage">{() => <ProtectedRoute><RevenueLeakage /></ProtectedRoute>}</Route>
+      <Route path="/restaurant-revenues">{() => <ProtectedRoute><RestaurantRevenues /></ProtectedRoute>}</Route>
       <Route path="/dormant-vendors">{() => <ProtectedRoute><DormantVendors /></ProtectedRoute>}</Route>
       <Route>{() => <Redirect to="/" />}</Route>
     </Switch>

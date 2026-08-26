@@ -16,7 +16,7 @@ import { and, eq } from "drizzle-orm";
 import { db, hotelRoomsTable, roomServiceRequestsTable } from "@workspace/db";
 import { parseMoney, roundMoney } from "./payment-calculations.js";
 
-export type RoomBilling = { rate?: number; discount?: number; guestCount?: number };
+export type RoomBilling = { rate?: number; discount?: number; guestCount?: number; paid?: number };
 
 /** Read the billing block we stash inside roomControls (no dedicated column). */
 export function readRoomBilling(room: { roomControls?: unknown } | null | undefined): RoomBilling {
@@ -26,6 +26,7 @@ export function readRoomBilling(room: { roomControls?: unknown } | null | undefi
     rate: parseMoney(b.rate),
     discount: parseMoney(b.discount),
     guestCount: Number(b.guestCount) > 0 ? Number(b.guestCount) : 1,
+    paid: parseMoney(b.paid),
   };
 }
 
@@ -94,6 +95,8 @@ export async function computeRoomFolio(restaurantId: number, roomNumber: string)
 
   const subtotal = roundMoney(roomRent + servicesTotal);
   const total = roundMoney(Math.max(0, subtotal - discount));
+  const paid = roundMoney(billing.paid ?? 0);
+  const balance = roundMoney(Math.max(0, total - paid));
 
   return {
     room: room
@@ -110,5 +113,7 @@ export async function computeRoomFolio(restaurantId: number, roomNumber: string)
     discount,
     subtotal,
     total,
+    paid,
+    balance,
   };
 }

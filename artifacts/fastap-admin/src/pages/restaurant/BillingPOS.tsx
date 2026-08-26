@@ -5,6 +5,7 @@ import { downloadText } from "@/lib/download";
 import type { RecentBill } from "@/lib/restaurant-types";
 import { emptyPosStatsDisplay } from "@/lib/restaurantPublication";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
+import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import {
   Receipt, CreditCard, Smartphone, Banknote, Wallet, Nfc,
   Plus, Minus, Trash2, CheckCircle, Printer, Download, Search, X
@@ -21,10 +22,11 @@ const PAYMENT_METHODS = [
 interface BillItem { name: string; qty: number; price: number; }
 
 export default function BillingPOS() {
-  const { liveOrders, tables, updateOrderStatus, restaurantId, isRestaurantPublished } = useRestaurant();
+  const { liveOrders, tables, updateOrderStatus, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
   const [selectedOrder, setSelectedOrder] = useState<typeof liveOrders[0] | null>(null);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("upi");
+  const [reference, setReference] = useState("");
   const [discount, setDiscount] = useState(0);
   const [tip, setTip] = useState(0);
   const [coupon, setCoupon] = useState("");
@@ -33,14 +35,13 @@ export default function BillingPOS() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"new" | "recent">("new");
   const [recentBills, setRecentBills] = useState<RecentBill[]>([]);
+  const [billDetail, setBillDetail] = useState<any | null>(null);
   const [todayStats, setTodayStats] = useState({ collection: 0, bills: 0, avgBill: 0 });
 
   useEffect(() => {
     if (!restaurantId) return;
-    if (!isRestaurantPublished) {
-      setTodayStats(emptyPosStatsDisplay());
-      return;
-    }
+    // Always fetch — the dashboard API already returns zeros for an unpublished restaurant;
+    // gating on the context flag showed ₹0 whenever it was briefly stale after login.
     restaurantApi.dashboard(restaurantId).then(d => {
       setTodayStats({
         collection: parseFloat(String(d?.todayRevenue ?? 0)),
@@ -54,7 +55,21 @@ export default function BillingPOS() {
     if (!restaurantId) return;
     ordersApi.list(restaurantId, "completed").then(data => {
       if (Array.isArray(data) && data.length > 0) {
-        const mapped = data.slice(0, 20).map((o: any) => ({ id: `BILL-${o.id}`, table: o.tableNumber || o.tableName || "T-?", amount: parseFloat(String(o.totalAmount || 0)), method: o.paymentMethod || "UPI", time: o.updatedAt ? new Date(o.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—", status: "paid" }));
+        const mapped = data.slice(0, 20).map((o: any) => {
+          const pay = (o.metadata && typeof o.metadata === "object" ? o.metadata.payment : null) ?? {};
+          return {
+            id: `BILL-${o.id}`,
+            table: o.tableNumber || o.tableName || "T-?",
+            amount: parseFloat(String(o.total ?? o.totalAmount ?? 0)),
+            method: (o.paymentMethod || pay.method || "upi") as string,
+            time: o.updatedAt ? new Date(o.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—",
+            status: "paid",
+            reference: pay.utr || pay.upiId || o.invoiceNumber || undefined,
+            collectedBy: pay.collectedBy || undefined,
+            collectedFrom: pay.collectedFrom || undefined,
+            orderId: o.id,
+          };
+        });
         setRecentBills(mapped);
       }
     }).catch(() => {});
@@ -64,16 +79,27 @@ export default function BillingPOS() {
 
   function loadOrder(order: typeof liveOrders[0]) {
     setSelectedOrder(order);
-    setBillItems(order.items.map(i => ({ name: i.name, qty: i.qty, price: i.price })));
+    // Bill the order's ACTUAL amount: derive the unit price from the stored line subtotal
+    // (÷ qty) so the POS total matches the order total, instead of a possibly-stale unit price.
+    setBillItems(order.items.map(i => {
+      const qty = i.qty || 1;
+      // Keep FULL precision on the unit price (subtotal ÷ qty) so re-summing reproduces the
+      // order's exact subtotal — rounding the unit here is what introduced a ₹0.01 drift.
+      const unit = i.subtotal && i.subtotal > 0 ? (i.subtotal / qty) : i.price;
+      return { name: i.name, qty, price: unit };
+    }));
     setPaid(false);
     setDiscount(0);
     setTip(0);
   }
 
-  const subtotal = billItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const gst = Math.round(subtotal * 0.05);
-  const discountAmt = Math.round(subtotal * discount / 100);
-  const grandTotal = subtotal + gst - discountAmt + tip;
+  // Keep 2-decimal precision (don't round GST to whole rupees) so the POS total matches the
+  // order's exact amount — no ₹ mismatch between the bill card and what's collected.
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const subtotal = r2(billItems.reduce((s, i) => s + i.price * i.qty, 0));
+  const gst = r2(subtotal * 0.05);
+  const discountAmt = r2(subtotal * discount / 100);
+  const grandTotal = r2(subtotal + gst - discountAmt + tip);
   const perPerson = splitCount > 1 ? Math.ceil(grandTotal / splitCount) : grandTotal;
 
   function downloadInvoice(gstInvoice: boolean) {
@@ -85,7 +111,7 @@ export default function BillingPOS() {
       `Payment: ${method}`,
       `Date: ${new Date().toLocaleString("en-IN")}`,
       "",
-      ...billItems.map(i => `${i.name} x${i.qty} @ ₹${i.price} = ₹${i.price * i.qty}`),
+      ...billItems.map(i => `${i.name} x${i.qty} @ ₹${r2(i.price)} = ₹${r2(i.price * i.qty)}`),
       "",
       `Subtotal: ₹${subtotal}`,
       `GST (5%): ₹${gst}`,
@@ -103,12 +129,17 @@ export default function BillingPOS() {
     setPaying(true);
     try {
       const orderId = parseInt(selectedOrder.id, 10);
+      const isUpiLike = paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "nfc";
       if (!Number.isNaN(orderId) && restaurantId) {
         await ordersApi.update(restaurantId, orderId, {
           status: "completed",
           paymentMethod,
           paymentStatus: "paid",
           tipAmount: tip,
+          finalTotal: grandTotal,   // record exactly what was collected (incl. discount/tip)
+          collectedBy: currentStaff?.name || "Cashier",
+          collectedFrom: "Cashier POS",
+          ...(isUpiLike && reference ? (paymentMethod === "upi" ? { upiId: reference } : { utr: reference }) : {}),
         });
       }
       updateOrderStatus(selectedOrder.id, "billed");
@@ -116,10 +147,15 @@ export default function BillingPOS() {
         id: `BILL-${selectedOrder.id}`,
         table: selectedOrder.tableNo,
         amount: grandTotal,
-        method: paymentMethod.toUpperCase(),
+        method: paymentMethod,
         time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
         status: "paid",
+        reference: reference || undefined,
+        collectedBy: currentStaff?.name || "Cashier",
+        collectedFrom: "Cashier POS",
+        orderId,
       }, ...prev].slice(0, 20));
+      setReference("");
       setPaid(true);
     } finally {
       setPaying(false);
@@ -140,6 +176,7 @@ export default function BillingPOS() {
 
         {tab === "new" && (
           <>
+            <RevenueByDate restaurantId={restaurantId} title="Collection" />
             {/* Today's Summary */}
             <div className="grid grid-cols-3 gap-3">
               {[
@@ -198,15 +235,18 @@ export default function BillingPOS() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {recentBills.map(bill => (
-                    <tr key={bill.id} className="hover:bg-white/3">
+                    <tr key={bill.id} onClick={() => setBillDetail(bill)} className="hover:bg-white/5 cursor-pointer" title="Click to view payment details">
                       <td className="px-4 py-3 font-mono text-xs">{bill.id}</td>
                       <td className="px-4 py-3 font-semibold">{bill.table}</td>
-                      <td className="px-4 py-3 font-bold text-amber-400">₹{bill.amount}</td>
-                      <td className="px-4 py-3 text-white/60">{bill.method}</td>
+                      <td className="px-4 py-3 font-bold text-amber-400">₹{bill.amount.toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-3 text-white/60 uppercase">{bill.method}</td>
                       <td className="px-4 py-3 text-white/40">{bill.time}</td>
                       <td className="px-4 py-3"><span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{bill.status}</span></td>
                     </tr>
                   ))}
+                  {recentBills.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-white/30 text-sm">No bills collected yet today.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -256,7 +296,7 @@ export default function BillingPOS() {
                       <button onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-amber-500 flex items-center justify-center hover:bg-amber-400"><Plus className="h-3 w-3" /></button>
                     </div>
                     <span className="flex-1 text-sm">{item.name}</span>
-                    <span className="text-amber-400 font-semibold text-sm">₹{item.price * item.qty}</span>
+                    <span className="text-amber-400 font-semibold text-sm">₹{r2(item.price * item.qty)}</span>
                   </div>
                 ))}
               </div>
@@ -330,6 +370,14 @@ export default function BillingPOS() {
                     </button>
                   ))}
                 </div>
+                {(paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "nfc") && (
+                  <input
+                    value={reference}
+                    onChange={e => setReference(e.target.value)}
+                    placeholder={paymentMethod === "upi" ? "UPI ID / UTR number (optional)" : paymentMethod === "card" ? "Card txn / RRN (optional)" : "NFC txn reference (optional)"}
+                    className="mt-2 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                  />
+                )}
               </div>
             </div>
 
@@ -348,6 +396,37 @@ export default function BillingPOS() {
           </>
         )}
       </div>
+
+      {/* Bill payment detail — click a recent bill to see how the payment was made */}
+      {billDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setBillDetail(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] text-white" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <h3 className="font-bold flex items-center gap-2"><Receipt className="h-5 w-5 text-amber-400" /> Payment details</h3>
+              <button onClick={() => setBillDetail(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+            </div>
+            <div className="p-5 space-y-3 text-sm">
+              <div className="text-center py-2">
+                <p className="text-3xl font-extrabold text-amber-400">₹{Number(billDetail.amount).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-white/40 mt-1">{billDetail.id} · {billDetail.table}</p>
+              </div>
+              {[
+                ["Payment method", String(billDetail.method || "—").toUpperCase()],
+                ["Reference (UPI/UTR)", billDetail.reference || "—"],
+                ["Collected by", billDetail.collectedBy || "—"],
+                ["Collected from", billDetail.collectedFrom || "Cashier POS"],
+                ["Time", billDetail.time || "—"],
+                ["Status", billDetail.status || "paid"],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3 border-b border-white/5 pb-2">
+                  <span className="text-white/40">{k}</span>
+                  <span className="font-medium text-right break-all">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

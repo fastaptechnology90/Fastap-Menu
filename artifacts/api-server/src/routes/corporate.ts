@@ -43,7 +43,17 @@ function getWallets(rid: number) {
 
 router.get("/restaurants/:restaurantId/corporate/accounts", requireAuth, (req, res) => {
   const rid = parseInt(req.params.restaurantId, 10);
-  res.json(getAccounts(rid));
+  const accts = getAccounts(rid);
+  const invs = getInvoices(rid);
+  // Compute each account's real outstanding / billed from its invoices, instead of a
+  // static seed number — so the client's total actually reflects their invoices.
+  const withTotals = accts.map(a => {
+    const mine = invs.filter(i => i.company_id === a.id || i.company === a.company);
+    const outstanding = mine.filter(i => String(i.status) !== "paid").reduce((s, i) => s + Number(i.total || 0), 0);
+    const totalBilled = mine.reduce((s, i) => s + Number(i.total || 0), 0);
+    return { ...a, outstanding, creditUsed: outstanding, totalBilled, invoiceCount: mine.length };
+  });
+  res.json(withTotals);
 });
 
 router.post("/restaurants/:restaurantId/corporate/accounts", requireAuth, (req, res) => {

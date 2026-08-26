@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable } from "@workspace/db";
+import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
@@ -42,7 +42,8 @@ router.get("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
 router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req, res): Promise<void> => {
   const restaurantId = parseInt(req.params.restaurantId, 10);
   const orderId = parseInt(req.params.orderId, 10);
-  const { status, chefName, waiterName, isDelayed, delayReason, paymentMethod, paymentStatus, tipAmount } = req.body;
+  const { status, chefName, waiterName, isDelayed, delayReason, paymentMethod, paymentStatus, tipAmount,
+    finalTotal, collectedBy, collectedFrom, utr, upiId } = req.body;
   const [existing] = await db.select().from(ordersTable).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)));
   if (!existing) { res.status(404).json({ error: "Order not found" }); return; }
 
@@ -90,17 +91,85 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
   if (chefName) tracking.chefName = chefName;
   tracking.kitchenUpdates = updates;
 
+  // Capture payment detail (who collected it, from which panel, and the UPI/UTR reference)
+  // on the order metadata so every panel can show a full, clickable breakdown.
+  const existingPayment = (typeof meta.payment === "object" && meta.payment !== null ? meta.payment : {}) as Record<string, unknown>;
+  const hasPaymentDetail = paymentMethod || paymentStatus || collectedBy || collectedFrom || utr || upiId;
+  const paymentDetail = hasPaymentDetail ? {
+    ...existingPayment,
+    ...(paymentMethod ? { method: paymentMethod } : {}),
+    ...(paymentStatus ? { status: paymentStatus } : {}),
+    ...(collectedBy ? { collectedBy } : {}),
+    ...(collectedFrom ? { collectedFrom } : {}),
+    ...(utr ? { utr } : {}),
+    ...(upiId ? { upiId } : {}),
+    collectedAt: now,
+  } : existingPayment;
+
   const orderPatch: Record<string, unknown> = {
     status: status ?? existing.status,
     waiterName: waiterName ?? existing.waiterName,
-    metadata: { ...meta, tracking },
+    metadata: { ...meta, tracking, ...(hasPaymentDetail ? { payment: paymentDetail } : {}) },
   };
   if (paymentMethod) orderPatch.paymentMethod = paymentMethod;
   if (paymentStatus) orderPatch.paymentStatus = paymentStatus;
-  if (tipAmount !== undefined) orderPatch.tip = String(tipAmount);
+  if (tipAmount !== undefined) orderPatch.tipAmount = String(tipAmount);
+  // Persist the exact amount collected at the POS (incl. any discount/tip) so the order
+  // total = what was collected = what every revenue view shows. Keeps subtotal+tax+tip = total.
+  if (finalTotal !== undefined && finalTotal !== null && Number.isFinite(Number(finalTotal))) {
+    const ft = Number(finalTotal);
+    const tip = tipAmount !== undefined ? Number(tipAmount) : parseFloat(String(existing.tipAmount ?? 0)) || 0;
+    const taxable = Math.max(0, ft - tip);
+    const newSubtotal = taxable / 1.05;
+    orderPatch.total = ft.toFixed(2);
+    orderPatch.subtotal = newSubtotal.toFixed(2);
+    orderPatch.tax = (taxable - newSubtotal).toFixed(2);
+  }
 
   let [order] = await db.update(ordersTable).set(orderPatch).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  // Single write path: when an order first becomes paid, record it in the finance ledger
+  // (so Finance / Owner / Super-admin all see the same money) and, for cash, bump the open
+  // cash shift so the Cash Counter reflects real collections — not just seed data.
+  const wasPaid = existing.paymentStatus === "paid" || existing.status === "completed";
+  const nowPaid = order.paymentStatus === "paid" || order.status === "completed";
+  if (!wasPaid && nowPaid) {
+    try {
+      const amount = String(parseFloat(String(order.total ?? "0")).toFixed(2));
+      const method = (order.paymentMethod || paymentMethod || "cash") as string;
+      // Guard against a duplicate ledger row if this transition somehow fires twice.
+      const [dup] = await db.select({ id: financeTransactionsTable.id })
+        .from(financeTransactionsTable)
+        .where(and(eq(financeTransactionsTable.orderId, order.id), eq(financeTransactionsTable.type, "income")))
+        .limit(1);
+      if (!dup) {
+        await db.insert(financeTransactionsTable).values({
+          restaurantId,
+          type: "income",
+          category: "order_payment",
+          description: `Order #${order.id}${order.tableName ? ` · ${order.tableName}` : ""} — ${method}`,
+          amount,
+          paymentMethod: method,
+          reference: (utr || upiId || order.invoiceNumber || null) as string | null,
+          orderId: order.id,
+          performedBy: (collectedBy || collectedFrom || null) as string | null,
+        });
+        if (method === "cash") {
+          const [shift] = await db.select().from(cashShiftsTable)
+            .where(and(eq(cashShiftsTable.restaurantId, restaurantId), eq(cashShiftsTable.status, "open")))
+            .orderBy(desc(cashShiftsTable.openedAt)).limit(1);
+          if (shift) {
+            const newSales = (parseFloat(String(shift.cashSales ?? "0")) + parseFloat(amount)).toFixed(2);
+            await db.update(cashShiftsTable).set({ cashSales: newSales }).where(eq(cashShiftsTable.id, shift.id));
+          }
+        }
+      }
+    } catch (e) {
+      // Never fail the order update because the ledger write hit a snag.
+      console.error("finance ledger write failed for order", order.id, e);
+    }
+  }
 
   if (status === "ready" && !order.waiterName) {
     const auto = await autoAssignWaiterToOrder(restaurantId, orderId);

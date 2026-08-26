@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { analytics as analyticsApi, restaurantApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import {
   TrendingUp, ShoppingBag, Users, Grid3x3, AlertTriangle,
@@ -33,25 +34,26 @@ function payChip(mode?: string) {
   return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${c.cls}`}>{c.label}</span>;
 }
 
-type RevPeriod = "today" | "week" | "fortnight" | "month";
-
 export default function RestaurantDashboard() {
   const [, navigate] = useLocation();
   const { liveOrders, tables, restaurant, currentStaff, staffList, restaurantId, isRestaurantPublished } = useRestaurant();
   const [dashboard, setDashboard] = useState<any>(null);
-  const [revPeriod, setRevPeriod] = useState<RevPeriod>("month");
   const [revenueData, setRevenueData] = useState<{ time: string; revenue: number }[]>([]);
+  const [selOrder, setSelOrder] = useState<typeof liveOrders[0] | null>(null);
   const [topItems, setTopItems] = useState<{ name: string; orders: number; revenue: number; trend: string }[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const published = isRestaurantPublished && (dashboard?.isPublished !== false);
+  // Trust the dashboard API's publication flag once it has loaded (it's authoritative and
+  // already applies the gate); fall back to the context only while it's still loading. This
+  // stops the panel showing "unpublished / ₹0" when the context flag is briefly stale.
+  const published = dashboard ? dashboard.isPublished !== false : isRestaurantPublished;
 
   const loadDashboardData = useCallback(async () => {
     if (!restaurantId) return;
     const dash = await restaurantApi.dashboard(restaurantId).catch(() => null);
     if (dash) setDashboard(dash);
 
-    const apiPublished = dash?.isPublished !== false && isRestaurantPublished;
+    const apiPublished = dash ? dash.isPublished !== false : isRestaurantPublished;
     if (!apiPublished) {
       setRevenueData([]);
       setTopItems([]);
@@ -123,20 +125,11 @@ export default function RestaurantDashboard() {
   const loyaltyCustomers = published ? (dashboard?.loyaltyCustomers ?? 0) : 0;
   const pendingReservations = published ? (dashboard?.pendingReservations ?? 0) : 0;
 
-  // Revenue period selector (dropdown on the Revenue card): 1 day / 7 days / 15 days / month.
-  // All values come from the SAME dashboard endpoint (same sumTotal logic) so there is no
-  // amount mismatch versus the rest of the app.
-  const REV_PERIODS: Record<RevPeriod, { label: string; value: number; orders: number }> = {
-    today: { label: "Today", value: todayRevenue, orders: todayOrders },
-    week: { label: "7 Days", value: weekRevenue, orders: weekOrderCount },
-    fortnight: { label: "15 Days", value: fortnightRevenue, orders: fortnightOrderCount },
-    month: { label: "This Month", value: monthRevenue, orders: monthOrderCount },
-  };
-  const rev = REV_PERIODS[revPeriod];
-
+  // The Revenue card shows "This Month" — for any other period use the "Revenue by date"
+  // widget at the top of the page (custom-date). Old inline dropdown removed.
   const KPI_CARDS = [
     { label: "Today's Revenue", value: formatRevenue(todayRevenue), sub: `${todayOrders} orders · Week ${formatRevenue(weekRevenue)}`, icon: TrendingUp, color: "from-emerald-500/20 to-emerald-600/10", iconColor: "text-emerald-400" },
-    { label: "Revenue", value: formatRevenue(rev.value), sub: `${rev.label} · ${rev.orders} orders`, icon: ShoppingBag, color: "from-orange-500/20 to-orange-600/10", iconColor: "text-orange-400", isRevenue: true },
+    { label: "Revenue", value: formatRevenue(monthRevenue), sub: `This Month · ${monthOrderCount} orders`, icon: ShoppingBag, color: "from-orange-500/20 to-orange-600/10", iconColor: "text-orange-400" },
     { label: "Table Occupancy", value: `${occupiedTables}/${restaurant.totalTables || tables.length}`, sub: `${restaurant.totalTables || tables.length ? Math.round(occupiedTables / (restaurant.totalTables || tables.length) * 100) : 0}% occupied`, icon: Grid3x3, color: "from-blue-500/20 to-blue-600/10", iconColor: "text-blue-400" },
     { label: "Active Orders", value: activeOrders, sub: `${newOrders} new · ${readyOrders} ready`, icon: Clock, color: "from-violet-500/20 to-violet-600/10", iconColor: "text-violet-400" },
     { label: "Wallet Balance", value: formatRevenue(walletBalance), sub: `Pending settlement ${formatRevenue(pendingSettlements)}`, icon: TrendingUp, color: "from-amber-500/20 to-amber-600/10", iconColor: "text-amber-400" },
@@ -165,6 +158,8 @@ export default function RestaurantDashboard() {
         </div>
       </div>
 
+      <RevenueByDate restaurantId={restaurantId} title="Revenue" />
+
       {!published && (
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
           <p className="text-sm font-semibold text-amber-200">No analytics yet</p>
@@ -177,19 +172,6 @@ export default function RestaurantDashboard() {
           <div key={card.label} className={`rounded-2xl bg-gradient-to-br ${card.color} border border-white/8 p-4`}>
             <div className="flex items-start justify-between mb-3 gap-1">
               <card.icon className={`h-5 w-5 shrink-0 ${card.iconColor}`} />
-              {(card as any).isRevenue && (
-                <select
-                  value={revPeriod}
-                  onChange={e => setRevPeriod(e.target.value as RevPeriod)}
-                  className="text-[10px] font-semibold bg-white/10 border border-white/15 rounded-md px-1 py-0.5 text-white/70 focus:outline-none focus:border-orange-400/50 cursor-pointer hover:bg-white/15 transition-colors"
-                  title="Change revenue period"
-                >
-                  <option value="today">1D</option>
-                  <option value="week">7D</option>
-                  <option value="fortnight">15D</option>
-                  <option value="month">1M</option>
-                </select>
-              )}
             </div>
             <p className="text-2xl font-extrabold mb-1">{card.value}</p>
             <p className="text-xs text-white/40 leading-tight">{card.label}</p>
@@ -241,7 +223,7 @@ export default function RestaurantDashboard() {
             {!published || liveOrders.length === 0 ? (
               <p className="text-sm text-white/30 text-center py-8">{published ? "No active orders" : "Orders appear after publication"}</p>
             ) : liveOrders.slice(0, 5).map(order => (
-              <div key={order.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/8 transition-all cursor-pointer" onClick={() => navigate("/restaurant/orders")}>
+              <div key={order.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/8 transition-all cursor-pointer" onClick={() => setSelOrder(order)} title="Click for payment details">
                 <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${order.status === "new" ? "bg-orange-400 animate-pulse" : order.status === "ready" ? "bg-emerald-400 animate-pulse" : order.status === "preparing" ? "bg-blue-400" : "bg-white/30"}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -340,6 +322,39 @@ export default function RestaurantDashboard() {
             <button onClick={() => navigate("/restaurant/inventory")} className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-sm font-semibold transition-all shrink-0">
               View Inventory
             </button>
+          </div>
+        </div>
+      )}
+
+      {selOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelOrder(null)}>
+          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <h3 className="font-bold">Payment details</h3>
+              <button onClick={() => setSelOrder(null)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-3 text-sm">
+              <div className="text-center py-2">
+                <p className="text-3xl font-extrabold text-amber-400">₹{Number(selOrder.total).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-white/40 mt-1">{selOrder.tableNo} · {selOrder.id}</p>
+              </div>
+              {[
+                ["Payment method", String(selOrder.paymentMethod || "—").toUpperCase()],
+                ["Pay status", selOrder.paymentStatus || "—"],
+                ["UPI ID", selOrder.upiId || "—"],
+                ["UTR / Reference", selOrder.utr || "—"],
+                ["Collected by", selOrder.collectedBy || "—"],
+                ["From panel", selOrder.collectedFrom || "—"],
+                ["Customer", selOrder.customerName || "—"],
+                ["Room", selOrder.roomNumber || "—"],
+              ].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-3 border-b border-white/5 pb-2">
+                  <span className="text-white/40">{k}</span>
+                  <span className="font-medium text-right break-all capitalize">{v as string}</span>
+                </div>
+              ))}
+              <button onClick={() => { navigate("/restaurant/orders"); }} className="w-full py-2.5 rounded-xl border border-white/10 text-white/70 text-sm font-semibold hover:bg-white/5">Open in Order Management</button>
+            </div>
           </div>
         </div>
       )}

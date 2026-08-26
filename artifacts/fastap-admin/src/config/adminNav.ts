@@ -10,6 +10,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { title: "Master Search", href: "/search", icon: "search" },
       { title: "AI Insights", href: "/ai-insights", icon: "psychology" },
       { title: "Revenue Leakage", href: "/revenue-leakage", icon: "trending_down" },
+      { title: "Restaurant Revenues", href: "/restaurant-revenues", icon: "trending_up" },
     ],
   },
   {
@@ -64,6 +65,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { title: "Notifications", href: "/notifications", icon: "notifications" },
       { title: "Communications", href: "/communications", icon: "forum" },
       { title: "Announcements", href: "/announcements", icon: "campaign" },
+      { title: "Blog", href: "/blog", icon: "news" },
     ],
   },
   {

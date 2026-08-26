@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertTriangle, CheckCircle2, Mail } from "lucide-react";
 import { Icon } from "@/components/shared/Icon";
 import { PanelLogo } from "@/components/shared/PanelLogo";
+import { ForgotPasswordModal } from "@/components/shared/ForgotPasswordModal";
 import { IMAGES } from "@/lib/media";
 
 export default function Login() {
@@ -23,6 +24,7 @@ export default function Login() {
   // that is the one failure the user can fix from this screen.
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendNote, setResendNote] = useState("");
+  const [showForgot, setShowForgot] = useState(false);
 
   // The confirmation link lands back here with the outcome in the query string.
   const verified = new URLSearchParams(window.location.search).get("verified");
@@ -229,6 +231,14 @@ export default function Login() {
                     </>
                   )}
                 </Button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowForgot(true)}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-primary font-medium"
+                >
+                  Forgot password?
+                </button>
               </form>
             </CardContent>
           </Card>
@@ -252,6 +262,8 @@ export default function Login() {
           </p>
         </div>
       </div>
+
+      {showForgot && <ForgotPasswordModal scope="admin" accent="blue" onClose={() => setShowForgot(false)} />}
     </div>
   );
 }

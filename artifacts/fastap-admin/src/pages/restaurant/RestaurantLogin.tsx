@@ -4,6 +4,7 @@ import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
 import { restaurantAuth } from "@/lib/api";
 import { Icon } from "@/components/shared/Icon";
 import { PanelLogo } from "@/components/shared/PanelLogo";
+import { ForgotPasswordModal } from "@/components/shared/ForgotPasswordModal";
 import { IMAGES } from "@/lib/media";
 import {
   RESTAURANT_LOGIN_ROLES,
@@ -12,6 +13,26 @@ import {
 } from "@/config/restaurantLoginRoles";
 
 type LoginMethod = "password" | "otp";
+
+// Country dial codes for the phone/OTP login. `len` = expected national number length
+// (used for light validation; 0 = flexible).
+const COUNTRY_CODES: { code: string; flag: string; name: string; len: number }[] = [
+  { code: "+91", flag: "🇮🇳", name: "India", len: 10 },
+  { code: "+971", flag: "🇦🇪", name: "UAE", len: 9 },
+  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia", len: 9 },
+  { code: "+1", flag: "🇺🇸", name: "USA / Canada", len: 10 },
+  { code: "+44", flag: "🇬🇧", name: "UK", len: 10 },
+  { code: "+65", flag: "🇸🇬", name: "Singapore", len: 8 },
+  { code: "+61", flag: "🇦🇺", name: "Australia", len: 9 },
+  { code: "+92", flag: "🇵🇰", name: "Pakistan", len: 10 },
+  { code: "+880", flag: "🇧🇩", name: "Bangladesh", len: 10 },
+  { code: "+977", flag: "🇳🇵", name: "Nepal", len: 10 },
+  { code: "+94", flag: "🇱🇰", name: "Sri Lanka", len: 9 },
+  { code: "+49", flag: "🇩🇪", name: "Germany", len: 0 },
+  { code: "+33", flag: "🇫🇷", name: "France", len: 9 },
+  { code: "+81", flag: "🇯🇵", name: "Japan", len: 0 },
+  { code: "+86", flag: "🇨🇳", name: "China", len: 11 },
+];
 
 interface VenueOption {
   id: number;
@@ -29,6 +50,7 @@ export default function RestaurantLogin() {
   const [email, setEmail] = useState("manager@spicegarden.com");
   const [password, setPassword] = useState(DEMO_STAFF_PASSWORD);
   const [mobile, setMobile] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [showPass, setShowPass] = useState(false);
   const [step, setStep] = useState<"form" | "otp-verify">("form");
@@ -36,6 +58,7 @@ export default function RestaurantLogin() {
   const [error, setError] = useState("");
   const [venueOptions, setVenueOptions] = useState<VenueOption[] | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<number | null>(null);
+  const [showForgot, setShowForgot] = useState(false);
 
   function pickRole(role: StaffRole) {
     setSelectedRole(role);
@@ -57,8 +80,12 @@ export default function RestaurantLogin() {
 
   async function sendOtp() {
     const phone = mobile.replace(/\D/g, "");
-    if (phone.length < 10) {
-      setError("Enter a valid 10-digit mobile number");
+    const country = COUNTRY_CODES.find(c => c.code === countryCode);
+    const expected = country?.len ?? 0;
+    if (expected > 0 ? phone.length !== expected : phone.length < 6) {
+      setError(expected > 0
+        ? `Enter a valid ${expected}-digit ${country?.name ?? ""} number`
+        : "Enter a valid mobile number");
       return;
     }
     setLoading(true);
@@ -67,6 +94,7 @@ export default function RestaurantLogin() {
     try {
       await restaurantAuth.sendOtp({
         phone,
+        countryCode,
         restaurantId: selectedRestaurantId ?? undefined,
       });
       setStep("otp-verify");
@@ -251,21 +279,33 @@ export default function RestaurantLogin() {
           )}
 
           {step === "form" && loginMethod === "otp" && (
-            <div className="flex rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-              <div className="flex items-center px-4 border-r border-white/10 text-sm text-white/50">🇮🇳 +91</div>
+            <div className="flex rounded-xl border border-white/10 bg-white/5 overflow-hidden focus-within:border-amber-500/50">
+              <select
+                value={countryCode}
+                onChange={e => setCountryCode(e.target.value)}
+                className="bg-transparent px-3 py-3.5 text-sm text-white/80 border-r border-white/10 focus:outline-none cursor-pointer max-w-[130px]"
+                aria-label="Country code"
+              >
+                {COUNTRY_CODES.map(c => (
+                  <option key={c.code + c.name} value={c.code} className="bg-neutral-900 text-white">
+                    {c.flag} {c.code}
+                  </option>
+                ))}
+              </select>
               <input
-                className="flex-1 bg-transparent px-4 py-3.5 text-sm focus:outline-none placeholder:text-white/30"
+                className="flex-1 min-w-0 bg-transparent px-4 py-3.5 text-sm focus:outline-none placeholder:text-white/30"
                 placeholder="Registered mobile number"
+                inputMode="numeric"
                 value={mobile}
-                onChange={e => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                maxLength={10}
+                onChange={e => setMobile(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                maxLength={15}
               />
             </div>
           )}
 
           {step === "otp-verify" && (
             <div className="space-y-4">
-              <p className="text-sm text-white/60">Enter the OTP sent to +91 {mobile.slice(0, 5)}xxxxx</p>
+              <p className="text-sm text-white/60">Enter the OTP sent to {countryCode} {mobile.slice(0, 5)}xxxxx</p>
               <div className="flex gap-2 justify-between">
                 {otp.map((v, i) => (
                   <input
@@ -302,7 +342,15 @@ export default function RestaurantLogin() {
             )}
           </button>
 
-          <p className="mt-6 text-center text-sm text-white/40">
+          <button
+            type="button"
+            onClick={() => setShowForgot(true)}
+            className="mt-4 w-full text-center text-sm text-white/50 hover:text-amber-300 font-medium"
+          >
+            Forgot password?
+          </button>
+
+          <p className="mt-4 text-center text-sm text-white/40">
             New restaurant?{" "}
             <Link href="/restaurant/register" className="text-amber-400 hover:text-amber-300 font-semibold">
               Register with KYC
@@ -310,6 +358,8 @@ export default function RestaurantLogin() {
           </p>
         </div>
       </div>
+
+      {showForgot && <ForgotPasswordModal scope="staff" accent="amber" onClose={() => setShowForgot(false)} />}
     </div>
   );
 }

@@ -130,7 +130,7 @@ export const restaurantAuth = {
     phone?: string;
     otp?: string;
   }) => post<{ success: boolean; staff: any; restaurant: any; subscription?: any; requiresSubscription?: boolean }>("/restaurant-auth/login", data),
-  sendOtp: (data: { restaurantId?: number; phone: string }) =>
+  sendOtp: (data: { restaurantId?: number; phone: string; countryCode?: string }) =>
     post<{ success: boolean; message: string }>("/restaurant-auth/otp/send", data),
   register: (data: RestaurantRegisterPayload) =>
     post<{
@@ -151,6 +151,10 @@ export const restaurantAuth = {
     canSubscribe?: boolean;
   } | null>("/restaurant-auth/me"),
   logout: () => post<{ success: true }>("/restaurant-auth/logout", {}),
+  forgotPassword: (email: string) =>
+    post<{ success: boolean; message: string; emailConfigured: boolean; devToken?: string }>("/restaurant-auth/forgot-password", { email }),
+  resetPassword: (token: string, password: string) =>
+    post<{ success: boolean; message: string }>("/restaurant-auth/reset-password", { token, password }),
   security: (restaurantId?: number) => get<any>(`/restaurant-auth/security${restaurantId ? `?restaurantId=${restaurantId}` : ""}`),
   updateSecurity: (body: any) => put<any>("/restaurant-auth/security", body),
   subscription: {
@@ -193,7 +197,7 @@ export type SubscriptionStatus = {
 export const orders = {
   list: (rid: number, status?: string) => get<any[]>(`/restaurants/${rid}/orders${status ? `?status=${status}` : ""}`),
   get: (rid: number, id: number) => get<any>(`/restaurants/${rid}/orders/${id}`),
-  update: (rid: number, id: number, body: { status?: string; paymentMethod?: string; paymentStatus?: string; tipAmount?: number }) =>
+  update: (rid: number, id: number, body: { status?: string; paymentMethod?: string; paymentStatus?: string; tipAmount?: number; finalTotal?: number; collectedBy?: string; collectedFrom?: string; utr?: string; upiId?: string }) =>
     put<any>(`/restaurants/${rid}/orders/${id}`, body),
   create: (body: any) => post<any>("/public/orders", body),
 };
@@ -313,6 +317,7 @@ export const roomService = {
   minibar: (rid: number) => get<any[]>(`/restaurants/${rid}/minibar`),
   folio: (rid: number, roomNumber: string) => get<any>(`/restaurants/${rid}/rooms/${encodeURIComponent(roomNumber)}/folio`),
   checkout: (rid: number, roomNumber: string) => post<any>(`/restaurants/${rid}/rooms/${encodeURIComponent(roomNumber)}/checkout`, {}),
+  recordPayment: (rid: number, roomNumber: string, amount: number) => post<any>(`/restaurants/${rid}/rooms/${encodeURIComponent(roomNumber)}/payment`, { amount }),
 };
 
 // ─── Spa & Bar ────────────────────────────────────────────────────
@@ -817,6 +822,13 @@ export const restaurantApi = {
   get: (rid: number) => get<any>(`/restaurants/${rid}`),
   update: (rid: number, body: any) => put<any>(`/restaurants/${rid}`, body),
   dashboard: (rid: number) => get<any>(`/restaurants/${rid}/dashboard`),
+  revenue: (rid: number, params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    const qs = q.toString();
+    return get<{ from: string | null; to: string | null; revenue: number; totalOrders: number }>(`/restaurants/${rid}/revenue${qs ? `?${qs}` : ""}`);
+  },
   create: (body: any) => post<any>("/restaurants", body),
   whiteLabel: (rid: number) => get<any>(`/restaurants/${rid}/settings/white-label`),
   saveWhiteLabel: (rid: number, body: any) => put<any>(`/restaurants/${rid}/settings/white-label`, body),

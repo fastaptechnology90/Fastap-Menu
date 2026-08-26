@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, count, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, count, and, sql, inArray, gte, lte } from "drizzle-orm";
 import {
   db, restaurantsTable, usersTable, ordersTable, documentsTable, supportTicketsTable, staffTable, branchesTable,
   platformAuditLogsTable, platformSettlementsTable, platformRefundsTable, platformChargebacksTable,
@@ -23,9 +23,12 @@ import {
 } from "../lib/platform-admin";
 import { PLATFORM_CURRENCY } from "../lib/currency.js";
 import { invalidateRestaurantAnalyticsCache } from "../lib/analytics-cache.js";
-import { sumOrderTotals } from "../lib/payment-calculations.js";
+import { sumOrderTotals, isPaidOrder } from "../lib/payment-calculations.js";
+import { getSpaRevenue, getSpaRevenueByRestaurant } from "../lib/ancillary-revenue.js";
 import {
   listApprovals, createApproval, updateApproval, listPlatformReservations, updatePlatformReservation,
+  getRolePermissions, setRolePermissions,
+  listBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
   listVendorWallets, getBillingRules, saveBillingRules, getAIInsights, getAlertRules, saveAlertRules,
   getIncidents, saveIncident, updateIncident, getDRStatus, saveDRStatus, getLegalCenter, saveLegalHold,
   getSandboxConfig, saveSandboxConfig, getArchivalPolicies, runArchival, getFeatureReleases, saveFeatureReleases,
@@ -69,6 +72,79 @@ router.get("/superadmin/stats", ...admin, async (req, res): Promise<void> => {
   } catch {
     res.status(500).json({ error: "Failed to fetch stats" });
   }
+});
+
+// Custom-date revenue: the super-admin can see paid revenue for any day / date range,
+// optionally for one restaurant. Uses the same paid-order rule as every other panel.
+router.get("/superadmin/revenue", ...admin, async (req, res): Promise<void> => {
+  // Parse YYYY-MM-DD as LOCAL midnight (not UTC) to avoid a timezone off-by-one day.
+  const parseDay = (v: unknown): Date | null => {
+    if (typeof v !== "string" || !v) return null;
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const from = parseDay(req.query.from);
+  const toRaw = parseDay(req.query.to);
+  const toEnd = toRaw ? new Date(toRaw.getFullYear(), toRaw.getMonth(), toRaw.getDate(), 23, 59, 59, 999) : null;
+  const restaurantId = req.query.restaurantId ? parseInt(String(req.query.restaurantId), 10) : null;
+
+  // Fetch and filter in JS so a bill COLLECTED in the range counts even if the order was
+  // opened earlier (metadata.payment.collectedAt), matching the owner/POS "today" figure.
+  const rows = await db.select({
+    total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status,
+    createdAt: ordersTable.createdAt, metadata: ordersTable.metadata,
+  }).from(ordersTable).where(restaurantId && !Number.isNaN(restaurantId) ? eq(ordersTable.restaurantId, restaurantId) : undefined);
+  const inRange = (o: typeof rows[0]) => {
+    const created = new Date(o.createdAt);
+    const colRaw = (o.metadata as any)?.payment?.collectedAt;
+    const collected = colRaw ? new Date(colRaw) : null;
+    const okFrom = (d: Date | null) => d != null && !Number.isNaN(d.getTime()) && (!from || d >= from) && (!toEnd || d <= toEnd);
+    return okFrom(created) || okFrom(collected);
+  };
+  const inRangeRows = rows.filter(inRange);
+  const orderRevenue = sumOrderTotals(inRangeRows);
+  const spaRevenue = await getSpaRevenue(restaurantId && !Number.isNaN(restaurantId) ? restaurantId : null, from, toEnd);
+  res.json({
+    from: from ? from.toISOString().slice(0, 10) : null,
+    to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
+    revenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+    orderRevenue,
+    spaRevenue,
+    totalOrders: inRangeRows.length,
+  });
+});
+
+// All restaurants with their total revenue (orders + spa) — one row per restaurant so the
+// super-admin can see "is restaurant se itna aaya", plus a platform grand total.
+router.get("/superadmin/restaurant-revenues", ...admin, async (_req, res): Promise<void> => {
+  const allRest = await db.select({ id: restaurantsTable.id, name: restaurantsTable.name, isActive: restaurantsTable.isActive, settings: restaurantsTable.settings }).from(restaurantsTable);
+  // Skip soft-deleted restaurants (same rule the vendor/KYC lists use) so the list isn't
+  // cluttered with removed test venues.
+  const restaurants = allRest.filter(r => !readPlatformControls(r.settings).deletedAt);
+  const allOrders = await db.select({ restaurantId: ordersTable.restaurantId, total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status }).from(ordersTable);
+  const byRest = new Map<number, typeof allOrders>();
+  for (const o of allOrders) {
+    const arr = byRest.get(o.restaurantId) ?? [];
+    arr.push(o);
+    byRest.set(o.restaurantId, arr);
+  }
+  const spaByRest = await getSpaRevenueByRestaurant();   // one query for all restaurants
+  const rows = restaurants.map(r => {
+    const orders = byRest.get(r.id) ?? [];
+    const orderRevenue = sumOrderTotals(orders);
+    const spaRevenue = spaByRest.get(r.id) ?? 0;
+    return {
+      id: r.id, name: r.name, isActive: r.isActive,
+      orderRevenue, spaRevenue,
+      totalRevenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+      paidOrders: orders.filter(isPaidOrder).length,
+    };
+  });
+  rows.sort((a, b) => b.totalRevenue - a.totalRevenue);
+  const grandTotal = Math.round(rows.reduce((s, r) => s + r.totalRevenue, 0) * 100) / 100;
+  res.json({ restaurants: rows, grandTotal, count: rows.length });
 });
 
 router.get("/superadmin/analytics/revenue-series", ...admin, async (_req, res): Promise<void> => {
@@ -1840,6 +1916,42 @@ router.post("/superadmin/support/merge", ...admin, async (req, res) => {
   if (!updated) { res.status(404).json({ error: "Ticket not found" }); return; }
   await logPlatformAudit(req, "Tickets Merged", "Support", `${primaryId}+${secondaryId}`);
   res.json({ id: `TKT-${updated.id}`, merged: true });
+});
+
+router.get("/superadmin/role-permissions", ...admin, async (_req, res) => {
+  res.json(await getRolePermissions());
+});
+router.put("/superadmin/role-permissions", ...admin, async (req, res) => {
+  const saved = await setRolePermissions({
+    roles: (req.body?.roles ?? {}) as Record<string, string[]>,
+    teams: Array.isArray(req.body?.teams) ? req.body.teams : [],
+    pages: Array.isArray(req.body?.pages) ? req.body.pages : [],
+  });
+  await logPlatformAudit(req, "Role permissions updated", "Platform", "roles");
+  res.json(saved);
+});
+
+// ── Blog (Digital Marketing) ──────────────────────────────────
+router.get("/superadmin/blogs", ...admin, async (_req, res) => {
+  res.json({ posts: await listBlogPosts() });
+});
+router.post("/superadmin/blogs", ...admin, async (req: any, res) => {
+  const author = req.adminUser?.name ?? req.adminUser?.email ?? "Admin";
+  const post = await createBlogPost(req.body ?? {}, author);
+  await logPlatformAudit(req, `Blog created: ${post.title}`, "Blog", post.id);
+  res.status(201).json(post);
+});
+router.put("/superadmin/blogs/:id", ...admin, async (req, res) => {
+  const post = await updateBlogPost(req.params.id, req.body ?? {});
+  if (!post) { res.status(404).json({ error: "Blog post not found" }); return; }
+  await logPlatformAudit(req, `Blog updated: ${post.title}`, "Blog", post.id);
+  res.json(post);
+});
+router.delete("/superadmin/blogs/:id", ...admin, async (req, res) => {
+  const ok = await deleteBlogPost(req.params.id);
+  if (!ok) { res.status(404).json({ error: "Blog post not found" }); return; }
+  await logPlatformAudit(req, `Blog deleted`, "Blog", req.params.id);
+  res.json({ success: true });
 });
 
 router.get("/superadmin/approvals", ...admin, async (_req, res) => { res.json(await listApprovals()); });

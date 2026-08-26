@@ -3,6 +3,7 @@ import { Banknote, Lock, Unlock, AlertTriangle, Plus, Minus, CheckCircle, Clock,
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { finance as financeApi } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
+import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import { toast } from "@/hooks/use-toast";
 
 // Start every count from zero so the cashier physically counts the drawer — no pre-filled fake amounts.
@@ -148,6 +149,8 @@ export default function CashCounter() {
           )}
         </div>
       </div>
+
+      <RevenueByDate restaurantId={restaurantId} title="Cash + Total revenue" />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

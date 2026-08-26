@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { CheckSquare, Plus, X, Clock, CheckCircle, Users, FileText, PlayCircle, Download } from "lucide-react";
+import { CheckSquare, Plus, X, Clock, CheckCircle, Users, FileText, PlayCircle, Download, Eye } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { tasksSop as tasksApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
@@ -20,6 +20,8 @@ export default function TaskSOP() {
   const [newTask, setNewTask] = useState({ title: "", assignedTo: "", dueDate: "", priority: "normal", notes: "" });
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [sopDocs, setSopDocs] = useState<SopDoc[]>([]);
+  const [sopRaw, setSopRaw] = useState<Record<string, any>>({});
+  const [viewSop, setViewSop] = useState<any | null>(null);
   const [trainingVideos, setTrainingVideos] = useState<TrainingVideo[]>([]);
   const [loadingVideo, setLoadingVideo] = useState<string | null>(null);
 
@@ -49,6 +51,7 @@ export default function TaskSOP() {
       }
       const staffCount = Math.max(staffList.length, 1);
       if (Array.isArray(sopRows)) {
+        setSopRaw(Object.fromEntries(sopRows.map((s: any) => [String(s.id), s])));
         setSopDocs(sopRows.map((s: any) => ({
           id: String(s.id),
           title: s.title,
@@ -302,9 +305,14 @@ export default function TaskSOP() {
                     <div className="flex justify-between text-xs mb-1"><span className="text-white/40">Read by staff</span><span className="text-white/60">{doc.readBy}/{doc.totalStaff}</span></div>
                     <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className={`h-full rounded-full ${readPct === 100 ? "bg-emerald-500" : readPct > 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${readPct}%` }} /></div>
                   </div>
-                  <button onClick={() => downloadSop(doc.id)} className="w-full py-2 rounded-xl border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10 flex items-center justify-center gap-1">
-                    <Download className="h-3.5 w-3.5" />Download
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => setViewSop({ ...doc, ...(sopRaw[doc.id] ?? {}) })} className="flex-1 py-2 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 flex items-center justify-center gap-1">
+                      <Eye className="h-3.5 w-3.5" />View
+                    </button>
+                    <button onClick={() => downloadSop(doc.id)} className="flex-1 py-2 rounded-xl border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10 flex items-center justify-center gap-1">
+                      <Download className="h-3.5 w-3.5" />Download
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -344,6 +352,41 @@ export default function TaskSOP() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {viewSop && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setViewSop(null)}>
+          <div className="bg-[#111827] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-violet-400" /></div>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm truncate">{viewSop.title}</h2>
+                  <p className="text-xs text-white/40 capitalize mt-0.5">{viewSop.category} · {viewSop.version ?? "v1.0"} · {viewSop.pages ?? 1} pages</p>
+                </div>
+              </div>
+              <button onClick={() => setViewSop(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+            </div>
+            <div className="p-5 overflow-y-auto text-sm text-white/80 space-y-3">
+              {Array.isArray(viewSop.steps) && viewSop.steps.length > 0 ? (
+                <ol className="space-y-2 list-decimal list-inside">
+                  {viewSop.steps.map((step: any, i: number) => (
+                    <li key={i} className="text-white/75">{typeof step === "string" ? step : (step?.text ?? step?.title ?? JSON.stringify(step))}</li>
+                  ))}
+                </ol>
+              ) : viewSop.content ? (
+                <p className="whitespace-pre-wrap text-white/75 leading-relaxed">{viewSop.content}</p>
+              ) : (
+                <p className="text-white/40 italic">No preview content available for this document. Use Download to get the full file.</p>
+              )}
+            </div>
+            <div className="p-4 border-t border-white/10">
+              <button onClick={() => { downloadSop(String(viewSop.id)); }} className="w-full py-2.5 rounded-xl bg-amber-500 text-black text-sm font-bold flex items-center justify-center gap-2 hover:bg-amber-400">
+                <Download className="h-4 w-4" />Download
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

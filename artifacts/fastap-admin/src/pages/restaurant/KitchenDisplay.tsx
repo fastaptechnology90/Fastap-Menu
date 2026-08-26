@@ -44,8 +44,9 @@ const COLS: { key: LiveOrder["status"]; label: string; color: string; bg: string
 ];
 
 const DEFAULT_TARGETS: Record<string,number> = { hot:18, grill:22, cold:8, bar:5, desserts:10, expo:25, all:20 };
-/** Hide stale test/historical orders from the kitchen board (24h window). */
-const KITCHEN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Hide stale/historical orders from the kitchen board. 7-day window so a quiet demo or
+ *  a slow day still shows recent active orders instead of a blank, "broken-looking" board. */
+const KITCHEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isKitchenActive(order: LiveOrder) {
   if (["served", "billed", "cancelled"].includes(order.status)) return false;
@@ -188,8 +189,16 @@ export default function KitchenDisplay() {
         ))}
       </div>
 
+      {active.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
+          <div className="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 text-3xl">🍳</div>
+          <h3 className="text-lg font-bold text-white/80">No active kitchen orders right now</h3>
+          <p className="text-sm text-white/40 mt-1 max-w-md">New dine-in / room / online orders will appear here automatically as soon as they come in. Completed, served and cancelled orders are hidden.</p>
+        </div>
+      )}
+
       {/* Kanban */}
-      {view==="kanban" && (
+      {active.length > 0 && view==="kanban" && (
         <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-3 divide-x divide-white/5">
           {COLS.map(col=>{
             const orders = getCol(col.key);
@@ -280,7 +289,7 @@ export default function KitchenDisplay() {
       )}
 
       {/* List View */}
-      {view==="list"&&(
+      {active.length > 0 && view==="list"&&(
         <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
           <table className="w-full text-sm">
             <thead>
@@ -321,7 +330,7 @@ export default function KitchenDisplay() {
       )}
 
       {/* Grid View */}
-      {view==="grid"&&(
+      {active.length > 0 && view==="grid"&&(
         <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
             {sortKitchenOrders(active, priorityMode).map(order=>{

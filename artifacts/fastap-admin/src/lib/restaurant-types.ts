@@ -63,6 +63,11 @@ export type OnlineTxnRow = {
   net: number;
   time: string;
   status: string;
+  upiId?: string | null;
+  collectedBy?: string | null;
+  collectedFrom?: string | null;
+  customerName?: string | null;
+  tableName?: string | null;
 };
 
 export type CashLedgerRow = {
@@ -80,6 +85,10 @@ export type RecentBill = {
   method: string;
   time: string;
   status: string;
+  reference?: string;      // UPI id / UTR / invoice reference
+  collectedBy?: string;    // staff who collected the payment
+  collectedFrom?: string;  // panel it was collected from
+  orderId?: number;
 };
 
 export type MetricHistoryPoint = {

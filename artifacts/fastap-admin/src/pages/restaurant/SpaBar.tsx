@@ -31,12 +31,19 @@ const CATEGORY_CFG: Record<string,{label:string;icon:any;color:string}> = {
 
 type Tab = "spa-bookings"|"spa-packages"|"bar-orders"|"bar-inventory"|"recipes";
 
-export default function SpaBar() {
+// mode splits this into a standalone Spa panel (spa role) and Bar panel (bar role).
+// "both" keeps the legacy combined view for owner/manager (and the old /spa-bar route).
+export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both" }) {
   const { restaurantId } = useRestaurant();
-  const [tab, setTab] = useState<Tab>("spa-bookings");
+  const showSpa = mode !== "bar";
+  const showBar = mode !== "spa";
+  const [tab, setTab] = useState<Tab>(mode === "bar" ? "bar-orders" : "spa-bookings");
   const [bookings, setBookings] = useState<SpaBooking[]>([]);
   const [packages, setPackages] = useState<SpaPackage[]>([]);
   const [barItems, setBarItems] = useState<BarItem[]>([]);
+  const [showAddBar, setShowAddBar] = useState(false);
+  const [savingBar, setSavingBar] = useState(false);
+  const [newBar, setNewBar] = useState({ name: "", category: "spirits", price: "", stock: "", minStock: "", unit: "bottle" });
   const [cocktailRecipes, setCocktailRecipes] = useState<CocktailRecipe[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [catFilter, setCatFilter] = useState("all");
@@ -163,6 +170,28 @@ export default function SpaBar() {
   const spaToday = bookings.filter(b => b.date === todayLabel).length;
   const spaPending = bookings.filter(b=>b.status==="pending").length;
 
+  async function saveNewBarItem() {
+    if (!restaurantId || !newBar.name.trim() || savingBar) return;
+    setSavingBar(true);
+    try {
+      const item: BarItem = {
+        id: `bar_${Date.now()}`,
+        name: newBar.name.trim(),
+        category: newBar.category,
+        price: parseFloat(newBar.price) || 0,
+        stock: parseFloat(newBar.stock) || 0,
+        minStock: parseFloat(newBar.minStock) || 0,
+        unit: newBar.unit || "unit",
+      };
+      const updated = [...barItems, item];
+      await barApi.updateInventory(restaurantId, updated);
+      setBarItems(updated);
+      setNewBar({ name: "", category: "spirits", price: "", stock: "", minStock: "", unit: "bottle" });
+      setShowAddBar(false);
+    } catch (e) { console.error(e); }
+    finally { setSavingBar(false); }
+  }
+
   const lowStock = barItems.filter(i=>i.stock<i.minStock);
   const filteredBar = catFilter==="all" ? barItems : barItems.filter(i=>i.category===catFilter);
 
@@ -170,10 +199,10 @@ export default function SpaBar() {
     <div className="p-4 lg:p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold">Spa & Bar</h1>
-          <p className="text-xs text-white/40">Wellness services and beverage management</p>
+          <h1 className="text-xl font-extrabold">{mode==="bar"?"Bar":mode==="spa"?"Spa":"Spa & Bar"}</h1>
+          <p className="text-xs text-white/40">{mode==="bar"?"Beverage & bar management":mode==="spa"?"Wellness & spa services":"Wellness services and beverage management"}</p>
         </div>
-        {(tab==="spa-bookings"||tab==="spa-packages")&&(
+        {showSpa && (tab==="spa-bookings"||tab==="spa-packages")&&(
           <button onClick={()=>setShowBook(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
             <Plus className="h-4 w-4"/>Book Spa
           </button>
@@ -183,10 +212,16 @@ export default function SpaBar() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Today's Bookings",value:spaToday,color:"text-emerald-400",bg:"bg-emerald-500/10"},
-          {label:"Spa Revenue",value:`₹${(spaRevenue/1000).toFixed(1)}K`,color:"text-amber-400",bg:"bg-amber-500/10"},
-          {label:"Pending Sessions",value:spaPending,color:"text-yellow-400",bg:"bg-yellow-500/10"},
-          {label:"Bar Alerts",value:lowStock.length,color:"text-red-400",bg:"bg-red-500/10"},
+          ...(showSpa ? [
+            {label:"Today's Bookings",value:spaToday,color:"text-emerald-400",bg:"bg-emerald-500/10"},
+            {label:"Spa Revenue",value:`₹${(spaRevenue/1000).toFixed(1)}K`,color:"text-amber-400",bg:"bg-amber-500/10"},
+            {label:"Pending Sessions",value:spaPending,color:"text-yellow-400",bg:"bg-yellow-500/10"},
+          ] : []),
+          ...(showBar ? [
+            {label:"Bar Items",value:barItems.length,color:"text-cyan-400",bg:"bg-cyan-500/10"},
+            {label:"Cocktail Recipes",value:cocktailRecipes.length,color:"text-violet-400",bg:"bg-violet-500/10"},
+            {label:"Bar Alerts (low stock)",value:lowStock.length,color:"text-red-400",bg:"bg-red-500/10"},
+          ] : []),
         ].map(s=>(
           <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
             <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
@@ -195,11 +230,15 @@ export default function SpaBar() {
         ))}
       </div>
 
-      <ModulePackages restaurantId={restaurantId} module="spa" title="Spa & Bar Packages / Plans" label="Plan" />
+      {showSpa && <ModulePackages restaurantId={restaurantId} module="spa" title="Spa Packages / Plans" label="Plan" />}
+      {mode==="bar" && <ModulePackages restaurantId={restaurantId} module="bar" title="Bar Packages / Plans" label="Plan" />}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit overflow-x-auto no-scrollbar">
-        {([["spa-bookings","Spa Bookings"],["spa-packages","Packages & Therapists"],["bar-orders","Bar Orders"],["bar-inventory","Bar Inventory"],["recipes","Cocktail Recipes"]] as [Tab,string][]).map(([t,l])=>(
+        {(([
+          ...(showSpa ? [["spa-bookings","Spa Bookings"],["spa-packages","Packages & Therapists"]] : []),
+          ...(showBar ? [["bar-orders","Bar Orders"],["bar-inventory","Bar Inventory"],["recipes","Cocktail Recipes"]] : []),
+        ]) as [Tab,string][]).map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} className={`shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
         ))}
       </div>
@@ -339,6 +378,12 @@ export default function SpaBar() {
 
       {tab==="bar-inventory"&&(
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-white/70">Bar Products ({barItems.length})</p>
+            <button onClick={()=>setShowAddBar(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all">
+              <Plus className="h-4 w-4"/>Add Product
+            </button>
+          </div>
           {lowStock.length>0&&(
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
               <p className="text-sm font-bold text-red-400 mb-2">⚠️ Low Stock Alerts ({lowStock.length} items)</p>
@@ -347,6 +392,12 @@ export default function SpaBar() {
               </div>
             </div>
           )}
+          {barItems.length===0 && (
+            <div className="text-center py-12 text-white/40 text-sm border border-white/5 rounded-2xl bg-white/[0.02]">
+              No bar products yet. Click "Add Product" to add spirits, beer, wine, cocktails etc.
+            </div>
+          )}
+          {barItems.length>0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-white/30 border-b border-white/5">
@@ -371,6 +422,7 @@ export default function SpaBar() {
               })}
             </tbody>
           </table>
+          )}
         </div>
       )}
 
@@ -410,6 +462,53 @@ export default function SpaBar() {
       )}
 
       {/* Spa Booking Modal */}
+      {showAddBar&&(
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={()=>setShowAddBar(false)}>
+          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <h3 className="font-bold flex items-center gap-2"><Wine className="h-5 w-5 text-amber-400"/> Add bar product</h3>
+              <button onClick={()=>setShowAddBar(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Product name <span className="text-red-400">*</span></label>
+                <input value={newBar.name} onChange={e=>setNewBar(p=>({...p,name:e.target.value}))} placeholder="e.g. Old Monk Rum" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Category</label>
+                  <select value={newBar.category} onChange={e=>setNewBar(p=>({...p,category:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+                    {["spirits","beer","wine","cocktail","mocktail"].map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Unit</label>
+                  <select value={newBar.unit} onChange={e=>setNewBar(p=>({...p,unit:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+                    {["bottle","peg","glass","pint","can","unit"].map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Price (₹)</label>
+                  <input type="number" min={0} value={newBar.price} onChange={e=>setNewBar(p=>({...p,price:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Stock</label>
+                  <input type="number" min={0} value={newBar.stock} onChange={e=>setNewBar(p=>({...p,stock:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Min stock (alert)</label>
+                  <input type="number" min={0} value={newBar.minStock} onChange={e=>setNewBar(p=>({...p,minStock:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={()=>setShowAddBar(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
+                <button onClick={saveNewBarItem} disabled={savingBar||!newBar.name.trim()} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">{savingBar?"Saving…":"Add product"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showBook&&(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">

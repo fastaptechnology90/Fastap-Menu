@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle, AlertCircle, Download, CreditCard, Banknote, DollarSign, BarChart3, BookOpen } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { finance as financeApi } from "@/lib/api";
+import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import type { SettlementRow, OnlineTxnRow, CashLedgerRow } from "@/lib/restaurant-types";
 
@@ -20,6 +21,7 @@ export default function FinanceWallet() {
   const [walletData, setWalletData] = useState({ onlineBalance: 0, pendingSettlement: 0, lockedBalance: 0, reserveBalance: 0, totalCashSales: 0, totalOnlineSales: 0, taxCollected: 0, pendingRefunds: 0 });
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [onlineTxns, setOnlineTxns] = useState<OnlineTxnRow[]>([]);
+  const [selTxn, setSelTxn] = useState<OnlineTxnRow | null>(null);
   const [cashLedger, setCashLedger] = useState<CashLedgerRow[]>([]);
   const [pnl, setPnl] = useState({ revenue: 0, cogs: 0, grossProfit: 0, staffCost: 0, utilities: 0, rent: 0, marketing: 0, misc: 0, netProfit: 0, margin: 0 });
   // True only when the finance API actually returns an expense breakdown; otherwise the expense lines are shown as "—" instead of a fabricated ₹0.
@@ -34,15 +36,9 @@ export default function FinanceWallet() {
 
   useEffect(() => {
     if (!restaurantId) return;
-    if (!isRestaurantPublished) {
-      setWalletData({ onlineBalance: 0, pendingSettlement: 0, lockedBalance: 0, reserveBalance: 0, totalCashSales: 0, totalOnlineSales: 0, taxCollected: 0, pendingRefunds: 0 });
-      setSettlements([]);
-      setOnlineTxns([]);
-      setCashLedger([]);
-      setPnl({ revenue: 0, cogs: 0, grossProfit: 0, staffCost: 0, utilities: 0, rent: 0, marketing: 0, misc: 0, netProfit: 0, margin: 0 });
-      setExpensesTracked(false);
-      return;
-    }
+    // Always fetch — the API is the source of truth and already returns zeros for a genuinely
+    // unpublished restaurant. (Gating here on the context flag showed ₹0 whenever that flag
+    // was briefly stale after login, even though the data was available.)
     financeApi.wallet(restaurantId).then((data) => {
       if (!data) return;
       setWalletData({
@@ -86,6 +82,10 @@ export default function FinanceWallet() {
     }).catch(() => {});
   }, [restaurantId, isRestaurantPublished]);
 
+  // Do we actually have finance data? Drives the "unavailable" banner instead of the
+  // (sometimes stale) context flag, so a published restaurant never shows the banner.
+  const hasFinanceData = walletData.totalOnlineSales > 0 || walletData.totalCashSales > 0 || onlineTxns.length > 0 || pnl.revenue > 0;
+
   return (
     <div className="p-4 lg:p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -93,12 +93,14 @@ export default function FinanceWallet() {
           <h1 className="text-xl font-extrabold">Finance & Wallet</h1>
           <p className="text-xs text-white/40">Fastap wallet, settlements, P&L & cash ledger</p>
         </div>
-        <button onClick={handleExport} disabled={exporting || !isRestaurantPublished} className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/70 font-bold px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50">
+        <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/70 font-bold px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50">
           <Download className="h-4 w-4" /> {exporting ? "Exporting…" : "Export"}
         </button>
       </div>
 
-      {!isRestaurantPublished && (
+      <RevenueByDate restaurantId={restaurantId} title="Revenue" />
+
+      {!isRestaurantPublished && !hasFinanceData && (
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
           <p className="text-sm font-semibold text-amber-200">Finance analytics unavailable</p>
           <p className="text-xs text-white/50 mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
@@ -219,7 +221,7 @@ export default function FinanceWallet() {
           </div>
           <div className="divide-y divide-white/5">
             {onlineTxns.map(t => (
-              <div key={t.id} className="px-4 py-3">
+              <div key={t.id} onClick={() => setSelTxn(t)} className="px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors" title="Click for payment details">
                 <div className="flex items-center gap-3">
                   <span className="text-xl shrink-0">{TYPE_CFG[t.type]?.icon || "💰"}</span>
                   <div className="flex-1 min-w-0">
@@ -291,6 +293,42 @@ export default function FinanceWallet() {
               <p className="text-base font-extrabold text-emerald-400 shrink-0">₹{s.amount.toLocaleString()}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {selTxn && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelTxn(null)}>
+          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <h3 className="font-bold flex items-center gap-2"><CreditCard className="h-5 w-5 text-amber-400" /> Payment details</h3>
+              <button onClick={() => setSelTxn(null)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-3 text-sm">
+              <div className="text-center py-2">
+                <p className="text-3xl font-extrabold text-amber-400">₹{Number(selTxn.amount).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-white/40 mt-1 font-mono">{selTxn.id}</p>
+              </div>
+              {[
+                ["Payment method", String(selTxn.type || "—").toUpperCase()],
+                ["UPI ID", selTxn.upiId || "—"],
+                ["UTR / Reference", selTxn.utr || "—"],
+                ["Collected by", selTxn.collectedBy || "—"],
+                ["From panel", selTxn.collectedFrom || "—"],
+                ["Customer", selTxn.customerName || "—"],
+                ["Table / Room", selTxn.tableName || "—"],
+                ["Gateway", selTxn.gateway || "—"],
+                ["Net payout", `₹${Number(selTxn.net).toLocaleString("en-IN")}`],
+                ["Commission", `₹${Number(selTxn.commission).toLocaleString("en-IN")}`],
+                ["Time", selTxn.time || "—"],
+                ["Status", selTxn.status || "—"],
+              ].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-3 border-b border-white/5 pb-2">
+                  <span className="text-white/40">{k}</span>
+                  <span className="font-medium text-right break-all">{v as string}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

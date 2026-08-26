@@ -4,7 +4,7 @@ import { db, roomServiceRequestsTable, hotelRoomsTable, menuItemsTable, categori
 import { requireAuth } from "../middlewares/auth";
 import { getSettingsSection } from "../lib/restaurant-settings";
 import { autoAssignRoomServiceRequest } from "../lib/staff-auto-assignment.js";
-import { computeRoomFolio, mergeRoomBilling } from "../lib/hotel-folio.js";
+import { computeRoomFolio, mergeRoomBilling, readRoomBilling } from "../lib/hotel-folio.js";
 import { parseMoney } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
@@ -54,12 +54,13 @@ router.get("/restaurants/:restaurantId/rooms", requireAuth, async (req, res): Pr
   res.json(rooms);
 });
 
-/** Pull rate/discount/guestCount out of the body into a billing patch (only set keys). */
-function billingPatchFromBody(body: Record<string, unknown>): { rate?: number; discount?: number; guestCount?: number } {
-  const patch: { rate?: number; discount?: number; guestCount?: number } = {};
+/** Pull rate/discount/guestCount/paid out of the body into a billing patch (only set keys). */
+function billingPatchFromBody(body: Record<string, unknown>): { rate?: number; discount?: number; guestCount?: number; paid?: number } {
+  const patch: { rate?: number; discount?: number; guestCount?: number; paid?: number } = {};
   if (body.rate != null && body.rate !== "") patch.rate = parseMoney(body.rate);
   if (body.discount != null && body.discount !== "") patch.discount = parseMoney(body.discount);
   if (body.guestCount != null && body.guestCount !== "") patch.guestCount = parseInt(String(body.guestCount), 10) || 1;
+  if (body.paid != null && body.paid !== "") patch.paid = parseMoney(body.paid);
   return patch;
 }
 
@@ -100,6 +101,25 @@ router.get("/restaurants/:restaurantId/rooms/:roomNumber/folio", requireAuth, as
   const restaurantId = parseInt(req.params.restaurantId, 10);
   const folio = await computeRoomFolio(restaurantId, req.params.roomNumber);
   res.json(folio);
+});
+
+// Record a (partial) payment against a room folio — increments the paid amount so
+// reception can show "paid" vs "remaining". No schema change: paid lives in billing.
+router.post("/restaurants/:restaurantId/rooms/:roomNumber/payment", requireAuth, async (req, res): Promise<void> => {
+  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const roomNumber = req.params.roomNumber;
+  const amount = parseMoney(req.body?.amount);
+  if (amount <= 0) { res.status(400).json({ error: "amount must be greater than 0" }); return; }
+  const [room] = await db.select().from(hotelRoomsTable)
+    .where(and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)));
+  if (!room) { res.status(404).json({ error: "Room not found" }); return; }
+  const current = readRoomBilling(room);
+  const newPaid = Math.round(((current.paid ?? 0) + amount) * 100) / 100;
+  await db.update(hotelRoomsTable)
+    .set({ roomControls: mergeRoomBilling(room.roomControls ?? DEFAULT_ROOM_CONTROLS, { paid: newPaid }) })
+    .where(and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)));
+  const folio = await computeRoomFolio(restaurantId, roomNumber);
+  res.json({ recorded: true, paid: newPaid, folio });
 });
 
 // Check-out: settle the folio, free the room. Returns the final bill.

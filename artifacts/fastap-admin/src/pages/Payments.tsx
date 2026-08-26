@@ -168,6 +168,7 @@ export default function Payments() {
             <DataTable
               data={filtered}
               pageSize={10}
+              onRowClick={(row: Payment) => setDetailId(row.id)}
               columns={[
                 { header: "TXN ID", cell: (row: Payment) => <span className="font-mono text-xs">{row.id}</span> },
                 { header: "Vendor", cell: (row: Payment) => <span className="font-medium">{row.vendorName}</span> },
@@ -198,7 +199,13 @@ export default function Payments() {
                 <div><Label className="text-muted-foreground">Gateway ID</Label><p className="font-mono text-xs">{detail.gatewayTxnId}</p></div>
                 <div><Label className="text-muted-foreground">Gross</Label><p className="font-bold">{fmtINRFull(detail.grossAmount)}</p></div>
                 <div><Label className="text-muted-foreground">Net Payout</Label><p>{fmtINRFull(detail.netPayout)}</p></div>
-                <div><Label className="text-muted-foreground">UTR</Label><p>{detail.utr || "—"}</p></div>
+                <div><Label className="text-muted-foreground">Payment method</Label>{modeBadge(detail.paymentMode)}</div>
+                <div><Label className="text-muted-foreground">UPI ID</Label><p className="break-all">{detail.upiId || "—"}</p></div>
+                <div><Label className="text-muted-foreground">UTR / Reference</Label><p className="break-all">{detail.reference || detail.utr || "—"}</p></div>
+                <div><Label className="text-muted-foreground">Collected by</Label><p>{detail.collectedBy || "—"}</p></div>
+                <div><Label className="text-muted-foreground">From panel</Label><p>{detail.collectedFrom || "—"}</p></div>
+                <div><Label className="text-muted-foreground">Customer</Label><p>{detail.customerName || "—"}</p></div>
+                <div><Label className="text-muted-foreground">Table / Room</Label><p>{detail.tableName || detail.roomNumber || "—"}</p></div>
                 <div><Label className="text-muted-foreground">Status</Label><StatusBadge status={detail.status} /></div>
                 {detail.held && <div className="col-span-2"><Badge variant="destructive">On Hold</Badge></div>}
               </div>

@@ -8,6 +8,7 @@ import {
   emptyFinanceSummary,
   emptyFinanceWallet,
 } from "../lib/restaurant-publication.js";
+import { isPaidOrder } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
 
@@ -112,21 +113,21 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
   let taxCollected = 0;
   for (const o of orders) {
     taxCollected += parseFloat(String(o.tax || 0));
-    if (o.paymentStatus === "refunded") refundAmount += parseFloat(String(o.total));
-    else if (o.paymentStatus === "paid" || o.status === "completed") {
-      const method = (o.paymentMethod || "cash").toLowerCase();
-      const amt = parseFloat(String(o.total));
-      if (ONLINE_METHODS.has(method)) totalOnlineSales += amt;
-      else totalCashSales += amt;
-    }
+    if (o.paymentStatus === "refunded") { refundAmount += parseFloat(String(o.total)); continue; }
+    // Same PAID rule as owner dashboard / analytics / super-admin — one consistent number.
+    if (!isPaidOrder(o)) continue;
+    const method = (o.paymentMethod || "cash").toLowerCase();
+    const amt = parseFloat(String(o.total));
+    if (ONLINE_METHODS.has(method)) totalOnlineSales += amt;
+    else totalCashSales += amt;
   }
+  // "Sales" revenue = orders only, so the finance panel's revenue equals what the owner,
+  // analytics and super-admin panels show for the same restaurant. Order-linked ledger rows
+  // are already counted above; manual (non-order) income is shown in the ledger/summary but
+  // is NOT folded into sales revenue. Non-order refunds still reduce the payout.
   for (const t of txs) {
-    const method = (t.paymentMethod || "cash").toLowerCase();
-    const amt = parseFloat(String(t.amount));
-    if (t.type === "income") {
-      if (ONLINE_METHODS.has(method)) totalOnlineSales += amt;
-      else totalCashSales += amt;
-    } else if (t.type === "refund") refundAmount += amt;
+    if (t.orderId) continue;
+    if (t.type === "refund") refundAmount += parseFloat(String(t.amount));
   }
 
   const commissionRate = 0.02;
@@ -139,18 +140,27 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
   const onlineTxns = orders
     .filter(o => ONLINE_METHODS.has((o.paymentMethod || "").toLowerCase()))
     .slice(0, 50)
-    .map(o => ({
-      id: `ORD-${o.id}`,
-      type: (o.paymentMethod || "upi").toLowerCase(),
-      amount: parseFloat(String(o.total)),
-      gateway: "Fastap Gateway",
-      utr: o.paymentStatus === "paid" ? `UTR${o.id}` : "Pending",
-      tax: parseFloat(String(o.tax)),
-      commission: parseFloat(String(o.total)) * commissionRate,
-      net: parseFloat(String(o.total)) * (1 - commissionRate),
-      time: new Date(o.createdAt).toLocaleString("en-IN"),
-      status: o.paymentStatus === "refunded" ? "refund" : o.paymentStatus === "paid" ? "success" : "pending",
-    }));
+    .map(o => {
+      const md = (o.metadata ?? {}) as Record<string, any>;
+      const pay = (md.payment ?? {}) as Record<string, any>;
+      return {
+        id: `ORD-${o.id}`,
+        type: (o.paymentMethod || "upi").toLowerCase(),
+        amount: parseFloat(String(o.total)),
+        gateway: "Fastap Gateway",
+        utr: pay.utr || pay.upiId || (o.paymentStatus === "paid" ? `UTR${o.id}` : "Pending"),
+        upiId: pay.upiId ?? null,
+        collectedBy: pay.collectedBy ?? null,
+        collectedFrom: pay.collectedFrom ?? null,
+        customerName: o.customerName ?? null,
+        tableName: o.tableName ?? null,
+        tax: parseFloat(String(o.tax)),
+        commission: parseFloat(String(o.total)) * commissionRate,
+        net: parseFloat(String(o.total)) * (1 - commissionRate),
+        time: new Date(o.createdAt).toLocaleString("en-IN"),
+        status: o.paymentStatus === "refunded" ? "refund" : o.paymentStatus === "paid" ? "success" : "pending",
+      };
+    });
 
   const cashLedger = txs
     .filter(t => !ONLINE_METHODS.has((t.paymentMethod || "cash").toLowerCase()))

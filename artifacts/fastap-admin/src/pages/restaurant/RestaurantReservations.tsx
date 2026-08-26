@@ -274,32 +274,71 @@ export default function RestaurantReservations() {
               <h3 className="font-bold">New Reservation</h3>
               <button onClick={() => setAddMode(false)}><X className="h-5 w-5 text-white/40" /></button>
             </div>
-            <div className="p-5 space-y-3">
-              {[
-                { label: "Guest Name*", field: "guestName", type: "text" },
-                { label: "Mobile", field: "mobile", type: "text" },
-                { label: "Email", field: "email", type: "email" },
-                { label: "Date*", field: "date", type: "date" },
-                { label: "Time*", field: "time", type: "time" },
-                { label: "Guests", field: "guests", type: "number" },
-                { label: "Room Number", field: "room", type: "text" },
-                { label: "Deposit (₹)", field: "deposit", type: "number" },
-                { label: "Special Request", field: "special", type: "text" },
-              ].map(({ label, field, type }) => (
-                <div key={field}>
-                  <label className="block text-xs text-white/40 mb-1">{label}</label>
-                  <input type={type} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white [color-scheme:dark]" value={(newRes as any)[field] || ""} onChange={e => setNewRes({ ...newRes, [field]: type === "number" ? Number(e.target.value) : e.target.value })} />
+            <div className="p-5 space-y-5">
+              {/* Guest details */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80">Guest details</p>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Guest name <span className="text-red-400">*</span></label>
+                  <input type="text" placeholder="Full name" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.guestName || ""} onChange={e => setNewRes({ ...newRes, guestName: e.target.value })} />
                 </div>
-              ))}
-              <div>
-                <label className="block text-xs text-white/40 mb-1">Section</label>
-                <select className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white" value={newRes.section || ""} onChange={e => setNewRes({ ...newRes, section: e.target.value })}>
-                  {["Indoor AC", "Premium Indoor", "Family Section", "Outdoor Garden", "Rooftop", "VIP Lounge", "Banquet Hall", "Spa"].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Mobile</label>
+                    <input type="tel" inputMode="numeric" placeholder="10-digit number" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.mobile || ""} onChange={e => setNewRes({ ...newRes, mobile: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Email</label>
+                    <input type="email" placeholder="name@email.com" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.email || ""} onChange={e => setNewRes({ ...newRes, email: e.target.value })} />
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2 pt-2">
+
+              {/* Booking details */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80">Booking details</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Date <span className="text-red-400">*</span></label>
+                    <input type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white [color-scheme:dark]" value={newRes.date || ""} onChange={e => setNewRes({ ...newRes, date: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Time <span className="text-red-400">*</span></label>
+                    <input type="time" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white [color-scheme:dark]" value={newRes.time || ""} onChange={e => setNewRes({ ...newRes, time: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Guests (people)</label>
+                    <input type="number" min={1} placeholder="2" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.guests || ""} onChange={e => setNewRes({ ...newRes, guests: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Room / Table no.</label>
+                    <input type="text" placeholder="e.g. R-102 / T-12" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.room || ""} onChange={e => setNewRes({ ...newRes, room: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Section</label>
+                  <select className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white" value={newRes.section || ""} onChange={e => setNewRes({ ...newRes, section: e.target.value })}>
+                    {["Indoor AC", "Premium Indoor", "Family Section", "Outdoor Garden", "Rooftop", "VIP Lounge", "Banquet Hall", "Spa"].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Payment + notes */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80">Payment &amp; notes</p>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Advance deposit (₹)</label>
+                  <input type="number" min={0} placeholder="0" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={newRes.deposit || ""} onChange={e => setNewRes({ ...newRes, deposit: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Special request</label>
+                  <textarea rows={2} placeholder="Window seat, birthday setup, allergy note…" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white resize-none" value={newRes.special || ""} onChange={e => setNewRes({ ...newRes, special: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
                 <button onClick={() => setAddMode(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
-                <button onClick={handleAddRes} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold">Book Now</button>
+                <button onClick={handleAddRes} disabled={!newRes.guestName || !newRes.date || !newRes.time} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">Book Now</button>
               </div>
             </div>
           </div>

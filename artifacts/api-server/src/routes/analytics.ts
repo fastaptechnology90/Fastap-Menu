@@ -8,6 +8,7 @@ import {
   emptyAnalyticsSummary,
   emptyOrderStats,
 } from "../lib/restaurant-publication.js";
+import { isPaidOrder, orderGrossTotal } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
 
@@ -89,9 +90,11 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
     : eq(ordersTable.restaurantId, restaurantId);
 
   const [totalOrdersRow] = await db.select({ count: count() }).from(ordersTable).where(orderWhere);
-  const periodOrders = await db.select({ total: ordersTable.total }).from(ordersTable).where(orderWhere);
-  const totalRevenue = periodOrders.reduce((s, o) => s + parseFloat(o.total as string || "0"), 0);
-  const avgOrderValue = totalOrdersRow?.count ? totalRevenue / totalOrdersRow.count : 0;
+  // Revenue = PAID / in-flight orders only (same rule as owner dashboard & super-admin).
+  const periodOrders = await db.select({ total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status }).from(ordersTable).where(orderWhere);
+  const paidOrders = periodOrders.filter(isPaidOrder);
+  const totalRevenue = Math.round(paidOrders.reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
+  const avgOrderValue = paidOrders.length ? totalRevenue / paidOrders.length : 0;
 
   const [totalCustomers] = await db.select({ count: count() }).from(customersTable).where(eq(customersTable.restaurantId, restaurantId));
   const [totalScansRow] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).where(eq(qrCodesTable.restaurantId, restaurantId));
@@ -187,15 +190,26 @@ router.get("/restaurants/:restaurantId/analytics/daily-sales", requireAuth, asyn
     return d;
   })();
 
-  const rows = await db.select({
-    date: sql<string>`DATE(${ordersTable.createdAt})::text`,
-    orders: count(),
-    revenue: sum(ordersTable.total),
+  // Aggregate in JS so we can apply the same PAID-order filter as the summary/dashboard.
+  const dayRows = await db.select({
+    createdAt: ordersTable.createdAt, total: ordersTable.total,
+    paymentStatus: ordersTable.paymentStatus, status: ordersTable.status,
   }).from(ordersTable)
-    .where(and(eq(ordersTable.restaurantId, restaurantId), gte(ordersTable.createdAt, since)))
-    .groupBy(sql`DATE(${ordersTable.createdAt})`).orderBy(sql`DATE(${ordersTable.createdAt})`);
+    .where(and(eq(ordersTable.restaurantId, restaurantId), gte(ordersTable.createdAt, since)));
 
-  res.json(rows.map(r => ({ date: r.date, orders: r.orders, revenue: parseFloat(String(r.revenue ?? 0)) })));
+  const byDate = new Map<string, { orders: number; revenue: number }>();
+  for (const o of dayRows) {
+    if (!isPaidOrder(o)) continue;
+    const date = new Date(o.createdAt).toISOString().slice(0, 10);
+    const cur = byDate.get(date) ?? { orders: 0, revenue: 0 };
+    cur.orders += 1;
+    cur.revenue += orderGrossTotal(o);
+    byDate.set(date, cur);
+  }
+  const result = [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, v]) => ({ date, orders: v.orders, revenue: Math.round(v.revenue * 100) / 100 }));
+  res.json(result);
 });
 
 router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, async (req, res): Promise<void> => {

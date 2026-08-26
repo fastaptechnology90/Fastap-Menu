@@ -25,6 +25,25 @@ async function request<T>(path: string, options?: RequestInit, skipAuthRedirect 
   return res.json();
 }
 
+export type RolePermissionsConfig = {
+  roles: Record<string, string[]>;
+  teams?: { key: string; label: string }[];
+  pages?: { href: string; title: string; group?: string }[];
+};
+
+export type BlogPost = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  coverUrl?: string;
+  status: "draft" | "published";
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const api = {
   auth: {
     login: (email: string, password: string) =>
@@ -34,6 +53,16 @@ export const api = {
       }),
     logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
     me: () => request<AdminUser>("/auth/me", undefined, true),
+    forgotPassword: (email: string) =>
+      request<{ message: string; emailConfigured: boolean; devToken?: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (token: string, password: string) =>
+      request<{ message: string }>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, password }),
+      }),
     setupSuperAdmin: (name: string, email: string, password: string) =>
       request<{ user: AdminUser }>("/superadmin/setup", {
         method: "POST",
@@ -42,6 +71,15 @@ export const api = {
   },
   dashboard: {
     stats: () => request<DashboardStats>("/superadmin/stats"),
+    revenue: (params?: { from?: string; to?: string; restaurantId?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.from) q.set("from", params.from);
+      if (params?.to) q.set("to", params.to);
+      if (params?.restaurantId) q.set("restaurantId", String(params.restaurantId));
+      const qs = q.toString();
+      return request<{ from: string | null; to: string | null; revenue: number; totalOrders: number }>(`/superadmin/revenue${qs ? `?${qs}` : ""}`);
+    },
+    restaurantRevenues: () => request<{ restaurants: { id: number; name: string; isActive: boolean; orderRevenue: number; spaRevenue: number; totalRevenue: number; paidOrders: number }[]; grandTotal: number; count: number }>("/superadmin/restaurant-revenues"),
   },
   vendors: {
     list: (includeDeleted = false) =>
@@ -346,6 +384,17 @@ export const api = {
     update: (id: string, data: Record<string, unknown>) =>
       request<any>(`/superadmin/approvals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
+  rolePermissions: {
+    get: () => request<RolePermissionsConfig>("/superadmin/role-permissions"),
+    save: (config: RolePermissionsConfig) =>
+      request<RolePermissionsConfig>("/superadmin/role-permissions", { method: "PUT", body: JSON.stringify(config) }),
+  },
+  blogs: {
+    list: () => request<{ posts: BlogPost[] }>("/superadmin/blogs"),
+    create: (post: Partial<BlogPost>) => request<BlogPost>("/superadmin/blogs", { method: "POST", body: JSON.stringify(post) }),
+    update: (id: string, post: Partial<BlogPost>) => request<BlogPost>(`/superadmin/blogs/${id}`, { method: "PUT", body: JSON.stringify(post) }),
+    remove: (id: string) => request<{ success: boolean }>(`/superadmin/blogs/${id}`, { method: "DELETE" }),
+  },
   reservations: {
     list: () => request<any[]>("/superadmin/reservations"),
     updateStatus: (id: string, status: string) =>
@@ -599,10 +648,15 @@ export interface PaymentDetail extends Payment {
   vendorId: string;
   taxAmount?: number;
   utr?: string | null;
+  upiId?: string | null;
+  reference?: string | null;
+  collectedBy?: string | null;
+  collectedFrom?: string | null;
   gatewayTxnId?: string;
   held?: boolean;
   customerName?: string | null;
   tableName?: string | null;
+  roomNumber?: string | null;
   retryCount?: number;
 }
 

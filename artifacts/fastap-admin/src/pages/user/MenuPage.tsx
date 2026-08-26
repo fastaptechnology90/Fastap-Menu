@@ -654,18 +654,26 @@ export default function MenuPage() {
         <div className="menu-app__brand-row">
           <GuestBackButton fallback="/" />
           <div className="menu-app__brand">
-            <h1 className="menu-app__title">{activeRestaurant}</h1>
-            <p className="menu-app__subtitle">
-              {activeTable || "Table"} · {activeSection}
-              {menuFromCache ? " · Cached" : ""}
-            </p>
+            {/* Demo menu: no venue branding — just "Demo Menu". Real venues show name + table. */}
+            <h1 className="menu-app__title">{isDemo ? "Demo Menu" : activeRestaurant}</h1>
+            {!isDemo && (
+              <p className="menu-app__subtitle">
+                {activeTable || "Table"} · {activeSection}
+                {menuFromCache ? " · Cached" : ""}
+              </p>
+            )}
           </div>
-          <button type="button" onClick={() => setShowServiceSheet(true)} className="menu-app__icon-btn" aria-label="Services">
-            <Grid3x3 className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => navigate("/user/profile")} className="menu-app__icon-btn" aria-label="Profile">
-            <Icon name="person" size={18} />
-          </button>
+          {/* Services ("explore") + profile/login are hidden on the view-only demo menu. */}
+          {!isDemo && (
+            <button type="button" onClick={() => setShowServiceSheet(true)} className="menu-app__icon-btn" aria-label="Services">
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+          )}
+          {!isDemo && (
+            <button type="button" onClick={() => navigate("/user/profile")} className="menu-app__icon-btn" aria-label="Profile">
+              <Icon name="person" size={18} />
+            </button>
+          )}
         </div>
 
         <div className="menu-app__search-row">

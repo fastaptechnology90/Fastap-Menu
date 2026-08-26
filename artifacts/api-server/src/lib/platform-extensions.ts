@@ -31,6 +31,101 @@ export async function listApprovals() {
   return data.items ?? [];
 }
 
+// ── Blog posts (managed by the Digital Marketing team on the admin Blog page) ──
+export type BlogPost = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  coverUrl?: string;
+  status: "draft" | "published";
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function blogSlug(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+export async function listBlogPosts(): Promise<BlogPost[]> {
+  const data = await getJson<{ items: BlogPost[] }>("blogs", { items: [] });
+  return data.items ?? [];
+}
+
+async function saveBlogPosts(items: BlogPost[]) {
+  await setJson("blogs", { items });
+}
+
+export async function createBlogPost(input: Partial<BlogPost>, author: string): Promise<BlogPost> {
+  const items = await listBlogPosts();
+  const now = new Date().toISOString();
+  const title = (input.title ?? "Untitled").trim() || "Untitled";
+  const post: BlogPost = {
+    id: `BLOG-${Date.now()}`,
+    title,
+    slug: blogSlug(input.slug || title) || `post-${Date.now()}`,
+    excerpt: input.excerpt ?? "",
+    content: input.content ?? "",
+    coverUrl: input.coverUrl,
+    status: input.status === "published" ? "published" : "draft",
+    author,
+    createdAt: now,
+    updatedAt: now,
+  };
+  items.unshift(post);
+  await saveBlogPosts(items);
+  return post;
+}
+
+export async function updateBlogPost(id: string, patch: Partial<BlogPost>): Promise<BlogPost | null> {
+  const items = await listBlogPosts();
+  const idx = items.findIndex(p => p.id === id);
+  if (idx === -1) return null;
+  const current = items[idx];
+  items[idx] = {
+    ...current,
+    ...patch,
+    id: current.id,
+    slug: patch.slug !== undefined ? (blogSlug(patch.slug) || current.slug) : current.slug,
+    createdAt: current.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+  await saveBlogPosts(items);
+  return items[idx];
+}
+
+export async function deleteBlogPost(id: string): Promise<boolean> {
+  const items = await listBlogPosts();
+  const next = items.filter(p => p.id !== id);
+  if (next.length === items.length) return false;
+  await saveBlogPosts(next);
+  return true;
+}
+
+// Role -> allowed admin page paths. Managed on the super-admin Roles & Permissions page.
+export type RolePermissionsConfig = {
+  roles: Record<string, string[]>;
+  teams?: { key: string; label: string }[];   // custom teams the admin added
+  pages?: { href: string; title: string; group?: string }[]; // custom pages the admin added
+};
+
+export async function getRolePermissions(): Promise<RolePermissionsConfig> {
+  const data = await getJson<RolePermissionsConfig>("rolePermissions", { roles: {}, teams: [], pages: [] });
+  return { roles: data.roles ?? {}, teams: data.teams ?? [], pages: data.pages ?? [] };
+}
+
+export async function setRolePermissions(config: RolePermissionsConfig): Promise<RolePermissionsConfig> {
+  const clean: RolePermissionsConfig = {
+    roles: config.roles ?? {},
+    teams: Array.isArray(config.teams) ? config.teams : [],
+    pages: Array.isArray(config.pages) ? config.pages : [],
+  };
+  await setJson("rolePermissions", clean);
+  return clean;
+}
+
 export async function createApproval(item: Record<string, unknown>) {
   const items = await listApprovals() as Record<string, unknown>[];
   const entry = { id: `APR-${Date.now()}`, status: "pending", level: 1, createdAt: new Date().toISOString(), ...item };

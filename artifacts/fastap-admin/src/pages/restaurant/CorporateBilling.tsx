@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { corporateApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
-import { Building2, Plus, CreditCard, X, TrendingUp, DollarSign, AlertCircle, Download, Send, Search, Save } from "lucide-react";
+import { Building2, Plus, CreditCard, X, TrendingUp, DollarSign, AlertCircle, Download, Send, Search, Save, Eye } from "lucide-react";
 
 type Account = {
   id: string; company: string; contactName: string; email: string; phone: string;
@@ -90,6 +90,7 @@ export default function CorporateBilling() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAccount, setEditAccount] = useState({ company:"", contactName:"", email:"", phone:"", creditLimit:"", gstNo:"", tier:"business" });
   const [editSaving, setEditSaving] = useState(false);
+  const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
 
   // No corporateApi method exists for this action — surface it clearly instead of faking success.
   const featureNeedsApi = (feature: string, endpoint: string) =>
@@ -275,7 +276,7 @@ export default function CorporateBilling() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredInvoices.map(inv=>(
-                  <tr key={inv.id} className={`hover:bg-white/3 transition-all ${inv.status==="overdue"?"bg-red-500/3":""}`}>
+                  <tr key={inv.id} onClick={()=>setViewInvoice(inv)} title="Click to view invoice details" className={`cursor-pointer hover:bg-white/5 transition-all ${inv.status==="overdue"?"bg-red-500/3":""}`}>
                     <td className="py-3 pr-3 font-mono text-xs text-amber-400">{inv.id}</td>
                     <td className="py-3 pr-3 font-semibold whitespace-nowrap">{inv.account}</td>
                     <td className="py-3 pr-3 text-xs text-white/50 whitespace-nowrap">{inv.period}</td>
@@ -284,8 +285,9 @@ export default function CorporateBilling() {
                     <td className="py-3 pr-3 text-white/50">₹{inv.gst.toLocaleString()}</td>
                     <td className="py-3 pr-3 font-bold text-amber-400">₹{inv.total.toLocaleString()}</td>
                     <td className="py-3 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${inv.status==="paid"?"bg-emerald-500/15 text-emerald-400":inv.status==="pending"?"bg-yellow-500/15 text-yellow-400":"bg-red-500/15 text-red-400"}`}>{inv.status}</span></td>
-                    <td className="py-3">
+                    <td className="py-3" onClick={e=>e.stopPropagation()}>
                       <div className="flex gap-1">
+                        <button onClick={()=>setViewInvoice(inv)} title="View invoice" className="p-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"><Eye className="h-3.5 w-3.5"/></button>
                         <button onClick={()=>featureNeedsApi("Invoice download", "GET /restaurants/:id/corporate/invoices/:id/download")} title="Download PDF" className="p-1.5 rounded-lg border border-white/10 text-white/40 hover:text-white hover:bg-white/5"><Download className="h-3.5 w-3.5"/></button>
                         {inv.status!=="paid"&&<button onClick={()=>featureNeedsApi("Send invoice", "POST /restaurants/:id/corporate/invoices/:id/send")} title="Send to client" className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"><Send className="h-3.5 w-3.5"/></button>}
                       </div>
@@ -439,6 +441,45 @@ export default function CorporateBilling() {
             <div className="flex gap-3 mt-5">
               <button onClick={()=>setShowEdit(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
               <button onClick={submitEditAccount} disabled={editSaving||!editAccount.company} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40"><Save className="h-4 w-4"/>{editSaving?"Saving…":"Save Changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={()=>setViewInvoice(null)}>
+          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h3 className="font-bold flex items-center gap-2"><Building2 className="h-5 w-5 text-amber-400"/> Invoice {viewInvoice.id}</h3>
+                <p className="text-xs text-white/40 mt-0.5">{viewInvoice.account} · {viewInvoice.period}</p>
+              </div>
+              <button onClick={()=>setViewInvoice(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+            </div>
+            <div className="p-5 space-y-3 text-sm">
+              <div className="text-center py-2">
+                <p className="text-3xl font-extrabold text-amber-400">₹{viewInvoice.total.toLocaleString()}</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold mt-2 inline-block ${viewInvoice.status==="paid"?"bg-emerald-500/15 text-emerald-400":viewInvoice.status==="pending"?"bg-yellow-500/15 text-yellow-400":"bg-red-500/15 text-red-400"}`}>{viewInvoice.status}</span>
+              </div>
+              {[
+                ["Company / Account", viewInvoice.account],
+                ["Billing period", viewInvoice.period],
+                ["Meals billed", String(viewInvoice.meals)],
+                ["Amount (pre-GST)", `₹${viewInvoice.amount.toLocaleString()}`],
+                ["GST", `₹${viewInvoice.gst.toLocaleString()}`],
+                ["Total", `₹${viewInvoice.total.toLocaleString()}`],
+                ["Due date", viewInvoice.dueDate || "—"],
+                ["Paid on", viewInvoice.paidOn || "—"],
+              ].map(([k,v])=>(
+                <div key={k as string} className="flex justify-between gap-3 border-b border-white/5 pb-2">
+                  <span className="text-white/40">{k}</span>
+                  <span className="font-medium text-right">{v as string}</span>
+                </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <button onClick={()=>featureNeedsApi("Invoice download", "GET /restaurants/:id/corporate/invoices/:id/download")} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/70 text-sm font-semibold hover:bg-white/5 flex items-center justify-center gap-1"><Download className="h-4 w-4"/> Download</button>
+                {viewInvoice.status!=="paid" && <button onClick={()=>featureNeedsApi("Send invoice", "POST /restaurants/:id/corporate/invoices/:id/send")} className="flex-1 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm font-bold hover:bg-emerald-500/25 flex items-center justify-center gap-1"><Send className="h-4 w-4"/> Send</button>}
+              </div>
             </div>
           </div>
         </div>

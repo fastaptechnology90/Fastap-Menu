@@ -280,6 +280,19 @@ export default function OrderManagement() {
                 {selectedOrder.paymentStatus && <div>Pay status: <span className="text-white capitalize">{selectedOrder.paymentStatus}</span></div>}
                 <div>Time: <span className="text-white">{getElapsed(selectedOrder.placedAt)}</span></div>
               </div>
+
+              {/* Full payment breakdown — kaise pay hua (UPI id / UTR), kisne aur kis panel se */}
+              {(selectedOrder.upiId || selectedOrder.utr || selectedOrder.collectedBy || selectedOrder.collectedFrom) && (
+                <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400/80">Payment received</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-white/50">
+                    {selectedOrder.upiId && <div>UPI ID: <span className="text-white break-all">{selectedOrder.upiId}</span></div>}
+                    {selectedOrder.utr && <div>UTR / Ref: <span className="text-white break-all">{selectedOrder.utr}</span></div>}
+                    {selectedOrder.collectedBy && <div>Collected by: <span className="text-white">{selectedOrder.collectedBy}</span></div>}
+                    {selectedOrder.collectedFrom && <div>From panel: <span className="text-white">{selectedOrder.collectedFrom}</span></div>}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

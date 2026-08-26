@@ -46,9 +46,11 @@ export const restaurantNavGroups: RestaurantNavGroup[] = [
   {
     group: "Hotel Services",
     items: [
+      { path: "/restaurant/reception", label: "Reception", icon: "concierge" },
       { path: "/restaurant/room-service", label: "Room Service", icon: "room_service" },
       { path: "/restaurant/housekeeping", label: "Housekeeping", icon: "cleaning_services" },
-      { path: "/restaurant/spa-bar", label: "Spa & Bar", icon: "spa" },
+      { path: "/restaurant/spa", label: "Spa", icon: "spa" },
+      { path: "/restaurant/bar", label: "Bar", icon: "local_bar" },
       { path: "/restaurant/events", label: "Events & Banquet", icon: "celebration" },
     ],
   },

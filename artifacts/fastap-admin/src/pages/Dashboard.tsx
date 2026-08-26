@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +17,85 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/apiClient";
 import { fmtINR, fmtINRFull } from "@/lib/format";
 
+function ymd(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Super-admin can see paid revenue for any day / date range (custom-date). */
+function RevenueByDate() {
+  const today = new Date();
+  const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d; };
+  const PRESETS: { key: string; label: string; from?: string; to?: string }[] = [
+    { key: "today", label: "Today", from: ymd(today), to: ymd(today) },
+    { key: "7d", label: "7 days", from: ymd(daysAgo(6)), to: ymd(today) },
+    { key: "15d", label: "15 days", from: ymd(daysAgo(14)), to: ymd(today) },
+    { key: "30d", label: "30 days", from: ymd(daysAgo(29)), to: ymd(today) },
+    { key: "all", label: "All time" },
+  ];
+  const [preset, setPreset] = useState("today");
+  const [from, setFrom] = useState(ymd(today));
+  const [to, setTo] = useState(ymd(today));
+
+  function applyPreset(p: typeof PRESETS[0]) {
+    setPreset(p.key);
+    if (p.from) setFrom(p.from);
+    if (p.to) setTo(p.to);
+  }
+  const isAll = preset === "all";
+  const params = isAll ? {} : { from, to };
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["superadmin-revenue", isAll ? "all" : from, isAll ? "all" : to],
+    queryFn: () => api.dashboard.revenue(params),
+  });
+
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="lg:w-64">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><IndianRupee className="h-3.5 w-3.5" /> Revenue {data?.from ? `(${data.from}${data.to && data.to !== data.from ? ` → ${data.to}` : ""})` : "(all time)"}</p>
+            <p className="text-3xl font-extrabold mt-1">
+              {isFetching ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : fmtINRFull(data?.revenue ?? 0)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{data?.totalOrders ?? 0} orders in range</p>
+          </div>
+          <div className="flex-1 space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map(p => (
+                <Button key={p.key} variant={preset === p.key ? "default" : "outline"} size="sm" className="rounded-lg" onClick={() => applyPreset(p)}>{p.label}</Button>
+              ))}
+              <Button variant={preset === "custom" ? "default" : "outline"} size="sm" className="rounded-lg" onClick={() => setPreset("custom")}>Custom</Button>
+            </div>
+            {preset === "custom" && (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <label className="text-muted-foreground text-xs">From</label>
+                <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className="rounded-lg border bg-background px-2 py-1.5 text-sm" />
+                <label className="text-muted-foreground text-xs">To</label>
+                <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="rounded-lg border bg-background px-2 py-1.5 text-sm" />
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const PAY_LABEL: Record<string, string> = {
+  upi: "UPI", card: "Card", cash: "Cash", wallet: "Wallet", nfc: "NFC",
+  netbanking: "Net Banking", room_bill: "Room Bill", aggregator: "Aggregator", online: "Online",
+};
+function payLabel(mode?: string) {
+  const m = String(mode ?? "").toLowerCase();
+  return PAY_LABEL[m] ?? (mode ? String(mode).toUpperCase() : "—");
+}
+
 export default function Dashboard() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [selectedTxn, setSelectedTxn] = useState<any | null>(null);
+  const [txnSearch, setTxnSearch] = useState("");
 
   const { data: stats, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["superadmin-stats"],
@@ -131,6 +208,8 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <RevenueByDate />
+
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
@@ -240,14 +319,35 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Recent Transactions</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Recent Transactions</CardTitle>
+            <p className="text-xs text-muted-foreground">Click a transaction to see how it was paid (UPI / cash / card), the UPI id / UTR and who collected it.</p>
+            <div className="relative mt-2">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                value={txnSearch}
+                onChange={e => setTxnSearch(e.target.value)}
+                placeholder="Search by restaurant / vendor name…"
+                className="w-full rounded-lg border bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </CardHeader>
           <CardContent>
-            <DataTable data={payments.slice(0, 5)} pageSize={5} columns={[
-              { header: "ID", cell: row => <span className="font-mono text-xs">{row.id}</span> },
-              { header: "Vendor", accessorKey: "vendorName" },
-              { header: "Amount", cell: row => fmtINRFull(row.grossAmount) },
-              { header: "Status", cell: row => <StatusBadge status={row.status} /> },
-            ]} />
+            {(() => {
+              const q = txnSearch.trim().toLowerCase();
+              const filtered = q ? payments.filter(p => String((p as any).vendorName ?? "").toLowerCase().includes(q)) : payments;
+              return filtered.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No transactions{q ? ` for "${txnSearch}"` : ""}.</p>
+              ) : (
+                <DataTable data={filtered.slice(0, q ? 20 : 5)} pageSize={q ? 10 : 5} onRowClick={row => setSelectedTxn(row)} columns={[
+                  { header: "ID", cell: row => <span className="font-mono text-xs">{row.id}</span> },
+                  { header: "Vendor", accessorKey: "vendorName" },
+                  { header: "Amount", cell: row => fmtINRFull(row.grossAmount) },
+                  { header: "Mode", cell: row => <span className="text-xs font-semibold">{payLabel((row as any).paymentMode)}</span> },
+                  { header: "Status", cell: row => <StatusBadge status={row.status} /> },
+                ]} />
+              );
+            })()}
           </CardContent>
         </Card>
         <Card>
@@ -261,6 +361,46 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {selectedTxn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedTxn(null)}>
+          <div className="w-full max-w-md rounded-2xl border bg-background shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <h3 className="font-bold">Transaction details</h3>
+              </div>
+              <button onClick={() => setSelectedTxn(null)} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-3 text-sm">
+              <div className="text-center py-2">
+                <p className="text-3xl font-extrabold">{fmtINRFull(selectedTxn.grossAmount)}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">{selectedTxn.id} · {selectedTxn.orderId}</p>
+                <div className="mt-2"><StatusBadge status={selectedTxn.status} /></div>
+              </div>
+              {[
+                ["Vendor / Hotel", selectedTxn.vendorName],
+                ["Payment method", payLabel(selectedTxn.paymentMode)],
+                ["UPI ID", selectedTxn.upiId || "—"],
+                ["UTR / Reference", selectedTxn.reference || selectedTxn.utr || "—"],
+                ["Gateway txn", selectedTxn.gatewayTxnId || "—"],
+                ["Collected by", selectedTxn.collectedBy || "—"],
+                ["Collected from", selectedTxn.collectedFrom || "—"],
+                ["Customer", selectedTxn.customerName || "—"],
+                ["Table / Room", selectedTxn.tableName || selectedTxn.roomNumber || "—"],
+                ["Commission", fmtINRFull(selectedTxn.commission ?? 0)],
+                ["Net payout", fmtINRFull(selectedTxn.netPayout ?? 0)],
+                ["Date / Time", selectedTxn.dateTime ? new Date(selectedTxn.dateTime).toLocaleString("en-IN") : "—"],
+              ].map(([k, v]) => (
+                <div key={k as string} className="flex justify-between gap-3 border-b border-border/50 pb-2">
+                  <span className="text-muted-foreground">{k}</span>
+                  <span className="font-medium text-right break-all">{v as string}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

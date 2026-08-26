@@ -50,7 +50,7 @@ export interface LiveOrder {
   id: string;
   tableNo: string;
   waiter: string;
-  items: { name: string; qty: number; price: number; status: "pending" | "preparing" | "ready" }[];
+  items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready" }[];
   status: "new" | "accepted" | "preparing" | "ready" | "served" | "billed" | "cancelled";
   type: "dine-in" | "takeaway" | "room-service" | "delivery";
   placedAt: Date;
@@ -62,6 +62,12 @@ export interface LiveOrder {
   paymentStatus?: string;
   customerName?: string;
   roomNumber?: string;
+  // Full payment breakdown (populated when a bill is collected) so the owner can click a
+  // payment and see the UPI id / UTR, who collected it and from which panel.
+  upiId?: string;
+  utr?: string;
+  collectedBy?: string;
+  collectedFrom?: string;
 }
 
 export interface TableInfo {
@@ -141,7 +147,7 @@ interface RestaurantContextValue {
     password?: string;
     phone?: string;
     otp?: string;
-  }) => Promise<{ staff: any; restaurant: any }>;
+  }) => Promise<{ staff: any; restaurant: any; subscription?: any; requiresSubscription?: boolean }>;
   applyAuthResult: (result: { staff: any; restaurant: any }) => void;
   logoutStaff: () => Promise<void>;
   rolePermissions: RolePermissions;
@@ -172,6 +178,9 @@ function mapApiOrder(o: any): LiveOrder {
     name: typeof i === "object" ? (i.name || i.menuItemName || "Item") : String(i),
     qty: typeof i === "object" ? (i.quantity || i.qty || 1) : 1,
     price: typeof i === "object" ? (parseFloat(i.price) || 0) : 0,
+    // line subtotal (pre-tax) as stored on the order — the POS uses this to bill the
+    // exact order amount instead of re-deriving from a possibly-stale unit price.
+    subtotal: typeof i === "object" ? (parseFloat(i.subtotal) || 0) : 0,
     status: "pending" as const,
   })) : [];
   const tableName = o.tableName ?? o.table_name;
@@ -191,10 +200,14 @@ function mapApiOrder(o: any): LiveOrder {
     total: parseFloat(String(o.total)),
     guests: o.guestCount ?? o.guest_count ?? 1,
     specialReq: o.notes || undefined,
-    paymentMethod: o.paymentMethod || o.payment_method || "cash",
+    paymentMethod: o.paymentMethod || o.payment_method || (o.metadata?.payment?.method) || "cash",
     paymentStatus: o.paymentStatus || o.payment_status || undefined,
     customerName: o.customerName || o.customer_name || undefined,
     roomNumber: (o.metadata && (o.metadata.roomNumber || o.metadata.room_number)) || o.roomNumber || undefined,
+    upiId: o.metadata?.payment?.upiId || undefined,
+    utr: o.metadata?.payment?.utr || o.metadata?.utr || undefined,
+    collectedBy: o.metadata?.payment?.collectedBy || undefined,
+    collectedFrom: o.metadata?.payment?.collectedFrom || undefined,
   };
 }
 

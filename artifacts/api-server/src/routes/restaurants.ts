@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, count, sum, desc, gte } from "drizzle-orm";
+import { eq, and, count, sum, desc, gte, lte } from "drizzle-orm";
 import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable } from "@workspace/db";
 import { CreateRestaurantBody, UpdateRestaurantBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
@@ -13,6 +13,8 @@ import {
   isRestaurantPublished,
   getPublicationStatus,
 } from "../lib/restaurant-publication.js";
+import { isPaidOrder, orderGrossTotal } from "../lib/payment-calculations.js";
+import { getSpaRevenue, getSpaRevenueBuckets } from "../lib/ancillary-revenue.js";
 
 const router: IRouter = Router();
 
@@ -169,11 +171,26 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
 
   const allOrders = await db.select().from(ordersTable).where(eq(ordersTable.restaurantId, id)).orderBy(desc(ordersTable.createdAt));
   const orderAt = (o: typeof allOrders[0]) => new Date(o.createdAt);
-  const todayOrders = allOrders.filter(o => orderAt(o) >= today);
-  const weekOrders = allOrders.filter(o => orderAt(o) >= weekStart);
-  const fortnightOrders = allOrders.filter(o => orderAt(o) >= fortnightStart);
-  const monthOrders = allOrders.filter(o => orderAt(o) >= monthStart);
-  const sumTotal = (list: typeof allOrders) => list.reduce((s, o) => s + parseFloat(String(o.total || 0)), 0);
+  // When a bill is COLLECTED we stamp metadata.payment.collectedAt. A bill collected today
+  // must count toward today's revenue even if the order was opened on an earlier day — so a
+  // period includes anything created OR collected within it.
+  const collectedAt = (o: typeof allOrders[0]): Date | null => {
+    const c = (o.metadata as any)?.payment?.collectedAt;
+    if (!c) return null;
+    const d = new Date(c);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const inPeriod = (o: typeof allOrders[0], since: Date) => {
+    const col = collectedAt(o);
+    return orderAt(o) >= since || (col != null && col >= since);
+  };
+  const todayOrders = allOrders.filter(o => inPeriod(o, today));
+  const weekOrders = allOrders.filter(o => inPeriod(o, weekStart));
+  const fortnightOrders = allOrders.filter(o => inPeriod(o, fortnightStart));
+  const monthOrders = allOrders.filter(o => inPeriod(o, monthStart));
+  // Revenue counts only PAID / in-flight orders (excludes cancelled/refunded/failed) — the
+  // same rule the super-admin panel uses, so one restaurant shows one consistent number.
+  const sumTotal = (list: typeof allOrders) => Math.round(list.filter(isPaidOrder).reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
 
   const activeOrders = allOrders.filter(o => ["pending", "confirmed", "preparing", "ready"].includes(o.status));
   const cancelledOrders = allOrders.filter(o => o.status === "cancelled");
@@ -211,6 +228,10 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount * 0.5);
   const pendingSettlement = Math.round(Math.max(0, onlineBalance * 0.15));
 
+  // Fold spa revenue into the same buckets so the restaurant total includes it (one query).
+  const [spaToday, spaWeek, spaFortnight, spaMonth] = await getSpaRevenueBuckets(id, [today, weekStart, fortnightStart, monthStart]);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
   res.json({
     isPublished: true,
     publicationStatus: "Published",
@@ -218,12 +239,13 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     weekOrders: weekOrders.length,
     fortnightOrders: fortnightOrders.length,
     monthOrders: monthOrders.length,
-    todayRevenue: sumTotal(todayOrders),
-    weekRevenue: sumTotal(weekOrders),
-    fortnightRevenue: sumTotal(fortnightOrders),
-    monthRevenue: sumTotal(monthOrders),
-    netRevenue: sumTotal(monthOrders),
-    grossRevenue: sumTotal(monthOrders),
+    todayRevenue: r2(sumTotal(todayOrders) + spaToday),
+    weekRevenue: r2(sumTotal(weekOrders) + spaWeek),
+    fortnightRevenue: r2(sumTotal(fortnightOrders) + spaFortnight),
+    monthRevenue: r2(sumTotal(monthOrders) + spaMonth),
+    netRevenue: r2(sumTotal(monthOrders) + spaMonth),
+    grossRevenue: r2(sumTotal(monthOrders) + spaMonth),
+    spaRevenueMonth: spaMonth,
     activeOrders: activeOrders.length,
     cancelledOrders: cancelledOrders.length,
     totalCustomers: customers[0]?.count ?? 0,
@@ -247,6 +269,52 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
       ...o,
       items: Array.isArray(o.items) ? o.items : [],
     })),
+  });
+});
+
+// Custom-date revenue for a restaurant panel — same PAID rule as everywhere else, so any
+// panel (owner / cashier / finance / cash-counter) can show revenue for any day or range.
+router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const access = await resolveAnalyticsAccess(req, id);
+  if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
+  if (access.kind === "unpublished") { res.json({ from: null, to: null, revenue: 0, totalOrders: 0 }); return; }
+
+  // Parse YYYY-MM-DD as a LOCAL midnight (not UTC) so day boundaries line up with the
+  // server's clock and with collectedAt comparisons — avoids a timezone off-by-one.
+  const parseDay = (v: unknown): Date | null => {
+    if (typeof v !== "string" || !v) return null;
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const from = parseDay(req.query.from);
+  const toRaw = parseDay(req.query.to);
+  const toEnd = toRaw ? new Date(toRaw.getFullYear(), toRaw.getMonth(), toRaw.getDate(), 23, 59, 59, 999) : null;
+
+  // Fetch all of the restaurant's orders and filter in JS so a bill COLLECTED in the range
+  // counts even if the order was opened earlier (metadata.payment.collectedAt). This is what
+  // makes "today's collection" reflect money actually taken today.
+  const rows = await db.select({ total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, createdAt: ordersTable.createdAt, metadata: ordersTable.metadata })
+    .from(ordersTable).where(eq(ordersTable.restaurantId, id));
+  const inRange = (o: typeof rows[0]) => {
+    const created = new Date(o.createdAt);
+    const colRaw = (o.metadata as any)?.payment?.collectedAt;
+    const collected = colRaw ? new Date(colRaw) : null;
+    const okFrom = (d: Date | null) => d != null && (!from || d >= from) && (!toEnd || d <= toEnd);
+    return okFrom(created) || (collected != null && !Number.isNaN(collected.getTime()) && okFrom(collected));
+  };
+  const paid = rows.filter(o => isPaidOrder(o) && inRange(o));
+  const orderRevenue = Math.round(paid.reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
+  const spaRevenue = await getSpaRevenue(id, from, toEnd);   // spa folded into the total
+  res.json({
+    from: from ? from.toISOString().slice(0, 10) : null,
+    to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
+    revenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+    orderRevenue,
+    spaRevenue,
+    totalOrders: paid.length,
   });
 });
 

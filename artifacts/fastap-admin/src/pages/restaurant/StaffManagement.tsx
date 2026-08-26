@@ -62,13 +62,20 @@ export default function StaffManagement() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "schedule" | "attendance">("list");
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, active: true, password: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, active: true, password: "", shift: "Morning (7AM-3PM)" });
   const [editSaving, setEditSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   function openEditStaff() {
     if (!selected) return;
-    setEditForm({ name: selected.name, email: selected.email, mobile: selected.mobile, role: selected.role, active: selected.status !== "offline", password: "" });
+    openEditFor(selected);
+  }
+
+  // Open the edit modal directly for a given staff member (used by the Schedule tab's
+  // per-row Edit button so HR can change that person's shift/schedule in one click).
+  function openEditFor(s: StaffMember) {
+    setSelected(s);
+    setEditForm({ name: s.name, email: s.email, mobile: s.mobile, role: s.role, active: s.status !== "offline", password: "", shift: s.shift || "Morning (7AM-3PM)" });
     setEditMode(true);
   }
 
@@ -82,6 +89,7 @@ export default function StaffManagement() {
         phone: editForm.mobile,
         role: editForm.role,
         isActive: editForm.active,
+        shift: editForm.shift,
       };
       if (editForm.password) body.password = editForm.password;
       await staffApi.update(restaurantId, parseInt(selected.id, 10), body);
@@ -256,6 +264,8 @@ export default function StaffManagement() {
 
       {/* Schedule Tab */}
       {activeTab === "schedule" && (
+        <div className="space-y-3">
+        <p className="text-xs text-white/40 flex items-center gap-1">Weekly shift roster. Tap the <Edit2 className="h-3 w-3 inline text-amber-400" /> pencil next to a staff member to change their shift/schedule.</p>
         <div className="rounded-2xl border border-white/8 overflow-hidden">
           <div className="grid grid-cols-8 text-xs text-white/40 border-b border-white/5 bg-white/[0.02]">
             <div className="px-4 py-3 font-medium">Staff</div>
@@ -263,16 +273,19 @@ export default function StaffManagement() {
               <div key={d} className="px-2 py-3 font-medium text-center">{d}</div>
             ))}
           </div>
-          {staff.slice(0, 6).map(s => {
+          {staff.map(s => {
             const roleCfg = roleCfgOf(s.role);
             return (
               <div key={s.id} className="grid grid-cols-8 border-b border-white/5 hover:bg-white/3 transition-all">
                 <div className="px-4 py-3 flex items-center gap-2">
                   <span className="text-base">{roleCfg.icon}</span>
-                  <div>
-                    <p className="text-sm font-medium">{s.name.split(" ")[0]}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{s.name.split(" ")[0]}</p>
                     <p className="text-xs text-white/30">{roleCfg.label}</p>
                   </div>
+                  <button onClick={() => openEditFor(s)} title="Edit shift / schedule" className="shrink-0 h-7 w-7 flex items-center justify-center rounded-lg text-amber-400 hover:bg-amber-500/15 transition-all">
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => {
                   const isOff = d === "Sun" && s.role !== "waiter";
@@ -290,6 +303,7 @@ export default function StaffManagement() {
               </div>
             );
           })}
+        </div>
         </div>
       )}
 
@@ -433,6 +447,15 @@ export default function StaffManagement() {
               <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
                 {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs text-white/40">Shift (by time)</label>
+              <select value={editForm.shift} onChange={e => setEditForm(p => ({ ...p, shift: e.target.value }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+                {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                {/* keep whatever was stored even if it's an old plain label */}
+                {editForm.shift && !SHIFTS.includes(editForm.shift) && <option value={editForm.shift}>{editForm.shift}</option>}
+              </select>
+              <p className="text-[10px] text-white/30 mt-1">HR can reassign a staff member's shift here — it drives the weekly schedule.</p>
             </div>
             <div>
               <label className="text-xs text-white/40">Status</label>

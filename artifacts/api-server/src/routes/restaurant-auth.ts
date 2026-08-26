@@ -25,6 +25,9 @@ import {
   isRestaurantPublished,
   getPublicationStatus,
 } from "../lib/restaurant-publication.js";
+import { isEmailConfigured, sendEmail, publicBaseUrl } from "../lib/email.js";
+import { makeResetToken, verifyResetToken } from "../lib/password-reset.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -132,6 +135,10 @@ async function staffResponse(staffMember: typeof staffTable.$inferSelect, restau
       fssaiNumber: restaurant.fssaiNumber,
       kycStatus: (restaurant.settings as { kyc?: { status?: string } } | null)?.kyc?.status ?? "approved",
       plan: restaurant.plan,
+      // Include publication status right in the login response so the panel doesn't show
+      // "unpublished / ₹0" for a moment after login (before /me runs and fills it in).
+      isPublished: isRestaurantPublished(restaurant),
+      publicationStatus: getPublicationStatus(restaurant),
     },
     subscription,
     requiresSubscription: !subscription.active,
@@ -877,6 +884,58 @@ router.get("/restaurant-auth/me", async (req, res): Promise<void> => {
     requiresSubscription: !subscription.active,
     canSubscribe: canSubscribeStaffRole(staffRole),
   });
+});
+
+/**
+ * Staff forgot password — step 1. Generic response (no enumeration). Emails a reset
+ * link when a provider is configured; otherwise (demo) returns the signed `devToken`
+ * so the reset can be completed immediately.
+ */
+router.post("/restaurant-auth/forgot-password", async (req, res): Promise<void> => {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const mailWorks = await isEmailConfigured();
+  const done = (extra: Record<string, unknown> = {}) => res.json({
+    success: true,
+    message: "If that email is registered, a password reset link has been sent.",
+    emailConfigured: mailWorks,
+    ...extra,
+  });
+  if (!email) { done(); return; }
+
+  const [staffMember] = await db.select().from(staffTable).where(sql`lower(${staffTable.email}) = ${email}`).limit(1);
+  if (!staffMember) { done(); return; }
+
+  const token = makeResetToken("staff", staffMember.id);
+  const base = publicBaseUrl(`${req.protocol}://${req.get("host") ?? ""}`);
+  const link = `${base}/reset-password?token=${token}&staff=1`;
+  if (mailWorks && staffMember.email) {
+    await sendEmail({
+      to: staffMember.email,
+      subject: "Reset your Fastap staff password",
+      html: `<p>Hi ${staffMember.name ?? "there"},</p><p>Click below to reset your password. It expires in 30 minutes.</p><p><a href="${link}">Reset password</a></p>`,
+      text: `Reset your Fastap password (expires in 30 min): ${link}`,
+    }).catch(() => {});
+    done();
+  } else {
+    logger.info({ staffId: staffMember.id }, "staff password reset requested (demo — token returned)");
+    done({ devToken: token });
+  }
+});
+
+/**
+ * Staff forgot password — step 2. Verifies the token and sets the new pinHash.
+ */
+router.post("/restaurant-auth/reset-password", async (req, res): Promise<void> => {
+  const token = typeof req.body?.token === "string" ? req.body.token : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (password.length < 8) { res.status(400).json({ error: "Password must be at least 8 characters." }); return; }
+  const valid = verifyResetToken("staff", token);
+  if (!valid) { res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." }); return; }
+
+  const pinHash = await bcrypt.hash(password, 12);
+  await db.update(staffTable).set({ pinHash }).where(eq(staffTable.id, valid.id));
+  logger.info({ staffId: valid.id }, "staff password reset completed");
+  res.json({ success: true, message: "Password updated. You can now sign in with your new password." });
 });
 
 router.post("/restaurant-auth/logout", async (req, res): Promise<void> => {

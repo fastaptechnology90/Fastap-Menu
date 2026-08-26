@@ -63,6 +63,7 @@ import {
   sumOrderCommissions,
   sumOrderTotals,
 } from "./payment-calculations.js";
+import { getSpaRevenue } from "./ancillary-revenue.js";
 import { invalidateRestaurantAnalyticsCache } from "./analytics-cache.js";
 
 const DEFAULT_FEATURE_FLAGS = [
@@ -491,7 +492,9 @@ export async function getEnhancedStats(period?: string) {
   // vendor list / settlements (which are all-time).
   const periodSince = statsPeriodStart(period);
   const revenueOrders = periodSince ? paidOrdersList.filter(o => new Date(o.createdAt) >= periodSince) : paidOrdersList;
-  const totalRevenue = sumOrderTotals(revenueOrders);
+  // Fold platform-wide spa revenue into the total so it matches the owner panels.
+  const spaRevenueTotal = await getSpaRevenue(null, periodSince, null);
+  const totalRevenue = roundMoney(sumOrderTotals(revenueOrders) + spaRevenueTotal);
   const platformCommission = sumOrderCommissions(revenueOrders, commissionRate);
 
   const pendingKyc = allRestaurantsForKyc.filter(r => {
@@ -596,10 +599,12 @@ export async function listPayments(limit = 100, status?: string) {
       const paid = isPaidOrder(order);
       const commission = calcCommissionAmount(order, commissionRate);
       const net = paid ? calcNetPayout(gross, commission) : 0;
+      const md = (order.metadata ?? {}) as Record<string, any>;
+      const pay = (md.payment ?? {}) as Record<string, any>;
       return {
         id: `TXN-${order.id}`,
         orderId: `ORD-${order.id}`,
-        gatewayTxnId: (order.metadata as { gatewayTxnId?: string })?.gatewayTxnId ?? `GW${order.id}`,
+        gatewayTxnId: md.gatewayTxnId ?? `GW${order.id}`,
         vendorId: String(order.restaurantId),
         vendorName: restaurantName,
         grossAmount: gross,
@@ -609,10 +614,19 @@ export async function listPayments(limit = 100, status?: string) {
         isPaid: paid,
         commission,
         netPayout: net,
-        paymentMode: order.paymentMethod || "cash",
+        paymentMode: order.paymentMethod || pay.method || "cash",
         status: order.paymentStatus || order.status,
         dateTime: order.createdAt.toISOString(),
-        utr: (order.metadata as { utr?: string })?.utr ?? null,
+        // Full payment breakdown so the super-admin can click a transaction and see exactly
+        // how it was paid — UPI id / UTR, who collected it, and from which panel.
+        utr: pay.utr ?? md.utr ?? null,
+        upiId: pay.upiId ?? null,
+        reference: pay.utr ?? pay.upiId ?? md.utr ?? order.invoiceNumber ?? null,
+        collectedBy: pay.collectedBy ?? null,
+        collectedFrom: pay.collectedFrom ?? null,
+        customerName: order.customerName ?? null,
+        tableName: order.tableName ?? null,
+        roomNumber: md.roomNumber ?? null,
       };
     });
 }
@@ -1158,25 +1172,31 @@ export async function getPaymentDetail(txnId: string) {
   const gross = orderGrossTotal(row.order);
   const commission = calcCommissionAmount(row.order, commissionRate);
   const net = isPaidOrder(row.order) ? calcNetPayout(gross, commission) : 0;
-  const meta = (row.order.metadata ?? {}) as Record<string, unknown>;
+  const meta = (row.order.metadata ?? {}) as Record<string, any>;
+  const pay = (meta.payment ?? {}) as Record<string, any>;
   return {
     id: `TXN-${row.order.id}`,
     orderId: `ORD-${row.order.id}`,
     vendorId: String(row.restaurantId),
     vendorName: row.restaurantName,
     gatewayTxnId: String(meta.gatewayTxnId ?? `GW${row.order.id}`),
-    utr: meta.utr ?? null,
+    utr: pay.utr ?? meta.utr ?? null,
+    upiId: pay.upiId ?? null,
+    reference: pay.utr ?? pay.upiId ?? meta.utr ?? row.order.invoiceNumber ?? null,
+    collectedBy: pay.collectedBy ?? null,
+    collectedFrom: pay.collectedFrom ?? null,
     grossAmount: gross,
     taxAmount: parseMoney(row.order.tax),
     commissionBase: orderCommissionBase(row.order),
     commission,
     netPayout: net,
-    paymentMode: row.order.paymentMethod || "cash",
+    paymentMode: row.order.paymentMethod || pay.method || "cash",
     status: row.order.paymentStatus || row.order.status,
     held: Boolean(meta.held),
     dateTime: row.order.createdAt.toISOString(),
     customerName: row.order.customerName ?? null,
     tableName: row.order.tableName ?? null,
+    roomNumber: meta.roomNumber ?? null,
     retryCount: Number(meta.retryCount ?? 0),
     gatewayResponse: meta.gatewayResponse ?? null,
   };
@@ -1184,7 +1204,7 @@ export async function getPaymentDetail(txnId: string) {
 
 export async function getLiveFeed() {
   const [recentOrders, recentPayments, recentRefunds, recentSettlements, recentTickets, recentAudit] = await Promise.all([
-    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, restaurantName: restaurantsTable.name, tableName: ordersTable.tableName, total: ordersTable.total, status: ordersTable.status, paymentMethod: ordersTable.paymentMethod, createdAt: ordersTable.createdAt })
+    db.select({ id: ordersTable.id, restaurantId: ordersTable.restaurantId, restaurantName: restaurantsTable.name, tableName: ordersTable.tableName, total: ordersTable.total, status: ordersTable.status, paymentStatus: ordersTable.paymentStatus, paymentMethod: ordersTable.paymentMethod, customerName: ordersTable.customerName, invoiceNumber: ordersTable.invoiceNumber, metadata: ordersTable.metadata, createdAt: ordersTable.createdAt })
       .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id)).orderBy(desc(ordersTable.createdAt)).limit(8),
     db.select({ order: ordersTable, restaurantName: restaurantsTable.name })
       .from(ordersTable).innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
@@ -1200,16 +1220,34 @@ export async function getLiveFeed() {
   ]);
 
   return {
-    orders: recentOrders.map(o => ({
-      type: "order", id: `ORD-${o.id}`, vendorId: o.restaurantId, vendor: o.restaurantName,
-      tableName: o.tableName, amount: parseMoney(o.total), status: o.status,
-      mode: o.paymentMethod || "cash", at: o.createdAt.toISOString(),
-    })),
-    payments: recentPayments.map(({ order, restaurantName }) => ({
-      type: "payment", id: `TXN-${order.id}`, vendor: restaurantName,
-      amount: parseMoney(order.total), status: order.paymentStatus || order.status,
-      mode: order.paymentMethod || "cash", at: order.createdAt.toISOString(),
-    })),
+    orders: recentOrders.map(o => {
+      const md = (o.metadata ?? {}) as Record<string, any>;
+      const pay = (md.payment ?? {}) as Record<string, any>;
+      return {
+        type: "order", id: `ORD-${o.id}`, vendorId: o.restaurantId, vendor: o.restaurantName,
+        tableName: o.tableName, amount: parseMoney(o.total), status: o.status,
+        mode: o.paymentMethod || pay.method || "cash", at: o.createdAt.toISOString(),
+        paymentStatus: o.paymentStatus, customerName: o.customerName,
+        upiId: pay.upiId ?? null, utr: pay.utr ?? md.utr ?? null,
+        reference: pay.utr ?? pay.upiId ?? md.utr ?? o.invoiceNumber ?? null,
+        collectedBy: pay.collectedBy ?? null, collectedFrom: pay.collectedFrom ?? null,
+        roomNumber: md.roomNumber ?? null,
+      };
+    }),
+    payments: recentPayments.map(({ order, restaurantName }) => {
+      const md = (order.metadata ?? {}) as Record<string, any>;
+      const pay = (md.payment ?? {}) as Record<string, any>;
+      return {
+        type: "payment", id: `TXN-${order.id}`, vendor: restaurantName,
+        amount: parseMoney(order.total), status: order.paymentStatus || order.status,
+        mode: order.paymentMethod || pay.method || "cash", at: order.createdAt.toISOString(),
+        upiId: pay.upiId ?? null, utr: pay.utr ?? md.utr ?? null,
+        reference: pay.utr ?? pay.upiId ?? md.utr ?? order.invoiceNumber ?? null,
+        collectedBy: pay.collectedBy ?? null, collectedFrom: pay.collectedFrom ?? null,
+        customerName: order.customerName ?? null, tableName: order.tableName ?? null,
+        roomNumber: md.roomNumber ?? null,
+      };
+    }),
     refunds: recentRefunds.map(({ refund, restaurantName }) => ({
       type: "refund", id: `REF-${refund.id}`, vendor: restaurantName,
       amount: parseMoney(refund.amount), status: refund.status, at: refund.requestedAt.toISOString(),

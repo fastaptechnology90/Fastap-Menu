@@ -19,9 +19,10 @@ interface DataTableProps<T> {
   data: T[];
   pageSize?: number;
   keyExtractor?: (item: T) => string | number;
+  onRowClick?: (item: T) => void;
 }
 
-export function DataTable<T>({ columns, data, pageSize = 10, keyExtractor }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, pageSize = 10, keyExtractor, onRowClick }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.ceil(data.length / pageSize);
 
@@ -45,7 +46,11 @@ export function DataTable<T>({ columns, data, pageSize = 10, keyExtractor }: Dat
           <TableBody>
             {paginatedData.length > 0 ? (
               paginatedData.map((row, rowIndex) => (
-                <TableRow key={getRowKey(row, rowIndex)}>
+                <TableRow
+                  key={getRowKey(row, rowIndex)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={onRowClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+                >
                   {columns.map((col, colIndex) => (
                     <TableCell key={colIndex}>
                       {col.cell

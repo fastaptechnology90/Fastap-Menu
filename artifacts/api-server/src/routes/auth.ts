@@ -7,6 +7,7 @@ import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import { resolveAdminPermissions } from "../lib/admin-rbac.js";
 import { registerRateLimit, loginRateLimit } from "../middlewares/rate-limit.js";
 import { isEmailConfigured, sendEmail, publicBaseUrl, verificationEmail } from "../lib/email.js";
+import { makeResetToken, verifyResetToken } from "../lib/password-reset.js";
 import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
@@ -179,6 +180,59 @@ router.post("/auth/resend-verification", registerRateLimit, async (req, res): Pr
   await db.update(usersTable).set({ emailVerificationToken: token }).where(eq(usersTable.id, user.id));
   await sendVerification(user, verificationLink(req, token));
   done();
+});
+
+/**
+ * Forgot password — step 1. Always answers the same way whether or not the address
+ * exists (no account enumeration). When a mail provider is configured a reset link is
+ * emailed; until then (demo) the signed token is returned as `devToken` so the flow is
+ * fully testable. Real delivery (SendGrid etc.) is plugged into sendEmail() later.
+ */
+router.post("/auth/forgot-password", loginRateLimit, async (req, res): Promise<void> => {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+  const mailWorks = await isEmailConfigured();
+  const done = (extra: Record<string, unknown> = {}) => res.json({
+    message: "If that email is registered, a password reset link has been sent.",
+    emailConfigured: mailWorks,
+    ...extra,
+  });
+  if (!email) { done(); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  if (!user) { done(); return; }
+
+  const token = makeResetToken("admin", user.id);
+  const base = publicBaseUrl(`${req.protocol}://${req.get("host") ?? ""}`);
+  const link = `${base}/reset-password?token=${token}`;
+  if (mailWorks) {
+    await sendEmail({
+      to: user.email,
+      subject: "Reset your Fastap password",
+      html: `<p>Hi ${user.name},</p><p>Click the link below to reset your password. It expires in 30 minutes.</p><p><a href="${link}">Reset password</a></p><p>If you didn't request this, you can ignore this email.</p>`,
+      text: `Reset your Fastap password (expires in 30 min): ${link}`,
+    }).catch(() => {});
+    done();
+  } else {
+    // Demo mode — no email provider. Return the token so the reset can be completed now.
+    logger.info({ userId: user.id }, "password reset requested (demo — token returned)");
+    done({ devToken: token });
+  }
+});
+
+/**
+ * Forgot password — step 2. Verifies the signed token and sets the new password.
+ */
+router.post("/auth/reset-password", loginRateLimit, async (req, res): Promise<void> => {
+  const token = typeof req.body?.token === "string" ? req.body.token : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (password.length < 8) { res.status(400).json({ error: "Password must be at least 8 characters." }); return; }
+  const valid = verifyResetToken("admin", token);
+  if (!valid) { res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." }); return; }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, valid.id));
+  logger.info({ userId: valid.id }, "password reset completed");
+  res.json({ message: "Password updated. You can now sign in with your new password." });
 });
 
 router.post("/auth/logout", (req, res): void => {

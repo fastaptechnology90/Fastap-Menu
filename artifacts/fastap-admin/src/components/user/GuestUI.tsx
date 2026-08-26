@@ -143,8 +143,11 @@ export function GuestBottomNav() {
   const [location, navigate] = useAppLocation();
   const { cartCount, venue, activeTable } = useUser();
 
+  // Guard must match the guest area only. "/user" or "/user/…" — NOT the admin "/users"
+  // page, which also begins with "/user" and was wrongly showing this bottom nav.
+  const inGuestArea = location === "/user" || location.startsWith("/user/");
   if (
-    !location.startsWith("/user")
+    !inGuestArea
     || HIDE_NAV_PATHS.some(p => location.startsWith(p))
     || location.startsWith("/user/order/")
   ) {
