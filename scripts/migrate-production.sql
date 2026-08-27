@@ -9,6 +9,7 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS tables_assigned jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS join_date timestamptz;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS performance_score integer DEFAULT 90;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule jsonb DEFAULT '{}'::jsonb;
 
 -- Restaurants
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS settings jsonb NOT NULL DEFAULT '{}'::jsonb;

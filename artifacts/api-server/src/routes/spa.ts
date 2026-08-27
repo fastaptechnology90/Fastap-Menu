@@ -82,8 +82,22 @@ router.post("/restaurants/:restaurantId/spa/bookings", requireAuth, async (req, 
 router.put("/restaurants/:restaurantId/spa/bookings/:bookingId", requireAuth, async (req, res): Promise<void> => {
   const bookingId = parseInt(req.params.bookingId, 10);
   const restaurantId = parseInt(req.params.restaurantId, 10);
-  const { status, therapist, notes, paymentStatus } = req.body;
-  const [booking] = await db.update(spaBookingsTable).set({ status, therapist, notes, paymentStatus }).where(and(eq(spaBookingsTable.id, bookingId), eq(spaBookingsTable.restaurantId, restaurantId))).returning();
+  const { status, therapist, notes, paymentStatus, payment } = req.body;
+  const updates: Record<string, unknown> = {};
+  if (status !== undefined) updates.status = status;
+  if (therapist !== undefined) updates.therapist = therapist;
+  if (notes !== undefined) updates.notes = notes;
+  if (paymentStatus !== undefined) updates.paymentStatus = paymentStatus;
+  // Spa Payments page: record HOW the payment was collected (method / upi id / utr / who)
+  // into the booking metadata so the owner can click a payment and see full detail.
+  if (payment && typeof payment === "object") {
+    const [existing] = await db.select().from(spaBookingsTable).where(and(eq(spaBookingsTable.id, bookingId), eq(spaBookingsTable.restaurantId, restaurantId)));
+    if (!existing) { res.status(404).json({ error: "Booking not found" }); return; }
+    const prevMeta = (existing.metadata && typeof existing.metadata === "object") ? existing.metadata as Record<string, unknown> : {};
+    updates.metadata = { ...prevMeta, payment: { ...(payment as Record<string, unknown>), collectedAt: new Date().toISOString() } };
+    if (paymentStatus === undefined) updates.paymentStatus = "paid";
+  }
+  const [booking] = await db.update(spaBookingsTable).set(updates).where(and(eq(spaBookingsTable.id, bookingId), eq(spaBookingsTable.restaurantId, restaurantId))).returning();
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
   res.json(booking);
 });

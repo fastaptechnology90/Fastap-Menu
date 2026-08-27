@@ -13,6 +13,7 @@ export const staffTable = pgTable("staff", {
   pinHash: text("pin_hash"),
   salary: numeric("salary", { precision: 10, scale: 2 }),
   shift: text("shift").default("morning"),
+  weeklySchedule: jsonb("weekly_schedule").default({}),
   status: text("status").notNull().default("active"),
   tablesAssigned: jsonb("tables_assigned").default([]),
   joinDate: timestamp("join_date", { withTimezone: true }),

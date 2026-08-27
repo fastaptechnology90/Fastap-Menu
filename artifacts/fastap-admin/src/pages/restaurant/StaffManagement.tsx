@@ -3,7 +3,30 @@ import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
 import { staff as staffApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 
-interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; performance: number; tablesAssigned?: string[]; }
+interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; performance: number; tablesAssigned?: string[]; weeklySchedule?: Record<string, string>; }
+
+// HR day-wise roster building blocks
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_SHIFTS = ["Morning", "Afternoon", "Night", "Split", "Off"];
+const SHIFT_STYLE: Record<string, string> = {
+  Morning: "text-amber-400 bg-amber-500/10",
+  Afternoon: "text-cyan-400 bg-cyan-500/10",
+  Night: "text-violet-400 bg-violet-500/10",
+  Split: "text-emerald-400 bg-emerald-500/10",
+  Off: "text-white/25 bg-white/5",
+};
+// When a day has no explicit setting, derive a sensible default from the base shift
+// (Sunday is the weekly off for everyone except waiters).
+function defaultDayShift(s: { shift?: string; role?: string }, day: string): string {
+  if (day === "Sun" && s.role !== "waiter") return "Off";
+  return (s.shift || "Morning").split(" ")[0];
+}
+function buildWeekly(s: StaffMember): Record<string, string> {
+  const ws = s.weeklySchedule || {};
+  const out: Record<string, string> = {};
+  for (const d of DAYS) out[d] = ws[d] || defaultDayShift(s, d);
+  return out;
+}
 import {
   Plus, Search, Phone, Mail, Star, Clock, Shield, Edit2, X, Save,
   CheckCircle, AlertCircle, TrendingUp, Calendar, Trash2
@@ -39,6 +62,7 @@ export default function StaffManagement() {
     mobile: s.mobile || s.phone || "",
     status: (s.isActive ? "active" : "offline") as "active" | "on-break" | "offline",
     shift: s.shift || "Morning",
+    weeklySchedule: (s.weeklySchedule && typeof s.weeklySchedule === "object") ? s.weeklySchedule : {},
     joinDate: s.createdAt?.split("T")[0] || s.joinDate?.split?.("T")[0] || "",
     performance: 90, // NOTE: not sourced from API — no per-staff performance metric exists yet
   });
@@ -62,7 +86,7 @@ export default function StaffManagement() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "schedule" | "attendance">("list");
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, active: true, password: "", shift: "Morning (7AM-3PM)" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", role: "waiter" as StaffRole, active: true, password: "", shift: "Morning (7AM-3PM)", weeklySchedule: {} as Record<string, string> });
   const [editSaving, setEditSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -75,7 +99,7 @@ export default function StaffManagement() {
   // per-row Edit button so HR can change that person's shift/schedule in one click).
   function openEditFor(s: StaffMember) {
     setSelected(s);
-    setEditForm({ name: s.name, email: s.email, mobile: s.mobile, role: s.role, active: s.status !== "offline", password: "", shift: s.shift || "Morning (7AM-3PM)" });
+    setEditForm({ name: s.name, email: s.email, mobile: s.mobile, role: s.role, active: s.status !== "offline", password: "", shift: s.shift || "Morning (7AM-3PM)", weeklySchedule: buildWeekly(s) });
     setEditMode(true);
   }
 
@@ -90,6 +114,7 @@ export default function StaffManagement() {
         role: editForm.role,
         isActive: editForm.active,
         shift: editForm.shift,
+        weeklySchedule: editForm.weeklySchedule,
       };
       if (editForm.password) body.password = editForm.password;
       await staffApi.update(restaurantId, parseInt(selected.id, 10), body);
@@ -265,7 +290,12 @@ export default function StaffManagement() {
       {/* Schedule Tab */}
       {activeTab === "schedule" && (
         <div className="space-y-3">
-        <p className="text-xs text-white/40 flex items-center gap-1">Weekly shift roster. Tap the <Edit2 className="h-3 w-3 inline text-amber-400" /> pencil next to a staff member to change their shift/schedule.</p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-white/40 flex items-center gap-1">Day-wise roster. Click the <Edit2 className="h-3 w-3 inline text-amber-400" /> pencil next to any staff member to set a different shift per day (e.g. Monday Night).</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {DAY_SHIFTS.map(sh => <span key={sh} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh]}`}>{sh}</span>)}
+          </div>
+        </div>
         <div className="rounded-2xl border border-white/8 overflow-hidden">
           <div className="grid grid-cols-8 text-xs text-white/40 border-b border-white/5 bg-white/[0.02]">
             <div className="px-4 py-3 font-medium">Staff</div>
@@ -287,19 +317,14 @@ export default function StaffManagement() {
                     <Edit2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => {
-                  const isOff = d === "Sun" && s.role !== "waiter";
-                  const shift = s.shift.split(" ")[0];
+                {(() => { const wk = buildWeekly(s); return DAYS.map(d => {
+                  const sh = wk[d];
                   return (
                     <div key={d} className="px-1 py-3 flex items-center justify-center">
-                      {isOff ? (
-                        <span className="text-xs text-white/20 bg-white/5 px-1.5 py-0.5 rounded">Off</span>
-                      ) : (
-                        <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{shift}</span>
-                      )}
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh] || "text-amber-400 bg-amber-500/10"}`}>{sh}</span>
                     </div>
                   );
-                })}
+                }); })()}
               </div>
             );
           })}
@@ -455,7 +480,29 @@ export default function StaffManagement() {
                 {/* keep whatever was stored even if it's an old plain label */}
                 {editForm.shift && !SHIFTS.includes(editForm.shift) && <option value={editForm.shift}>{editForm.shift}</option>}
               </select>
-              <p className="text-[10px] text-white/30 mt-1">HR can reassign a staff member's shift here — it drives the weekly schedule.</p>
+              <p className="text-[10px] text-white/30 mt-1">This is the base / default shift — used when a day has no specific setting.</p>
+            </div>
+            <div>
+              <label className="text-xs text-white/40">Weekly schedule (day-wise)</label>
+              <p className="text-[10px] text-white/30 mb-1.5">Set a different shift for each day — e.g. Monday Night, Tuesday Morning. "Off" means a day off.</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {DAYS.map(d => (
+                  <div key={d} className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-2 py-1.5">
+                    <span className="text-xs font-semibold text-white/60 w-8 shrink-0">{d}</span>
+                    <select
+                      value={editForm.weeklySchedule[d] || defaultDayShift({ shift: editForm.shift, role: editForm.role }, d)}
+                      onChange={e => setEditForm(p => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [d]: e.target.value } }))}
+                      className={`flex-1 min-w-0 bg-transparent border border-white/10 rounded-md px-1.5 py-1 text-xs font-semibold focus:outline-none ${SHIFT_STYLE[editForm.weeklySchedule[d]] || "text-white/70"}`}
+                    >
+                      {DAY_SHIFTS.map(sh => <option key={sh} value={sh} className="bg-[#111827] text-white">{sh}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, (p.shift || "Morning").split(" ")[0]])) }))} className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-white/50 hover:bg-white/5">All days base shift</button>
+                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, d === "Sun" ? "Off" : (p.shift || "Morning").split(" ")[0]])) }))} className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-white/50 hover:bg-white/5">Sunday Off</button>
+              </div>
             </div>
             <div>
               <label className="text-xs text-white/40">Status</label>

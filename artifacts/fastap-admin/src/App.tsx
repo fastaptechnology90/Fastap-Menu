@@ -132,6 +132,7 @@ import AIFeatures from "@/pages/restaurant/AIFeatures";
 import RoomService from "@/pages/restaurant/RoomService";
 import HousekeepingMaintenance from "@/pages/restaurant/HousekeepingMaintenance";
 import SpaBar from "@/pages/restaurant/SpaBar";
+import SpaPayments from "@/pages/restaurant/SpaPayments";
 import LoyaltyWallet from "@/pages/restaurant/LoyaltyWallet";
 import MarketingAutomation from "@/pages/restaurant/MarketingAutomation";
 import FinanceWallet from "@/pages/restaurant/FinanceWallet";
@@ -315,6 +316,7 @@ function AppRoutes() {
       <Route path="/restaurant/room-service">{() => <RestaurantProtectedRoute><RoomService /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/housekeeping">{() => <RestaurantProtectedRoute><HousekeepingMaintenance /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/spa">{() => <RestaurantProtectedRoute><SpaBar mode="spa" /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/spa-payments">{() => <RestaurantProtectedRoute><SpaPayments /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/bar">{() => <RestaurantProtectedRoute><SpaBar mode="bar" /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/spa-bar">{() => <RestaurantProtectedRoute><SpaBar /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/loyalty">{() => <RestaurantProtectedRoute><LoyaltyWallet /></RestaurantProtectedRoute>}</Route>

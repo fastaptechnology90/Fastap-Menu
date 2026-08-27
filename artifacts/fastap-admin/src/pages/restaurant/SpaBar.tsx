@@ -8,6 +8,8 @@ import { ModulePackages } from "@/components/restaurant/ModulePackages";
 type SpaBooking = {
   id: string; guest: string; room: string; service: string; therapist: string;
   time: string; status: string; amount: number; date: string; notes: string;
+  phone?: string; email?: string; duration?: number; paymentStatus?: string; bookingType?: string;
+  scheduledAt?: string; payment?: { method?: string; amount?: number; upiId?: string; utr?: string; reference?: string; collectedBy?: string; collectedAt?: string };
 };
 type SpaPackage = {
   id: string; name: string; duration: string; price: number; category: string;
@@ -46,6 +48,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
   const [newBar, setNewBar] = useState({ name: "", category: "spirits", price: "", stock: "", minStock: "", unit: "bottle" });
   const [cocktailRecipes, setCocktailRecipes] = useState<CocktailRecipe[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [detailBooking, setDetailBooking] = useState<SpaBooking | null>(null);
   const [catFilter, setCatFilter] = useState("all");
   const [showBook, setShowBook] = useState(false);
   const [newBook, setNewBook] = useState({ guest:"", room:"", serviceId:"", therapist:"", time:"", notes:"", discount:"" });
@@ -77,6 +80,13 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
         amount: parseFloat(String(b.price || b.totalAmount || 0)),
         date: b.scheduledAt ? new Date(b.scheduledAt).toLocaleDateString() : todayLabel,
         notes: b.notes || "",
+        phone: b.guestPhone || b.customerPhone || "",
+        email: b.guestEmail || "",
+        duration: Number(b.duration || 0),
+        paymentStatus: b.paymentStatus || "pending",
+        bookingType: b.bookingType || "single",
+        scheduledAt: b.scheduledAt || "",
+        payment: b.metadata?.payment,
       }));
       setBookings(mappedBookings);
 
@@ -249,7 +259,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
             <div className="text-center py-12 text-white/40 text-sm">No spa bookings yet. Create services and accept bookings from guests.</div>
           )}
           {bookings.map(b=>(
-            <div key={b.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+            <div key={b.id} onClick={()=>setDetailBooking(b)} title="Click for full guest details" className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 cursor-pointer hover:border-emerald-500/30 transition-colors">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0"><Leaf className="h-5 w-5 text-emerald-400"/></div>
                 <div className="flex-1 min-w-0">
@@ -266,7 +276,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
                   </div>
                   {b.notes&&<p className="text-xs text-yellow-300/70 mt-1">⚠️ {b.notes}</p>}
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0" onClick={e=>e.stopPropagation()}>
                   {b.status==="pending"&&<button onClick={()=>updateBooking(b.id,"confirmed")} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Confirm</button>}
                   {b.status==="confirmed"&&<button onClick={()=>updateBooking(b.id,"completed")} className="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 text-xs font-semibold hover:bg-teal-500/30 flex items-center gap-1"><CheckCircle className="h-3 w-3"/>Done</button>}
                 </div>
@@ -583,6 +593,66 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
           </div>
         </div>
       )}
+
+      {/* Full guest / booking detail */}
+      {detailBooking && (() => {
+        const b = detailBooking;
+        const pay = b.payment;
+        const paid = b.paymentStatus === "paid";
+        const rows: [string, string][] = [
+          ["Guest", b.guest || "—"],
+          ["Mobile", b.phone || "—"],
+          ["Email", b.email || "—"],
+          ["Service", b.service || "—"],
+          ["Room", b.room || "—"],
+          ["Therapist", b.therapist || "—"],
+          ["Date", b.scheduledAt ? new Date(b.scheduledAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : b.date || "—"],
+          ["Time", b.time || "—"],
+          ["Duration", b.duration ? `${b.duration} min` : "—"],
+          ["Type", b.bookingType || "single"],
+          ["Amount", b.amount > 0 ? `₹${b.amount.toLocaleString("en-IN")}` : "—"],
+          ["Status", b.status || "—"],
+          ["Payment", paid ? `Paid${pay?.method ? ` · ${String(pay.method).toUpperCase()}` : ""}` : "Pending"],
+        ];
+        if (paid && pay) {
+          if (pay.upiId) rows.push(["UPI ID", pay.upiId]);
+          if (pay.utr || pay.reference) rows.push(["UTR / Ref", pay.utr || pay.reference || "—"]);
+          if (pay.collectedBy) rows.push(["Collected by", pay.collectedBy]);
+        }
+        if (b.notes) rows.push(["Notes", b.notes]);
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailBooking(null)}>
+            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base truncate flex items-center gap-2"><Leaf className="h-4 w-4 text-emerald-400" />{b.guest}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.status === "completed" ? "bg-teal-500/20 text-teal-300" : b.status === "confirmed" ? "bg-emerald-500/20 text-emerald-300" : b.status === "cancelled" ? "bg-rose-500/20 text-rose-300" : "bg-yellow-500/20 text-yellow-300"}`}>{b.status}</span>
+                    {paid && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">PAID</span>}
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5">{b.service}</p>
+                </div>
+                <button onClick={() => setDetailBooking(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+              <div className="p-5">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {rows.map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-sm font-medium break-all capitalize">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-5" onClick={e => e.stopPropagation()}>
+                  {b.status === "pending" && <button onClick={() => { updateBooking(b.id, "confirmed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30">Confirm</button>}
+                  {b.status === "confirmed" && <button onClick={() => { updateBooking(b.id, "completed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-xl bg-teal-500/20 text-teal-300 text-sm font-bold hover:bg-teal-500/30 flex items-center justify-center gap-1"><CheckCircle className="h-4 w-4" /> Mark Done</button>}
+                  <button onClick={() => setDetailBooking(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

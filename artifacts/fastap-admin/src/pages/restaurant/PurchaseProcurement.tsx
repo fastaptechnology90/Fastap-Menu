@@ -92,7 +92,14 @@ export default function PurchaseProcurement() {
         setOrders(poData.map((o:any)=>({
           id: o.poNumber || String(o.id),
           supplier: o.supplierName || "Supplier",
-          items: o.items || [],
+          // API stores items as {name, quantity, unitPrice}. Normalize to the shape the
+          // UI renders ({name, qty, unit, price, total}) so the detail modal never hits
+          // undefined.toLocaleString() and crashes the whole page.
+          items: (Array.isArray(o.items) ? o.items : []).map((it: any) => {
+            const qty = Number(it.qty ?? it.quantity ?? 0);
+            const price = Number(it.price ?? it.unitPrice ?? 0);
+            return { name: it.name || "Item", qty, unit: it.unit || "unit", price, total: Number(it.total ?? qty * price) };
+          }),
           total: parseFloat(String(o.total||0)),
           status: o.status === "received" ? "delivered" : o.status || "pending",
           createdAt: o.createdAt?.split("T")[0] || "",
@@ -376,8 +383,8 @@ export default function PurchaseProcurement() {
                         <tr key={i} className="hover:bg-white/3">
                           <td className="px-3 py-2.5 font-medium">{item.name}</td>
                           <td className="px-3 py-2.5 text-white/60">{item.qty} {item.unit}</td>
-                          <td className="px-3 py-2.5 text-white/60">₹{item.price}</td>
-                          <td className="px-3 py-2.5 font-bold text-amber-400">₹{item.total.toLocaleString()}</td>
+                          <td className="px-3 py-2.5 text-white/60">₹{Number(item.price || 0).toLocaleString()}</td>
+                          <td className="px-3 py-2.5 font-bold text-amber-400">₹{Number(item.total || 0).toLocaleString()}</td>
                         </tr>
                       ))}
                       <tr className="bg-white/5"><td colSpan={3} className="px-3 py-2.5 font-bold">Total</td><td className="px-3 py-2.5 font-extrabold text-amber-400">₹{selectedPO.total.toLocaleString()}</td></tr>

@@ -44,7 +44,7 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
 router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
   const staffId = parseInt(req.params.staffId, 10);
   const restaurantId = parseInt(req.params.restaurantId, 10);
-  const { name, email, role, phone, password, isActive, shift } = req.body;
+  const { name, email, role, phone, password, isActive, shift, weeklySchedule } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
   if (email !== undefined) updates.email = String(email).trim().toLowerCase();
@@ -52,6 +52,10 @@ router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req,
   if (phone !== undefined) updates.phone = phone ? String(phone).replace(/\D/g, "") : null;
   if (isActive !== undefined) updates.isActive = isActive;
   if (shift !== undefined) updates.shift = shift ? String(shift) : "morning"; // HR can change a staff member's shift
+  // HR day-wise roster: { Mon: "Night", Tue: "Morning", ..., Sun: "Off" }
+  if (weeklySchedule !== undefined && weeklySchedule && typeof weeklySchedule === "object") {
+    updates.weeklySchedule = weeklySchedule;
+  }
   if (password) {
     if (String(password).length < 6) {
       res.status(400).json({ error: "password must be at least 6 characters" });

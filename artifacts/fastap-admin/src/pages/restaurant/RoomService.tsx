@@ -25,6 +25,11 @@ type RoomRequest = {
   priority: string;
   charge: number;
   assignedTo: string;
+  guestPhone?: string;
+  notes?: string;
+  paymentMethod?: string;
+  items?: { name?: string; description?: string; quantity?: number; qty?: number; price?: number }[];
+  createdAt?: string;
 };
 
 type Room = {
@@ -75,6 +80,11 @@ function mapRequest(r: any): RoomRequest {
     priority: "normal",
     charge: parseFloat(String(r.total)) || 0,
     assignedTo: r.assignedTo || "Auto-assigning…",
+    guestPhone: r.guestPhone || "",
+    notes: r.notes || "",
+    paymentMethod: r.paymentMethod || "",
+    items,
+    createdAt: r.createdAt || "",
   };
 }
 
@@ -126,6 +136,7 @@ export default function RoomService() {
   const { restaurantId } = useRestaurant();
   const [tab, setTab] = useState<Tab>("requests");
   const [requests, setRequests] = useState<RoomRequest[]>([]);
+  const [detailReq, setDetailReq] = useState<RoomRequest | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("all");
@@ -305,7 +316,7 @@ export default function RoomService() {
       });
       alert(`✅ MakeMyTrip booking auto-allotted to Room ${res?.allottedRoom ?? "?"}.`);
       await loadData();
-    } catch { alert("OTA ingest failed — koi vacant room nahi mila ya server error."); }
+    } catch { alert("OTA ingest failed — no vacant room found or server error."); }
     finally { setOtaBusy(false); }
   }
 
@@ -428,7 +439,7 @@ export default function RoomService() {
             const tcfg = TYPE_CFG[req.type] || TYPE_CFG.food;
             const scfg = STATUS_CFG[req.status] || STATUS_CFG.pending;
             return (
-              <div key={req.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+              <div key={req.id} onClick={()=>setDetailReq(req)} title="Click for full details" className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 cursor-pointer hover:border-amber-500/30 transition-colors">
                 <div className="flex items-start gap-3">
                   <div className={`h-10 w-10 rounded-xl ${tcfg.bg} flex items-center justify-center ${tcfg.color} shrink-0`}><tcfg.icon className="h-5 w-5"/></div>
                   <div className="flex-1 min-w-0">
@@ -443,7 +454,7 @@ export default function RoomService() {
                     <p className="text-xs text-emerald-400/90 mt-1">Staff: {req.assignedTo}</p>
                     <p className="text-xs text-white/30 mt-0.5 flex items-center gap-1"><Clock className="h-3 w-3"/>{req.time}</p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-2 shrink-0" onClick={e=>e.stopPropagation()}>
                     {req.status==="pending"&&(
                       <button onClick={()=>updateStatus(req.id,req.type==="food"?"preparing":"in-progress")} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Accept</button>
                     )}
@@ -523,8 +534,8 @@ export default function RoomService() {
             <div>
               <label className="text-xs text-white/40 mb-2 block">Select Room</label>
               <select value={foodRoom} onChange={e=>setFoodRoom(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white">
-                <option value="">-- Select Occupied Room --</option>
-                {activeRooms.map(r=><option key={r.number} value={r.number}>Room {r.number} — {r.guest}</option>)}
+                <option value="">-- Select Room --</option>
+                {rooms.map(r=><option key={r.number} value={r.number}>Room {r.number}{r.guest ? ` — ${r.guest}` : ` (${r.status})`}</option>)}
               </select>
             </div>
             {/* Search + category filter */}
@@ -602,8 +613,8 @@ export default function RoomService() {
             <div>
               <label className="text-xs text-white/40 mb-2 block">Select Room</label>
               <select value={posRoom} onChange={e=>setPosRoom(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white">
-                <option value="">-- Select Occupied Room --</option>
-                {activeRooms.map(r=><option key={r.number} value={r.number}>Room {r.number} — {r.guest}</option>)}
+                <option value="">-- Select Room --</option>
+                {rooms.map(r=><option key={r.number} value={r.number}>Room {r.number}{r.guest ? ` — ${r.guest}` : ` (${r.status})`}</option>)}
               </select>
             </div>
             {(["beverages","snacks","amenities"] as const).map(cat=>(
@@ -676,7 +687,7 @@ export default function RoomService() {
                 <label className="text-xs text-white/40 mb-2 block uppercase tracking-wide">Room</label>
                 <select value={selectedRoom} onChange={e=>setSelectedRoom(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white">
                   <option value="">-- Select Room --</option>
-                  {activeRooms.map(r=><option key={r.number} value={r.number}>Room {r.number} — {r.guest}</option>)}
+                  {rooms.map(r=><option key={r.number} value={r.number}>Room {r.number}{r.guest ? ` — ${r.guest}` : ` (${r.status})`}</option>)}
                 </select>
               </div>
               <div>
@@ -834,6 +845,75 @@ export default function RoomService() {
           </div>
         </div>
       )}
+
+      {/* Service request full detail */}
+      {detailReq && (() => {
+        const req = detailReq;
+        const tcfg = TYPE_CFG[req.type] || TYPE_CFG.food;
+        const scfg = STATUS_CFG[req.status] || STATUS_CFG.pending;
+        const items = Array.isArray(req.items) ? req.items : [];
+        const rows: [string, string][] = [
+          ["Room", `Room ${req.room}`],
+          ["Guest", req.guestName || "—"],
+          ["Mobile", req.guestPhone || "—"],
+          ["Request type", tcfg.label],
+          ["Status", scfg.label],
+          ["Amount", req.charge > 0 ? `₹${req.charge.toLocaleString("en-IN")}` : "—"],
+          ["Payment", req.paymentMethod ? req.paymentMethod.toUpperCase() : "Room bill"],
+          ["Assigned to", req.assignedTo || "—"],
+          ["Time", req.createdAt ? new Date(req.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : req.time || "—"],
+        ];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailReq(null)}>
+            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base flex items-center gap-2"><span className={`h-7 w-7 rounded-lg ${tcfg.bg} ${tcfg.color} flex items-center justify-center`}><tcfg.icon className="h-4 w-4" /></span>Room {req.room}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${scfg.bg} ${scfg.color}`}>{scfg.label}</span>
+                    {req.charge > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">₹{req.charge}</span>}
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5">{req.guestName} · {tcfg.label}</p>
+                </div>
+                <button onClick={() => setDetailReq(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {rows.map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-sm font-medium break-all capitalize">{v}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-2">Order / Items</p>
+                  {items.length > 0 ? (
+                    <div className="rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+                      {items.map((it, i) => (
+                        <div key={i} className="flex justify-between gap-3 px-3 py-2 text-xs">
+                          <span className="text-white/70 truncate">{it.name || it.description || "Item"}{(it.quantity || it.qty) ? ` × ${it.quantity || it.qty}` : ""}</span>
+                          {it.price != null && <span className="text-white/80 shrink-0">₹{Number(it.price).toLocaleString("en-IN")}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/70">{req.item}</p>
+                  )}
+                  {req.notes && <p className="text-xs text-yellow-300/70 mt-2">⚠️ {req.notes}</p>}
+                </div>
+
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                  {req.status === "pending" && <button onClick={() => { updateStatus(req.id, req.type === "food" ? "preparing" : "in-progress"); setDetailReq(null); }} className="flex-1 py-2.5 rounded-xl bg-blue-500/20 text-blue-300 text-sm font-bold hover:bg-blue-500/30">Accept</button>}
+                  {(req.status === "preparing" || req.status === "in-progress") && <button onClick={() => { updateStatus(req.id, "completed"); setDetailReq(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30 flex items-center justify-center gap-1"><CheckCircle className="h-4 w-4" /> Mark Done</button>}
+                  <button onClick={() => setDetailReq(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -46,6 +46,7 @@ async function ensureDemoData() {
 async function ensureSchemaColumns() {
   const guards = [
     `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS room_number text`,
+    `ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule jsonb DEFAULT '{}'::jsonb`,
   ];
   for (const sql of guards) {
     try {

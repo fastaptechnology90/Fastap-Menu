@@ -19,7 +19,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   finance: ["/restaurant/analytics", "/restaurant/billing", "/restaurant/finance", "/restaurant/cash-counter", "/restaurant/corporate-billing"],
   hr: ["/restaurant/staff", "/restaurant/commissions", "/restaurant/tasks-sop"],
   bar: ["/restaurant/orders", "/restaurant/billing", "/restaurant/inventory", "/restaurant/bar"],
-  spa: ["/restaurant/reservations", "/restaurant/customers", "/restaurant/spa"],
+  spa: ["/restaurant/spa", "/restaurant/spa-payments", "/restaurant/reservations", "/restaurant/customers"],
   housekeeping: ["/restaurant/housekeeping", "/restaurant/room-service", "/restaurant/tasks-sop"],
   franchise: RESTAURANT_ALL_PATHS,
 };

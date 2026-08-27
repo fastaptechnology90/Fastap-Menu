@@ -7,7 +7,14 @@ import { BedDouble, UserPlus, Users, CalendarDays, Wallet, X, CheckCircle, Loade
 type Folio = {
   room: { id: number; number: string; type: string; status: string; guestName: string | null; guestPhone: string | null; checkIn: string | null; checkOut: string | null; rate: number; guestCount: number; nights: number } | null;
   total: number; paid: number; balance: number; roomRent: number; servicesTotal: number; discount: number;
+  lines?: { id: number; typeLabel: string; label: string; amount: number; status: string }[];
 };
+
+function fmtDate(v: string | null | undefined) {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
 
 function isJustArrived(checkIn: string | null | undefined): boolean {
   if (!checkIn) return false;
@@ -23,6 +30,7 @@ export default function Reception() {
   const [loading, setLoading] = useState(true);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [payFor, setPayFor] = useState<Folio | null>(null);
+  const [detailGuest, setDetailGuest] = useState<Folio | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ roomId: "", guestName: "", guestPhone: "", guestCount: "1", nights: "1", rate: "", advance: "" });
@@ -147,7 +155,7 @@ export default function Reception() {
           {occupiedFolios.map(f => {
             const r = f.room!;
             return (
-              <div key={r.number} className="bg-[#0e1520] border border-white/8 rounded-2xl p-4 space-y-3">
+              <div key={r.number} onClick={() => setDetailGuest(f)} title="Click for full guest details" className="bg-[#0e1520] border border-white/8 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-amber-500/30 transition-colors">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -175,7 +183,7 @@ export default function Reception() {
                   <div className="flex justify-between font-bold text-rose-300"><span>Remaining</span><span>{fmt(f.balance)}</span></div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setPayFor(f); setPayAmount(String(f.balance || "")); }} className="flex-1 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/25 flex items-center justify-center gap-1">
                     <Wallet className="h-3.5 w-3.5" /> Record payment
                   </button>
@@ -261,6 +269,78 @@ export default function Reception() {
           </div>
         </div>
       )}
+
+      {/* Full guest details */}
+      {detailGuest?.room && (() => {
+        const r = detailGuest.room; const f = detailGuest;
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailGuest(null)}>
+            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base truncate">{r.guestName || "Guest"}</h3>
+                    {isJustArrived(r.checkIn) && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">JUST ARRIVED</span>}
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5">Room {r.number} · {r.type}</p>
+                </div>
+                <button onClick={() => setDetailGuest(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+
+              <div className="p-5 space-y-4 text-sm">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-2">Guest details</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {[
+                      ["Name", r.guestName || "—"],
+                      ["Mobile", r.guestPhone || "—"],
+                      ["Room", `${r.number} · ${r.type}`],
+                      ["People", `${r.guestCount} guest${r.guestCount > 1 ? "s" : ""}`],
+                      ["Nights", `${r.nights}`],
+                      ["Rate / night", fmt(r.rate)],
+                      ["Check-in", fmtDate(r.checkIn)],
+                      ["Check-out", fmtDate(r.checkOut)],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <p className="text-[11px] text-white/35">{k}</p>
+                        <p className="font-medium break-all">{v}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {Array.isArray(f.lines) && f.lines.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-400/80 mb-2">Charges</p>
+                    <div className="rounded-xl bg-white/[0.03] border border-white/5 divide-y divide-white/5">
+                      {f.lines.map(l => (
+                        <div key={l.id} className="flex justify-between gap-3 px-3 py-2 text-xs">
+                          <span className="text-white/60 truncate">{l.label} <span className="text-white/30">· {l.typeLabel}</span></span>
+                          <span className="text-white/80 shrink-0">{fmt(l.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between"><span className="text-white/40">Room rent ({r.nights}n @ {fmt(r.rate)})</span><span className="text-white/70">{fmt(f.roomRent)}</span></div>
+                  <div className="flex justify-between"><span className="text-white/40">Services (food/spa/bar)</span><span className="text-white/70">{fmt(f.servicesTotal)}</span></div>
+                  {f.discount > 0 && <div className="flex justify-between"><span className="text-white/40">Discount</span><span className="text-white/70">- {fmt(f.discount)}</span></div>}
+                  <div className="flex justify-between border-t border-white/10 pt-1.5 font-bold text-sm"><span>Total bill</span><span className="text-white">{fmt(f.total)}</span></div>
+                  <div className="flex justify-between text-emerald-400 font-semibold"><span>Paid</span><span>{fmt(f.paid)}</span></div>
+                  <div className="flex justify-between font-bold text-rose-300"><span>Remaining</span><span>{fmt(f.balance)}</span></div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button onClick={() => { setPayFor(f); setPayAmount(String(f.balance || "")); setDetailGuest(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm font-bold hover:bg-emerald-500/25 flex items-center justify-center gap-1"><Wallet className="h-4 w-4" /> Record payment</button>
+                  <button onClick={() => { const num = r.number; const gn = r.guestName || "guest"; setDetailGuest(null); checkout(num, gn); }} disabled={busy} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-bold hover:bg-white/5 flex items-center justify-center gap-1"><LogOut className="h-4 w-4" /> Check out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

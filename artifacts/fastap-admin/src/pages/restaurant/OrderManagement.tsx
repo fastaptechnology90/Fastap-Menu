@@ -281,7 +281,7 @@ export default function OrderManagement() {
                 <div>Time: <span className="text-white">{getElapsed(selectedOrder.placedAt)}</span></div>
               </div>
 
-              {/* Full payment breakdown — kaise pay hua (UPI id / UTR), kisne aur kis panel se */}
+              {/* Full payment breakdown — how it was paid (UPI id / UTR), by whom and from which panel */}
               {(selectedOrder.upiId || selectedOrder.utr || selectedOrder.collectedBy || selectedOrder.collectedFrom) && (
                 <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400/80">Payment received</p>
