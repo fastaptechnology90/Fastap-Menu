@@ -16,7 +16,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   kitchen: ["/restaurant/kitchen", "/restaurant/menu", "/restaurant/inventory"],
   chef: ["/restaurant/kitchen", "/restaurant/menu", "/restaurant/inventory", "/restaurant/food-costing", "/restaurant/procurement"],
   reception: ["/restaurant/reception", "/restaurant/dashboard", "/restaurant/reservations", "/restaurant/customers", "/restaurant/queue", "/restaurant/room-service", "/restaurant/events"],
-  finance: ["/restaurant/analytics", "/restaurant/billing", "/restaurant/finance", "/restaurant/cash-counter", "/restaurant/corporate-billing"],
+  finance: ["/restaurant/revenue", "/restaurant/analytics", "/restaurant/billing", "/restaurant/finance", "/restaurant/cash-counter", "/restaurant/corporate-billing"],
   hr: ["/restaurant/staff", "/restaurant/commissions", "/restaurant/tasks-sop"],
   bar: ["/restaurant/orders", "/restaurant/billing", "/restaurant/inventory", "/restaurant/bar"],
   spa: ["/restaurant/spa", "/restaurant/spa-payments", "/restaurant/reservations", "/restaurant/customers"],

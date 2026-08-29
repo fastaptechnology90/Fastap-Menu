@@ -187,6 +187,7 @@ export default function OrderManagement() {
                       <span className="text-xs text-white/30">{order.id}</span>
                     </div>
                     <p className="text-xs text-white/40 mt-0.5">{order.customerName || order.waiter} · {order.guests} guests</p>
+                    {order.customerPhone && <p className="text-xs text-white/40 flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</p>}
                   </div>
                   <div className="text-right">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
@@ -274,6 +275,7 @@ export default function OrderManagement() {
                 <div>Type: <span className="text-white capitalize">{selectedOrder.type}</span></div>
                 <div>Guests: <span className="text-white">{selectedOrder.guests}</span></div>
                 <div>Customer: <span className="text-white">{selectedOrder.customerName || "—"}</span></div>
+                <div>Mobile: <span className="text-white">{selectedOrder.customerPhone || "—"}</span></div>
                 <div>Table: <span className="text-white">{selectedOrder.tableNo}</span></div>
                 {selectedOrder.roomNumber && <div>Room: <span className="text-white">{selectedOrder.roomNumber}</span></div>}
                 <div className="flex items-center gap-1.5">Payment: {payMethodBadge(selectedOrder.paymentMethod)}</div>
@@ -298,12 +300,22 @@ export default function OrderManagement() {
             <div>
               <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Items</p>
               {selectedOrder.items.map((item, i) => (
-                <div key={i} className="flex justify-between items-center py-2 border-b border-white/5">
-                  <div>
-                    <p className="text-sm">{item.qty}× {item.name}</p>
+                <div key={i} className="flex justify-between items-start gap-3 py-2 border-b border-white/5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                      {item.qty}× {item.name}
+                      {item.variant && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{item.variant}</span>}
+                    </p>
+                    {Array.isArray(item.addons) && item.addons.length > 0 && (
+                      <p className="text-xs text-emerald-300/80 mt-0.5">+ {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
+                    )}
+                    {Array.isArray(item.customizations) && item.customizations.length > 0 && (
+                      <p className="text-xs text-cyan-300/80 mt-0.5">{item.customizations.join(" · ")}</p>
+                    )}
+                    {item.notes && <p className="text-xs text-yellow-300/80 mt-0.5">📝 {item.notes}</p>}
                     <span className={`text-xs ${item.status === "ready" ? "text-emerald-400" : item.status === "preparing" ? "text-blue-400" : "text-white/30"}`}>{item.status}</span>
                   </div>
-                  <span className="text-amber-400 font-semibold">₹{item.price * item.qty}</span>
+                  <span className="text-amber-400 font-semibold shrink-0">₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
                 </div>
               ))}
               <div className="flex justify-between font-bold mt-2 pt-2">

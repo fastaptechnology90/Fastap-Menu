@@ -28,6 +28,7 @@ export const PATH_PERMISSIONS: Record<string, string[]> = {
   "/restaurant/staff": ["add_staff", "view_reports"],
   "/restaurant/commissions": ["view_reports", "add_staff"],
   "/restaurant/tasks-sop": ["activity_tracking", "add_staff"],
+  "/restaurant/revenue": ["view_reports", "view_wallet"],
   "/restaurant/analytics": ["view_reports"],
   "/restaurant/finance": ["view_wallet", "view_settlements"],
   "/restaurant/corporate-billing": ["view_wallet", "view_reports"],

@@ -449,7 +449,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
 
 export default function MenuPage() {
   const [, navigate] = useAppLocation();
-  const { addToCart, cartCount, cartTotal, activeRestaurant, activeTable, activeSection, dietaryFilter, setDietaryFilter, setActiveRestaurant, setActiveTable, loadVenue, venue, user, favorites } = useUser();
+  const { addToCart, cart, updateQuantity, cartCount, cartTotal, activeRestaurant, activeTable, activeSection, dietaryFilter, setDietaryFilter, setActiveRestaurant, setActiveTable, loadVenue, venue, user, favorites } = useUser();
   // Demo menu (the marketing "spice-garden" venue) is VIEW-ONLY: no login, no ordering —
   // visitors can browse the menu but cannot add to cart or check out.
   const urlSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("slug") : null;
@@ -762,14 +762,23 @@ export default function MenuPage() {
               </p>
 
               <div className="menu-app__grid">
-                {filteredItems.map(item => (
-                  <MenuGridCard
-                    key={item.id}
-                    item={item}
-                    onOpen={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
-                    onAdd={e => { e.stopPropagation(); setSelectedItem(item); }}
-                  />
-                ))}
+                {filteredItems.map(item => {
+                  // Plain cart line (no customizations) that the card's +/- stepper controls.
+                  const line = cart.find(c => c.menuItemId === item.id && (!c.customizations || c.customizations.length === 0));
+                  const qty = line?.quantity ?? 0;
+                  return (
+                    <MenuGridCard
+                      key={item.id}
+                      item={item}
+                      readOnly={isDemo}
+                      quantity={qty}
+                      onOpen={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
+                      onAdd={e => { e.stopPropagation(); handleAdd(item, [], []); announce(`${item.name} added to order`); }}
+                      onIncrement={e => { e.stopPropagation(); handleAdd(item, [], []); }}
+                      onDecrement={e => { e.stopPropagation(); if (line) updateQuantity(line.id, qty - 1); }}
+                    />
+                  );
+                })}
               </div>
 
               {filteredItems.length === 0 && (

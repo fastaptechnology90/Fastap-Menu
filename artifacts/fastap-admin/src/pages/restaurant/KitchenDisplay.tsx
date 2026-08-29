@@ -234,15 +234,29 @@ export default function KitchenDisplay() {
                         </div>
 
                         <div className="space-y-1.5 mb-2.5">
-                          {stItems.map((item,i)=>(
-                            <div key={i} className="flex items-center gap-2">
+                          {stItems.map((item,i)=>{
+                            const hasExtras = (Array.isArray(item.addons)&&item.addons.length>0)||(Array.isArray(item.customizations)&&item.customizations.length>0)||item.variant||item.notes;
+                            return (
+                            <div key={i} className="flex items-start gap-2">
                               <div className={`h-5 w-5 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${item.status==="ready"?"bg-emerald-500/30 text-emerald-400":item.status==="preparing"?"bg-blue-500/30 text-blue-400":"bg-white/10 text-white/50"}`}>{item.qty}</div>
-                              <span className={`text-sm flex-1 ${item.status==="ready"?"line-through text-white/40":"text-white/85"}`}>{item.name}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded-md ${getItemStation(item.name)==="grill"?"bg-orange-500/15 text-orange-400":getItemStation(item.name)==="cold"?"bg-cyan-500/15 text-cyan-400":getItemStation(item.name)==="bar"?"bg-violet-500/15 text-violet-400":getItemStation(item.name)==="desserts"?"bg-pink-500/15 text-pink-400":"bg-red-500/15 text-red-400"}`}>
-                                {getItemStation(item.name)}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-sm flex-1 ${item.status==="ready"?"line-through text-white/40":"text-white/85"}`}>{item.name}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-md shrink-0 ${getItemStation(item.name)==="grill"?"bg-orange-500/15 text-orange-400":getItemStation(item.name)==="cold"?"bg-cyan-500/15 text-cyan-400":getItemStation(item.name)==="bar"?"bg-violet-500/15 text-violet-400":getItemStation(item.name)==="desserts"?"bg-pink-500/15 text-pink-400":"bg-red-500/15 text-red-400"}`}>
+                                    {getItemStation(item.name)}
+                                  </span>
+                                </div>
+                                {hasExtras && (
+                                  <div className="mt-1 ml-0.5 pl-2 border-l-2 border-amber-500/40 space-y-0.5">
+                                    {item.variant && <p className="text-[11px] text-violet-300">🍽 {item.variant}</p>}
+                                    {Array.isArray(item.addons)&&item.addons.length>0 && <p className="text-[11px] font-semibold text-emerald-300">+ {item.addons.map(a=>a.name).join(", ")}</p>}
+                                    {Array.isArray(item.customizations)&&item.customizations.length>0 && <p className="text-[11px] font-semibold text-cyan-300">⚡ {item.customizations.join(" · ")}</p>}
+                                    {item.notes && <p className="text-[11px] text-yellow-300">📝 {item.notes}</p>}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          ))}
+                          );})}
                         </div>
 
                         {order.specialReq&&(
@@ -342,7 +356,16 @@ export default function KitchenDisplay() {
                     <Timer start={order.placedAt} targetMins={target}/>
                   </div>
                   <div className="space-y-1 mb-2">
-                    {order.items.slice(0,3).map((item,i)=><p key={i} className="text-xs text-white/60 truncate">{item.qty}× {item.name}</p>)}
+                    {order.items.slice(0,3).map((item,i)=>{
+                      const extras=[...(item.addons?.map(a=>a.name)||[]),...(item.customizations||[])];
+                      return (
+                        <div key={i}>
+                          <p className="text-xs text-white/60 truncate">{item.qty}× {item.name}</p>
+                          {extras.length>0&&<p className="text-[10px] text-amber-300/90 truncate">↳ {extras.join(", ")}</p>}
+                          {item.notes&&<p className="text-[10px] text-yellow-300/80 truncate">📝 {item.notes}</p>}
+                        </div>
+                      );
+                    })}
                     {order.items.length>3&&<p className="text-xs text-white/30">+{order.items.length-3} more</p>}
                   </div>
                   {order.specialReq&&<p className="text-xs text-yellow-300 truncate mb-1">⚠️ {order.specialReq}</p>}

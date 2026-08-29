@@ -32,6 +32,10 @@ export function RevenueByDate({ restaurantId, title = "Revenue" }: { restaurantI
     queryKey: ["restaurant-revenue", restaurantId, isAll ? "all" : from, isAll ? "all" : to],
     queryFn: () => restaurantApi.revenue(Number(restaurantId), params),
     enabled: !!restaurantId,
+    // Auto-refresh so collected amounts show up without a manual page refresh.
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   function applyPreset(p: typeof PRESETS[0]) {

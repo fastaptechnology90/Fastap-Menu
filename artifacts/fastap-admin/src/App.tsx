@@ -136,6 +136,7 @@ import SpaPayments from "@/pages/restaurant/SpaPayments";
 import LoyaltyWallet from "@/pages/restaurant/LoyaltyWallet";
 import MarketingAutomation from "@/pages/restaurant/MarketingAutomation";
 import FinanceWallet from "@/pages/restaurant/FinanceWallet";
+import RevenueOverview from "@/pages/restaurant/RevenueOverview";
 import FoodCosting from "@/pages/restaurant/FoodCosting";
 import PurchaseProcurement from "@/pages/restaurant/PurchaseProcurement";
 import StaffCommissionChat from "@/pages/restaurant/StaffCommissionChat";
@@ -322,6 +323,7 @@ function AppRoutes() {
       <Route path="/restaurant/loyalty">{() => <RestaurantProtectedRoute><LoyaltyWallet /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/marketing">{() => <RestaurantProtectedRoute><MarketingAutomation /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/finance">{() => <RestaurantProtectedRoute><FinanceWallet /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/revenue">{() => <RestaurantProtectedRoute><RevenueOverview /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/food-costing">{() => <RestaurantProtectedRoute><FoodCosting /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/procurement">{() => <RestaurantProtectedRoute><PurchaseProcurement /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/commissions">{() => <RestaurantProtectedRoute><StaffCommissionChat /></RestaurantProtectedRoute>}</Route>

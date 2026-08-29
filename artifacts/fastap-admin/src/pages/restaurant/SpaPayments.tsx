@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Wallet, X, CheckCircle, Search, Receipt, CreditCard, Smartphone, Banknote, Loader2, Clock, User } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { spa as spaApi } from "@/lib/api";
@@ -27,6 +28,7 @@ function fmtDateTime(v: string | undefined) {
 
 export default function SpaPayments() {
   const { restaurantId, currentStaff } = useRestaurant();
+  const qc = useQueryClient();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"pending" | "history">("pending");
@@ -79,6 +81,8 @@ export default function SpaPayments() {
       });
       setPayFor(null);
       load();
+      // Refresh the shared revenue widget immediately (don't wait for the poll).
+      qc.invalidateQueries({ queryKey: ["restaurant-revenue"] });
     } catch { /* ignore */ }
     finally { setSaving(false); }
   }

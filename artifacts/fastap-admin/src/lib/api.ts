@@ -829,6 +829,18 @@ export const restaurantApi = {
     const qs = q.toString();
     return get<{ from: string | null; to: string | null; revenue: number; totalOrders: number }>(`/restaurants/${rid}/revenue${qs ? `?${qs}` : ""}`);
   },
+  revenueBreakdown: (rid: number, params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    const qs = q.toString();
+    return get<{
+      from: string | null; to: string | null; total: number; orderRevenue: number; spaRevenue: number; totalOrders: number;
+      bySource: { label: string; amount: number; count: number }[];
+      byType: { type: string; amount: number; count: number }[];
+      byMethod: { method: string; amount: number; count: number }[];
+    }>(`/restaurants/${rid}/revenue-breakdown${qs ? `?${qs}` : ""}`);
+  },
   create: (body: any) => post<any>("/restaurants", body),
   whiteLabel: (rid: number) => get<any>(`/restaurants/${rid}/settings/white-label`),
   saveWhiteLabel: (rid: number, body: any) => put<any>(`/restaurants/${rid}/settings/white-label`, body),

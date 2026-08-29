@@ -50,7 +50,7 @@ export interface LiveOrder {
   id: string;
   tableNo: string;
   waiter: string;
-  items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready" }[];
+  items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready"; variant?: string; addons?: { name: string; price: number }[]; customizations?: string[]; notes?: string }[];
   status: "new" | "accepted" | "preparing" | "ready" | "served" | "billed" | "cancelled";
   type: "dine-in" | "takeaway" | "room-service" | "delivery";
   placedAt: Date;
@@ -61,6 +61,7 @@ export interface LiveOrder {
   paymentMethod: string;
   paymentStatus?: string;
   customerName?: string;
+  customerPhone?: string;
   roomNumber?: string;
   // Full payment breakdown (populated when a bill is collected) so the owner can click a
   // payment and see the UPI id / UTR, who collected it and from which panel.
@@ -182,6 +183,11 @@ function mapApiOrder(o: any): LiveOrder {
     // exact order amount instead of re-deriving from a possibly-stale unit price.
     subtotal: typeof i === "object" ? (parseFloat(i.subtotal) || 0) : 0,
     status: "pending" as const,
+    // Carry the extras through so the owner can see them in Order Details.
+    variant: typeof i === "object" ? (i.variant || undefined) : undefined,
+    addons: typeof i === "object" && Array.isArray(i.addons) ? i.addons.map((a: any) => ({ name: String(a?.name ?? a), price: parseFloat(a?.price) || 0 })) : undefined,
+    customizations: typeof i === "object" && Array.isArray(i.customizations) ? i.customizations.map((c: any) => String(c)) : undefined,
+    notes: typeof i === "object" ? (i.notes || i.specialInstructions || undefined) : undefined,
   })) : [];
   const tableName = o.tableName ?? o.table_name;
   const tableId = o.tableId ?? o.table_id;
@@ -203,6 +209,7 @@ function mapApiOrder(o: any): LiveOrder {
     paymentMethod: o.paymentMethod || o.payment_method || (o.metadata?.payment?.method) || "cash",
     paymentStatus: o.paymentStatus || o.payment_status || undefined,
     customerName: o.customerName || o.customer_name || undefined,
+    customerPhone: o.customerPhone || o.customer_phone || undefined,
     roomNumber: (o.metadata && (o.metadata.roomNumber || o.metadata.room_number)) || o.roomNumber || undefined,
     upiId: o.metadata?.payment?.upiId || undefined,
     utr: o.metadata?.payment?.utr || o.metadata?.utr || undefined,

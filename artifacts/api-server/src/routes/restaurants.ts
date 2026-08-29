@@ -318,4 +318,94 @@ router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): 
   });
 });
 
+// Full revenue breakdown for the owner — how much came from which panel/source, which
+// order type, and which payment method. Uses the SAME paid-order rule + spa fold as
+// /revenue, so every section sums to the same grand total (no mismatch).
+router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.restaurantId, 10);
+  const access = await resolveAnalyticsAccess(req, id);
+  if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
+  if (access.kind === "unpublished") { res.json({ from: null, to: null, total: 0, orderRevenue: 0, spaRevenue: 0, totalOrders: 0, bySource: [], byType: [], byMethod: [] }); return; }
+
+  const parseDay = (v: unknown): Date | null => {
+    if (typeof v !== "string" || !v) return null;
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const from = parseDay(req.query.from);
+  const toRaw = parseDay(req.query.to);
+  const toEnd = toRaw ? new Date(toRaw.getFullYear(), toRaw.getMonth(), toRaw.getDate(), 23, 59, 59, 999) : null;
+
+  const rows = await db.select({ total: ordersTable.total, subtotal: ordersTable.subtotal, tax: ordersTable.tax, tipAmount: ordersTable.tipAmount, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, type: ordersTable.type, paymentMethod: ordersTable.paymentMethod, createdAt: ordersTable.createdAt, metadata: ordersTable.metadata })
+    .from(ordersTable).where(eq(ordersTable.restaurantId, id));
+  const inRange = (o: typeof rows[0]) => {
+    const created = new Date(o.createdAt);
+    const colRaw = (o.metadata as any)?.payment?.collectedAt;
+    const collected = colRaw ? new Date(colRaw) : null;
+    const okFrom = (d: Date | null) => d != null && (!from || d >= from) && (!toEnd || d <= toEnd);
+    return okFrom(created) || (collected != null && !Number.isNaN(collected.getTime()) && okFrom(collected));
+  };
+  const paid = rows.filter(o => isPaidOrder(o) && inRange(o));
+
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const orderRevenue = round(paid.reduce((s, o) => s + orderGrossTotal(o), 0));
+  const spaRevenue = await getSpaRevenue(id, from, toEnd);
+
+  // Which panel a given order type belongs to
+  const sourceOf = (t: string | null | undefined): string => {
+    const x = String(t || "").toLowerCase();
+    if (x.includes("room")) return "Room Service";
+    if (x.includes("bar")) return "Bar";
+    if (x.includes("take") || x.includes("pickup")) return "Takeaway";
+    if (x.includes("deliver")) return "Delivery";
+    if (x.includes("banquet") || x.includes("event")) return "Events & Banquet";
+    return "Restaurant / POS";
+  };
+  const methodOf = (o: typeof rows[0]): string => {
+    const m = String((o.metadata as any)?.payment?.method || o.paymentMethod || "cash").toLowerCase();
+    if (m.includes("upi")) return "UPI";
+    if (m.includes("card")) return "Card";
+    if (m.includes("cash")) return "Cash";
+    if (m.includes("wallet")) return "Wallet";
+    if (m.includes("room") || m.includes("bill")) return "Room bill";
+    return m ? m.charAt(0).toUpperCase() + m.slice(1) : "Other";
+  };
+
+  const accumulate = (keyFn: (o: typeof rows[0]) => string) => {
+    const map = new Map<string, { amount: number; count: number }>();
+    for (const o of paid) {
+      const k = keyFn(o);
+      const cur = map.get(k) || { amount: 0, count: 0 };
+      cur.amount += orderGrossTotal(o); cur.count += 1;
+      map.set(k, cur);
+    }
+    return map;
+  };
+
+  const sourceMap = accumulate(o => sourceOf(o.type));
+  const typeMap = accumulate(o => String(o.type || "dine_in"));
+  const methodMap = accumulate(o => methodOf(o));
+
+  const bySource = [...sourceMap.entries()].map(([label, v]) => ({ label, amount: round(v.amount), count: v.count }));
+  if (spaRevenue > 0) bySource.push({ label: "Spa", amount: round(spaRevenue), count: 0 });
+  bySource.sort((a, b) => b.amount - a.amount);
+
+  const byType = [...typeMap.entries()].map(([type, v]) => ({ type, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
+  const byMethod = [...methodMap.entries()].map(([method, v]) => ({ method, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
+
+  res.json({
+    from: from ? from.toISOString().slice(0, 10) : null,
+    to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
+    total: round(orderRevenue + spaRevenue),
+    orderRevenue,
+    spaRevenue,
+    totalOrders: paid.length,
+    bySource,
+    byType,
+    byMethod,
+  });
+});
+
 export default router;

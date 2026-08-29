@@ -12,7 +12,7 @@ import {
 } from "@/lib/orderTracking";
 import {
   ChevronLeft, RefreshCw, Phone, Star, MessageSquare,
-  CheckCircle, ChefHat, User2, Truck, AlertCircle, RotateCcw, Share2, Download, Timer, Radio, FileText,
+  CheckCircle, ChefHat, User2, Truck, AlertCircle, RotateCcw, Share2, Download, Timer, Radio, FileText, Plus,
 } from "lucide-react";
 
 function formatCountdown(seconds: number): string {
@@ -298,6 +298,7 @@ export default function OrderTracking() {
   );
 
   function handleReorder() {
+    if (!displayOrder) return;
     reorderFromOrder(displayOrder);
     navigate("/user/cart");
   }
@@ -537,8 +538,17 @@ export default function OrderTracking() {
           </div>
         </div>
 
+        {/* Order more — the guest can keep ordering (new/different items) while this
+            order is being prepared; goes back to the menu keeping table + venue. */}
+        <button
+          onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))}
+          className="w-full flex items-center gap-2 justify-center py-3.5 rounded-xl bg-orange-500 text-white text-sm font-bold shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-transform"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} /> Order More Items
+        </button>
+
         <button onClick={handleReorder} className="w-full flex items-center gap-2 justify-center py-3 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold">
-          <RotateCcw className="h-4 w-4 text-orange-400" /> One-click Reorder
+          <RotateCcw className="h-4 w-4 text-orange-400" /> Reorder same items
         </button>
 
         {isDelivered && !reviewSubmitted && (

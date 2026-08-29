@@ -66,6 +66,7 @@ export const restaurantNavGroups: RestaurantNavGroup[] = [
   {
     group: "Finance & Reports",
     items: [
+      { path: "/restaurant/revenue", label: "Revenue Overview", icon: "trending_up" },
       { path: "/restaurant/analytics", label: "Analytics", icon: "bar_chart" },
       { path: "/restaurant/finance", label: "Finance & Wallet", icon: "account_balance_wallet" },
       { path: "/restaurant/corporate-billing", label: "Corporate Billing", icon: "business" },

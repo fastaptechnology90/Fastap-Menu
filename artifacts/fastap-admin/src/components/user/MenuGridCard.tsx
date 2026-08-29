@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { AppImage } from "@/components/shared/AppImage";
-import { Plus, Star } from "lucide-react";
+import { Plus, Minus, Star } from "lucide-react";
 import type { MenuItemCardData } from "./MenuItemCard";
 
 function isVeg(tags: string[]) {
@@ -13,10 +13,18 @@ export function MenuGridCard({
   item,
   onOpen,
   onAdd,
+  quantity = 0,
+  readOnly = false,
+  onIncrement,
+  onDecrement,
 }: {
   item: MenuItemCardData;
   onOpen: () => void;
   onAdd: (e: MouseEvent) => void;
+  quantity?: number;
+  readOnly?: boolean;
+  onIncrement?: (e: MouseEvent) => void;
+  onDecrement?: (e: MouseEvent) => void;
 }) {
   const veg = isVeg(item.dietaryTags);
 
@@ -48,9 +56,21 @@ export function MenuGridCard({
         </button>
         <div className="menu-grid-card__footer">
           <span className="menu-grid-card__price">₹{item.price}</span>
-          <button type="button" onClick={onAdd} className="menu-grid-card__add" aria-label={`Add ${item.name}`}>
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-          </button>
+          {readOnly ? null : quantity > 0 ? (
+            <div className="menu-grid-card__stepper">
+              <button type="button" onClick={onDecrement} aria-label={`Remove one ${item.name}`}>
+                <Minus className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+              <span>{quantity}</span>
+              <button type="button" onClick={onIncrement} aria-label={`Add one ${item.name}`}>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={onAdd} className="menu-grid-card__add" aria-label={`Add ${item.name}`}>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       </div>
     </article>

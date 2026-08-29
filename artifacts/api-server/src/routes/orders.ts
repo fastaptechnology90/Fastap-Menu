@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, ne } from "drizzle-orm";
 import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
@@ -251,6 +251,46 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     advanceAmount: advanceAmount != null ? parseFloat(String(advanceAmount)) : undefined,
     grandTotal: total,
   });
+
+  // Running tab: if this table already has an OPEN (unbilled) order, append the new items
+  // to it instead of creating a separate order — so the guest keeps ONE order + one bill.
+  // Only for seated dine-in / room orders; takeaway & delivery stay separate.
+  const OPEN_STATUSES = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
+  const isSeated = (type ?? "dine_in") === "dine_in" || String(type ?? "").includes("room");
+  if (isSeated && tableName) {
+    const [openOrder] = await db.select().from(ordersTable)
+      .where(and(
+        eq(ordersTable.restaurantId, restaurantId),
+        eq(ordersTable.tableName, tableName),
+        inArray(ordersTable.status, OPEN_STATUSES),
+        ne(ordersTable.paymentStatus, "paid"),
+      ))
+      .orderBy(desc(ordersTable.createdAt)).limit(1);
+    if (openOrder) {
+      const prevItems = Array.isArray(openOrder.items) ? (openOrder.items as any[]) : [];
+      const mergedItems = [...prevItems, ...orderItems];
+      const mergedSubtotal = parseFloat(String(openOrder.subtotal || 0)) + subtotal;
+      const mergedTax = parseFloat(String(openOrder.tax || 0)) + tax;
+      const mergedTotal = parseFloat(String(openOrder.total || 0)) + subtotal + tax;
+      // If the order was already finished, bump it back so the kitchen makes the new round.
+      const bumped = ["ready", "served"].includes(String(openOrder.status)) ? "pending" : openOrder.status;
+      const [updated] = await db.update(ordersTable).set({
+        items: mergedItems,
+        subtotal: String(mergedSubtotal.toFixed(2)),
+        tax: String(mergedTax.toFixed(2)),
+        total: String(mergedTotal.toFixed(2)),
+        status: bumped,
+      }).where(eq(ordersTable.id, openOrder.id)).returning();
+      for (const item of items) {
+        const mi = menuMap.get(item.menuItemId);
+        if (mi) await db.update(menuItemsTable).set({ orderCount: mi.orderCount + item.quantity }).where(eq(menuItemsTable.id, mi.id));
+      }
+      broadcastEvent("order_updated", { id: updated.id, restaurantId, tableName, total: mergedTotal, status: bumped, appended: true });
+      broadcastOrderEvent(updated.id, "order_status", { id: updated.id, status: bumped, tableName });
+      res.status(200).json(parseOrder(updated));
+      return;
+    }
+  }
 
   const [order] = await db.insert(ordersTable).values({
     restaurantId, tableId: tableId ?? null, tableName: tableName ?? null,
