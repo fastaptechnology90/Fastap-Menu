@@ -48,6 +48,8 @@ export default function CartPage() {
     venue.roomNumber ? "room-service" : activeTable ? "dine-in" : "takeaway",
   );
   const [paymentMethod, setPaymentMethod] = useState("upi");
+  const [guestName, setGuestName] = useState(user?.name ?? "");
+  const [guestPhone, setGuestPhone] = useState(user?.mobile ?? "");
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
   const [tip, setTip] = useState(0);
@@ -150,6 +152,8 @@ export default function CartPage() {
     try {
       const order = await placeOrder({
         orderType,
+        customerName: guestName,
+        customerPhone: guestPhone,
         paymentMethod,
         tip: tipAmount,
         discount,
@@ -580,6 +584,27 @@ export default function CartPage() {
           <button onClick={() => navigate(withGuestQuery("/user/payment", venue, activeTable))} className="mt-3 w-full py-2.5 rounded-xl border border-orange-500/30 text-orange-300 text-xs font-semibold hover:bg-orange-500/10">
             Advanced checkout — split, partial, invoices →
           </button>
+        </div>
+
+        {/* Guest details — so the order shows the guest's name & phone in every panel */}
+        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+          <p className="text-sm font-semibold mb-1">Your details</p>
+          <p className="text-xs text-white/40 mb-3">Taaki staff aapko naam se serve kar sake aur zaroorat pade to call kar sake.</p>
+          <div className="space-y-2">
+            <input
+              value={guestName}
+              onChange={e => setGuestName(e.target.value)}
+              placeholder="Your name"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/40"
+            />
+            <input
+              value={guestPhone}
+              onChange={e => setGuestPhone(e.target.value.replace(/[^\d+]/g, ""))}
+              inputMode="tel"
+              placeholder="Phone number"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/40"
+            />
+          </div>
         </div>
       </div>
 

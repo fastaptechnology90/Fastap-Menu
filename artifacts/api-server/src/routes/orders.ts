@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
@@ -263,7 +263,6 @@ router.post("/public/orders", async (req, res): Promise<void> => {
         eq(ordersTable.restaurantId, restaurantId),
         eq(ordersTable.tableName, tableName),
         inArray(ordersTable.status, OPEN_STATUSES),
-        ne(ordersTable.paymentStatus, "paid"),
       ))
       .orderBy(desc(ordersTable.createdAt)).limit(1);
     if (openOrder) {

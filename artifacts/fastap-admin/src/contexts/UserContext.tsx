@@ -143,6 +143,8 @@ export interface VenueLoadParams {
 
 export interface PlaceOrderOptions {
   orderType?: OrderTypeId | string;
+  customerName?: string;
+  customerPhone?: string;
   paymentMethod?: string;
   tip?: number;
   discount?: number;
@@ -426,8 +428,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       restaurantId: venue.restaurantId,
       tableId: venue.tableId,
       tableName: activeTable || (venue.roomNumber ? `Room ${venue.roomNumber}` : null),
-      customerName: user?.name,
-      customerPhone: user?.mobile,
+      customerName: opts.customerName?.trim() || user?.name,
+      customerPhone: opts.customerPhone?.trim() || user?.mobile,
       customerEmail: user?.email,
       type: apiType,
       items: cart.map(c => ({
