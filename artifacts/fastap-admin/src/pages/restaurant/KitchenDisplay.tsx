@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
+import { splitCustomizations } from "@/lib/orderItemExtras";
 import { ChefHat, Volume2, VolumeX, Flame, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play } from "lucide-react";
 
 function Timer({ start, targetMins = 20 }: { start: Date; targetMins?: number }) {
@@ -249,8 +250,11 @@ export default function KitchenDisplay() {
                                 {hasExtras && (
                                   <div className="mt-1 ml-0.5 pl-2 border-l-2 border-amber-500/40 space-y-0.5">
                                     {item.variant && <p className="text-[11px] text-violet-300">🍽 {item.variant}</p>}
-                                    {Array.isArray(item.addons)&&item.addons.length>0 && <p className="text-[11px] font-semibold text-emerald-300">+ {item.addons.map(a=>a.name).join(", ")}</p>}
-                                    {Array.isArray(item.customizations)&&item.customizations.length>0 && <p className="text-[11px] font-semibold text-cyan-300">⚡ {item.customizations.join(" · ")}</p>}
+                                    {Array.isArray(item.addons)&&item.addons.length>0 && <p className="text-[11px] font-semibold text-emerald-300">➕ Add: {item.addons.map(a=>a.name).join(", ")}</p>}
+                                    {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
+                                      {removes.length>0 && <p className="text-[11px] font-semibold text-rose-300">➖ Remove: {removes.join(", ")}</p>}
+                                      {prefs.length>0 && <p className="text-[11px] font-semibold text-cyan-300">⚡ {prefs.join(" · ")}</p>}
+                                    </>); })()}
                                     {item.notes && <p className="text-[11px] text-yellow-300">📝 {item.notes}</p>}
                                   </div>
                                 )}

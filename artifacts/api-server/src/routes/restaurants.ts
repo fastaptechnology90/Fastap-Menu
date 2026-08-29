@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, desc, gte, lte } from "drizzle-orm";
-import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable } from "@workspace/db";
+import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable, spaBookingsTable, banquetEventsTable } from "@workspace/db";
 import { CreateRestaurantBody, UpdateRestaurantBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { createRestaurantRateLimit } from "../middlewares/rate-limit.js";
@@ -13,8 +13,8 @@ import {
   isRestaurantPublished,
   getPublicationStatus,
 } from "../lib/restaurant-publication.js";
-import { isPaidOrder, orderGrossTotal } from "../lib/payment-calculations.js";
-import { getSpaRevenue, getSpaRevenueBuckets } from "../lib/ancillary-revenue.js";
+import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
+import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue } from "../lib/ancillary-revenue.js";
 
 const router: IRouter = Router();
 
@@ -308,12 +308,14 @@ router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): 
   const paid = rows.filter(o => isPaidOrder(o) && inRange(o));
   const orderRevenue = Math.round(paid.reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
   const spaRevenue = await getSpaRevenue(id, from, toEnd);   // spa folded into the total
+  const banquetRevenue = await getBanquetRevenue(id, from, toEnd); // events & banquet advance
   res.json({
     from: from ? from.toISOString().slice(0, 10) : null,
     to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
-    revenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+    revenue: Math.round((orderRevenue + spaRevenue + banquetRevenue) * 100) / 100,
     orderRevenue,
     spaRevenue,
+    banquetRevenue,
     totalOrders: paid.length,
   });
 });
@@ -338,7 +340,7 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
   const toRaw = parseDay(req.query.to);
   const toEnd = toRaw ? new Date(toRaw.getFullYear(), toRaw.getMonth(), toRaw.getDate(), 23, 59, 59, 999) : null;
 
-  const rows = await db.select({ total: ordersTable.total, subtotal: ordersTable.subtotal, tax: ordersTable.tax, tipAmount: ordersTable.tipAmount, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, type: ordersTable.type, paymentMethod: ordersTable.paymentMethod, createdAt: ordersTable.createdAt, metadata: ordersTable.metadata })
+  const rows = await db.select({ id: ordersTable.id, invoiceNumber: ordersTable.invoiceNumber, tableName: ordersTable.tableName, customerName: ordersTable.customerName, total: ordersTable.total, subtotal: ordersTable.subtotal, tax: ordersTable.tax, tipAmount: ordersTable.tipAmount, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, type: ordersTable.type, paymentMethod: ordersTable.paymentMethod, createdAt: ordersTable.createdAt, metadata: ordersTable.metadata })
     .from(ordersTable).where(eq(ordersTable.restaurantId, id));
   const inRange = (o: typeof rows[0]) => {
     const created = new Date(o.createdAt);
@@ -352,6 +354,7 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
   const round = (n: number) => Math.round(n * 100) / 100;
   const orderRevenue = round(paid.reduce((s, o) => s + orderGrossTotal(o), 0));
   const spaRevenue = await getSpaRevenue(id, from, toEnd);
+  const banquetRevenue = await getBanquetRevenue(id, from, toEnd);
 
   // Which panel a given order type belongs to
   const sourceOf = (t: string | null | undefined): string => {
@@ -384,27 +387,87 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
     return map;
   };
 
+  // Who collected a payment. If no staff is recorded, an online method (UPI/Card/Wallet)
+  // means the guest paid directly → "Online / Guest"; otherwise it's genuinely unrecorded.
+  const collectorLabel = (collectedBy: unknown, method: string): string => {
+    const c = String(collectedBy || "").trim();
+    if (c) return c;
+    return (method === "UPI" || method === "Card" || method === "Wallet") ? "Online / Guest" : "Not recorded";
+  };
+  const collectorOf = (o: typeof rows[0]): string => collectorLabel((o.metadata as any)?.payment?.collectedBy, methodOf(o));
+
   const sourceMap = accumulate(o => sourceOf(o.type));
   const typeMap = accumulate(o => String(o.type || "dine_in"));
-  const methodMap = accumulate(o => methodOf(o));
-
   const bySource = [...sourceMap.entries()].map(([label, v]) => ({ label, amount: round(v.amount), count: v.count }));
   if (spaRevenue > 0) bySource.push({ label: "Spa", amount: round(spaRevenue), count: 0 });
+  if (banquetRevenue > 0) bySource.push({ label: "Events & Banquet", amount: round(banquetRevenue), count: 0 });
   bySource.sort((a, b) => b.amount - a.amount);
 
   const byType = [...typeMap.entries()].map(([type, v]) => ({ type, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
-  const byMethod = [...methodMap.entries()].map(([method, v]) => ({ method, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
+
+  // Individual payments for drill-down — orders + spa + banquet, so EVERY panel's sales
+  // (cashier/POS, room service, spa, bar, events) are visible with who collected each.
+  const inDateRange = (raw: unknown) => { const d = new Date(String(raw)); return !Number.isNaN(d.getTime()) && (!from || d >= from) && (!toEnd || d <= toEnd); };
+  const orderPayments = paid.map(o => ({
+    id: `o-${o.id}`, orderNumber: o.invoiceNumber || `#${o.id}`,
+    source: sourceOf(o.type), type: String(o.type || "dine_in"),
+    method: methodOf(o), collector: collectorOf(o),
+    amount: round(orderGrossTotal(o)),
+    tableName: o.tableName || null, customerName: o.customerName || null,
+    upiId: (o.metadata as any)?.payment?.upiId || null, utr: (o.metadata as any)?.payment?.utr || null,
+    at: String((o.metadata as any)?.payment?.collectedAt || o.createdAt),
+  }));
+
+  const SPA_OK = new Set(["booked", "confirmed", "in_progress", "completed"]);
+  const spaRows = await db.select({ id: spaBookingsTable.id, serviceName: spaBookingsTable.serviceName, guestName: spaBookingsTable.guestName, price: spaBookingsTable.price, status: spaBookingsTable.status, createdAt: spaBookingsTable.createdAt, metadata: spaBookingsTable.metadata })
+    .from(spaBookingsTable).where(eq(spaBookingsTable.restaurantId, id));
+  const spaPayments = spaRows.filter(s => SPA_OK.has(String(s.status ?? "").toLowerCase()) && inDateRange(s.createdAt)).map(s => {
+    const pay = (s.metadata as any)?.payment ?? {};
+    return {
+      id: `s-${s.id}`, orderNumber: `SPA-${s.id}`, source: "Spa", type: "spa",
+      method: pay.method ? String(pay.method).toUpperCase() : "—",
+      collector: collectorLabel(pay.collectedBy, pay.method ? String(pay.method).toUpperCase() : "—"),
+      amount: round(parseMoney(s.price)),
+      tableName: null, customerName: s.guestName || s.serviceName || null,
+      upiId: pay.upiId || null, utr: pay.utr || null, at: String(pay.collectedAt || s.createdAt),
+    };
+  });
+
+  const banquetRows = await db.select({ id: banquetEventsTable.id, name: banquetEventsTable.name, advancePaid: banquetEventsTable.advancePaid, status: banquetEventsTable.status, createdAt: banquetEventsTable.createdAt })
+    .from(banquetEventsTable).where(eq(banquetEventsTable.restaurantId, id));
+  const banquetPayments = banquetRows.filter(b => String(b.status ?? "").toLowerCase() !== "cancelled" && parseMoney(b.advancePaid) > 0 && inDateRange(b.createdAt)).map(b => ({
+    id: `b-${b.id}`, orderNumber: `EVT-${b.id}`, source: "Events & Banquet", type: "banquet",
+    method: "Advance", collector: "Events desk",
+    amount: round(parseMoney(b.advancePaid)),
+    tableName: null, customerName: b.name || null, upiId: null, utr: null, at: String(b.createdAt),
+  }));
+
+  const payments = [...orderPayments, ...spaPayments, ...banquetPayments].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  // Collected-by + payment-method from ALL payments (orders + spa + banquet), so every
+  // method and every collector used anywhere in the restaurant is shown.
+  const collAll = new Map<string, { amount: number; count: number }>();
+  const methAll = new Map<string, { amount: number; count: number }>();
+  for (const p of payments) {
+    const c = collAll.get(p.collector) || { amount: 0, count: 0 }; c.amount += p.amount; c.count += 1; collAll.set(p.collector, c);
+    const m = methAll.get(p.method) || { amount: 0, count: 0 }; m.amount += p.amount; m.count += 1; methAll.set(p.method, m);
+  }
+  const byCollector = [...collAll.entries()].map(([collector, v]) => ({ collector, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
+  const byMethod = [...methAll.entries()].map(([method, v]) => ({ method, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
 
   res.json({
     from: from ? from.toISOString().slice(0, 10) : null,
     to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
-    total: round(orderRevenue + spaRevenue),
+    total: round(orderRevenue + spaRevenue + banquetRevenue),
     orderRevenue,
     spaRevenue,
+    banquetRevenue,
     totalOrders: paid.length,
     bySource,
     byType,
     byMethod,
+    byCollector,
+    payments,
   });
 });
 

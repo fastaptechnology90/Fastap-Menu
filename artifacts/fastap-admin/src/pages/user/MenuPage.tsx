@@ -10,6 +10,7 @@ import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestEmpty } from "@/components/user/GuestApiState";
 import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
+import { loadActiveOrder, clearActiveOrder } from "@/lib/activeOrder";
 import { MenuGridCard } from "@/components/user/MenuGridCard";
 import { ServiceHubSheet } from "@/components/user/ServiceHubSheet";
 import { MenuFilterSheet } from "@/components/user/MenuFilterSheet";
@@ -458,6 +459,32 @@ export default function MenuPage() {
   const { loadMenuWithCache, isOnline, connectionStatus, settings, pendingOrders } = useOffline();
   const { canInstall, isStandalone, installApp } = usePwa();
   const [menuFromCache, setMenuFromCache] = useState(false);
+  // The guest's active (unbilled) order, restored on reopen so they see it + can edit it.
+  const [activeOrder, setActiveOrder] = useState<{ id: string; total: number; status: string; items: { menuItemId?: number | string; id?: number | string; name: string; quantity?: number; qty?: number; customizations?: string[]; addons?: unknown[]; variant?: string }[] } | null>(null);
+  const OPEN_ORDER = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "serving", "served"];
+  async function refreshActiveOrder() {
+    const ref = loadActiveOrder();
+    if (!ref?.id) { setActiveOrder(null); return; }
+    try {
+      const o = await publicApi.getOrder(ref.id);
+      const status = String(o?.status ?? "").toLowerCase();
+      if (!o || !OPEN_ORDER.includes(status)) { clearActiveOrder(); setActiveOrder(null); return; }
+      setActiveOrder({ id: String(o.id), total: parseFloat(String(o.total)) || 0, status, items: Array.isArray(o.items) ? o.items : [] });
+    } catch { setActiveOrder(null); }
+  }
+  useEffect(() => { refreshActiveOrder(); /* eslint-disable-next-line */ }, []);
+  // Quantity of a menu item already in the active order (plain lines only — no customizations).
+  function orderedQtyOf(itemId: string) {
+    if (!activeOrder) return 0;
+    return activeOrder.items
+      .filter(i => String(i.menuItemId ?? i.id) === String(itemId) && (!i.customizations || i.customizations.length === 0) && (!i.addons || (i.addons as unknown[]).length === 0) && !i.variant)
+      .reduce((s, i) => s + (i.quantity ?? i.qty ?? 1), 0);
+  }
+  async function adjustOrdered(itemId: string, delta: number) {
+    if (!activeOrder) return;
+    try { await publicApi.adjustOrderItem(activeOrder.id, Number(itemId), delta); await refreshActiveOrder(); }
+    catch { /* order may be locked (already prepared) */ await refreshActiveOrder(); }
+  }
   const [activeCategory, setActiveCategory] = useState("all");
   const [categoryGroup, setCategoryGroup] = useState<CategoryGroup>("all");
   const [search, setSearch] = useState("");
@@ -761,11 +788,31 @@ export default function MenuPage() {
                 ) : null}
               </p>
 
+              {activeOrder && !isDemo && (
+                <button
+                  onClick={() => navigate(`/user/order/${activeOrder.id}`)}
+                  className="w-full mb-3 flex items-center gap-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 px-4 py-3 text-left active:scale-[0.99] transition-transform"
+                >
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-emerald-300">Your order is on the way 🍽️</p>
+                    <p className="text-xs text-white/50">{activeOrder.items.length} item{activeOrder.items.length !== 1 ? "s" : ""} · ₹{activeOrder.total} · tap to track the timer</p>
+                  </div>
+                  <span className="text-emerald-300 text-sm font-bold shrink-0">Track →</span>
+                </button>
+              )}
+              {activeOrder && !isDemo && (
+                <p className="text-[11px] text-white/40 mb-3 px-1">Neeche jo items order me hain unpe <b className="text-rose-300">−</b> dabao to hat jayenge, aur nayi cheez pe <b className="text-emerald-300">+</b> dabao to isi order me add ho jayegi.</p>
+              )}
               <div className="menu-app__grid">
                 {filteredItems.map(item => {
-                  // Plain cart line (no customizations) that the card's +/- stepper controls.
+                  // With an active (unbilled) order, the card reflects what's already ordered and
+                  // edits the order live (+/- ). Otherwise it controls the plain cart line.
                   const line = cart.find(c => c.menuItemId === item.id && (!c.customizations || c.customizations.length === 0));
-                  const qty = line?.quantity ?? 0;
+                  const qty = activeOrder ? orderedQtyOf(item.id) : (line?.quantity ?? 0);
                   return (
                     <MenuGridCard
                       key={item.id}
@@ -773,9 +820,9 @@ export default function MenuPage() {
                       readOnly={isDemo}
                       quantity={qty}
                       onOpen={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
-                      onAdd={e => { e.stopPropagation(); handleAdd(item, [], []); announce(`${item.name} added to order`); }}
-                      onIncrement={e => { e.stopPropagation(); handleAdd(item, [], []); }}
-                      onDecrement={e => { e.stopPropagation(); if (line) updateQuantity(line.id, qty - 1); }}
+                      onAdd={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, 1); else handleAdd(item, [], []); announce(`${item.name} added to order`); }}
+                      onIncrement={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, 1); else handleAdd(item, [], []); }}
+                      onDecrement={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, -1); else if (line) updateQuantity(line.id, qty - 1); }}
                     />
                   );
                 })}

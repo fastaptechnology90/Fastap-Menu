@@ -24,7 +24,7 @@ import {
 import { PLATFORM_CURRENCY } from "../lib/currency.js";
 import { invalidateRestaurantAnalyticsCache } from "../lib/analytics-cache.js";
 import { sumOrderTotals, isPaidOrder } from "../lib/payment-calculations.js";
-import { getSpaRevenue, getSpaRevenueByRestaurant } from "../lib/ancillary-revenue.js";
+import { getSpaRevenue, getSpaRevenueByRestaurant, getBanquetRevenue, getBanquetRevenueByRestaurant } from "../lib/ancillary-revenue.js";
 import {
   listApprovals, createApproval, updateApproval, listPlatformReservations, updatePlatformReservation,
   getRolePermissions, setRolePermissions,
@@ -105,13 +105,16 @@ router.get("/superadmin/revenue", ...admin, async (req, res): Promise<void> => {
   };
   const inRangeRows = rows.filter(inRange);
   const orderRevenue = sumOrderTotals(inRangeRows);
-  const spaRevenue = await getSpaRevenue(restaurantId && !Number.isNaN(restaurantId) ? restaurantId : null, from, toEnd);
+  const rid = restaurantId && !Number.isNaN(restaurantId) ? restaurantId : null;
+  const spaRevenue = await getSpaRevenue(rid, from, toEnd);
+  const banquetRevenue = await getBanquetRevenue(rid, from, toEnd);
   res.json({
     from: from ? from.toISOString().slice(0, 10) : null,
     to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
-    revenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+    revenue: Math.round((orderRevenue + spaRevenue + banquetRevenue) * 100) / 100,
     orderRevenue,
     spaRevenue,
+    banquetRevenue,
     totalOrders: inRangeRows.length,
   });
 });
@@ -131,14 +134,16 @@ router.get("/superadmin/restaurant-revenues", ...admin, async (_req, res): Promi
     byRest.set(o.restaurantId, arr);
   }
   const spaByRest = await getSpaRevenueByRestaurant();   // one query for all restaurants
+  const banquetByRest = await getBanquetRevenueByRestaurant();
   const rows = restaurants.map(r => {
     const orders = byRest.get(r.id) ?? [];
     const orderRevenue = sumOrderTotals(orders);
     const spaRevenue = spaByRest.get(r.id) ?? 0;
+    const banquetRevenue = banquetByRest.get(r.id) ?? 0;
     return {
       id: r.id, name: r.name, isActive: r.isActive,
-      orderRevenue, spaRevenue,
-      totalRevenue: Math.round((orderRevenue + spaRevenue) * 100) / 100,
+      orderRevenue, spaRevenue, banquetRevenue,
+      totalRevenue: Math.round((orderRevenue + spaRevenue + banquetRevenue) * 100) / 100,
       paidOrders: orders.filter(isPaidOrder).length,
     };
   });

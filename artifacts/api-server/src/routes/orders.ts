@@ -351,6 +351,47 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   res.status(201).json(parseOrder({ ...order, invoiceNumber: generateInvoiceNumber(order.id, restaurantId) }));
 });
 
+// Live-edit a still-open order from the guest menu: +1 / -1 a plain (un-customized) item.
+// Only while the order is not yet prepared/billed. Recomputes totals so the bill stays exact.
+router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<void> => {
+  const orderId = parseInt(req.params.orderId, 10);
+  const { menuItemId, delta } = req.body;
+  const d = parseInt(String(delta), 10);
+  if (Number.isNaN(orderId) || !menuItemId || !d) { res.status(400).json({ error: "orderId, menuItemId and delta required" }); return; }
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+  const OPEN = ["new", "pending", "accepted", "confirmed", "preparing"];
+  if (!OPEN.includes(String(order.status))) { res.status(409).json({ error: "Order can no longer be changed — it's already prepared or billed." }); return; }
+
+  const items = Array.isArray(order.items) ? [...(order.items as any[])] : [];
+  const isPlain = (i: any) => (i.menuItemId === menuItemId || i.id === menuItemId) && (!i.customizations || i.customizations.length === 0) && (!i.addons || i.addons.length === 0) && !i.variant;
+  const idx = items.findIndex(isPlain);
+  if (idx >= 0) {
+    const it = items[idx];
+    const unit = parseFloat(String(it.price)) || 0;
+    const newQty = (it.quantity ?? it.qty ?? 1) + d;
+    if (newQty <= 0) items.splice(idx, 1);
+    else items[idx] = { ...it, quantity: newQty, qty: newQty, subtotal: unit * newQty };
+  } else if (d > 0) {
+    const [mi] = await db.select().from(menuItemsTable).where(and(eq(menuItemsTable.id, menuItemId), eq(menuItemsTable.restaurantId, order.restaurantId)));
+    if (!mi) { res.status(400).json({ error: "Menu item not found" }); return; }
+    const unit = parseFloat(String(mi.discountedPrice || mi.price)) || 0;
+    items.push({ id: mi.id, menuItemId: mi.id, name: mi.name, price: unit, quantity: d, qty: d, subtotal: unit * d });
+  } else {
+    res.status(400).json({ error: "Item not in order" }); return;
+  }
+
+  const subtotal = Math.round(items.reduce((s, i) => s + (parseFloat(String(i.subtotal)) || (parseFloat(String(i.price)) || 0) * (i.quantity ?? i.qty ?? 1)), 0) * 100) / 100;
+  const tax = Math.round(subtotal * 0.05 * 100) / 100;
+  const total = Math.round((subtotal + tax) * 100) / 100;
+  const [updated] = await db.update(ordersTable).set({
+    items, subtotal: String(subtotal.toFixed(2)), tax: String(tax.toFixed(2)), total: String(total.toFixed(2)),
+  }).where(eq(ordersTable.id, orderId)).returning();
+  broadcastEvent("order_updated", { id: orderId, restaurantId: order.restaurantId, tableName: order.tableName, total, status: order.status });
+  broadcastOrderEvent(orderId, "order_status", { id: orderId, status: order.status, tableName: order.tableName });
+  res.json(parseOrder(updated));
+});
+
 router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
   if (Number.isNaN(orderId)) { res.status(400).json({ error: "Invalid order ID" }); return; }

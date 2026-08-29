@@ -538,6 +538,8 @@ export const publicApi = {
   reorder: (orderId: number, body?: { tableName?: string; paymentMethod?: string }) =>
     post<any>(`/public/orders/reorder/${orderId}`, body ?? {}),
   getOrder: (orderId: number | string) => get<any>(`/public/orders/${orderId}`),
+  adjustOrderItem: (orderId: number | string, menuItemId: number, delta: number) =>
+    post<any>(`/public/orders/${orderId}/adjust-item`, { menuItemId, delta }),
   orderStatus: (orderId: number | string) => get<OrderTrackingResponse>(`/public/orders/${orderId}/status`),
   orderMessage: (orderId: number | string, body: { message: string }) =>
     post<{ success: boolean; callId?: number }>(`/public/orders/${orderId}/message`, body),
@@ -835,10 +837,12 @@ export const restaurantApi = {
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
     return get<{
-      from: string | null; to: string | null; total: number; orderRevenue: number; spaRevenue: number; totalOrders: number;
+      from: string | null; to: string | null; total: number; orderRevenue: number; spaRevenue: number; banquetRevenue?: number; totalOrders: number;
       bySource: { label: string; amount: number; count: number }[];
       byType: { type: string; amount: number; count: number }[];
       byMethod: { method: string; amount: number; count: number }[];
+      byCollector?: { collector: string; amount: number; count: number }[];
+      payments?: { id: string; orderNumber: string; source: string; type: string; method: string; collector: string; amount: number; tableName: string | null; customerName: string | null; upiId: string | null; utr: string | null; at: string }[];
     }>(`/restaurants/${rid}/revenue-breakdown${qs ? `?${qs}` : ""}`);
   },
   create: (body: any) => post<any>("/restaurants", body),

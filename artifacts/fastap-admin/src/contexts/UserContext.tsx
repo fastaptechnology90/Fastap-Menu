@@ -10,6 +10,7 @@ import {
 import { ORDER_TYPE_MAP, type OrderTypeId, type OrderMetadata, type CourseTimingId } from "@/lib/orderingCatalog";
 import type { FavoriteMeal } from "@/lib/api";
 import { queueOfflineOrder, backupCart } from "@/lib/offlineStorage";
+import { saveActiveOrder } from "@/lib/activeOrder";
 
 export type DietaryFilter = "all" | "veg" | "non-veg" | "vegan" | "jain" | "gluten-free" | "keto" | "sugar-free" | "organic" | "nut-free" | "dairy-free";
 
@@ -470,6 +471,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const order = mapOrderFromApi(created, activeRestaurant);
       setOrders(prev => [order, ...prev]);
       setCart([]);
+      // Remember this as the guest's active order so a close+reopen returns to it (with timer).
+      saveActiveOrder({ id: String(order.id), slug: venue.restaurantSlug ?? null, table: activeTable ?? null, at: Date.now() });
       return order;
     } catch (err) {
       const pendingId = `pending-${Date.now()}`;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, menu as menuApi } from "@/lib/api";
+import { splitCustomizations } from "@/lib/orderItemExtras";
 import { toast } from "@/hooks/use-toast";
 import {
   Plus, Filter, Search, CheckCircle, XCircle, Clock, ChefHat,
@@ -197,15 +198,24 @@ export default function OrderManagement() {
 
                 {/* Items */}
                 <div className="space-y-1.5 mb-3">
-                  {order.items.slice(0, 3).map((item, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-1.5 w-1.5 rounded-full ${item.status === "ready" ? "bg-emerald-400" : item.status === "preparing" ? "bg-blue-400 animate-pulse" : "bg-white/20"}`} />
-                        <span className="text-white/70">{item.qty}× {item.name}</span>
+                  {order.items.slice(0, 3).map((item, i) => {
+                    const { removes, prefs } = splitCustomizations(item.customizations);
+                    const adds = Array.isArray(item.addons) ? item.addons.map(a => a.name) : [];
+                    return (
+                      <div key={i} className="text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${item.status === "ready" ? "bg-emerald-400" : item.status === "preparing" ? "bg-blue-400 animate-pulse" : "bg-white/20"}`} />
+                            <span className="text-white/70 truncate">{item.qty}× {item.name}</span>
+                          </div>
+                          <span className="text-white/40 shrink-0">₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
+                        </div>
+                        {adds.length > 0 && <p className="text-[10px] text-emerald-300/90 ml-3.5 truncate">➕ {adds.join(", ")}</p>}
+                        {removes.length > 0 && <p className="text-[10px] text-rose-300/90 ml-3.5 truncate">➖ {removes.join(", ")}</p>}
+                        {prefs.length > 0 && <p className="text-[10px] text-cyan-300/80 ml-3.5 truncate">⚡ {prefs.join(", ")}</p>}
                       </div>
-                      <span className="text-white/40">₹{item.price * item.qty}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {order.items.length > 3 && <p className="text-xs text-white/30">+{order.items.length - 3} more items</p>}
                 </div>
 
@@ -307,11 +317,12 @@ export default function OrderManagement() {
                       {item.variant && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{item.variant}</span>}
                     </p>
                     {Array.isArray(item.addons) && item.addons.length > 0 && (
-                      <p className="text-xs text-emerald-300/80 mt-0.5">+ {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
+                      <p className="text-xs text-emerald-300/90 mt-0.5">➕ Add: {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
                     )}
-                    {Array.isArray(item.customizations) && item.customizations.length > 0 && (
-                      <p className="text-xs text-cyan-300/80 mt-0.5">{item.customizations.join(" · ")}</p>
-                    )}
+                    {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
+                      {removes.length > 0 && <p className="text-xs text-rose-300/90 mt-0.5">➖ Remove: {removes.join(", ")}</p>}
+                      {prefs.length > 0 && <p className="text-xs text-cyan-300/80 mt-0.5">⚡ {prefs.join(" · ")}</p>}
+                    </>); })()}
                     {item.notes && <p className="text-xs text-yellow-300/80 mt-0.5">📝 {item.notes}</p>}
                     <span className={`text-xs ${item.status === "ready" ? "text-emerald-400" : item.status === "preparing" ? "text-blue-400" : "text-white/30"}`}>{item.status}</span>
                   </div>

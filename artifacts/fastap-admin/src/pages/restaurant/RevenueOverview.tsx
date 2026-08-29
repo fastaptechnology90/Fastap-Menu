@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { restaurantApi } from "@/lib/api";
-import { TrendingUp, CalendarRange, Loader2, ShoppingBag, Utensils, Leaf, BedDouble, Wine, Package, CreditCard, Smartphone, Banknote, Wallet } from "lucide-react";
+import { TrendingUp, CalendarRange, Loader2, ShoppingBag, Utensils, Leaf, BedDouble, Wine, Package, CreditCard, Smartphone, Banknote, Wallet, User, X } from "lucide-react";
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,6 +39,8 @@ export default function RevenueOverview() {
     { key: "all", label: "All time", from: undefined as string | undefined, to: undefined as string | undefined },
   ];
   const [preset, setPreset] = useState("today");
+  const [drill, setDrill] = useState<{ kind: "source" | "collector" | "method"; value: string } | null>(null);
+  const [expandedPay, setExpandedPay] = useState<string | null>(null);
   const [from, setFrom] = useState(ymd(today));
   const [to, setTo] = useState(ymd(today));
   const isAll = preset === "all";
@@ -65,7 +67,7 @@ export default function RevenueOverview() {
   const CANON = ["Restaurant / POS", "Room Service", "Bar", "Takeaway", "Delivery", "Events & Banquet", "Spa"];
   const rows = CANON.map(label => {
     const found = (data?.bySource ?? []).find(s => s.label === label);
-    const amount = found?.amount ?? (label === "Spa" ? (data?.spaRevenue ?? 0) : 0);
+    const amount = found?.amount ?? (label === "Spa" ? (data?.spaRevenue ?? 0) : label === "Events & Banquet" ? (data?.banquetRevenue ?? 0) : 0);
     return { label, amount, count: found?.count ?? 0 };
   });
 
@@ -101,6 +103,7 @@ export default function RevenueOverview() {
         <div className="flex flex-wrap gap-4 mt-3 text-sm">
           <span className="text-white/70"><Utensils className="h-3.5 w-3.5 inline mb-0.5 text-cyan-400" /> Orders: <b>{fmt(data?.orderRevenue)}</b></span>
           <span className="text-white/70"><Leaf className="h-3.5 w-3.5 inline mb-0.5 text-emerald-400" /> Spa: <b>{fmt(data?.spaRevenue)}</b></span>
+          {(data?.banquetRevenue ?? 0) > 0 && <span className="text-white/70"><Package className="h-3.5 w-3.5 inline mb-0.5 text-violet-400" /> Events: <b>{fmt(data?.banquetRevenue)}</b></span>}
           <span className="text-white/40">· {data?.totalOrders ?? 0} paid orders</span>
         </div>
       </div>
@@ -124,9 +127,10 @@ export default function RevenueOverview() {
             <tbody className="divide-y divide-white/5">
               {rows.map(r => {
                 const Icon = SOURCE_ICON[r.label] || Utensils;
+                const clickable = r.amount > 0;
                 return (
-                  <tr key={r.label} className={r.amount > 0 ? "" : "opacity-45"}>
-                    <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/40" /> {r.label}</span></td>
+                  <tr key={r.label} onClick={() => clickable && setDrill({ kind: "source", value: r.label })} title={clickable ? "Click to see payments" : undefined} className={`${r.amount > 0 ? "" : "opacity-45"} ${clickable ? "cursor-pointer hover:bg-white/5" : ""} transition-colors`}>
+                    <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/40" /> {r.label}{clickable && <span className="text-white/25 text-xs">›</span>}</span></td>
                     <td className="px-4 py-2.5 text-right text-white/60">{r.label === "Spa" ? "—" : r.count}</td>
                     <td className="px-4 py-2.5 text-right font-semibold text-amber-400">{fmt(r.amount)}</td>
                     <td className="px-4 py-2.5 text-right text-white/50">{pct(r.amount)}%</td>
@@ -165,17 +169,24 @@ export default function RevenueOverview() {
       </Section>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* By payment method */}
-        <Section title="By payment method" subtitle={`Order payments · ${fmt(data?.orderRevenue)}`}>
-          {(data?.byMethod ?? []).length === 0 ? <Empty /> : (data?.byMethod ?? []).map(m => {
-            const Icon = METHOD_ICON[m.method] || Banknote;
-            return (
-              <div key={m.method} className="flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5 text-sm">
-                <span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/50" /> {m.method} <span className="text-white/30 text-xs">· {m.count}</span></span>
-                <span className="font-bold">{fmt(m.amount)}</span>
-              </div>
-            );
-          })}
+        {/* By payment method — every method used across the whole restaurant */}
+        <Section title="By payment method" subtitle="UPI · Cash · Card · Wallet · Room bill · Aggregator — sab">
+          {(() => {
+            const CANON_M = ["Cash", "UPI", "Card", "Wallet", "Room bill", "Aggregator"];
+            const map = new Map((data?.byMethod ?? []).map(m => [m.method, m]));
+            const extras = (data?.byMethod ?? []).filter(m => !CANON_M.includes(m.method));
+            const mrows = [...CANON_M.map(method => map.get(method) ?? { method, amount: 0, count: 0 }), ...extras];
+            return mrows.map(m => {
+              const Icon = METHOD_ICON[m.method] || Banknote;
+              const clickable = m.count > 0;
+              return (
+                <div key={m.method} onClick={() => clickable && setDrill({ kind: "method", value: m.method })} className={`flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5 text-sm ${clickable ? "cursor-pointer hover:border-amber-500/30" : "opacity-45"} transition-colors`}>
+                  <span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/50" /> {m.method} <span className="text-white/30 text-xs">· {m.count}</span>{clickable && <span className="text-white/25 text-xs">›</span>}</span>
+                  <span className="font-bold">{fmt(m.amount)}</span>
+                </div>
+              );
+            });
+          })()}
         </Section>
 
         {/* By order type */}
@@ -189,7 +200,62 @@ export default function RevenueOverview() {
         </Section>
       </div>
 
-      <p className="text-[11px] text-white/30">Note: "By panel" ka total grand total ({fmt(total)}) = orders + spa. "By payment method" aur "By order type" sirf order revenue ({fmt(data?.orderRevenue)}) cover karte hain (spa alag). Same paid-order rule sab jagah.</p>
+      {/* Collected by — kisne (kis panel/staff) kitna collect kiya */}
+      <Section title="Collected by" subtitle="Kisne (kis staff/panel) kitna payment collect kiya">
+        {(data?.byCollector ?? []).length === 0 ? <Empty /> : (data?.byCollector ?? []).map(c => (
+          <div key={c.collector} onClick={() => setDrill({ kind: "collector", value: c.collector })} className="flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5 text-sm cursor-pointer hover:border-amber-500/30 transition-colors">
+            <span className="flex items-center gap-2"><User className="h-4 w-4 text-white/50" /> {c.collector} <span className="text-white/30 text-xs">· {c.count}</span><span className="text-white/25 text-xs">›</span></span>
+            <span className="font-bold">{fmt(c.amount)}</span>
+          </div>
+        ))}
+      </Section>
+
+      <p className="text-[11px] text-white/30">Tip: kisi bhi panel/source row pe <b>click</b> karo → us panel ke saare individual payments (order, amount, method, kisne collect kiya) dikhenge. "By panel" total = grand total ({fmt(total)}). Same paid-order rule sab jagah.</p>
+
+      {/* Drill-down: payments for the clicked source */}
+      {drill && (() => {
+        const list = (data?.payments ?? []).filter(p => (drill.kind === "source" ? p.source : drill.kind === "collector" ? p.collector : p.method) === drill.value);
+        const sum = list.reduce((s, p) => s + p.amount, 0);
+        const kindLabel = drill.kind === "source" ? "panel" : drill.kind === "collector" ? "collected by" : "method";
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setDrill(null); setExpandedPay(null); }}>
+            <div className="w-full max-w-lg bg-[#111827] rounded-2xl border border-white/10 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-[#111827]">
+                <div>
+                  <h3 className="font-bold">{drill.value} <span className="text-white/40 text-xs font-normal">· {kindLabel}</span></h3>
+                  <p className="text-xs text-white/40">{list.length} payment{list.length !== 1 ? "s" : ""} · {fmt(sum)}</p>
+                </div>
+                <button onClick={() => setDrill(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+              <div className="p-3 space-y-2">
+                {list.length === 0 ? <p className="text-sm text-white/30 py-6 text-center">Is panel me abhi koi payment nahi.</p> : list.map(p => {
+                  const open = expandedPay === p.id;
+                  return (
+                  <div key={p.id} onClick={() => setExpandedPay(open ? null : p.id)} className="bg-white/[0.03] border border-white/5 rounded-xl p-3 cursor-pointer hover:border-amber-500/30 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">{p.orderNumber}{p.tableName ? ` · ${p.tableName}` : ""}</span>
+                      <span className="text-amber-400 font-bold">{fmt(p.amount)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px]">
+                      <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300">{p.method}</span>
+                      {p.customerName && <span className="text-white/50">{p.customerName}</span>}
+                      <span className="text-white/40">collected by: <b className="text-white/70">{p.collector}</b></span>
+                      <span className="text-white/25 ml-auto">{open ? "▲" : "▼"}</span>
+                    </div>
+                    {open && (
+                      <div className="mt-2 pt-2 border-t border-white/5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                        {[["Panel", p.source], ["Type", p.type], ["Amount", fmt(p.amount)], ["Method", p.method], ["Collected by", p.collector], ["Guest", p.customerName || "—"], ["Table", p.tableName || "—"], ["UPI ID", p.upiId || "—"], ["UTR / Ref", p.utr || "—"], ["Time", p.at ? new Date(p.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"]].map(([k, v]) => (
+                          <div key={k}><span className="text-white/35">{k}: </span><span className="text-white/75 capitalize">{v}</span></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );})}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
