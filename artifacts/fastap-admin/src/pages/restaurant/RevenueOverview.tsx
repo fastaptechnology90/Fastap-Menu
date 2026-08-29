@@ -76,7 +76,7 @@ export default function RevenueOverview() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-extrabold flex items-center gap-2"><TrendingUp className="h-5 w-5 text-amber-400" /> Revenue Overview</h1>
-          <p className="text-xs text-white/40">Poora revenue breakdown — kis panel se kitna, kis method se kitna, sab kuch.</p>
+          <p className="text-xs text-white/40">Full revenue breakdown — by panel, by payment method, everything.</p>
         </div>
         {isFetching && <Loader2 className="h-4 w-4 animate-spin text-white/40" />}
       </div>
@@ -112,7 +112,7 @@ export default function RevenueOverview() {
       <div className="rounded-2xl bg-[#0e1520] border border-white/8 overflow-hidden">
         <div className="px-4 py-3 border-b border-white/8">
           <h2 className="text-sm font-bold">Revenue by source — full table</h2>
-          <p className="text-[11px] text-white/40">Orders · Cashier/POS · Room Service · Bar · Spa · Events — sab ek jagah</p>
+          <p className="text-[11px] text-white/40">Orders · Cashier/POS · Room Service · Bar · Spa · Events — all in one place</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -151,7 +151,7 @@ export default function RevenueOverview() {
       </div>
 
       {/* By source / panel */}
-      <Section title="By panel / source" subtitle="Kis panel se kitna revenue aaya">
+      <Section title="By panel / source" subtitle="Revenue from each panel">
         {(data?.bySource ?? []).length === 0 ? <Empty /> : (data?.bySource ?? []).map((s, i) => {
           const Icon = SOURCE_ICON[s.label] || Utensils;
           return (
@@ -170,7 +170,7 @@ export default function RevenueOverview() {
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* By payment method — every method used across the whole restaurant */}
-        <Section title="By payment method" subtitle="UPI · Cash · Card · Wallet · Room bill · Aggregator — sab">
+        <Section title="By payment method" subtitle="UPI · Cash · Card · Wallet · Room bill · Aggregator">
           {(() => {
             const CANON_M = ["Cash", "UPI", "Card", "Wallet", "Room bill", "Aggregator"];
             const map = new Map((data?.byMethod ?? []).map(m => [m.method, m]));
@@ -201,7 +201,7 @@ export default function RevenueOverview() {
       </div>
 
       {/* Collected by — kisne (kis panel/staff) kitna collect kiya */}
-      <Section title="Collected by" subtitle="Kisne (kis staff/panel) kitna payment collect kiya">
+      <Section title="Collected by" subtitle="Which staff / panel collected how much">
         {(data?.byCollector ?? []).length === 0 ? <Empty /> : (data?.byCollector ?? []).map(c => (
           <div key={c.collector} onClick={() => setDrill({ kind: "collector", value: c.collector })} className="flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2.5 text-sm cursor-pointer hover:border-amber-500/30 transition-colors">
             <span className="flex items-center gap-2"><User className="h-4 w-4 text-white/50" /> {c.collector} <span className="text-white/30 text-xs">· {c.count}</span><span className="text-white/25 text-xs">›</span></span>
@@ -210,7 +210,7 @@ export default function RevenueOverview() {
         ))}
       </Section>
 
-      <p className="text-[11px] text-white/30">Tip: kisi bhi panel/source row pe <b>click</b> karo → us panel ke saare individual payments (order, amount, method, kisne collect kiya) dikhenge. "By panel" total = grand total ({fmt(total)}). Same paid-order rule sab jagah.</p>
+      <p className="text-[11px] text-white/30">Tip: <b>click</b> any panel / method / collector row to see its individual payments (order, amount, method, who collected). "By panel" total = grand total ({fmt(total)}). Same paid-order rule everywhere.</p>
 
       {/* Drill-down: payments for the clicked source */}
       {drill && (() => {
@@ -228,7 +228,7 @@ export default function RevenueOverview() {
                 <button onClick={() => setDrill(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
               </div>
               <div className="p-3 space-y-2">
-                {list.length === 0 ? <p className="text-sm text-white/30 py-6 text-center">Is panel me abhi koi payment nahi.</p> : list.map(p => {
+                {list.length === 0 ? <p className="text-sm text-white/30 py-6 text-center">No payments here yet.</p> : list.map(p => {
                   const open = expandedPay === p.id;
                   return (
                   <div key={p.id} onClick={() => setExpandedPay(open ? null : p.id)} className="bg-white/[0.03] border border-white/5 rounded-xl p-3 cursor-pointer hover:border-amber-500/30 transition-colors">

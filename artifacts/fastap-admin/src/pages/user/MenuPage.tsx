@@ -805,7 +805,7 @@ export default function MenuPage() {
                 </button>
               )}
               {activeOrder && !isDemo && (
-                <p className="text-[11px] text-white/40 mb-3 px-1">Neeche jo items order me hain unpe <b className="text-rose-300">−</b> dabao to hat jayenge, aur nayi cheez pe <b className="text-emerald-300">+</b> dabao to isi order me add ho jayegi.</p>
+                <p className="text-[11px] text-white/40 mb-3 px-1">Tap <b className="text-rose-300">−</b> on an item already in your order to remove it, or <b className="text-emerald-300">+</b> on anything new to add it to this same order.</p>
               )}
               <div className="menu-app__grid">
                 {filteredItems.map(item => {
