@@ -697,14 +697,8 @@ export default function MenuPage() {
         <div className="menu-app__brand-row">
           <GuestBackButton fallback="/" />
           <div className="menu-app__brand">
-            {/* Demo menu: no venue branding — just "Demo Menu". Real venues show name + table. */}
+            {/* Restaurant name only — no table/section subtitle, per the minimal header. */}
             <h1 className="menu-app__title">{isDemo ? "Demo Menu" : activeRestaurant}</h1>
-            {!isDemo && (
-              <p className="menu-app__subtitle">
-                {activeTable || "Table"} · {activeSection}
-                {menuFromCache ? " · Cached" : ""}
-              </p>
-            )}
           </div>
           {/* Header kept intentionally minimal: restaurant name only — no services/explore or
               profile/sign-in buttons. Back, search and filter are the only controls. */}
