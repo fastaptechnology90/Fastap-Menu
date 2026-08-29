@@ -4,6 +4,7 @@ import { db, restaurantsTable, categoriesTable, menuItemsTable, menuViewsTable, 
 import { MENU_CATEGORY_CATALOG, DIETARY_FILTERS, DEFAULT_CUSTOMIZATION } from "../seed-menu-data.js";
 import { buildUpsellSuggestions } from "../lib/ordering.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
+import { resolveVenueSlug } from "../lib/demo-venue.js";
 
 const router: IRouter = Router();
 
@@ -25,7 +26,7 @@ function formatMenuItem(i: typeof menuItemsTable.$inferSelect) {
 
 router.get("/public/menu/:slug", async (req, res): Promise<void> => {
   try {
-    const slug = req.params.slug;
+    const slug = resolveVenueSlug(req.params.slug);
     const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.slug, slug));
     if (!restaurant) { res.status(404).json({ error: "Menu not found" }); return; }
     if (!canAccessGuestVenue(restaurant)) {

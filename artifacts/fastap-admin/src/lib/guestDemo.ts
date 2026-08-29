@@ -1,10 +1,13 @@
 import { parseEntryFromUrl, loadEntryContext } from "./smartEntry";
 
-/** Demo venue defaults for landing → guest navigation (legacy marketing links) */
-export const DEMO_SLUG = "spice-garden";
+/** Demo venue defaults for landing → guest navigation (legacy marketing links).
+ * DEMO_SLUG is a NEUTRAL alias so the demo URL never exposes the real restaurant slug.
+ * The backend maps this alias to the actual demo venue (see lib/demo-venue.ts). */
+export const DEMO_SLUG = "demo";
 export const DEMO_TABLE = "T-12";
 export const DEMO_MENU_PATH = "/user/menu";
-export const DEMO_MENU_URL = `/user/menu?slug=${DEMO_SLUG}&table=${DEMO_TABLE}`;
+// Demo link is just a menu preview — no table number in the URL.
+export const DEMO_MENU_URL = `/user/menu?slug=${DEMO_SLUG}`;
 
 function usableSlug(slug: string | undefined | null): string | null {
   const s = slug?.trim();

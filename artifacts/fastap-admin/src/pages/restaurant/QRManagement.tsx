@@ -112,7 +112,15 @@ export default function QRManagement() {
       const updated = await apiFetch(`/restaurants/${restaurantId}/qrcodes`);
       setQrcodes(Array.isArray(updated) ? updated : []);
       setShowAdd(false); setNewName("");
-      toast({ title: "QR code saved", description: `“${name}” is ready.` });
+      // Jump to the tab where this QR will actually appear so the user sees it right away.
+      // Table-linked QRs -> Tables; room QRs -> Rooms; everything else (takeaway/general/
+      // an unlinked "table") lands under General.
+      const destTab = normalizedRoom ? "room" : (tableId ? "table" : "general");
+      setTab(destTab);
+      toast({
+        title: "QR code saved",
+        description: `“${name}” is ready — shown in the ${destTab === "room" ? "Rooms" : destTab === "table" ? "Tables" : "General"} tab.`,
+      });
     } catch (e) {
       console.error(e);
       toast({ title: "Failed to generate QR", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
@@ -316,6 +324,7 @@ export default function QRManagement() {
                   <option value="takeaway">Takeaway</option>
                   <option value="general">General</option>
                 </select>
+                <p className="text-[11px] text-slate-400 mt-1">Tip: a table's own QR is created from its card in the Tables tab. QRs made here (Takeaway / General / an unlinked Table) appear under the <b>General</b> tab.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter } from "lucide-react";
+import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter, Eye } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { procurement as procurementApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
@@ -47,6 +47,8 @@ export default function PurchaseProcurement() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPO, setSelectedPO] = useState<PurchaseOrderRow | null>(null);
+  const [detailSupplier, setDetailSupplier] = useState<SupplierRow | null>(null);
+  const [detailInvoice, setDetailInvoice] = useState<{ id: string; po: string; supplier: string; amount: number; dueDate: string; status: string; paidOn: string | null; gst: number } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [poForm, setPoForm] = useState({ supplierName: "", itemName: "", qty: 1, unitPrice: 0 });
   const [creatingPo, setCreatingPo] = useState(false);
@@ -270,7 +272,7 @@ export default function PurchaseProcurement() {
           {suppliers.length === 0 ? <EmptyState title="No suppliers" /> : suppliers.map(s=>{
             const creditPct = Math.round((s.creditUsed/s.creditLimit)*100);
             return (
-              <div key={s.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
+              <div key={s.id} onClick={()=>setDetailSupplier(s)} title="Click for full supplier details" className="bg-[#0e1520] border border-white/5 rounded-2xl p-5 cursor-pointer hover:border-blue-500/30 transition-colors">
                 <div className="flex items-start gap-4">
                   <div className="h-12 w-12 rounded-2xl bg-blue-500/15 flex items-center justify-center shrink-0"><Building2 className="h-6 w-6 text-blue-400"/></div>
                   <div className="flex-1 min-w-0">
@@ -299,7 +301,8 @@ export default function PurchaseProcurement() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 shrink-0">
+                  <div className="flex flex-col gap-2 shrink-0" onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>setDetailSupplier(s)} title="View details" className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-semibold hover:bg-blue-500/30 flex items-center justify-center gap-1"><Eye className="h-3.5 w-3.5"/>View</button>
                     <button onClick={()=>{ setPoForm(f=>({...f,supplierName:s.name})); setShowAdd(true); }} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">New PO</button>
                     <button onClick={()=>{ setSearch(s.name); setTab("purchase-orders"); }} className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10">History</button>
                   </div>
@@ -328,7 +331,7 @@ export default function PurchaseProcurement() {
               {invoiceList.map(inv=>{
                 const cfg = invStatusCfg(inv.status);
                 return (
-                  <tr key={inv.id} className={`hover:bg-white/3 transition-all ${inv.status==="overdue"?"bg-red-500/3":""}`}>
+                  <tr key={inv.id} onClick={()=>setDetailInvoice(inv)} title="Click for full invoice details" className={`cursor-pointer hover:bg-white/5 transition-all ${inv.status==="overdue"?"bg-red-500/3":""}`}>
                     <td className="py-3 pr-4 font-mono text-xs text-amber-400">{inv.id}</td>
                     <td className="py-3 pr-4 text-xs text-white/50">{inv.po}</td>
                     <td className="py-3 pr-4 font-semibold">{inv.supplier}</td>
@@ -336,9 +339,12 @@ export default function PurchaseProcurement() {
                     <td className="py-3 pr-4 text-white/50">₹{inv.gst.toLocaleString()}</td>
                     <td className="py-3 pr-4 text-white/60">{inv.dueDate}</td>
                     <td className="py-3 pr-4"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span></td>
-                    <td className="py-3">
-                      {inv.status!=="paid"&&<button onClick={()=>payInvoice(inv)} className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Pay Now</button>}
-                      {inv.status==="paid"&&<button onClick={()=>window.print()} className="px-3 py-1 rounded-lg border border-white/10 text-xs text-white/40 hover:bg-white/5">Receipt</button>}
+                    <td className="py-3" onClick={e=>e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={()=>setDetailInvoice(inv)} title="View invoice" className="h-7 w-7 rounded-lg bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 flex items-center justify-center shrink-0"><Eye className="h-3.5 w-3.5"/></button>
+                        {inv.status!=="paid"&&<button onClick={()=>payInvoice(inv)} className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Pay Now</button>}
+                        {inv.status==="paid"&&<button onClick={()=>window.print()} className="px-3 py-1 rounded-lg border border-white/10 text-xs text-white/40 hover:bg-white/5">Receipt</button>}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -424,6 +430,106 @@ export default function PurchaseProcurement() {
           </div>
         </div>
       )}
+
+      {/* Supplier full detail */}
+      {detailSupplier && (() => {
+        const s = detailSupplier;
+        const creditPct = s.creditLimit > 0 ? Math.round((s.creditUsed / s.creditLimit) * 100) : 0;
+        const rows: [string, string][] = [
+          ["Supplier", s.name],
+          ["Category", s.category || "—"],
+          ["Contact person", s.contact || "—"],
+          ["Phone", s.phone || "—"],
+          ["Email", s.email || "—"],
+          ["Payment terms", s.paymentTerms || "—"],
+          ["Status", s.status === "inactive" ? "Inactive" : "Active"],
+          ["Rating", `${s.rating}★`],
+          ["Total orders", String(s.totalOrders)],
+          ["Total spend", `₹${s.totalSpend.toLocaleString("en-IN")}`],
+          ["Credit limit", `₹${s.creditLimit.toLocaleString("en-IN")}`],
+          ["Credit used", `₹${s.creditUsed.toLocaleString("en-IN")}`],
+        ];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailSupplier(null)}>
+            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-xl bg-blue-500/15 flex items-center justify-center"><Building2 className="h-4 w-4 text-blue-400" /></span>{s.name}</h3>
+                  <p className="text-xs text-white/40 mt-0.5">{s.category} · {s.paymentTerms} credit</p>
+                </div>
+                <button onClick={() => setDetailSupplier(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {rows.map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-sm font-medium break-all">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1"><span className="text-white/40">Credit Utilization</span><span className={creditPct > 80 ? "text-red-400" : "text-white/50"}>{creditPct}%</span></div>
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div className={`h-full rounded-full ${creditPct > 80 ? "bg-red-500" : creditPct > 60 ? "bg-yellow-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(creditPct, 100)}%` }} />
+                  </div>
+                </div>
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => { setPoForm(f => ({ ...f, supplierName: s.name })); setShowAdd(true); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-xl bg-amber-500/20 text-amber-300 text-sm font-bold hover:bg-amber-500/30">New PO</button>
+                  <button onClick={() => { setSearch(s.name); setTab("purchase-orders"); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">View POs</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Invoice full detail */}
+      {detailInvoice && (() => {
+        const inv = detailInvoice;
+        const cfg = invStatusCfg(inv.status);
+        const rows: [string, string][] = [
+          ["Invoice No.", inv.id],
+          ["PO Reference", inv.po],
+          ["Supplier", inv.supplier],
+          ["Amount", `₹${inv.amount.toLocaleString("en-IN")}`],
+          ["GST (18%)", `₹${inv.gst.toLocaleString("en-IN")}`],
+          ["Total (incl. GST)", `₹${(inv.amount + inv.gst).toLocaleString("en-IN")}`],
+          ["Due date", inv.dueDate || "—"],
+          ["Status", inv.status],
+          ["Paid on", inv.paidOn || "—"],
+        ];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailInvoice(null)}>
+            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-xl bg-amber-500/15 flex items-center justify-center"><FileText className="h-4 w-4 text-amber-400" /></span>{inv.id}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span>
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5">{inv.supplier}</p>
+                </div>
+                <button onClick={() => setDetailInvoice(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {rows.map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-sm font-medium break-all capitalize">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                  {inv.status !== "paid" && <button onClick={() => { payInvoice(inv); setDetailInvoice(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30">Pay Now</button>}
+                  <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">Print / Receipt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

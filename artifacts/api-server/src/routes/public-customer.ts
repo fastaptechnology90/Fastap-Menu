@@ -44,6 +44,7 @@ import {
   autoAssignRoomServiceRequest,
 } from "../lib/staff-auto-assignment.js";
 import { normalizeBuckets, totalBalance } from "../lib/customerWalletLogic.js";
+import { resolveVenueSlug } from "../lib/demo-venue.js";
 import { tierFromPoints, normalizeRewardsMeta } from "../lib/loyaltyMembershipLogic.js";
 import {
   parseDeviceInfo, recordDeviceLogin, removeDevice, trustDevice, markAlertsRead,
@@ -157,7 +158,7 @@ router.get("/public/venues", async (_req, res): Promise<void> => {
 });
 
 router.get("/public/venue/:slug", async (req, res): Promise<void> => {
-  const slug = req.params.slug;
+  const slug = resolveVenueSlug(req.params.slug);
   const q = req.query as EntryQuery;
   const tableParam = q.table;
   const roomParam = q.room;
