@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, gte } from "drizzle-orm";
 import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
@@ -257,12 +257,17 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // Only for seated dine-in / room orders; takeaway & delivery stay separate.
   const OPEN_STATUSES = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
   const isSeated = (type ?? "dine_in") === "dine_in" || String(type ?? "").includes("room");
+  // Only merge into a tab that's still ACTIVE (touched within this window). A table left
+  // idle longer than this is treated as a new guest → fresh order, not merged into the
+  // previous party's stale tab. Configurable via ORDER_MERGE_WINDOW_MIN (default 120 min).
+  const MERGE_WINDOW_MS = (parseInt(process.env.ORDER_MERGE_WINDOW_MIN ?? "120", 10) || 120) * 60 * 1000;
   if (isSeated && tableName) {
     const [openOrder] = await db.select().from(ordersTable)
       .where(and(
         eq(ordersTable.restaurantId, restaurantId),
         eq(ordersTable.tableName, tableName),
         inArray(ordersTable.status, OPEN_STATUSES),
+        gte(ordersTable.updatedAt, new Date(Date.now() - MERGE_WINDOW_MS)),
       ))
       .orderBy(desc(ordersTable.createdAt)).limit(1);
     if (openOrder) {
