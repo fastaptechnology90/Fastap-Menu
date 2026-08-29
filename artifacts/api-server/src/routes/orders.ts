@@ -390,7 +390,7 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   if (Number.isNaN(orderId) || !menuItemId || !d) { res.status(400).json({ error: "orderId, menuItemId and delta required" }); return; }
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
-  const OPEN = ["new", "pending", "accepted", "confirmed", "preparing"];
+  const OPEN = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
   if (!OPEN.includes(String(order.status))) { res.status(409).json({ error: "Order can no longer be changed — it's already prepared or billed." }); return; }
 
   const items = Array.isArray(order.items) ? [...(order.items as any[])] : [];
@@ -414,11 +414,13 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   const subtotal = Math.round(items.reduce((s, i) => s + (parseFloat(String(i.subtotal)) || (parseFloat(String(i.price)) || 0) * (i.quantity ?? i.qty ?? 1)), 0) * 100) / 100;
   const tax = Math.round(subtotal * 0.05 * 100) / 100;
   const total = Math.round((subtotal + tax) * 100) / 100;
+  // If the round was already finished, bump it back so the kitchen makes the new/changed items.
+  const bumped = ["ready", "served"].includes(String(order.status)) ? "pending" : order.status;
   const [updated] = await db.update(ordersTable).set({
-    items, subtotal: String(subtotal.toFixed(2)), tax: String(tax.toFixed(2)), total: String(total.toFixed(2)),
+    items, subtotal: String(subtotal.toFixed(2)), tax: String(tax.toFixed(2)), total: String(total.toFixed(2)), status: bumped,
   }).where(eq(ordersTable.id, orderId)).returning();
-  broadcastEvent("order_updated", { id: orderId, restaurantId: order.restaurantId, tableName: order.tableName, total, status: order.status });
-  broadcastOrderEvent(orderId, "order_status", { id: orderId, status: order.status, tableName: order.tableName });
+  broadcastEvent("order_updated", { id: orderId, restaurantId: order.restaurantId, tableName: order.tableName, total, status: bumped });
+  broadcastOrderEvent(orderId, "order_status", { id: orderId, status: bumped, tableName: order.tableName });
   res.json(parseOrder(updated));
 });
 

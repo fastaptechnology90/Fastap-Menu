@@ -603,10 +603,26 @@ export default function MenuPage() {
       return 0;
     });
 
-  function handleAdd(item: MenuDisplayItem, customizations: string[], addons: { name: string; price: number }[], instructions?: string, unitPrice?: number) {
+  async function handleAdd(item: MenuDisplayItem, customizations: string[], addons: { name: string; price: number }[], instructions?: string, unitPrice?: number) {
     if (isDemo) return; // demo menu is view-only — ordering disabled
-    const linePrice = unitPrice ?? item.price + addons.reduce((s, a) => s + a.price, 0);
     const beverageSlugs = ["soft-drinks", "coffee", "tea", "mocktails", "cocktails", "premium-liquor", "wine-menu", "beer-menu"];
+    const course = item.category === "starters" ? "starter" : item.category === "desserts" ? "dessert" : beverageSlugs.includes(item.category) ? "beverage" : "main";
+    // With a running (unbilled) order open, anything added — plain or customized, from the card
+    // or the detail sheet — goes straight into that SAME order (the server merges it into the
+    // open tab). This keeps one order + one bill and updates the live total/count immediately,
+    // instead of quietly dropping the item into a separate cart the guest can't see.
+    if (activeOrder && venue.restaurantId) {
+      try {
+        await publicApi.createOrder({
+          restaurantId: venue.restaurantId,
+          tableName: activeTable,
+          type: "dine_in",
+          items: [{ menuItemId: item.id, quantity: 1, unitPrice: unitPrice ?? item.price, addons, customizations, notes: instructions, course }],
+        });
+      } finally { await refreshActiveOrder(); }
+      return;
+    }
+    const linePrice = unitPrice ?? item.price + addons.reduce((s, a) => s + a.price, 0);
     addToCart({
       menuItemId: item.id,
       name: item.name,
@@ -615,7 +631,7 @@ export default function MenuPage() {
       customizations,
       addons,
       specialInstructions: instructions,
-      course: item.category === "starters" ? "starter" : item.category === "desserts" ? "dessert" : beverageSlugs.includes(item.category) ? "beverage" : "main",
+      course,
     });
   }
 
@@ -690,17 +706,8 @@ export default function MenuPage() {
               </p>
             )}
           </div>
-          {/* Services ("explore") + profile/login are hidden on the view-only demo menu. */}
-          {!isDemo && (
-            <button type="button" onClick={() => setShowServiceSheet(true)} className="menu-app__icon-btn" aria-label="Services">
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-          )}
-          {!isDemo && (
-            <button type="button" onClick={() => navigate("/user/profile")} className="menu-app__icon-btn" aria-label="Profile">
-              <Icon name="person" size={18} />
-            </button>
-          )}
+          {/* Header kept intentionally minimal: restaurant name only — no services/explore or
+              profile/sign-in buttons. Back, search and filter are the only controls. */}
         </div>
 
         <div className="menu-app__search-row">
