@@ -2,6 +2,11 @@
 // brings them back to it — the running tab, with the live timer and the ordered items.
 const KEY = "fastap_active_order";
 
+// Keep the guest's running tab only while it's fresh. After this idle window we treat it as
+// a finished sitting and drop it, so a returning guest starts a clean order instead of seeing
+// the previous party's stale tab. Matches the server merge window (ORDER_MERGE_WINDOW_MIN, 120m).
+const ACTIVE_ORDER_TTL_MS = 120 * 60 * 1000;
+
 export type ActiveOrderRef = { id: string; slug: string | null; table: string | null; at: number };
 
 export function saveActiveOrder(o: ActiveOrderRef): void {
@@ -13,7 +18,12 @@ export function loadActiveOrder(): ActiveOrderRef | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const o = JSON.parse(raw);
-    return o && o.id ? o as ActiveOrderRef : null;
+    if (!o || !o.id) return null;
+    if (typeof o.at === "number" && Date.now() - o.at > ACTIVE_ORDER_TTL_MS) {
+      clearActiveOrder();
+      return null;
+    }
+    return o as ActiveOrderRef;
   } catch { return null; }
 }
 

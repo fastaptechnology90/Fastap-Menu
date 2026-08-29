@@ -271,8 +271,33 @@ router.post("/public/orders", async (req, res): Promise<void> => {
       ))
       .orderBy(desc(ordersTable.createdAt)).limit(1);
     if (openOrder) {
-      const prevItems = Array.isArray(openOrder.items) ? (openOrder.items as any[]) : [];
-      const mergedItems = [...prevItems, ...orderItems];
+      // Signature so identical lines (same item + same variant/addons/customizations/notes/price)
+      // stack into one row with a bumped quantity, instead of piling up duplicate 1x lines.
+      // Different customizations (e.g. "no chili") keep their own line — they're a different dish.
+      const itemSig = (it: any): string => JSON.stringify({
+        m: it.menuItemId ?? it.id ?? it.name,
+        v: it.variant ?? null,
+        a: it.addons ?? null,
+        c: it.customizations ?? null,
+        n: it.notes ?? null,
+        p: it.price ?? it.unitPrice ?? null,
+      });
+      const prevItems = Array.isArray(openOrder.items) ? (openOrder.items as any[]).map(x => ({ ...x })) : [];
+      const sigIndex = new Map<string, number>();
+      prevItems.forEach((it, i) => sigIndex.set(itemSig(it), i));
+      const mergedItems = prevItems;
+      for (const ni of orderItems) {
+        const sig = itemSig(ni);
+        const idx = sigIndex.get(sig);
+        if (idx != null) {
+          const ex = mergedItems[idx];
+          ex.quantity = (Number(ex.quantity) || 0) + (Number(ni.quantity) || 0);
+          ex.subtotal = (Number(ex.subtotal) || 0) + (Number(ni.subtotal) || 0);
+        } else {
+          mergedItems.push({ ...ni });
+          sigIndex.set(sig, mergedItems.length - 1);
+        }
+      }
       const mergedSubtotal = parseFloat(String(openOrder.subtotal || 0)) + subtotal;
       const mergedTax = parseFloat(String(openOrder.tax || 0)) + tax;
       const mergedTotal = parseFloat(String(openOrder.total || 0)) + subtotal + tax;
