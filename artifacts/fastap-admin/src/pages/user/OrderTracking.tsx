@@ -21,6 +21,20 @@ function formatCountdown(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Always render order times in the venue's timezone (India by default), not the viewer's
+// device/WebView timezone — a phone or an APK WebView set to another zone would otherwise
+// show the clock hours shifted (e.g. UTC → 5.5h off).
+function fmtOrderTime(v: string | number | Date, tz: string): string {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: tz });
+}
+function fmtOrderDateTime(v: string | number | Date, tz: string): string {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: tz });
+}
+
 function applyTrackingToOrder(order: Order, t: OrderTrackingSnapshot): Order {
   return {
     ...order,
@@ -289,7 +303,9 @@ export default function OrderTracking() {
     );
   }
 
+  const tz = venue.timezone || "Asia/Kolkata";
   const elapsedMin = Math.floor((Date.now() - new Date(displayOrder.placedAt).getTime()) / 60000);
+  const placedAtLabel = fmtOrderDateTime(displayOrder.placedAt, tz);
 
   const isCancelled = displayTracking.lifecycleStage === "cancelled";
   const isDelivered = displayTracking.lifecycleStage === "delivered";
@@ -366,6 +382,9 @@ export default function OrderTracking() {
               Ordered {elapsedMin} min ago · Table {displayOrder.tableNo}
               {displayTracking.chefName && ` · ${displayTracking.chefName}`}
             </p>
+            {placedAtLabel && (
+              <p className="text-[11px] text-white/30 mt-1 text-center">Placed on {placedAtLabel}</p>
+            )}
           </div>
         )}
 
@@ -432,7 +451,7 @@ export default function OrderTracking() {
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {displayTracking.kitchenUpdates.map((u, i) => (
               <div key={`${u.at}-${i}`} className={`flex gap-2 text-xs p-2 rounded-lg ${u.type === "delay" ? "bg-yellow-500/10 border border-yellow-500/20" : u.type === "chef" ? "bg-violet-500/10 border border-violet-500/20" : u.type === "ready" ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-white/5"}`}>
-                <span className="text-white/30 shrink-0">{new Date(u.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="text-white/30 shrink-0">{fmtOrderTime(u.at, tz)}</span>
                 <span className="text-white/70">{u.message}</span>
               </div>
             ))}
