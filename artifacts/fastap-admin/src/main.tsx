@@ -1,3 +1,6 @@
+// MUST be first: pins all displayed date/time to the business timezone (IST) app-wide,
+// before any component renders, so the clock never shifts with the device/WebView zone.
+import "./lib/appTimezone";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
