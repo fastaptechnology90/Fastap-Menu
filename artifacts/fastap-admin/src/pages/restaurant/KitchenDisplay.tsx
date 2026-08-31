@@ -64,6 +64,19 @@ function sortKitchenOrders(orders: LiveOrder[], priorityMode: boolean) {
   });
 }
 
+// One short tone at an offset within the shared AudioContext.
+function beep(ctx: AudioContext, freq: number, startAt: number, dur: number, vol: number) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  gain.gain.value = vol;
+  const t = ctx.currentTime + startAt;
+  osc.start(t);
+  osc.stop(t + dur);
+}
+
 export default function KitchenDisplay() {
   const { liveOrders, updateOrderStatus } = useRestaurant();
   const [station, setStation] = useState("all");
@@ -75,22 +88,58 @@ export default function KitchenDisplay() {
   const [bumped, setBumped] = useState<LiveOrder[]>([]);
   const [targetTimes, setTargetTimes] = useState(DEFAULT_TARGETS);
   const [autoAccept, setAutoAccept] = useState(false);
+  const [flash, setFlash] = useState(false);
   const prevCount = useRef(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const active = liveOrders.filter(isKitchenActive);
 
+  // Mobile/WebView block audio until the first user gesture — create & resume the shared
+  // AudioContext on the first tap or key so the new-order chime can actually play afterwards.
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        if (!audioCtxRef.current) {
+          const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (Ctor) audioCtxRef.current = new Ctor();
+        }
+        if (audioCtxRef.current?.state === "suspended") audioCtxRef.current.resume();
+      } catch { /* audio unsupported */ }
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
   useEffect(() => {
     const newCount = active.filter(o=>o.status==="new").length;
-    if (soundOn && newCount > prevCount.current) {
-      try {
-        const ctx = new ((window as any).AudioContext || (window as any).webkitAudioContext)();
-        const osc = ctx.createOscillator(); const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = 880; gain.gain.value = 0.08;
-        osc.start(); setTimeout(()=>osc.stop(),180);
-      } catch {}
+    let clear: ReturnType<typeof setTimeout> | undefined;
+    if (newCount > prevCount.current) {
+      // Visual flash always (even when muted) so a silent kitchen still notices a new order.
+      setFlash(true);
+      clear = setTimeout(() => setFlash(false), 2600);
+      if (soundOn) {
+        try {
+          if (!audioCtxRef.current) {
+            const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+            if (Ctor) audioCtxRef.current = new Ctor();
+          }
+          const ctx = audioCtxRef.current;
+          if (ctx) {
+            if (ctx.state === "suspended") ctx.resume();
+            // Three louder rising tones — hard to miss over kitchen noise.
+            beep(ctx, 880, 0, 0.2, 0.18);
+            beep(ctx, 1108, 0.24, 0.2, 0.18);
+            beep(ctx, 1320, 0.48, 0.26, 0.18);
+          }
+        } catch { /* ignore */ }
+      }
     }
     prevCount.current = newCount;
+    return () => { if (clear) clearTimeout(clear); };
   }, [liveOrders, soundOn]);
 
   // Auto-accept: when enabled, freshly-arrived pending ("new") orders are advanced
@@ -127,6 +176,11 @@ export default function KitchenDisplay() {
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-[#050a12]">
+      {/* New-order flash — a pulsing amber frame so the kitchen notices even at a glance
+          (and even when sound is muted). Non-blocking overlay. */}
+      {flash && (
+        <div className="pointer-events-none fixed inset-0 z-50 ring-8 ring-inset ring-amber-400/70 animate-pulse" aria-hidden="true" />
+      )}
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-[#0c1220]">
         <div className="flex items-center gap-2 shrink-0">

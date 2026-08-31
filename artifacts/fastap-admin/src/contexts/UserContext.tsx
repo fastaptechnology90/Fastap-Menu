@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useSyncExt
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { resolveGuestSlug } from "@/lib/guestDemo";
 import { publicApi } from "@/lib/api";
+import { setAppTimezone } from "@/lib/appTimezone";
 import {
   parseEntryFromUrl, persistEntryContext, getDeviceId, clearEntryContext,
   detectAccessMethodClient, detectServiceModeClient,
@@ -338,6 +339,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       const data = await publicApi.venue(normalized, params);
       const { venue: v, smartEntry: se } = applyVenueFromApi(data, normalized, params);
+      setAppTimezone(v.timezone); // show guest dates/times in the venue's timezone
       setVenue(v);
       setSmartEntry(se);
       setActiveRestaurant(v.restaurantName);

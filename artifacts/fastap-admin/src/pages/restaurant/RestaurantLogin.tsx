@@ -42,6 +42,22 @@ interface VenueOption {
   businessType?: string;
 }
 
+// Reads a ?next= target from the URL and only allows an in-panel restaurant path (never the
+// login/subscription pages), so a deep-linked app returns to its own screen after login.
+function safeNextPath(): string | null {
+  try {
+    const p = new URLSearchParams(window.location.search).get("next");
+    if (!p) return null;
+    const dec = decodeURIComponent(p);
+    if (dec.startsWith("/restaurant/")
+      && !dec.startsWith("/restaurant/login")
+      && !dec.startsWith("/restaurant/subscription")) {
+      return dec;
+    }
+  } catch { /* ignore malformed next */ }
+  return null;
+}
+
 export default function RestaurantLogin() {
   const [, navigate] = useLocation();
   const { loginStaff } = useRestaurant();
@@ -142,7 +158,9 @@ export default function RestaurantLogin() {
       if (result?.requiresSubscription || !result?.subscription?.active) {
         navigate("/restaurant/subscription");
       } else {
-        navigate(defaultPathForRole(role));
+        // If the app was opened at a specific screen (e.g. the Kitchen app → /restaurant/kitchen)
+        // return there; otherwise fall back to the role's default page.
+        navigate(safeNextPath() || defaultPathForRole(role));
       }
     } catch (e: unknown) {
       const err = e as Error & { restaurants?: VenueOption[] };

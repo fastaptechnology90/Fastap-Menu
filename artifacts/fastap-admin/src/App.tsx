@@ -202,7 +202,9 @@ function RestaurantProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!currentStaff) return <Redirect to="/restaurant/login" />;
+  // Preserve where the user was headed (e.g. /restaurant/kitchen when the Kitchen app opens)
+  // so login can return them there instead of the role's generic default page.
+  if (!currentStaff) return <Redirect to={`/restaurant/login?next=${encodeURIComponent(location)}`} />;
   if (!hasActiveSubscription) return <Redirect to="/restaurant/subscription" />;
   return (
     <RestaurantLayout>

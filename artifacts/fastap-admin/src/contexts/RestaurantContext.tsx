@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { restaurantAuth, orders as ordersApi, tables as tablesApi, menu as menuApi, staff as staffApi, rbacApi, featuresApi, type SubscriptionStatus } from "@/lib/api";
 import { canAccessPath, hasPermission, type RolePermissions } from "@/lib/restaurantRbac";
 import { normalizeOrderStatus, toApiOrderStatus } from "@/lib/orderStatus";
+import { setAppTimezone } from "@/lib/appTimezone";
 import { useRestaurantSSE } from "@/hooks/useRestaurantSSE";
 import { PLATFORM_CURRENCY_SYMBOL } from "@/lib/currency";
 import { isRestaurantPublished as checkRestaurantPublished } from "@/lib/restaurantPublication";
@@ -357,6 +358,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     authGeneration.current += 1;
     const r = result.restaurant;
     const s = result.staff;
+    setAppTimezone(r?.timezone); // show all dates/times in this restaurant's timezone
     flushSync(() => {
       setRestaurantId(r.id);
       setRestaurant({
@@ -434,6 +436,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("fastap_restaurant_id", String(me.restaurantId));
         const r = me.restaurant;
         if (r) {
+          setAppTimezone(r.timezone); // restore this restaurant's timezone for date/time display
           setRestaurant({
             id: String(r.id),
             name: r.name || "Restaurant",
