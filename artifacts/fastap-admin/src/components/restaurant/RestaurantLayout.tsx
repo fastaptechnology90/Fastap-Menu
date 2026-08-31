@@ -206,7 +206,10 @@ export function RestaurantLayout({ children }: { children: React.ReactNode }) {
 
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />}
 
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      {/* On mobile the sidebar is a fixed 4.5rem icon rail (overlay), so offset the content by
+          that width to stop the page title/content hiding behind it. On lg the sidebar is
+          in-flow (relative), so no offset is needed. */}
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0 pl-[4.5rem] lg:pl-0">
         <header className="flex items-center gap-3 px-4 py-3 restaurant-glass border-b shrink-0">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center">
             <Icon name={sidebarOpen ? "close" : "menu"} size={20} />
