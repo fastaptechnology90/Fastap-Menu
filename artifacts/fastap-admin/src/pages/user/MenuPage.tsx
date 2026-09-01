@@ -779,6 +779,40 @@ export default function MenuPage() {
 
           {!loading && !menuError && (
             <>
+              {/* Chef's Specials — the restaurant's 2-4 highlighted signature dishes (items the
+                  owner marked "Featured"). A prominent scrollable strip at the top of the menu. */}
+              {featuredItems.length > 0 && !search && (
+                <section className="mb-4">
+                  <div className="flex items-center gap-2 mb-2 px-0.5">
+                    <span className="text-base">✨</span>
+                    <h2 className="text-sm font-extrabold tracking-tight">Chef's Specials</h2>
+                    <span className="text-[11px] text-white/40">Must-try picks</span>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto thin-scroll pb-1 -mx-1 px-1 snap-x">
+                    {featuredItems.slice(0, 4).map(item => (
+                      <button
+                        key={`special-${item.id}`}
+                        type="button"
+                        onClick={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
+                        className="snap-start shrink-0 w-40 text-left rounded-2xl overflow-hidden border border-amber-400/40 bg-gradient-to-b from-amber-500/15 to-transparent active:scale-[0.98] transition-transform"
+                      >
+                        <div className="relative h-24 w-full bg-white/5">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-2xl">🍽️</div>
+                          )}
+                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow">⭐ Special</span>
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-bold leading-tight truncate">{item.name}</p>
+                          <p className="text-[13px] font-extrabold text-amber-300 mt-0.5">₹{item.price}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
               <p className="menu-app__count">
                 {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
                 {search ? (
