@@ -94,7 +94,20 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     : inferSection(items);
   const status = dbToMobileStatus(row.status, meta);
   const seconds = timerSeconds(row.createdAt, status);
-  const itemNames = items.map(i => `${i.quantity ?? 1}x ${i.name ?? "Item"}`);
+  const itemNames = items.map(i => {
+    const base = `${i.quantity ?? 1}x ${i.name ?? "Item"}`;
+    return i.variant ? `${base} (${i.variant})` : base;
+  });
+  // Per-dish add-ons (paid extras), modifiers (removals / preferences like "No chili") and
+  // notes — each tagged with its dish so the line cook knows exactly what to do to which item.
+  const orderAddOns = items.flatMap((i: any) =>
+    Array.isArray(i.addons) ? i.addons.map((a: any) => `${i.name ?? "Item"}: + ${String(a.name ?? a)}`) : []);
+  const orderModifiers = items.flatMap((i: any) =>
+    Array.isArray(i.customizations) ? i.customizations.map((c: any) => `${i.name ?? "Item"}: ${String(c)}`) : []);
+  const orderNotes = [
+    ...items.filter((i: any) => i.notes).map((i: any) => `${i.name ?? "Item"}: ${String(i.notes)}`),
+    ...(row.notes ? [String(row.notes)] : []),
+  ];
   const vip = Boolean(meta.vip ?? tracking.vip);
   const allergy = items.some(i => Boolean(i.allergy) || /allergy|nut|gluten/i.test(String(i.notes ?? "")));
   const kotNumber = `KOT-${row.id}`;
@@ -119,9 +132,9 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     guestType: vip ? "VIP" : "Regular",
     deliveryType: row.type === "delivery" ? "Delivery" : row.type === "takeaway" ? "Takeaway" : "Dine-in",
     items: itemNames,
-    addOns: [] as string[],
-    modifiers: items.flatMap(i => (Array.isArray(i.addons) ? i.addons.map((a: any) => String(a.name ?? a)) : [])),
-    cookingNotes: items.map(i => i.notes).filter(Boolean).map(String),
+    addOns: orderAddOns,
+    modifiers: orderModifiers,
+    cookingNotes: orderNotes,
     status,
     priority,
     timerSeconds: seconds,
