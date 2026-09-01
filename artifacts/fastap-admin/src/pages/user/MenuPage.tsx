@@ -797,12 +797,8 @@ export default function MenuPage() {
                         className="snap-start shrink-0 w-40 text-left rounded-2xl overflow-hidden border border-amber-400/40 bg-gradient-to-b from-amber-500/15 to-transparent active:scale-[0.98] transition-transform"
                       >
                         <div className="relative h-24 w-full bg-white/5">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-2xl">🍽️</div>
-                          )}
-                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow">⭐ Special</span>
+                          <AppImage src={item.imageUrl} alt={item.name} fallbackId={item.id} category={item.category} className="h-full w-full" iconFallback="restaurant_menu" />
+                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow z-10">⭐ Special</span>
                         </div>
                         <div className="p-2">
                           <p className="text-xs font-bold leading-tight truncate">{item.name}</p>
