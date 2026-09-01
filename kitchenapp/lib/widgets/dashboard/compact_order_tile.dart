@@ -255,6 +255,74 @@ class CompactOrderTile extends StatelessWidget {
                   ),
                 ),
               ),
+            if (order.addOns.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('Add-ons', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              ...order.addOns.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_circle_outline,
+                          size: 14, color: AppColors.secondaryText),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(line,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            if (order.modifiers.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('Modifiers / Removals',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800, color: AppColors.primary)),
+              const SizedBox(height: 6),
+              ...order.modifiers.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.remove_circle_outline,
+                          size: 14, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(line,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            if (order.cookingNotes.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('Notes', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              ...order.cookingNotes.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.sticky_note_2_outlined,
+                          size: 14, color: AppColors.secondaryText),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(line,
+                            style:
+                                const TextStyle(fontStyle: FontStyle.italic)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

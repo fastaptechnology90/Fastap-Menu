@@ -17,6 +17,9 @@ class KitchenOrder {
     this.id,
     this.vip = false,
     this.allergy = false,
+    this.addOns = const [],
+    this.modifiers = const [],
+    this.cookingNotes = const [],
   });
 
   final String? id;
@@ -32,6 +35,12 @@ class KitchenOrder {
   final IconData priorityIcon;
   final bool vip;
   final bool allergy;
+  final List<String> addOns;
+  final List<String> modifiers;
+  final List<String> cookingNotes;
+
+  static List<String> _stringList(dynamic raw) =>
+      raw is List ? raw.map((e) => e.toString()).toList() : const [];
 
   factory KitchenOrder.fromJson(Map<String, dynamic> json) {
     final status = json['status'] as String;
@@ -52,6 +61,9 @@ class KitchenOrder {
       priorityIcon: _priorityIcon(status, priority, vip),
       vip: vip,
       allergy: json['allergy'] as bool? ?? false,
+      addOns: _stringList(json['addOns']),
+      modifiers: _stringList(json['modifiers']),
+      cookingNotes: _stringList(json['cookingNotes']),
     );
   }
 
