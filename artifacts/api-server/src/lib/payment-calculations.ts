@@ -31,6 +31,10 @@ export function orderGrossTotal(order: OrderLike): number {
 /** Count toward platform revenue / settlements when payment succeeded or is in-flight (not failed/refunded). */
 export function isPaidOrder(order: OrderLike): boolean {
   const ps = String(order.paymentStatus ?? "").toLowerCase();
+  // A cancelled (voided) order is never revenue — even if it was marked paid before it was
+  // cancelled (e.g. a UPI order auto-marks paid, then gets cancelled). Check this FIRST so a
+  // stale paymentStatus="paid" can't slip a cancelled order into revenue totals.
+  if (String(order.status ?? "").toLowerCase() === "cancelled") return false;
   if (ps === "refunded" || ps === "failed") return false;
   if (ps === "paid" || ps === "success") return true;
   const st = String(order.status ?? "").toLowerCase();
