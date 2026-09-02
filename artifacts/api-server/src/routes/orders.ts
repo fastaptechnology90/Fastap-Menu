@@ -353,8 +353,14 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   if (!OPEN.includes(String(order.status))) { res.status(409).json({ error: "Order can no longer be changed — it's already prepared or billed." }); return; }
 
   const items = Array.isArray(order.items) ? [...(order.items as any[])] : [];
-  const isPlain = (i: any) => (i.menuItemId === menuItemId || i.id === menuItemId) && (!i.customizations || i.customizations.length === 0) && (!i.addons || i.addons.length === 0) && !i.variant;
-  const idx = items.findIndex(isPlain);
+  const matchesItem = (i: any) => i.menuItemId === menuItemId || i.id === menuItemId;
+  const isPlain = (i: any) => matchesItem(i) && (!i.customizations || i.customizations.length === 0) && (!i.addons || i.addons.length === 0) && !i.variant;
+  let idx = items.findIndex(isPlain);
+  // When removing (delta < 0) and there's no plain line, remove a CUSTOMISED line of the same
+  // dish instead — so a guest can also take back an item they ordered with extras/removals.
+  if (idx < 0 && d < 0) {
+    for (let k = items.length - 1; k >= 0; k--) { if (matchesItem(items[k])) { idx = k; break; } }
+  }
   if (idx >= 0) {
     const it = items[idx];
     const unit = parseFloat(String(it.price)) || 0;

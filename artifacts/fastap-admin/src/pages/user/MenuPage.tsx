@@ -480,11 +480,12 @@ export default function MenuPage() {
     setActiveOrders(fetched.filter((x): x is ActiveOrderInfo => x !== null).sort((a, b) => a.at - b.at));
   }
   useEffect(() => { refreshActiveOrder(); /* eslint-disable-next-line */ }, []);
-  // Quantity of a menu item already in the active order (plain lines only — no customizations).
+  // How many of a menu item the guest has in the running order — counting EVERY line of the dish
+  // (plain and customised), so a dish ordered with extras/removals also shows the "ordered" −.
   function orderedQtyOf(itemId: string) {
     if (!activeOrder) return 0;
     return activeOrder.items
-      .filter(i => String(i.menuItemId ?? i.id) === String(itemId) && (!i.customizations || i.customizations.length === 0) && (!i.addons || (i.addons as unknown[]).length === 0) && !i.variant)
+      .filter(i => String(i.menuItemId ?? i.id) === String(itemId))
       .reduce((s, i) => s + (i.quantity ?? i.qty ?? 1), 0);
   }
   async function adjustOrdered(itemId: string, delta: number) {

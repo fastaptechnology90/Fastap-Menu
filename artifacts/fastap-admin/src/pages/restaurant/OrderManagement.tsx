@@ -125,7 +125,8 @@ export default function OrderManagement() {
       return {
         ...sorted[0],
         items: sorted.flatMap(o => o.items),
-        total: sorted.reduce((s, o) => s + o.total, 0),
+        // Round the summed total to paise — plain float addition leaves noise like 366.45000000000005.
+        total: Math.round(sorted.reduce((s, o) => s + o.total, 0) * 100) / 100,
         status: rep.status,
         tabOrders: sorted,
         roundCount: sorted.length,
