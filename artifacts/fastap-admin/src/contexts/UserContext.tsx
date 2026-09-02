@@ -394,7 +394,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [smartEntry, venue.restaurantId, activeTable]);
 
   useEffect(() => {
-    if (cart.length === 0) return;
+    // Back up + sync the cart on every change — INCLUDING when it becomes empty (e.g. after an
+    // order is placed). Skipping the empty case left the old cart in localStorage and the server
+    // session, so it came back on refresh and overwrote newly-added items.
     backupCart(cart);
     const t = setTimeout(() => {
       publicApi.session.sync(cart, getDeviceId()).catch(() => {});
@@ -473,6 +475,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const order = mapOrderFromApi(created, activeRestaurant);
       setOrders(prev => [order, ...prev]);
       setCart([]);
+      // Clear the saved cart immediately (local backup + server session) so a refresh right
+      // after ordering doesn't restore the just-ordered items back into the cart.
+      backupCart([]);
+      publicApi.session.sync([], getDeviceId()).catch(() => {});
       // Remember this as the guest's active order so a close+reopen returns to it (with timer).
       saveActiveOrder({ id: String(order.id), slug: venue.restaurantSlug ?? null, table: activeTable ?? null, at: Date.now() });
       return order;
