@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, gte } from "drizzle-orm";
 import { db, ordersTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
@@ -6,6 +6,11 @@ import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar", "Dessert", "Bakery", "Floor"];
 
 const ACTIVE_DB = ["pending", "confirmed", "preparing", "ready", "serving", "delayed", "billing"];
+// Orders the apps display: the active ones plus recently "completed" (delivered),
+// so the waiter keeps a "Delivered" record. Everything auto-clears from both apps
+// after 24h (a display window — the rows stay in the DB, just stop showing).
+const DISPLAY_DB = [...ACTIVE_DB, "completed"];
+const DISPLAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KITCHEN_ACTIVE = new Set(["new", "accepted", "preparing", "delayed", "ready", "re_fire", "on_hold"]);
 
 function parseItems(raw: unknown): any[] {
@@ -176,7 +181,8 @@ export async function fetchKitchenOrders(restaurantId: number) {
   const rows = await db.select().from(ordersTable)
     .where(and(
       eq(ordersTable.restaurantId, restaurantId),
-      inArray(ordersTable.status, ACTIVE_DB),
+      inArray(ordersTable.status, DISPLAY_DB),
+      gte(ordersTable.createdAt, new Date(Date.now() - DISPLAY_WINDOW_MS)),
     ))
     .orderBy(desc(ordersTable.createdAt))
     .limit(100);
@@ -236,9 +242,10 @@ function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[
       timestamp: new Date().toISOString(),
     })),
     orders: filtered
-      // Keep "serving" (out for delivery) so the waiter's assigned order stays
-      // in their queue between Start Delivery and Delivered instead of vanishing.
-      .filter(o => ["new", "accepted", "preparing", "delayed", "ready", "serving"].includes(o.status))
+      // Keep "serving" (out for delivery) and "served" (delivered) so the waiter's
+      // order stays visible through Start Delivery -> Delivered and keeps a
+      // Delivered record afterwards (until the 24h window drops it).
+      .filter(o => ["new", "accepted", "preparing", "delayed", "ready", "serving", "served"].includes(o.status))
       .map(o => ({ ...o, statusLabel: o.statusLabel ?? o.status })),
   };
 }

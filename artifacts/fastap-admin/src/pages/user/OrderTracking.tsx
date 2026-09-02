@@ -463,8 +463,10 @@ export default function OrderTracking() {
           <p className="text-sm font-semibold mb-4">Order Lifecycle</p>
           <div className="space-y-0">
             {ORDER_LIFECYCLE.map((step, idx) => {
-              const isDone = idx < activeIdx;
-              const isCurrent = idx === activeIdx;
+              // Once delivered, the final "Delivered" step is complete (green ✓),
+              // not "in progress" — it's the terminal stage, nothing follows.
+              const isDone = idx < activeIdx || (isDelivered && idx === activeIdx);
+              const isCurrent = idx === activeIdx && !isDelivered;
               const showDelayed = displayTracking.isDelayed && isCurrent;
               return (
                 <div key={step.key} className="flex gap-3">

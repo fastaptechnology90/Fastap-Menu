@@ -350,16 +350,22 @@ class HomeOrderPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final preview = deliveryMode
-        ? orders
+        ? (orders
             .where(
               (o) =>
-                  (o.rawStatus == 'ready' || o.rawStatus == 'serving') &&
+                  (o.rawStatus == 'ready' ||
+                      o.rawStatus == 'serving' ||
+                      o.rawStatus == 'served') &&
                   o.waiterName != null &&
                   myName != null &&
                   o.waiterName!.trim().toLowerCase() ==
                       myName!.trim().toLowerCase(),
             )
             .toList()
+          // Delivered orders sink to the bottom; still-to-deliver stay on top.
+          ..sort((a, b) =>
+              (a.rawStatus == 'served' ? 1 : 0) -
+              (b.rawStatus == 'served' ? 1 : 0)))
         : orders;
 
     return Column(
@@ -370,7 +376,7 @@ class HomeOrderPreview extends StatelessWidget {
           subtitle: deliveryMode
               ? (preview.isEmpty
                   ? 'Nothing to deliver yet'
-                  : '${preview.length} to deliver')
+                  : '${preview.where((o) => o.rawStatus != 'served').length} to deliver · ${preview.where((o) => o.rawStatus == 'served').length} delivered')
               : (preview.isEmpty
                   ? 'Queue is clear'
                   : '${orders.length} KOT${orders.length == 1 ? '' : 's'} in progress'),

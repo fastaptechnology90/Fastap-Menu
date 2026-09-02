@@ -20,6 +20,16 @@ class CompactOrderTile extends StatelessWidget {
   // the kitchen actions.
   final bool deliveryMode;
 
+  // Waiter-facing status label for the delivery flow; plain kitchen label otherwise.
+  String get statusText => deliveryMode
+      ? switch (order.rawStatus) {
+          'ready' => 'Ready to pick up',
+          'serving' => 'On the way',
+          'served' => 'Delivered',
+          _ => order.status,
+        }
+      : order.status;
+
   // Which actions to offer for the order's current machine status.
   static List<(String, String, IconData)> _actionsForStatus(
     String s,
@@ -201,7 +211,7 @@ class CompactOrderTile extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            order.status,
+                            statusText,
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -269,7 +279,7 @@ class CompactOrderTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    order.status,
+                    statusText,
                     style: TextStyle(
                       color: order.color,
                       fontWeight: FontWeight.w700,
