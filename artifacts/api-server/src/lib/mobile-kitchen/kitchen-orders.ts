@@ -236,7 +236,9 @@ function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[
       timestamp: new Date().toISOString(),
     })),
     orders: filtered
-      .filter(o => ["new", "accepted", "preparing", "delayed", "ready"].includes(o.status))
+      // Keep "serving" (out for delivery) so the waiter's assigned order stays
+      // in their queue between Start Delivery and Delivered instead of vanishing.
+      .filter(o => ["new", "accepted", "preparing", "delayed", "ready", "serving"].includes(o.status))
       .map(o => ({ ...o, statusLabel: o.statusLabel ?? o.status })),
   };
 }

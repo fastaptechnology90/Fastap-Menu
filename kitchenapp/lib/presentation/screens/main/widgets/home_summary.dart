@@ -374,15 +374,17 @@ class HomeOrderPreview extends StatelessWidget {
               : (preview.isEmpty
                   ? 'Queue is clear'
                   : '${orders.length} KOT${orders.length == 1 ? '' : 's'} in progress'),
-          trailing: TextButton.icon(
-            onPressed: onViewAll,
-            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-            label: Text(deliveryMode ? 'All' : 'KDS'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
+          trailing: deliveryMode
+              ? null
+              : TextButton.icon(
+                  onPressed: onViewAll,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                  label: const Text('KDS'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
         ),
         const SizedBox(height: AppSpacing.md),
         if (preview.isEmpty)

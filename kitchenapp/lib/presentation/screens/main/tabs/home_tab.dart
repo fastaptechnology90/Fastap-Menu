@@ -205,7 +205,10 @@ class HomeTab extends StatelessWidget {
                     child: _AlertStrip(count: rushCount),
                   ),
                 ),
-              if (showOrders && ordersFirst) orderPreviewSliver(),
+              // Waiter/housekeeping don't have the kitchen (KDS) tab, so
+              // showOrders is false for them — but they still need their own
+              // order/delivery list. Surface it on the role, not on KDS access.
+              if (ordersFirst) orderPreviewSliver(),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
