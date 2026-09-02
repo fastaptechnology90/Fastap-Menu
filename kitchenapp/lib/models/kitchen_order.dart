@@ -46,6 +46,31 @@ class KitchenOrder {
   static List<String> _stringList(dynamic raw) =>
       raw is List ? raw.map((e) => e.toString()).toList() : const [];
 
+  /// Optimistically re-derives the display label, colour and priority icon for
+  /// a new machine status, so a home-card action reflects instantly before the
+  /// background dashboard sync returns.
+  KitchenOrder withRawStatus(String newStatus) {
+    return KitchenOrder(
+      id: id,
+      title: title,
+      location: location,
+      section: section,
+      items: items,
+      status: _statusLabel(newStatus, vip),
+      rawStatus: newStatus,
+      timer: timer,
+      progress: progress,
+      color: DashboardTone.colorForOrderStatus(newStatus),
+      icon: icon,
+      priorityIcon: _priorityIcon(newStatus, vip ? 'vip' : 'normal', vip),
+      vip: vip,
+      allergy: allergy,
+      addOns: addOns,
+      modifiers: modifiers,
+      cookingNotes: cookingNotes,
+    );
+  }
+
   factory KitchenOrder.fromJson(Map<String, dynamic> json) {
     final status = json['status'] as String;
     final priority = json['priority'] as String? ?? 'normal';

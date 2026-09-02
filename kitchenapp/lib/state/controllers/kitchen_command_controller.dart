@@ -4156,9 +4156,50 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> performKdsAction(String orderId, String action) async {
-    await _kdsService.performAction(orderId: orderId, action: action);
-    await Future.wait([refreshKds(silent: true), refreshDashboard(silent: true)]);
+    // Reflect the transition locally first so the tap feels instant and the
+    // card moves through its states in place — instead of freezing (or looking
+    // like it vanished) until the server round-trip and follow-up sync finish.
+    // Terminal actions (cancel/reject/bump) return null and just fall through
+    // to the background sync, which removes them.
+    final nextRaw = _optimisticStatusForAction(action);
+    final previousKds = _kds;
+    final previousDashboard = _dashboard;
+    if (nextRaw != null) {
+      if (_kds != null) {
+        _kds = _kds!.withOrderStatus(orderId, KdsStatus.fromApi(nextRaw));
+      }
+      if (_dashboard != null) {
+        _dashboard = _dashboard!.withOrderStatus(orderId, nextRaw);
+      }
+      notifyListeners();
+    }
+    try {
+      await _kdsService.performAction(orderId: orderId, action: action);
+    } catch (error) {
+      // Roll back the optimistic change if the server rejected the action.
+      if (nextRaw != null) {
+        _kds = previousKds;
+        _dashboard = previousDashboard;
+        notifyListeners();
+      }
+      rethrow;
+    }
+    // Reconcile with the server in the background; do not block the UI on it.
+    unawaited(
+      Future.wait([refreshKds(silent: true), refreshDashboard(silent: true)]),
+    );
   }
+
+  /// Maps a KDS action to the machine status it produces, or null for terminal
+  /// actions (cancel/reject/bump) that should leave the board on the next sync.
+  String? _optimisticStatusForAction(String action) => switch (action) {
+        'accept' => 'accepted',
+        'prepare' => 'preparing',
+        'ready' => 'ready',
+        'delay' => 'delayed',
+        'refire' => 're_fire',
+        _ => null,
+      };
 
   Future<void> reorderKds(List<String> orderIds) async {
     await _kdsService.reorder(orderIds);

@@ -1,4 +1,5 @@
 import 'kds_order.dart';
+import 'kds_view_mode.dart';
 
 class KdsSnapshot {
   const KdsSnapshot({
@@ -100,6 +101,34 @@ class KdsSnapshot {
       lastSyncedAt: lastSyncedAt,
       orders: mergedOrders,
       groups: mergedGroups,
+      stats: stats,
+      isGrouped: isGrouped,
+    );
+  }
+
+  /// Optimistically reflects a new status for a single order so a button tap
+  /// transitions the card in place immediately, before the server round-trip
+  /// and the follow-up sync complete.
+  KdsSnapshot withOrderStatus(String orderId, KdsStatus status) {
+    KdsOrder apply(KdsOrder order) =>
+        order.id == orderId || order.orderId == orderId
+            ? order.copyWith(status: status)
+            : order;
+
+    return KdsSnapshot(
+      section: section,
+      view: view,
+      filter: filter,
+      lastSyncedAt: lastSyncedAt,
+      orders: orders.map(apply).toList(),
+      groups: groups
+          .map(
+            (group) => KdsOrderGroup(
+              label: group.label,
+              orders: group.orders.map(apply).toList(),
+            ),
+          )
+          .toList(),
       stats: stats,
       isGrouped: isGrouped,
     );

@@ -25,6 +25,23 @@ class DashboardSnapshot {
   final List<RushAlert> rushAlerts;
   final List<KitchenOrder> orders;
 
+  /// Optimistically transitions one order's status in the home-preview list so
+  /// a tapped action reflects immediately, ahead of the background sync.
+  DashboardSnapshot withOrderStatus(String orderId, String rawStatus) {
+    return DashboardSnapshot(
+      section: section,
+      lastSyncedAt: lastSyncedAt,
+      sections: sections,
+      widgets: widgets,
+      metrics: metrics,
+      sectionWorkload: sectionWorkload,
+      rushAlerts: rushAlerts,
+      orders: orders
+          .map((o) => o.id == orderId ? o.withRawStatus(rawStatus) : o)
+          .toList(),
+    );
+  }
+
   factory DashboardSnapshot.fromJson(Map<String, dynamic> json) {
     return DashboardSnapshot(
       section: json['section'] as String? ?? 'All',
