@@ -836,14 +836,14 @@ export default function MenuPage() {
                 </button>
               )}
               {activeOrder && !isDemo && (
-                <p className="text-[11px] text-white/40 mb-3 px-1">Tap <b className="text-rose-300">−</b> on an item already in your order to remove it, or <b className="text-emerald-300">+</b> on anything new to add it to this same order.</p>
+                <p className="text-[11px] text-white/40 mb-3 px-1">Want more? Add items with <b className="text-emerald-300">+</b>, then tap <b className="text-amber-300">Place Order</b> — it goes to your table as a new order.</p>
               )}
               <div className="menu-app__grid">
                 {filteredItems.map(item => {
-                  // With an active (unbilled) order, the card reflects what's already ordered and
-                  // edits the order live (+/- ). Otherwise it controls the plain cart line.
+                  // The +/- on a card only build the CART (add / remove) — nothing is ordered
+                  // yet. The guest reviews the cart and taps "Place Order" to actually submit.
                   const line = cart.find(c => c.menuItemId === item.id && (!c.customizations || c.customizations.length === 0));
-                  const qty = activeOrder ? orderedQtyOf(item.id) : (line?.quantity ?? 0);
+                  const qty = line?.quantity ?? 0;
                   return (
                     <MenuGridCard
                       key={item.id}
@@ -851,9 +851,9 @@ export default function MenuPage() {
                       readOnly={isDemo}
                       quantity={qty}
                       onOpen={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
-                      onAdd={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, 1); else handleAdd(item, [], []); announce(`${item.name} added to order`); }}
-                      onIncrement={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, 1); else handleAdd(item, [], []); }}
-                      onDecrement={e => { e.stopPropagation(); if (activeOrder) adjustOrdered(item.id, -1); else if (line) updateQuantity(line.id, qty - 1); }}
+                      onAdd={e => { e.stopPropagation(); handleAdd(item, [], []); announce(`${item.name} added to cart`); }}
+                      onIncrement={e => { e.stopPropagation(); handleAdd(item, [], []); }}
+                      onDecrement={e => { e.stopPropagation(); if (line) updateQuantity(line.id, qty - 1); }}
                     />
                   );
                 })}
