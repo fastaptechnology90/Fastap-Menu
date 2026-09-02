@@ -22,6 +22,7 @@ class KitchenOrder {
     this.cookingNotes = const [],
     this.rawStatus = '',
     this.waiterName,
+    this.isRoom = false,
   });
 
   final String? id;
@@ -46,6 +47,9 @@ class KitchenOrder {
   // Name of the waiter this order is assigned to (for the waiter app's
   // "My Deliveries" view). Set once the kitchen marks the order ready.
   final String? waiterName;
+  // True for room-service orders (housekeeping deliveries); false for table
+  // orders (waiter deliveries).
+  final bool isRoom;
 
   static List<String> _stringList(dynamic raw) =>
       raw is List ? raw.map((e) => e.toString()).toList() : const [];
@@ -73,6 +77,7 @@ class KitchenOrder {
       modifiers: modifiers,
       cookingNotes: cookingNotes,
       waiterName: waiterName,
+      isRoom: isRoom,
     );
   }
 
@@ -100,6 +105,7 @@ class KitchenOrder {
       modifiers: _stringList(json['modifiers']),
       cookingNotes: _stringList(json['cookingNotes']),
       waiterName: json['waiterName'] as String?,
+      isRoom: json['isRoom'] as bool? ?? false,
     );
   }
 

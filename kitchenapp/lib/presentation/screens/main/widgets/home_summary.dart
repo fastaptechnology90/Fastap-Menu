@@ -337,6 +337,7 @@ class HomeOrderPreview extends StatelessWidget {
     this.onAction,
     this.deliveryMode = false,
     this.myName,
+    this.roomDeliveries = false,
   });
 
   final List<KitchenOrder> orders;
@@ -346,6 +347,8 @@ class HomeOrderPreview extends StatelessWidget {
   // with Start Delivery / Delivered actions.
   final bool deliveryMode;
   final String? myName;
+  // Housekeeping delivers room orders; waiter delivers table orders.
+  final bool roomDeliveries;
 
   @override
   Widget build(BuildContext context) {
@@ -356,6 +359,7 @@ class HomeOrderPreview extends StatelessWidget {
                   (o.rawStatus == 'ready' ||
                       o.rawStatus == 'serving' ||
                       o.rawStatus == 'served') &&
+                  (roomDeliveries ? o.isRoom : !o.isRoom) &&
                   o.waiterName != null &&
                   myName != null &&
                   o.waiterName!.trim().toLowerCase() ==

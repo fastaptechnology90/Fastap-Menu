@@ -119,8 +119,14 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
   const vip = Boolean(meta.vip ?? tracking.vip);
   const allergy = items.some(i => Boolean(i.allergy) || /allergy|nut|gluten/i.test(String(i.notes ?? "")));
   const kotNumber = `KOT-${row.id}`;
-  const location = row.type === "room_service"
-    ? (row.tableName || (meta.roomNumber ? `Room ${meta.roomNumber}` : "Room Service"))
+  // A room order isn't always tagged type "room_service" — detect it by a room
+  // number or a "Room …" table name so the label reads "Room 501", not
+  // "Table Room 501", and so it routes to housekeeping rather than a waiter.
+  const isRoom = row.type === "room_service"
+    || meta.roomNumber != null
+    || /^\s*room\b/i.test(String(row.tableName ?? ""));
+  const location = isRoom
+    ? (meta.roomNumber ? `Room ${meta.roomNumber}` : (row.tableName || "Room Service"))
     : row.tableName
       ? `Table ${row.tableName}`
       : row.type === "delivery"
@@ -154,6 +160,7 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     reFireRequested: Boolean(meta.reFire),
     tableNumber: row.tableName ?? undefined,
     roomNumber: meta.roomNumber ? String(meta.roomNumber) : undefined,
+    isRoom,
     waiterName: row.waiterName ?? undefined,
     statusLabel: status === "preparing" && vip ? "VIP" : undefined,
     lineItems: itemNames.map(name => ({ name, status: "active", modifiable: true })),

@@ -214,17 +214,32 @@ export async function autoAssignWaiterToOrder(restaurantId: number, orderId: num
   if (!order || order.waiterName) return order;
   if (order.status !== "ready") return order;
 
-  const candidates = await activeStaff(restaurantId, ["waiter"]);
-  const picked = await pickLeastLoaded(candidates, n => waiterLoad(restaurantId, n));
-  if (!picked) return order;
-
   const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
   const tracking = (typeof meta.tracking === "object" && meta.tracking !== null ? meta.tracking : {}) as Record<string, unknown>;
+
+  // A room order (room number, "Room …" table name, or room_service type) is a
+  // housekeeping delivery; a table order is a waiter delivery.
+  const isRoomOrder = order.type === "room_service"
+    || meta.roomNumber != null
+    || /^\s*room\b/i.test(String(order.tableName ?? ""));
+  const role = isRoomOrder ? "housekeeping" : "waiter";
+
+  // Room orders go to housekeeping, table orders to a waiter. Fall back to a
+  // manager only when no dedicated staff for that role is on shift.
+  let candidates = await activeStaff(restaurantId, isRoomOrder ? ["housekeeping"] : ["waiter"]);
+  if (!candidates.length) {
+    candidates = await activeStaff(restaurantId, ["manager"]);
+  }
+  const picked = await pickLeastLoaded(candidates, n =>
+    isRoomOrder ? housekeepingLoad(restaurantId, n) : waiterLoad(restaurantId, n),
+  );
+  if (!picked) return order;
 
   const [updated] = await db.update(ordersTable).set({
     waiterId: picked.id,
     waiterName: picked.name,
-    status: order.type === "room_service" ? "serving" : order.status,
+    // Keep it "ready" so the assignee taps Start Delivery in their own app.
+    status: order.status,
     metadata: {
       ...meta,
       tracking: {
@@ -236,21 +251,22 @@ export async function autoAssignWaiterToOrder(restaurantId: number, orderId: num
     },
   }).where(eq(ordersTable.id, orderId)).returning();
 
-  const location =
-    order.type === "room_service"
-      ? order.tableName || `Room ${meta.roomNumber ?? "—"}`
-      : order.tableName || "Table";
+  const location = isRoomOrder
+    ? (meta.roomNumber ? `Room ${meta.roomNumber}` : (order.tableName || "Room service"))
+    : (order.tableName ? `Table ${order.tableName}` : "Table");
 
   await notifyStaffMember({
     restaurantId,
     staffName: picked.name,
-    staffRole: "waiter",
+    staffRole: role,
     title: `Order ready — ${location}`,
-    message: "Kitchen marked order ready — deliver to guest",
-    metadata: { orderId, tableName: order.tableName, module: "waiter" },
+    message: isRoomOrder
+      ? "Kitchen marked order ready — deliver to the room"
+      : "Kitchen marked order ready — deliver to guest",
+    metadata: { orderId, tableName: order.tableName, roomNumber: meta.roomNumber, module: role },
   });
 
-  broadcastEvent("waiter_assigned", {
+  broadcastEvent(isRoomOrder ? "housekeeping_assigned" : "waiter_assigned", {
     restaurantId,
     orderId,
     waiterName: picked.name,
