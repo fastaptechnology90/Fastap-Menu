@@ -110,6 +110,13 @@ export default function SmartDiningPage() {
   const summary = computeBillSummary(allLines, billConfig);
   const liveTotal = cartTotal + orderLines.reduce((s, l) => s + l.lineTotal, 0);
 
+  // Real assigned waiter for this table (falls back to "being assigned" until
+  // the kitchen marks an order ready and auto-assignment picks a waiter).
+  const assignedWaiter = useMemo(
+    () => orders.find(o => (o.tableNo === activeTable || !activeTable) && o.waiterName)?.waiterName,
+    [orders, activeTable],
+  );
+
   function sendRequest(label: string, type: string) {
     if (venue.restaurantId) {
       publicApi.waiterCall({
@@ -195,8 +202,12 @@ export default function SmartDiningPage() {
         <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4 flex items-center gap-3">
           <div className="h-11 w-11 rounded-full bg-gradient-to-br from-orange-500/30 to-pink-500/20 flex items-center justify-center text-lg">👨</div>
           <div className="flex-1">
-            <p className="text-sm font-semibold">Rahul Kumar · Your Waiter</p>
-            <p className="text-xs text-emerald-400 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online</p>
+            <p className="text-sm font-semibold">{assignedWaiter ? `${assignedWaiter} · Your Waiter` : "Your Waiter"}</p>
+            {assignedWaiter ? (
+              <p className="text-xs text-emerald-400 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online</p>
+            ) : (
+              <p className="text-xs text-white/45 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white/40" /> Being assigned…</p>
+            )}
           </div>
           <button onClick={() => sendRequest("Called your waiter", "call_waiter")} title="Call waiter" className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center hover:bg-emerald-500/30"><Phone className="h-4 w-4 text-emerald-400" /></button>
         </div>

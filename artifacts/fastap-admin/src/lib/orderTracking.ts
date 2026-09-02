@@ -51,7 +51,7 @@ export function buildDemoTracking(stage: LifecycleStage, elapsedMin: number): Or
     lifecycleStage: stage,
     dbStatus: stage === "cancelled" ? "cancelled" : "preparing",
     chefName: idx >= 3 ? "Chef Priya Sharma" : undefined,
-    waiterName: idx >= 5 ? "Rahul Kumar" : idx >= 4 ? "Rahul Kumar" : undefined,
+    waiterName: idx >= 4 ? "Assigned waiter" : undefined,
     waiterStatus: idx >= 6 ? "delivered" : idx >= 5 ? "on_the_way" : idx >= 4 ? "assigned" : "pending",
     estimatedServingMinutes: 25,
     estimatedServingAt: new Date(Date.now() + Math.max(5, 25 - elapsedMin) * 60000).toISOString(),
@@ -72,7 +72,7 @@ function demoKitchenFeed(stageIdx: number, elapsedMin: number): KitchenUpdate[] 
   if (stageIdx >= 3) feed.unshift({ at: t(5), message: "Chef Priya Sharma assigned to your order", type: "chef" });
   if (stageIdx >= 4) feed.unshift({ at: t(8), message: "Cooking in progress on tandoor station", type: "info" });
   if (stageIdx >= 5) feed.unshift({ at: t(18), message: "Plating complete — waiter notified", type: "ready" });
-  if (stageIdx >= 6) feed.unshift({ at: t(22), message: "Rahul is on the way with your order", type: "info" });
+  if (stageIdx >= 6) feed.unshift({ at: t(22), message: "Your waiter is on the way with your order", type: "info" });
   return feed;
 }
 
