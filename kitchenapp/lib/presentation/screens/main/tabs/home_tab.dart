@@ -131,6 +131,34 @@ class HomeTab extends StatelessWidget {
             .toList();
         final showDashboard = auth.canAccessNav(0);
         final showOrders = auth.canAccessNav(1);
+        // Waiter/housekeeping care about the live order list first (what to
+        // serve / deliver), so surface it above the pulse & metrics. Kitchen
+        // keeps its KDS-focused layout with orders lower down.
+        final ordersFirst =
+            role == StaffRole.waiter || role == StaffRole.housekeeping;
+
+        Widget orderPreviewSliver() => SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                  AppSpacing.lg,
+                ),
+                child: loading
+                    ? const SizedBox.shrink()
+                    : HomeOrderPreview(
+                        orders: dashboard?.orders ?? const [],
+                        onAction: controller.performKdsAction,
+                        onViewAll: () => ModuleScreenBuilder.open(
+                          context,
+                          navIndex: 1,
+                          controller: controller,
+                          auth: auth,
+                        ),
+                      ),
+              ),
+            );
 
         return RefreshIndicator(
           onRefresh: controller.refreshDashboard,
@@ -172,6 +200,7 @@ class HomeTab extends StatelessWidget {
                     child: _AlertStrip(count: rushCount),
                   ),
                 ),
+              if (showOrders && ordersFirst) orderPreviewSliver(),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -291,29 +320,7 @@ class HomeTab extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showOrders)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xl,
-                      AppSpacing.lg,
-                      AppSpacing.xl,
-                      AppSpacing.lg,
-                    ),
-                    child: loading
-                        ? const SizedBox.shrink()
-                        : HomeOrderPreview(
-                            orders: dashboard?.orders ?? const [],
-                            onAction: controller.performKdsAction,
-                            onViewAll: () => ModuleScreenBuilder.open(
-                              context,
-                              navIndex: 1,
-                              controller: controller,
-                              auth: auth,
-                            ),
-                          ),
-                  ),
-                ),
+              if (showOrders && !ordersFirst) orderPreviewSliver(),
               const SliverToBoxAdapter(
                 child: SizedBox(height: AppSpacing.xxxl),
               ),
