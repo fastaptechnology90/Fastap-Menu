@@ -304,6 +304,7 @@ class HomeTab extends StatelessWidget {
                         ? const SizedBox.shrink()
                         : HomeOrderPreview(
                             orders: dashboard?.orders ?? const [],
+                            onAction: controller.performKdsAction,
                             onViewAll: () => ModuleScreenBuilder.open(
                               context,
                               navIndex: 1,

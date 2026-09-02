@@ -20,6 +20,7 @@ class KitchenOrder {
     this.addOns = const [],
     this.modifiers = const [],
     this.cookingNotes = const [],
+    this.rawStatus = '',
   });
 
   final String? id;
@@ -28,6 +29,9 @@ class KitchenOrder {
   final String section;
   final List<String> items;
   final String status;
+  // Machine status from the API ('new','accepted','preparing','ready','delayed',…) used to
+  // decide which kitchen actions to offer. `status` above is the human label for display.
+  final String rawStatus;
   final String timer;
   final double progress;
   final Color color;
@@ -54,6 +58,7 @@ class KitchenOrder {
       section: json['section'] as String,
       items: (json['items'] as List<dynamic>).map((item) => item.toString()).toList(),
       status: json['statusLabel'] as String? ?? _statusLabel(status, vip),
+      rawStatus: status,
       timer: json['timer'] as String? ?? '00:00',
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       color: DashboardTone.colorForOrderStatus(status),

@@ -5,9 +5,41 @@ import '../../core/constants/app_spacing.dart';
 import '../../models/kitchen_order.dart';
 
 class CompactOrderTile extends StatelessWidget {
-  const CompactOrderTile({super.key, required this.order});
+  const CompactOrderTile({super.key, required this.order, this.onAction});
 
   final KitchenOrder order;
+  // Runs a kitchen action (accept / prepare / ready / cancel …) for this order.
+  // When provided, the detail sheet shows the matching action buttons.
+  final Future<void> Function(String orderId, String action)? onAction;
+
+  // Which actions to offer for the order's current machine status.
+  static List<(String, String, IconData)> _actionsForStatus(String s) {
+    switch (s) {
+      case 'new':
+        return [('Accept', 'accept', Icons.check), ('Reject', 'reject', Icons.close), ('Cancel', 'cancel', Icons.block)];
+      case 'accepted':
+      case 'confirmed':
+        return [('Start', 'prepare', Icons.play_arrow), ('Delay', 'delay', Icons.schedule), ('Cancel', 'cancel', Icons.block)];
+      case 'preparing':
+      case 'delayed':
+        return [('Ready', 'ready', Icons.task_alt), ('Delay', 'delay', Icons.schedule), ('Re-fire', 'refire', Icons.replay)];
+      case 'ready':
+        return [('Re-fire', 'refire', Icons.replay)];
+      default:
+        return const [];
+    }
+  }
+
+  static String _actionPast(String action) => switch (action) {
+        'accept' => 'accepted',
+        'reject' => 'rejected',
+        'cancel' => 'cancelled',
+        'prepare' => 'started',
+        'ready' => 'marked ready',
+        'delay' => 'delayed',
+        'refire' => 're-fired',
+        _ => 'updated',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +202,8 @@ class CompactOrderTile extends StatelessWidget {
   }
 
   void _showDetail(BuildContext context) {
+    final messenger = ScaffoldMessenger.of(context);
+    final actions = onAction == null ? const <(String, String, IconData)>[] : _actionsForStatus(order.rawStatus);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -321,6 +355,46 @@ class CompactOrderTile extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+            ],
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: actions.map((a) {
+                  final danger = a.$2 == 'reject' || a.$2 == 'cancel';
+                  final color = danger ? AppColors.danger : AppColors.primary;
+                  return FilledButton.tonalIcon(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      try {
+                        await onAction!(order.id ?? '', a.$2);
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(
+                            content: Text('Order ${_actionPast(a.$2)}'),
+                            duration: const Duration(milliseconds: 1600),
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                      } catch (_) {
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(
+                            content: const Text('Could not update the order. Check connection and try again.'),
+                            backgroundColor: AppColors.danger,
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                      }
+                    },
+                    icon: Icon(a.$3, size: 16, color: color),
+                    label: Text(a.$1, style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: color.withValues(alpha: 0.1),
+                      foregroundColor: color,
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ],

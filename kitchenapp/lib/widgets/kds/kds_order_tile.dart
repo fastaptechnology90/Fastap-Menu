@@ -250,8 +250,28 @@ class _KdsOrderTileState extends State<KdsOrderTile>
   }
 
   List<Widget> _actionsFor(KdsOrder order) {
-    Future<void> act(String action) =>
-        widget.controller.performKdsAction(order.id, action);
+    Future<void> act(String action) async {
+      try {
+        await widget.controller.performKdsAction(order.id, action);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text('Order ${_kdsActionPast(action)}'),
+            duration: const Duration(milliseconds: 1600),
+            behavior: SnackBarBehavior.floating,
+          ));
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: const Text('Could not update the order. Check connection and try again.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ));
+      }
+    }
 
     return switch (order.status) {
       KdsStatus.newOrder => [
@@ -426,6 +446,20 @@ class _LineBlock extends StatelessWidget {
     );
   }
 }
+
+// Past-tense label for the toast shown after a KDS action succeeds.
+String _kdsActionPast(String action) => switch (action) {
+      'accept' => 'accepted',
+      'reject' => 'rejected',
+      'cancel' => 'cancelled',
+      'prepare' => 'started',
+      'ready' => 'marked ready',
+      'delay' => 'delayed',
+      'refire' => 're-fired',
+      'hold' => 'held',
+      'release' => 'released',
+      _ => 'updated',
+    };
 
 class _ActionButton extends StatelessWidget {
   const _ActionButton(

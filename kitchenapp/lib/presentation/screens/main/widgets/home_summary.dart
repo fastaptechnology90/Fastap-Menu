@@ -334,10 +334,12 @@ class HomeOrderPreview extends StatelessWidget {
     super.key,
     required this.orders,
     required this.onViewAll,
+    this.onAction,
   });
 
   final List<KitchenOrder> orders;
   final VoidCallback onViewAll;
+  final Future<void> Function(String orderId, String action)? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +418,7 @@ class HomeOrderPreview extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
               itemBuilder: (context, index) => SizedBox(
                 width: 292,
-                child: CompactOrderTile(order: preview[index]),
+                child: CompactOrderTile(order: preview[index], onAction: onAction),
               ),
             ),
           ),
