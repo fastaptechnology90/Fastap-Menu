@@ -460,7 +460,7 @@ export default function MenuPage() {
   const { canInstall, isStandalone, installApp } = usePwa();
   const [menuFromCache, setMenuFromCache] = useState(false);
   // The guest's active (unbilled) order, restored on reopen so they see it + can edit it.
-  const [activeOrder, setActiveOrder] = useState<{ id: string; total: number; status: string; items: { menuItemId?: number | string; id?: number | string; name: string; quantity?: number; qty?: number; customizations?: string[]; addons?: unknown[]; variant?: string }[] } | null>(null);
+  const [activeOrder, setActiveOrder] = useState<{ id: string; total: number; status: string; waiterName?: string; items: { menuItemId?: number | string; id?: number | string; name: string; quantity?: number; qty?: number; customizations?: string[]; addons?: unknown[]; variant?: string }[] } | null>(null);
   const OPEN_ORDER = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "serving", "served"];
   async function refreshActiveOrder() {
     const ref = loadActiveOrder();
@@ -469,7 +469,7 @@ export default function MenuPage() {
       const o = await publicApi.getOrder(ref.id);
       const status = String(o?.status ?? "").toLowerCase();
       if (!o || !OPEN_ORDER.includes(status)) { clearActiveOrder(); setActiveOrder(null); return; }
-      setActiveOrder({ id: String(o.id), total: parseFloat(String(o.total)) || 0, status, items: Array.isArray(o.items) ? o.items : [] });
+      setActiveOrder({ id: String(o.id), total: parseFloat(String(o.total)) || 0, status, waiterName: o.waiterName ? String(o.waiterName) : undefined, items: Array.isArray(o.items) ? o.items : [] });
     } catch { setActiveOrder(null); }
   }
   useEffect(() => { refreshActiveOrder(); /* eslint-disable-next-line */ }, []);
@@ -881,8 +881,8 @@ export default function MenuPage() {
             <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-4">
               <Phone className="h-4 w-4 text-blue-400" />
               <div>
-                <p className="text-xs font-semibold text-blue-300">Your Waiter</p>
-                <p className="text-xs text-white/50">Rahul Kumar is serving your table</p>
+                <p className="text-xs font-semibold text-blue-300">{activeOrder?.waiterName ? "Your Waiter" : "Table Service"}</p>
+                <p className="text-xs text-white/50">{activeOrder?.waiterName ? `${activeOrder.waiterName} is serving your table` : "Tap a request below — a waiter will be notified for your table."}</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">

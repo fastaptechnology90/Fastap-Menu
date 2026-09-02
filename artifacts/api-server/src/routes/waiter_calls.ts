@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, waiterCallsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { broadcastEvent } from "../lib/sse";
 
 const router: IRouter = Router();
 
@@ -9,6 +10,8 @@ router.post("/public/waiter-call", async (req, res): Promise<void> => {
   const { restaurantId, tableId, tableName, type, message } = req.body;
   if (!restaurantId || !type) { res.status(400).json({ error: "restaurantId and type required" }); return; }
   const [call] = await db.insert(waiterCallsTable).values({ restaurantId, tableId, tableName, type, message, isResolved: false }).returning();
+  // Push it live to the staff panels so a table's request shows up without waiting for a poll.
+  broadcastEvent("waiter_call", { id: call.id, restaurantId, tableName, type, message });
   res.status(201).json(call);
 });
 
