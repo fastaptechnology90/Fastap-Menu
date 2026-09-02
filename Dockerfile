@@ -2,7 +2,10 @@
 # Using a Dockerfile (instead of Railway's auto-builder) pins the pnpm version so the
 # pnpm-workspace.yaml overrides/settings are honoured, and installs without a frozen
 # lockfile so the overrides drift can't fail the build.
-FROM node:22-bookworm-slim
+# Pull the base image from AWS ECR's public mirror of the Docker Official Images
+# instead of Docker Hub. Docker Hub rate-limits anonymous pulls from shared CI IPs
+# (Railway), which was failing the build with "registry-1.docker.io ... EOF".
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim
 
 # Build tools for native deps (bcrypt, cpu-features) + CA certs.
 RUN apt-get update \
