@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -211,8 +213,10 @@ class _KdsOrderTileState extends State<KdsOrderTile>
                               color: order.statusColor,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              order.timerLabel,
+                            _LiveTimer(
+                              initialSeconds: order.timerSeconds,
+                              active: order.status.apiValue != 'ready' &&
+                                  order.status.apiValue != 'served',
                               style: TextStyle(
                                 color: order.statusColor,
                                 fontWeight: FontWeight.w900,
@@ -498,4 +502,68 @@ class _ActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+// A ticking MM:SS timer that rebuilds ONLY itself once a second — instead of the whole KDS
+// board rebuilding every second (which made the app janky). It starts from the value the API
+// gave and re-syncs whenever a refresh brings a new base.
+class _LiveTimer extends StatefulWidget {
+  const _LiveTimer({required this.initialSeconds, required this.active, this.style});
+
+  final int initialSeconds;
+  final bool active;
+  final TextStyle? style;
+
+  @override
+  State<_LiveTimer> createState() => _LiveTimerState();
+}
+
+class _LiveTimerState extends State<_LiveTimer> {
+  late int _seconds;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _seconds = widget.initialSeconds;
+    if (widget.active) _start();
+  }
+
+  void _start() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _seconds += 1);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_LiveTimer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialSeconds != widget.initialSeconds) {
+      _seconds = widget.initialSeconds;
+    }
+    if (oldWidget.active != widget.active) {
+      if (widget.active) {
+        _start();
+      } else {
+        _timer?.cancel();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String get _label {
+    final safe = _seconds < 0 ? 0 : _seconds;
+    final m = safe ~/ 60;
+    final s = safe % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) => Text(_label, style: widget.style);
 }

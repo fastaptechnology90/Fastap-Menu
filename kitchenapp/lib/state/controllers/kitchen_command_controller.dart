@@ -860,13 +860,10 @@ class KitchenCommandController extends ChangeNotifier {
       },
     );
 
+    // Live per-second countdown is now handled locally by each order tile's _LiveTimer widget,
+    // so we no longer rebuild the whole KDS board every second (that per-second notifyListeners
+    // was the main source of jank / "slow app"). Base values still re-sync on the 15s refresh.
     _kdsTimer?.cancel();
-    _kdsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_selectedNav == 1 && _kds != null) {
-        _kds = _kds!.withLiveTimerTick();
-        notifyListeners();
-      }
-    });
   }
 
   Future<void> refreshDashboard({bool silent = false}) async {
