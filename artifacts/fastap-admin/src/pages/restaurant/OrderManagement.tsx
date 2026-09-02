@@ -52,7 +52,7 @@ export default function OrderManagement() {
   const [filter, setFilter] = useState<"all" | LiveOrder["status"]>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "dine-in" | "takeaway" | "room-service" | "delivery">("all");
   const [search, setSearch] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState<LiveOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<(LiveOrder & { tabOrders?: LiveOrder[]; roundCount?: number }) | null>(null);
   const [newOrderForm, setNewOrderForm] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
@@ -134,13 +134,16 @@ export default function OrderManagement() {
   }, [filtered]);
 
   // Advance only the laggard rounds sitting at the tab's current (least-advanced) stage.
-  function advanceTab(tab: TabOrder, target: LiveOrder["status"]) {
-    const active = tab.tabOrders.filter(o => o.status !== "cancelled");
+  function advanceTab(tab: LiveOrder & { tabOrders?: LiveOrder[] }, target: LiveOrder["status"]) {
+    const orders = tab.tabOrders ?? [tab];
+    const active = orders.filter(o => o.status !== "cancelled");
     const repRank = active.length ? Math.min(...active.map(o => STATUS_RANK[o.status])) : 0;
-    tab.tabOrders.filter(o => STATUS_RANK[o.status] === repRank).forEach(o => updateOrderStatus(o.id, target));
+    orders.filter(o => STATUS_RANK[o.status] === repRank).forEach(o => updateOrderStatus(o.id, target));
   }
-  function cancelTab(tab: TabOrder) {
-    tab.tabOrders.filter(o => o.status !== "cancelled").forEach(o => updateOrderStatus(o.id, "cancelled"));
+  // Cancel EVERY round of the tab (not just the first order) so a multi-round tab fully cancels.
+  function cancelTab(tab: LiveOrder & { tabOrders?: LiveOrder[] }) {
+    const orders = tab.tabOrders ?? [tab];
+    orders.filter(o => o.status !== "cancelled").forEach(o => updateOrderStatus(o.id, "cancelled"));
   }
 
   const counts = {
@@ -387,7 +390,7 @@ export default function OrderManagement() {
             <div className="space-y-2">
               {detailCfg.next && (
                 <button
-                  onClick={() => { updateOrderStatus(selectedOrder.id, detailCfg.next!); setSelectedOrder(null); }}
+                  onClick={() => { advanceTab(selectedOrder, detailCfg.next!); setSelectedOrder(null); }}
                   className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-semibold text-sm"
                 >
                   Mark as {STATUS_CFG[detailCfg.next!]?.label ?? detailCfg.next}
@@ -397,8 +400,8 @@ export default function OrderManagement() {
                 <Printer className="h-4 w-4" /> Print KOT
               </button>
               {selectedOrder.status !== "cancelled" && (
-                <button onClick={() => { updateOrderStatus(selectedOrder.id, "cancelled"); setSelectedOrder(null); }} className="w-full py-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-sm font-semibold">
-                  Cancel Order
+                <button onClick={() => { cancelTab(selectedOrder); setSelectedOrder(null); }} className="w-full py-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-sm font-semibold">
+                  Cancel Order{(selectedOrder.roundCount ?? 1) > 1 ? ` · all ${selectedOrder.roundCount} rounds` : ""}
                 </button>
               )}
             </div>
