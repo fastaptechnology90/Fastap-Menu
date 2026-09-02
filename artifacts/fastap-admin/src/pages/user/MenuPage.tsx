@@ -10,7 +10,7 @@ import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestEmpty } from "@/components/user/GuestApiState";
 import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
-import { loadActiveOrder, clearActiveOrder } from "@/lib/activeOrder";
+import { loadActiveOrders, removeActiveOrder, clearActiveOrder } from "@/lib/activeOrder";
 import { MenuGridCard } from "@/components/user/MenuGridCard";
 import { ServiceHubSheet } from "@/components/user/ServiceHubSheet";
 import { MenuFilterSheet } from "@/components/user/MenuFilterSheet";
@@ -459,18 +459,25 @@ export default function MenuPage() {
   const { loadMenuWithCache, isOnline, connectionStatus, settings, pendingOrders } = useOffline();
   const { canInstall, isStandalone, installApp } = usePwa();
   const [menuFromCache, setMenuFromCache] = useState(false);
-  // The guest's active (unbilled) order, restored on reopen so they see it + can edit it.
-  const [activeOrder, setActiveOrder] = useState<{ id: string; total: number; status: string; waiterName?: string; items: { menuItemId?: number | string; id?: number | string; name: string; quantity?: number; qty?: number; customizations?: string[]; addons?: unknown[]; variant?: string }[] } | null>(null);
+  // The guest's active (unbilled) orders — every round they've placed — restored on reopen so they
+  // can track each one (progress + waiter) and edit the running order.
+  type ActiveOrderInfo = { id: string; total: number; status: string; waiterName?: string; at: number; items: { menuItemId?: number | string; id?: number | string; name: string; quantity?: number; qty?: number; customizations?: string[]; addons?: unknown[]; variant?: string }[] };
+  const [activeOrders, setActiveOrders] = useState<ActiveOrderInfo[]>([]);
+  // The latest round — used for the card's ordered-qty / remove controls.
+  const activeOrder = activeOrders.length ? activeOrders[activeOrders.length - 1] : null;
   const OPEN_ORDER = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "serving", "served"];
   async function refreshActiveOrder() {
-    const ref = loadActiveOrder();
-    if (!ref?.id) { setActiveOrder(null); return; }
-    try {
-      const o = await publicApi.getOrder(ref.id);
-      const status = String(o?.status ?? "").toLowerCase();
-      if (!o || !OPEN_ORDER.includes(status)) { clearActiveOrder(); setActiveOrder(null); return; }
-      setActiveOrder({ id: String(o.id), total: parseFloat(String(o.total)) || 0, status, waiterName: o.waiterName ? String(o.waiterName) : undefined, items: Array.isArray(o.items) ? o.items : [] });
-    } catch { setActiveOrder(null); }
+    const refs = loadActiveOrders();
+    if (refs.length === 0) { setActiveOrders([]); return; }
+    const fetched = await Promise.all(refs.map(async ref => {
+      try {
+        const o = await publicApi.getOrder(ref.id);
+        const status = String(o?.status ?? "").toLowerCase();
+        if (!o || !OPEN_ORDER.includes(status)) { removeActiveOrder(ref.id); return null; }
+        return { id: String(o.id), total: parseFloat(String(o.total)) || 0, status, waiterName: o.waiterName ? String(o.waiterName) : undefined, at: ref.at ?? 0, items: Array.isArray(o.items) ? o.items : [] } as ActiveOrderInfo;
+      } catch { return null; }
+    }));
+    setActiveOrders(fetched.filter((x): x is ActiveOrderInfo => x !== null).sort((a, b) => a.at - b.at));
   }
   useEffect(() => { refreshActiveOrder(); /* eslint-disable-next-line */ }, []);
   // Quantity of a menu item already in the active order (plain lines only — no customizations).
@@ -807,24 +814,34 @@ export default function MenuPage() {
                 ) : null}
               </p>
 
-              {activeOrder && !isDemo && (
-                <button
-                  onClick={() => navigate(`/user/order/${activeOrder.id}`)}
-                  className="w-full mb-3 flex items-center gap-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 px-4 py-3 text-left active:scale-[0.99] transition-transform"
-                >
-                  <span className="relative flex h-2.5 w-2.5 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-emerald-300">Your order is on the way 🍽️</p>
-                    <p className="text-xs text-white/50">{activeOrder.items.length} item{activeOrder.items.length !== 1 ? "s" : ""} · ₹{activeOrder.total} · tap to track the timer</p>
-                  </div>
-                  <span className="text-emerald-300 text-sm font-bold shrink-0">Track →</span>
-                </button>
-              )}
-              {activeOrder && !isDemo && (
-                <p className="text-[11px] text-white/40 mb-3 px-1">Want more? Add items with <b className="text-emerald-300">+</b>, then tap <b className="text-amber-300">Place Order</b> — it goes to your table as a new order.</p>
+              {activeOrders.length > 0 && !isDemo && (
+                <div className="mb-3 space-y-2">
+                  {activeOrders.map((ord, i) => {
+                    const label = ord.status === "ready" ? "Ready to serve"
+                      : ord.status === "preparing" ? "Being prepared"
+                      : ord.status === "served" || ord.status === "serving" ? "On the way / served"
+                      : ord.status === "accepted" || ord.status === "confirmed" ? "Accepted by kitchen"
+                      : "Sent to kitchen";
+                    return (
+                      <button
+                        key={ord.id}
+                        onClick={() => navigate(`/user/order/${ord.id}`)}
+                        className="w-full flex items-center gap-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 px-4 py-3 text-left active:scale-[0.99] transition-transform"
+                      >
+                        <span className="relative flex h-2.5 w-2.5 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-emerald-300">{activeOrders.length > 1 ? `Order ${i + 1}` : "Your order"} · {label}</p>
+                          <p className="text-xs text-white/50 truncate">{ord.items.length} item{ord.items.length !== 1 ? "s" : ""} · ₹{ord.total} · {ord.waiterName ? `waiter: ${ord.waiterName}` : "waiter being assigned"}</p>
+                        </div>
+                        <span className="text-emerald-300 text-sm font-bold shrink-0">Track →</span>
+                      </button>
+                    );
+                  })}
+                  <p className="text-[11px] text-white/40 px-1">Want more? Add items with <b className="text-emerald-300">+</b>, then tap <b className="text-amber-300">Place Order</b> — it goes to your table as a new order.</p>
+                </div>
               )}
               <div className="menu-app__grid">
                 {filteredItems.map(item => {
