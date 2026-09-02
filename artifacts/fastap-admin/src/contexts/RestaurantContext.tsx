@@ -49,6 +49,9 @@ export interface RestaurantInfo {
 
 export interface LiveOrder {
   id: string;
+  // Shared tab id: same-table follow-up orders carry the first order's id so owner/cashier
+  // panels can group a table's separate orders into one combined tab & total.
+  tabId?: number;
   tableNo: string;
   waiter: string;
   items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready"; variant?: string; addons?: { name: string; price: number }[]; customizations?: string[]; notes?: string }[];
@@ -194,6 +197,7 @@ function mapApiOrder(o: any): LiveOrder {
   const tableId = o.tableId ?? o.table_id;
   return {
     id: String(o.id),
+    tabId: typeof o.metadata?.tabId === "number" ? o.metadata.tabId : undefined,
     tableNo: tableName
       ? String(tableName)
       : tableId != null && tableId !== ""

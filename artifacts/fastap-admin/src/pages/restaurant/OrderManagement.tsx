@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, menu as menuApi } from "@/lib/api";
 import { splitCustomizations } from "@/lib/orderItemExtras";
@@ -103,6 +103,46 @@ export default function OrderManagement() {
     return statusMatch && typeMatch && searchMatch;
   });
 
+  // Group a table's SEPARATE orders into ONE combined tab card (all items + combined total)
+  // for the owner / live view — while the kitchen app keeps each round separate (own buttons).
+  // The status shown is the least-advanced active round; actions advance just those laggards.
+  const STATUS_RANK: Record<LiveOrder["status"], number> = {
+    new: 0, accepted: 1, preparing: 2, ready: 3, served: 4, billed: 5, cancelled: 9,
+  };
+  type TabOrder = LiveOrder & { tabOrders: LiveOrder[]; roundCount: number };
+  const tabGroups: TabOrder[] = useMemo(() => {
+    const map = new Map<string, LiveOrder[]>();
+    for (const o of filtered) {
+      const key = String(o.tabId ?? o.id);
+      const arr = map.get(key);
+      if (arr) arr.push(o); else map.set(key, [o]);
+    }
+    return [...map.values()].map(group => {
+      if (group.length === 1) return { ...group[0], tabOrders: group, roundCount: 1 };
+      const sorted = [...group].sort((a, b) => a.placedAt.getTime() - b.placedAt.getTime());
+      const active = sorted.filter(o => o.status !== "cancelled");
+      const rep = (active.length ? active : sorted).reduce((m, o) => STATUS_RANK[o.status] < STATUS_RANK[m.status] ? o : m);
+      return {
+        ...sorted[0],
+        items: sorted.flatMap(o => o.items),
+        total: sorted.reduce((s, o) => s + o.total, 0),
+        status: rep.status,
+        tabOrders: sorted,
+        roundCount: sorted.length,
+      };
+    });
+  }, [filtered]);
+
+  // Advance only the laggard rounds sitting at the tab's current (least-advanced) stage.
+  function advanceTab(tab: TabOrder, target: LiveOrder["status"]) {
+    const active = tab.tabOrders.filter(o => o.status !== "cancelled");
+    const repRank = active.length ? Math.min(...active.map(o => STATUS_RANK[o.status])) : 0;
+    tab.tabOrders.filter(o => STATUS_RANK[o.status] === repRank).forEach(o => updateOrderStatus(o.id, target));
+  }
+  function cancelTab(tab: TabOrder) {
+    tab.tabOrders.filter(o => o.status !== "cancelled").forEach(o => updateOrderStatus(o.id, "cancelled"));
+  }
+
   const counts = {
     all: liveOrders.length,
     new: liveOrders.filter(o => o.status === "new").length,
@@ -167,7 +207,7 @@ export default function OrderManagement() {
 
         {/* Orders Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtered.map(order => {
+          {tabGroups.map(order => {
             const cfg = STATUS_CFG[order.status] ?? DEFAULT_STATUS;
             const elapsed = Math.floor((Date.now() - new Date(order.placedAt).getTime()) / 60000);
             const isUrgent = elapsed > 25 && !["served", "billed", "cancelled"].includes(order.status);
@@ -186,6 +226,9 @@ export default function OrderManagement() {
                       {order.roomNumber && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300">Room {order.roomNumber}</span>}
                       {payMethodBadge(order.paymentMethod)}
                       <span className="text-xs text-white/30">{order.id}</span>
+                      {order.roundCount > 1 && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">{order.roundCount} rounds</span>
+                      )}
                     </div>
                     <p className="text-xs text-white/40 mt-0.5">{order.customerName || order.waiter} · {order.guests} guests</p>
                     {order.customerPhone && <p className="text-xs text-white/40 flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</p>}
@@ -232,16 +275,16 @@ export default function OrderManagement() {
                   <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
                     {order.status === "new" && (
                       <>
-                        <button onClick={() => updateOrderStatus(order.id, "accepted")} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 border border-emerald-500/30">
+                        <button onClick={() => advanceTab(order, "accepted")} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 border border-emerald-500/30">
                           <CheckCircle className="h-3 w-3" /> Accept
                         </button>
-                        <button onClick={() => updateOrderStatus(order.id, "cancelled")} className="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/30 border border-red-500/30">
+                        <button onClick={() => cancelTab(order)} className="px-2.5 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/30 border border-red-500/30">
                           <XCircle className="h-3 w-3" />
                         </button>
                       </>
                     )}
                     {cfg.next && order.status !== "new" && (
-                      <button onClick={() => updateOrderStatus(order.id, cfg.next!)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 border border-amber-500/30">
+                      <button onClick={() => advanceTab(order, cfg.next!)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 border border-amber-500/30">
                         {cfg.next === "preparing" ? <ChefHat className="h-3 w-3" /> : cfg.next === "ready" ? <CheckCircle className="h-3 w-3" /> : cfg.next === "served" ? <Truck className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
                         {STATUS_CFG[cfg.next!]?.label}
                       </button>
@@ -252,7 +295,7 @@ export default function OrderManagement() {
             );
           })}
 
-          {filtered.length === 0 && (
+          {tabGroups.length === 0 && (
             <div className="col-span-3 text-center py-16 text-white/30">
               <div className="text-5xl mb-4">📋</div>
               <p className="font-semibold">No orders found</p>

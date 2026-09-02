@@ -252,72 +252,31 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     grandTotal: total,
   });
 
-  // Running tab: if this table already has an OPEN (unbilled) order, append the new items
-  // to it instead of creating a separate order — so the guest keeps ONE order + one bill.
-  // Only for seated dine-in / room orders; takeaway & delivery stay separate.
+  // Running tab: same-table follow-up orders stay SEPARATE orders (each its own KOT + its own
+  // lifecycle + its own kitchen status), so the kitchen app shows every round on its own card
+  // with its own Accept/Start/Ready buttons, and each guest tracks their own order's progress.
+  // They're tagged with a shared `tabId` so the owner / cashier panels can group a table's
+  // orders into one combined tab, bill and total. Only for seated dine-in / room orders.
   const OPEN_STATUSES = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
   const isSeated = (type ?? "dine_in") === "dine_in" || String(type ?? "").includes("room");
-  // Only merge into a tab that's still ACTIVE (touched within this window). A table left
-  // idle longer than this is treated as a new guest → fresh order, not merged into the
-  // previous party's stale tab. Configurable via ORDER_MERGE_WINDOW_MIN (default 120 min).
-  const MERGE_WINDOW_MS = (parseInt(process.env.ORDER_MERGE_WINDOW_MIN ?? "120", 10) || 120) * 60 * 1000;
+  // A table left idle longer than this window starts a brand-new tab (new party), instead of
+  // linking to the previous party's stale tab. Configurable via ORDER_MERGE_WINDOW_MIN (120m).
+  const TAB_WINDOW_MS = (parseInt(process.env.ORDER_MERGE_WINDOW_MIN ?? "120", 10) || 120) * 60 * 1000;
+  let tabId: number | null = null;
   if (isSeated && tableName) {
     const [openOrder] = await db.select().from(ordersTable)
       .where(and(
         eq(ordersTable.restaurantId, restaurantId),
         eq(ordersTable.tableName, tableName),
         inArray(ordersTable.status, OPEN_STATUSES),
-        gte(ordersTable.updatedAt, new Date(Date.now() - MERGE_WINDOW_MS)),
+        gte(ordersTable.updatedAt, new Date(Date.now() - TAB_WINDOW_MS)),
       ))
       .orderBy(desc(ordersTable.createdAt)).limit(1);
     if (openOrder) {
-      // Signature so identical lines (same item + same variant/addons/customizations/notes/price)
-      // stack into one row with a bumped quantity, instead of piling up duplicate 1x lines.
-      // Different customizations (e.g. "no chili") keep their own line — they're a different dish.
-      const itemSig = (it: any): string => JSON.stringify({
-        m: it.menuItemId ?? it.id ?? it.name,
-        v: it.variant ?? null,
-        a: it.addons ?? null,
-        c: it.customizations ?? null,
-        n: it.notes ?? null,
-        p: it.price ?? it.unitPrice ?? null,
-      });
-      const prevItems = Array.isArray(openOrder.items) ? (openOrder.items as any[]).map(x => ({ ...x })) : [];
-      const sigIndex = new Map<string, number>();
-      prevItems.forEach((it, i) => sigIndex.set(itemSig(it), i));
-      const mergedItems = prevItems;
-      for (const ni of orderItems) {
-        const sig = itemSig(ni);
-        const idx = sigIndex.get(sig);
-        if (idx != null) {
-          const ex = mergedItems[idx];
-          ex.quantity = (Number(ex.quantity) || 0) + (Number(ni.quantity) || 0);
-          ex.subtotal = (Number(ex.subtotal) || 0) + (Number(ni.subtotal) || 0);
-        } else {
-          mergedItems.push({ ...ni });
-          sigIndex.set(sig, mergedItems.length - 1);
-        }
-      }
-      const mergedSubtotal = parseFloat(String(openOrder.subtotal || 0)) + subtotal;
-      const mergedTax = parseFloat(String(openOrder.tax || 0)) + tax;
-      const mergedTotal = parseFloat(String(openOrder.total || 0)) + subtotal + tax;
-      // If the order was already finished, bump it back so the kitchen makes the new round.
-      const bumped = ["ready", "served"].includes(String(openOrder.status)) ? "pending" : openOrder.status;
-      const [updated] = await db.update(ordersTable).set({
-        items: mergedItems,
-        subtotal: String(mergedSubtotal.toFixed(2)),
-        tax: String(mergedTax.toFixed(2)),
-        total: String(mergedTotal.toFixed(2)),
-        status: bumped,
-      }).where(eq(ordersTable.id, openOrder.id)).returning();
-      for (const item of items) {
-        const mi = menuMap.get(item.menuItemId);
-        if (mi) await db.update(menuItemsTable).set({ orderCount: mi.orderCount + item.quantity }).where(eq(menuItemsTable.id, mi.id));
-      }
-      broadcastEvent("order_updated", { id: updated.id, restaurantId, tableName, total: mergedTotal, status: bumped, appended: true });
-      broadcastOrderEvent(updated.id, "order_status", { id: updated.id, status: bumped, tableName });
-      res.status(200).json(parseOrder(updated));
-      return;
+      const openMeta = (typeof openOrder.metadata === "object" && openOrder.metadata !== null
+        ? openOrder.metadata : {}) as Record<string, unknown>;
+      // Reuse the tab's existing id if the found order is itself a follow-up; else it is the root.
+      tabId = typeof openMeta.tabId === "number" ? openMeta.tabId : openOrder.id;
     }
   }
 
@@ -335,7 +294,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     orderSource: "user_web",
     nfcTagId: nfcTagId ?? null,
     qrCodeId: qrCodeId ?? null,
-    metadata: { ...enrichedMeta, ...trackingMeta, billing: billingMeta },
+    metadata: { ...enrichedMeta, ...trackingMeta, billing: billingMeta, ...(tabId ? { tabId } : {}) },
     scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
   }).returning();
 
