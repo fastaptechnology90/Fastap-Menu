@@ -607,21 +607,9 @@ export default function MenuPage() {
     if (isDemo) return; // demo menu is view-only — ordering disabled
     const beverageSlugs = ["soft-drinks", "coffee", "tea", "mocktails", "cocktails", "premium-liquor", "wine-menu", "beer-menu"];
     const course = item.category === "starters" ? "starter" : item.category === "desserts" ? "dessert" : beverageSlugs.includes(item.category) ? "beverage" : "main";
-    // With a running (unbilled) order open, anything added — plain or customized, from the card
-    // or the detail sheet — goes straight into that SAME order (the server merges it into the
-    // open tab). This keeps one order + one bill and updates the live total/count immediately,
-    // instead of quietly dropping the item into a separate cart the guest can't see.
-    if (activeOrder && venue.restaurantId) {
-      try {
-        await publicApi.createOrder({
-          restaurantId: venue.restaurantId,
-          tableName: activeTable,
-          type: "dine_in",
-          items: [{ menuItemId: item.id, quantity: 1, unitPrice: unitPrice ?? item.price, addons, customizations, notes: instructions, course }],
-        });
-      } finally { await refreshActiveOrder(); }
-      return;
-    }
+    // Everything the guest taps + on goes into the CART (even when they already have an order
+    // running). Nothing is sent to the kitchen until they tap Place Order — which submits a new
+    // order for the table. This is what stops a tap from silently placing an order on its own.
     const linePrice = unitPrice ?? item.price + addons.reduce((s, a) => s + a.price, 0);
     addToCart({
       menuItemId: item.id,
@@ -850,6 +838,8 @@ export default function MenuPage() {
                       item={item}
                       readOnly={isDemo}
                       quantity={qty}
+                      orderedQty={activeOrder ? orderedQtyOf(item.id) : 0}
+                      onRemoveOrdered={e => { e.stopPropagation(); adjustOrdered(item.id, -1); }}
                       onOpen={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
                       onAdd={e => { e.stopPropagation(); handleAdd(item, [], []); announce(`${item.name} added to cart`); }}
                       onIncrement={e => { e.stopPropagation(); handleAdd(item, [], []); }}

@@ -1642,6 +1642,14 @@ html:has(.menu-page)::-webkit-scrollbar-thumb:hover {
   font-weight: 700;
   font-size: 0.85rem;
 }
+/* "In your order" variant — green so it reads differently from the orange cart stepper. */
+.menu-grid-card__stepper--ordered {
+  background: rgb(16 185 129 / 0.15);
+  border-color: rgb(16 185 129 / 0.45);
+  color: rgb(52 211 153);
+}
+.menu-grid-card__stepper--ordered button { color: rgb(52 211 153); }
+.menu-grid-card__stepper--ordered button:active { background: rgb(16 185 129); color: white; }
 
 .menu-app__cart {
   position: fixed;

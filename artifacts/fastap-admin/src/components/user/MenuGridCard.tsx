@@ -17,6 +17,8 @@ export function MenuGridCard({
   readOnly = false,
   onIncrement,
   onDecrement,
+  orderedQty = 0,
+  onRemoveOrdered,
 }: {
   item: MenuItemCardData;
   onOpen: () => void;
@@ -25,6 +27,10 @@ export function MenuGridCard({
   readOnly?: boolean;
   onIncrement?: (e: MouseEvent) => void;
   onDecrement?: (e: MouseEvent) => void;
+  // How many of this dish the guest has ALREADY ordered (in the running order). When >0 and it's
+  // not in the cart, the card shows the ordered count with a − to remove it from the order.
+  orderedQty?: number;
+  onRemoveOrdered?: (e: MouseEvent) => void;
 }) {
   const veg = isVeg(item.dietaryTags);
 
@@ -63,6 +69,18 @@ export function MenuGridCard({
               </button>
               <span>{quantity}</span>
               <button type="button" onClick={onIncrement} aria-label={`Add one ${item.name}`}>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : orderedQty > 0 ? (
+            // Already in the guest's running order: − removes one from that order (live), + adds
+            // another to the cart. A dot marks it as "in your order".
+            <div className="menu-grid-card__stepper menu-grid-card__stepper--ordered" title="In your order">
+              <button type="button" onClick={onRemoveOrdered} aria-label={`Remove one ${item.name} from your order`}>
+                <Minus className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+              <span>{orderedQty}</span>
+              <button type="button" onClick={onAdd} aria-label={`Add another ${item.name}`}>
                 <Plus className="h-4 w-4" strokeWidth={2.5} />
               </button>
             </div>
