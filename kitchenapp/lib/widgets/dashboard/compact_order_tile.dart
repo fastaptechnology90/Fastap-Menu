@@ -5,15 +5,33 @@ import '../../core/constants/app_spacing.dart';
 import '../../models/kitchen_order.dart';
 
 class CompactOrderTile extends StatelessWidget {
-  const CompactOrderTile({super.key, required this.order, this.onAction});
+  const CompactOrderTile({
+    super.key,
+    required this.order,
+    this.onAction,
+    this.deliveryMode = false,
+  });
 
   final KitchenOrder order;
   // Runs a kitchen action (accept / prepare / ready / cancel …) for this order.
   // When provided, the detail sheet shows the matching action buttons.
   final Future<void> Function(String orderId, String action)? onAction;
+  // Waiter app: show delivery actions (Start Delivery / Delivered) in place of
+  // the kitchen actions.
+  final bool deliveryMode;
 
   // Which actions to offer for the order's current machine status.
-  static List<(String, String, IconData)> _actionsForStatus(String s) {
+  static List<(String, String, IconData)> _actionsForStatus(
+    String s,
+    bool deliveryMode,
+  ) {
+    if (deliveryMode) {
+      return switch (s) {
+        'ready' => [('Start Delivery', 'serve', Icons.delivery_dining)],
+        'serving' => [('Delivered', 'deliver', Icons.check_circle)],
+        _ => const [],
+      };
+    }
     switch (s) {
       case 'new':
         return [('Accept', 'accept', Icons.check), ('Reject', 'reject', Icons.close), ('Cancel', 'cancel', Icons.block)];
@@ -38,6 +56,8 @@ class CompactOrderTile extends StatelessWidget {
         'ready' => 'marked ready',
         'delay' => 'delayed',
         'refire' => 're-fired',
+        'serve' => 'out for delivery',
+        'deliver' => 'delivered',
         _ => 'updated',
       };
 
@@ -203,7 +223,7 @@ class CompactOrderTile extends StatelessWidget {
 
   void _showDetail(BuildContext context) {
     final messenger = ScaffoldMessenger.of(context);
-    final actions = onAction == null ? const <(String, String, IconData)>[] : _actionsForStatus(order.rawStatus);
+    final actions = onAction == null ? const <(String, String, IconData)>[] : _actionsForStatus(order.rawStatus, deliveryMode);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,

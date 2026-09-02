@@ -335,28 +335,49 @@ class HomeOrderPreview extends StatelessWidget {
     required this.orders,
     required this.onViewAll,
     this.onAction,
+    this.deliveryMode = false,
+    this.myName,
   });
 
   final List<KitchenOrder> orders;
   final VoidCallback onViewAll;
   final Future<void> Function(String orderId, String action)? onAction;
+  // Waiter app: show only the orders assigned to me that are ready/on-the-way,
+  // with Start Delivery / Delivered actions.
+  final bool deliveryMode;
+  final String? myName;
 
   @override
   Widget build(BuildContext context) {
-    final preview = orders;
+    final preview = deliveryMode
+        ? orders
+            .where(
+              (o) =>
+                  (o.rawStatus == 'ready' || o.rawStatus == 'serving') &&
+                  o.waiterName != null &&
+                  myName != null &&
+                  o.waiterName!.trim().toLowerCase() ==
+                      myName!.trim().toLowerCase(),
+            )
+            .toList()
+        : orders;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         HomeSectionTitle(
-          title: 'Active orders',
-          subtitle: preview.isEmpty
-              ? 'Queue is clear'
-              : '${orders.length} KOT${orders.length == 1 ? '' : 's'} in progress',
+          title: deliveryMode ? 'My deliveries' : 'Active orders',
+          subtitle: deliveryMode
+              ? (preview.isEmpty
+                  ? 'Nothing to deliver yet'
+                  : '${preview.length} to deliver')
+              : (preview.isEmpty
+                  ? 'Queue is clear'
+                  : '${orders.length} KOT${orders.length == 1 ? '' : 's'} in progress'),
           trailing: TextButton.icon(
             onPressed: onViewAll,
             icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-            label: const Text('KDS'),
+            label: Text(deliveryMode ? 'All' : 'KDS'),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primary,
               textStyle: const TextStyle(fontWeight: FontWeight.w800),
@@ -393,17 +414,23 @@ class HomeOrderPreview extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                const Text(
-                  'All caught up!',
-                  style: TextStyle(
+                Text(
+                  deliveryMode ? 'No deliveries yet' : 'All caught up!',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.primaryText,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'No active orders right now.',
-                  style: TextStyle(color: AppColors.secondaryText, fontSize: 13),
+                Text(
+                  deliveryMode
+                      ? 'Orders assigned to you will show here once the kitchen marks them ready.'
+                      : 'No active orders right now.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -418,7 +445,11 @@ class HomeOrderPreview extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
               itemBuilder: (context, index) => SizedBox(
                 width: 292,
-                child: CompactOrderTile(order: preview[index], onAction: onAction),
+                child: CompactOrderTile(
+                  order: preview[index],
+                  onAction: onAction,
+                  deliveryMode: deliveryMode,
+                ),
               ),
             ),
           ),

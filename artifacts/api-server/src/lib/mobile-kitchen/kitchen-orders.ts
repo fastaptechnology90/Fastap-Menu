@@ -21,8 +21,8 @@ function dbToMobileStatus(status: string, meta: Record<string, unknown>): string
     case "preparing": return "preparing";
     case "delayed": return "delayed";
     case "ready": return "ready";
-    case "serving":
-    case "delivered":
+    case "serving": return "serving";
+    case "delivered": return "served";
     case "billing": return "ready";
     case "completed": return "served";
     case "cancelled": return "rejected";
@@ -41,6 +41,9 @@ function mobileToDbStatus(action: string, current: string): { status: string; me
     case "hold": return { status: current, meta: { kitchenHold: true } };
     case "release": return { status: "preparing", meta: { kitchenHold: false } };
     case "refire": return { status: "preparing", meta: { reFire: true } };
+    // Waiter delivery flow: pick up a ready order (on the way), then deliver it.
+    case "serve": return { status: "serving" };
+    case "deliver": return { status: "completed" };
     default: return { status: current };
   }
 }
@@ -161,6 +164,9 @@ function availableActions(status: string): string[] {
     case "preparing": return ["ready", "delay", "hold", "refire", "cancel", "reassign"];
     case "delayed": return ["prepare", "ready", "hold", "refire", "cancel"];
     case "re_fire": return ["ready", "delay", "refire", "cancel"];
+    // Waiter delivery actions surfaced once the kitchen is done.
+    case "ready": return ["serve"];
+    case "serving": return ["deliver"];
     case "on_hold": return ["release", "reject"];
     default: return [];
   }
@@ -389,6 +395,16 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
   const nextMeta = { ...meta, ...(mapped.meta ?? {}) };
   if (mapped.meta?.kitchenHold === false) delete nextMeta.kitchenHold;
   if (mapped.meta?.reFire) nextMeta.reFire = true;
+  // Reflect the waiter's delivery step in the guest-facing tracking snapshot.
+  if (action === "serve" || action === "deliver") {
+    const tracking = (nextMeta.tracking && typeof nextMeta.tracking === "object"
+      ? nextMeta.tracking
+      : {}) as Record<string, unknown>;
+    nextMeta.tracking = {
+      ...tracking,
+      waiterStatus: action === "serve" ? "on_the_way" : "delivered",
+    };
+  }
 
   let [updated] = await db.update(ordersTable).set({
     status: mapped.status,

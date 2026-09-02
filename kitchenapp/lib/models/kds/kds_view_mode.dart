@@ -30,6 +30,7 @@ enum KdsStatus {
   accepted('accepted', 'Accepted'),
   preparing('preparing', 'Preparing'),
   ready('ready', 'Ready'),
+  serving('serving', 'On the way'),
   served('served', 'Served'),
   delayed('delayed', 'Delayed'),
   cancelled('cancelled', 'Cancelled'),

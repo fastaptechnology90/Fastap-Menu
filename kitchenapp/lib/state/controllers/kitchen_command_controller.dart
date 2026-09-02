@@ -4198,6 +4198,7 @@ class KitchenCommandController extends ChangeNotifier {
         'ready' => 'ready',
         'delay' => 'delayed',
         'refire' => 're_fire',
+        'serve' => 'serving',
         _ => null,
       };
 

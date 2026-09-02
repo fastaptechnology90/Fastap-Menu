@@ -21,6 +21,7 @@ class KitchenOrder {
     this.modifiers = const [],
     this.cookingNotes = const [],
     this.rawStatus = '',
+    this.waiterName,
   });
 
   final String? id;
@@ -42,6 +43,9 @@ class KitchenOrder {
   final List<String> addOns;
   final List<String> modifiers;
   final List<String> cookingNotes;
+  // Name of the waiter this order is assigned to (for the waiter app's
+  // "My Deliveries" view). Set once the kitchen marks the order ready.
+  final String? waiterName;
 
   static List<String> _stringList(dynamic raw) =>
       raw is List ? raw.map((e) => e.toString()).toList() : const [];
@@ -68,6 +72,7 @@ class KitchenOrder {
       addOns: addOns,
       modifiers: modifiers,
       cookingNotes: cookingNotes,
+      waiterName: waiterName,
     );
   }
 
@@ -94,6 +99,7 @@ class KitchenOrder {
       addOns: _stringList(json['addOns']),
       modifiers: _stringList(json['modifiers']),
       cookingNotes: _stringList(json['cookingNotes']),
+      waiterName: json['waiterName'] as String?,
     );
   }
 

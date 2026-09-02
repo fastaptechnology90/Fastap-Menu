@@ -78,6 +78,7 @@ class DashboardTone {
     return switch (status) {
       'delayed' || 'rejected' || 'cancelled' => AppColors.danger,
       'ready' => AppColors.primary,
+      'serving' => AppColors.info,
       'served' => AppColors.primary,
       'new' || 'accepted' => AppColors.info,
       're_fire' => AppColors.warning,

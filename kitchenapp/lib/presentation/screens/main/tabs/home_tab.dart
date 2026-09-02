@@ -150,6 +150,11 @@ class HomeTab extends StatelessWidget {
                     : HomeOrderPreview(
                         orders: dashboard?.orders ?? const [],
                         onAction: controller.performKdsAction,
+                        // Waiter sees a focused "My deliveries" list (only the
+                        // orders assigned to them) with Start Delivery /
+                        // Delivered actions.
+                        deliveryMode: role == StaffRole.waiter,
+                        myName: user?.name,
                         onViewAll: () => ModuleScreenBuilder.open(
                           context,
                           navIndex: 1,
