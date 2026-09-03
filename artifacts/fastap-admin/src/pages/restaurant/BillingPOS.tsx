@@ -61,7 +61,9 @@ export default function BillingPOS() {
             id: `BILL-${o.id}`,
             table: o.tableNumber || o.tableName || "T-?",
             amount: parseFloat(String(o.total ?? o.totalAmount ?? 0)),
-            method: (o.paymentMethod || pay.method || "upi") as string,
+            // Fall back to cash (not upi) when no method was recorded, so this
+            // matches Order Management and Revenue for the same order.
+            method: (o.paymentMethod || pay.method || "cash") as string,
             time: o.updatedAt ? new Date(o.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—",
             status: "paid",
             reference: pay.utr || pay.upiId || o.invoiceNumber || undefined,
