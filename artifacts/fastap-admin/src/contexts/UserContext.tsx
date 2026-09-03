@@ -38,6 +38,7 @@ export interface Order {
   placedAt: Date;
   estimatedTime: number;
   waiterName?: string;
+  paymentStatus?: string;
 }
 
 export interface UserProfile {

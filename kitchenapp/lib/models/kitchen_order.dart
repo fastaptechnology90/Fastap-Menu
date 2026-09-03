@@ -23,6 +23,8 @@ class KitchenOrder {
     this.rawStatus = '',
     this.waiterName,
     this.isRoom = false,
+    this.total = 0,
+    this.paymentStatus = 'pending',
   });
 
   final String? id;
@@ -50,6 +52,9 @@ class KitchenOrder {
   // True for room-service orders (housekeeping deliveries); false for table
   // orders (waiter deliveries).
   final bool isRoom;
+  // Bill total and whether it's been paid (for the waiter's Payment Received).
+  final double total;
+  final String paymentStatus;
 
   static List<String> _stringList(dynamic raw) =>
       raw is List ? raw.map((e) => e.toString()).toList() : const [];
@@ -78,6 +83,8 @@ class KitchenOrder {
       cookingNotes: cookingNotes,
       waiterName: waiterName,
       isRoom: isRoom,
+      total: total,
+      paymentStatus: paymentStatus,
     );
   }
 
@@ -106,6 +113,8 @@ class KitchenOrder {
       cookingNotes: _stringList(json['cookingNotes']),
       waiterName: json['waiterName'] as String?,
       isRoom: json['isRoom'] as bool? ?? false,
+      total: (json['total'] as num?)?.toDouble() ?? 0,
+      paymentStatus: json['paymentStatus'] as String? ?? 'pending',
     );
   }
 

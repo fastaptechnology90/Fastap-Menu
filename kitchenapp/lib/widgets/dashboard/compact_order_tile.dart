@@ -395,6 +395,49 @@ class CompactOrderTile extends StatelessWidget {
                 ),
               ),
             ],
+            if (deliveryMode && onAction != null) ...[
+              const SizedBox(height: 16),
+              if (order.paymentStatus == 'paid')
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Color(0xFF059669), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Paid · ₹${order.total.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment received · ₹${order.total.toStringAsFixed(0)} — how did the guest pay?',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _payButton(context, messenger, 'Cash', 'collect_cash'),
+                        const SizedBox(width: 8),
+                        _payButton(context, messenger, 'UPI', 'collect_upi'),
+                        const SizedBox(width: 8),
+                        _payButton(context, messenger, 'Card', 'collect_card'),
+                      ],
+                    ),
+                  ],
+                ),
+            ],
             if (actions.isNotEmpty) ...[
               const SizedBox(height: 18),
               Wrap(
@@ -439,6 +482,45 @@ class CompactOrderTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _payButton(
+    BuildContext context,
+    ScaffoldMessengerState messenger,
+    String label,
+    String action,
+  ) {
+    return Expanded(
+      child: FilledButton(
+        onPressed: () async {
+          Navigator.of(context).pop();
+          try {
+            await onAction!(order.id ?? '', action);
+            messenger
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(
+                content: Text('Payment received · $label · ₹${order.total.toStringAsFixed(0)}'),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(milliseconds: 1600),
+              ));
+          } catch (_) {
+            messenger
+              ..hideCurrentSnackBar()
+              ..showSnackBar(const SnackBar(
+                content: Text('Could not mark paid. Check connection and try again.'),
+                backgroundColor: AppColors.danger,
+                behavior: SnackBarBehavior.floating,
+              ));
+          }
+        },
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF059669),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
   }

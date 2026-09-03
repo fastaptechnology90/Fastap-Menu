@@ -167,6 +167,7 @@ export default function OrderTracking() {
         placedAt: new Date(String(data.createdAt)),
         estimatedTime: 20,
         waiterName: data.waiterName,
+        paymentStatus: data.paymentStatus,
       });
       applyStatus(st);
     } catch {
@@ -556,6 +557,32 @@ export default function OrderTracking() {
                 <Download className="h-3.5 w-3.5" /> PDF Invoice
               </button>
             </div>
+            {/* Pay bill — cash / UPI at the table; the waiter collects and marks it paid */}
+            {displayOrder.paymentStatus === "paid" ? (
+              <div className="flex items-center gap-2 justify-center py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-bold">
+                <CheckCircle className="h-4 w-4" /> Paid · ₹{displayOrder.total}
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-white/50 mb-2">Pay your bill — a waiter will collect at your table</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {["Cash", "UPI", "Card"].map(m => (
+                    <button
+                      key={m}
+                      onClick={async () => {
+                        try {
+                          await notifyWaiter("payment_request", `Guest wants to pay ₹${displayOrder.total} by ${m} — order #${displayOrder.id}`);
+                          showToast(`Waiter notified — they will collect your ${m} payment`);
+                        } catch { showToast("Could not notify waiter, please try again"); }
+                      }}
+                      className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold hover:bg-orange-500/10 hover:border-orange-500/30 transition-colors"
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

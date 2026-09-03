@@ -162,6 +162,10 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     roomNumber: meta.roomNumber ? String(meta.roomNumber) : undefined,
     isRoom,
     waiterName: row.waiterName ?? undefined,
+    // Bill + payment so the waiter can collect and mark it paid.
+    total: Number(row.total ?? 0),
+    paymentStatus: String(row.paymentStatus ?? "pending"),
+    paymentMethod: row.paymentMethod ?? undefined,
     statusLabel: status === "preparing" && vip ? "VIP" : undefined,
     lineItems: itemNames.map(name => ({ name, status: "active", modifiable: true })),
     held: status === "on_hold",
@@ -542,6 +546,20 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
     .where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)))
     .limit(1);
   if (!existing) throw new Error("ORDER_NOT_FOUND");
+
+  // Payment collected by the waiter (cash / UPI / card at the table): mark the
+  // bill paid with the ACTUAL method the waiter chose ("collect_cash" etc.), so
+  // the owner's live-order page shows the real method — not the order's default.
+  if (action === "collect" || action.startsWith("collect_")) {
+    const method = action.includes("_") ? action.split("_")[1] : "cash";
+    const [paid] = await db.update(ordersTable).set({
+      paymentStatus: "paid",
+      paymentMethod: method,
+    }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
+    broadcastEvent("order_paid", { id: orderId, restaurantId, tableName: existing.tableName });
+    broadcastOrderEvent(orderId, "order_paid", { id: orderId, paymentStatus: "paid" });
+    return mapOrderRow(paid);
+  }
 
   const meta = (existing.metadata && typeof existing.metadata === "object" ? existing.metadata : {}) as Record<string, unknown>;
   const mobileStatus = dbToMobileStatus(existing.status, meta);
