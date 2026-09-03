@@ -148,8 +148,16 @@ export default function QRManagement() {
   const roomQRs = qrcodes.filter(q => q.type === "room");
   const generalQRs = qrcodes.filter(q => !q.tableId && q.type !== "room");
 
+  // Every table and room has a scannable QR (from its scan URL), plus any general
+  // QR records — so the total must match what the tabs show, not just the raw
+  // qrcodes records (which can be empty even when tables/rooms exist).
+  const totalQrCount =
+    (tables.length || tableQRs.length) +
+    (rooms.length || roomQRs.length) +
+    generalQRs.length;
+
   const stats = [
-    { label: "Total QR Codes", value: qrcodes.length, icon: QrCode, color: "text-violet-400" },
+    { label: "Total QR Codes", value: totalQrCount, icon: QrCode, color: "text-violet-400" },
     { label: "Total Scans", value: qrcodes.reduce((s, q) => s + (q.scans || 0), 0), icon: Eye, color: "text-blue-400" },
     { label: "Active Tables", value: tables.length, icon: Table2, color: "text-green-400" },
     { label: "Rooms", value: rooms.length || roomQRs.length, icon: BedDouble, color: "text-orange-400" },
