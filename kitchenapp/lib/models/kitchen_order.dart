@@ -25,6 +25,7 @@ class KitchenOrder {
     this.isRoom = false,
     this.total = 0,
     this.paymentStatus = 'pending',
+    this.billRequested = false,
   });
 
   final String? id;
@@ -55,6 +56,9 @@ class KitchenOrder {
   // Bill total and whether it's been paid (for the waiter's Payment Received).
   final double total;
   final String paymentStatus;
+  // True once the waiter has already asked the guest to pay (Request Payment),
+  // so the tile shows an "Already requested" state instead of the button again.
+  final bool billRequested;
 
   static List<String> _stringList(dynamic raw) =>
       raw is List ? raw.map((e) => e.toString()).toList() : const [];
@@ -85,6 +89,7 @@ class KitchenOrder {
       isRoom: isRoom,
       total: total,
       paymentStatus: paymentStatus,
+      billRequested: billRequested,
     );
   }
 
@@ -115,6 +120,7 @@ class KitchenOrder {
       isRoom: json['isRoom'] as bool? ?? false,
       total: (json['total'] as num?)?.toDouble() ?? 0,
       paymentStatus: json['paymentStatus'] as String? ?? 'pending',
+      billRequested: json['billRequested'] as bool? ?? false,
     );
   }
 

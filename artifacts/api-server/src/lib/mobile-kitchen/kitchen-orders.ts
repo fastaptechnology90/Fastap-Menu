@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, inArray, gte, sql } from "drizzle-orm";
 import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
@@ -166,6 +166,8 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     total: Number(row.total ?? 0),
     paymentStatus: String(row.paymentStatus ?? "pending"),
     paymentMethod: row.paymentMethod ?? undefined,
+    cleared: Boolean(meta.tableCleared),
+    billRequested: Boolean(meta.billRequested),
     statusLabel: status === "preparing" && vip ? "VIP" : undefined,
     lineItems: itemNames.map(name => ({ name, status: "active", modifiable: true })),
     held: status === "on_hold",
@@ -256,7 +258,7 @@ function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[
       // Keep "serving" (out for delivery) and "served" (delivered) so the waiter's
       // order stays visible through Start Delivery -> Delivered and keeps a
       // Delivered record afterwards (until the 24h window drops it).
-      .filter(o => ["new", "accepted", "preparing", "delayed", "ready", "serving", "served"].includes(o.status))
+      .filter(o => ["new", "accepted", "preparing", "delayed", "ready", "serving", "served"].includes(o.status) && !o.cleared)
       .map(o => ({ ...o, statusLabel: o.statusLabel ?? o.status })),
   };
 }
@@ -574,12 +576,19 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
 
   // Guest left: close the table's open orders and free the table for the next guest.
   if (action === "clear_table") {
-    await db.update(ordersTable).set({ status: "completed" }).where(and(
+    // Mark the table's orders completed AND flag them cleared, so they drop out
+    // of the waiter's "My deliveries" (the table is done, ready for the next guest).
+    await db.update(ordersTable).set({
+      status: "completed",
+      metadata: sql`COALESCE(${ordersTable.metadata}, '{}'::jsonb) || '{"tableCleared": true}'::jsonb`,
+    }).where(and(
       eq(ordersTable.restaurantId, restaurantId),
       existing.tableId
         ? eq(ordersTable.tableId, existing.tableId)
         : eq(ordersTable.tableName, existing.tableName),
-      inArray(ordersTable.status, ACTIVE_DB),
+      // Include already-delivered ("completed") orders too, so clearing a table
+      // whose order was just delivered still flags it cleared.
+      inArray(ordersTable.status, DISPLAY_DB),
     ));
     if (existing.tableId) {
       await db.update(tablesMapTable).set({ status: "free", currentGuestCount: 0 })

@@ -430,23 +430,54 @@ class CompactOrderTile extends StatelessWidget {
                 _outlinedAction(context, messenger, Icons.table_restaurant_outlined,
                     'Clear Table', 'clear_table', 'Table cleared for the next guest'),
               ] else ...[
-                _outlinedAction(context, messenger, Icons.receipt_long_outlined,
-                    'Request Payment from Guest', 'request_payment', 'Payment requested from the guest'),
+                // Once the waiter has asked the guest to pay, don't offer the
+                // button again — show an "Already requested" state instead.
+                if (order.billRequested)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.hourglass_top, color: AppColors.primary, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Already requested for payment',
+                            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  _outlinedAction(context, messenger, Icons.receipt_long_outlined,
+                      'Request Payment from Guest', 'request_payment', 'Payment requested from the guest'),
                 const SizedBox(height: 12),
                 Text(
                   'Payment received · ₹${order.total.toStringAsFixed(0)} — how did the guest pay?',
                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _payButton(context, messenger, 'Cash', 'collect_cash'),
-                    const SizedBox(width: 8),
-                    _payButton(context, messenger, 'UPI', 'collect_upi'),
-                    const SizedBox(width: 8),
-                    _payButton(context, messenger, 'Card', 'collect_card'),
-                  ],
-                ),
+                Builder(builder: (context) {
+                  // Fit three method chips per row inside the sheet's padding.
+                  final chipW = (MediaQuery.of(context).size.width - AppSpacing.lg * 2 - 16) / 3;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _payButton(context, messenger, 'Cash', 'collect_cash', chipW),
+                      _payButton(context, messenger, 'UPI', 'collect_upi', chipW),
+                      _payButton(context, messenger, 'Card', 'collect_card', chipW),
+                      _payButton(context, messenger, 'Wallet', 'collect_wallet', chipW),
+                      _payButton(context, messenger, 'NFC', 'collect_nfc', chipW),
+                    ],
+                  );
+                }),
               ],
             ],
             if (actions.isNotEmpty) ...[
@@ -502,8 +533,10 @@ class CompactOrderTile extends StatelessWidget {
     ScaffoldMessengerState messenger,
     String label,
     String action,
+    double width,
   ) {
-    return Expanded(
+    return SizedBox(
+      width: width,
       child: FilledButton(
         onPressed: () async {
           Navigator.of(context).pop();

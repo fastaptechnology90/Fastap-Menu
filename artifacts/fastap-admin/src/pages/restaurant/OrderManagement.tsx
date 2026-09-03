@@ -25,7 +25,7 @@ const TYPE_ICON: Record<string, string> = {
 // How the payment was made — colour-coded so the owner can track UPI vs cash vs room bill.
 const PAY_LABEL: Record<string, string> = {
   upi: "UPI", cash: "Cash", card: "Card", netbanking: "Netbanking",
-  wallet: "Wallet", room_bill: "Room Bill", aggregator: "Aggregator",
+  wallet: "Wallet", nfc: "NFC", room_bill: "Room Bill", aggregator: "Aggregator",
 };
 function payMethodBadge(mode?: string) {
   const m = (mode || "cash").toLowerCase();
@@ -33,6 +33,8 @@ function payMethodBadge(mode?: string) {
   const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-400"
     : m === "cash" ? "bg-amber-500/15 text-amber-400"
     : m === "card" ? "bg-blue-500/15 text-blue-400"
+    : m === "wallet" ? "bg-fuchsia-500/15 text-fuchsia-400"
+    : m === "nfc" ? "bg-teal-500/15 text-teal-400"
     : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-400"
     : m === "room_bill" ? "bg-cyan-500/15 text-cyan-400"
     : m === "aggregator" ? "bg-pink-500/15 text-pink-400"
