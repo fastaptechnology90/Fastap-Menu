@@ -41,6 +41,7 @@ export default function QRManagement() {
   const { restaurantId, restaurant } = useRestaurant();
   const { toast } = useToast();
   const [qrcodes, setQrcodes] = useState<any[]>([]);
+  const [totalScans, setTotalScans] = useState(0);
   const [tables, setTables] = useState<any[]>([]);
   const [rooms, setRooms] = useState<{ number: string }[]>([]);
   const [venueSlug, setVenueSlug] = useState("spice-garden");
@@ -67,7 +68,10 @@ export default function QRManagement() {
       apiFetch(`/restaurants/${restaurantId}/rooms`).catch(() => []),
       apiFetch(`/restaurants/${restaurantId}`).catch(() => null),
     ]).then(([qr, tbl, rms, meta]) => {
-      setQrcodes(Array.isArray(qr) ? qr : []);
+      // Endpoint returns { codes, totalScans }; tolerate the old array shape too.
+      const codes = Array.isArray(qr) ? qr : (qr?.codes ?? []);
+      setQrcodes(codes);
+      setTotalScans(Array.isArray(qr) ? 0 : Number(qr?.totalScans ?? 0));
       setTables(Array.isArray(tbl) ? tbl : []);
       setRooms(Array.isArray(rms) ? rms.map((r: any) => ({ number: r.number })) : []);
       if (meta?.slug) setVenueSlug(meta.slug);
@@ -110,7 +114,8 @@ export default function QRManagement() {
         body: JSON.stringify({ tableId, label: name, type: normalizedRoom ? "room" : newType, roomNumber: normalizedRoom }),
       });
       const updated = await apiFetch(`/restaurants/${restaurantId}/qrcodes`);
-      setQrcodes(Array.isArray(updated) ? updated : []);
+      setQrcodes(Array.isArray(updated) ? updated : (updated?.codes ?? []));
+      if (!Array.isArray(updated)) setTotalScans(Number(updated?.totalScans ?? 0));
       setShowAdd(false); setNewName("");
       // Jump to the tab where this QR will actually appear so the user sees it right away.
       // Table-linked QRs -> Tables; room QRs -> Rooms; everything else (takeaway/general/
@@ -158,7 +163,7 @@ export default function QRManagement() {
 
   const stats = [
     { label: "Total QR Codes", value: totalQrCount, icon: QrCode, color: "text-violet-400" },
-    { label: "Total Scans", value: qrcodes.reduce((s, q) => s + (q.scans || 0), 0), icon: Eye, color: "text-blue-400" },
+    { label: "Total Scans", value: totalScans, icon: Eye, color: "text-blue-400" },
     { label: "Active Tables", value: tables.length, icon: Table2, color: "text-green-400" },
     { label: "Rooms", value: rooms.length || roomQRs.length, icon: BedDouble, color: "text-orange-400" },
   ];

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, qrCodesTable, restaurantsTable, tablesMapTable } from "@workspace/db";
+import { eq, and, count } from "drizzle-orm";
+import { db, qrCodesTable, restaurantsTable, tablesMapTable, menuViewsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { buildScanUrl } from "../lib/scan-urls.js";
 
@@ -9,7 +9,12 @@ const router: IRouter = Router();
 router.get("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res): Promise<void> => {
   const restaurantId = parseInt(req.params.restaurantId, 10);
   const codes = await db.select().from(qrCodesTable).where(eq(qrCodesTable.restaurantId, restaurantId));
-  res.json(codes);
+  // Real scan activity: every menu open (via a QR scan or link) is logged in
+  // menu_views, plus any counter on explicit QR records.
+  const [viewRow] = await db.select({ n: count() }).from(menuViewsTable)
+    .where(eq(menuViewsTable.restaurantId, restaurantId));
+  const codeScans = codes.reduce((s, c) => s + (c.scans || 0), 0);
+  res.json({ codes, totalScans: Number(viewRow?.n ?? 0) + codeScans });
 });
 
 router.post("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res): Promise<void> => {
