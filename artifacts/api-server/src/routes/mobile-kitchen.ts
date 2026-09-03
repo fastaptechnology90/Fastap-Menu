@@ -238,7 +238,7 @@ router.get("/dashboard", requireMobileAuth, async (req, res) => {
   if (!(await gateModuleAccess(req, res, "/dashboard"))) return;
   const s = mobileSession(req);
   const section = String(req.query.section ?? "All");
-  res.json({ success: true, data: await getDashboard(s.restaurantId, section) });
+  res.json({ success: true, data: await getDashboard(s.restaurantId, section, { role: s.user.role, name: s.user.name }) });
 });
 
 router.get("/dashboard/widgets", requireMobileAuth, async (req, res) => {

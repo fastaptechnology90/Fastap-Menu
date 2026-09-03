@@ -161,8 +161,9 @@ export async function autoAssignMaintenanceRequest(restaurantId: number, request
 }
 
 function roomServiceRoles(type: string) {
-  if (type === "food" || type === "minibar") return { roles: ["waiter"], food: true };
-  return { roles: ["housekeeping", "waiter"], food: false };
+  // Every in-room request is handled by housekeeping (fall back to a manager
+  // only when none is on shift — see the assignment below).
+  return { roles: ["housekeeping"], food: type === "food" || type === "minibar" };
 }
 
 export async function autoAssignRoomServiceRequest(restaurantId: number, requestId: number) {
@@ -171,15 +172,15 @@ export async function autoAssignRoomServiceRequest(restaurantId: number, request
   );
   if (!req || req.assignedTo) return req;
 
-  const { roles, food } = roomServiceRoles(req.type);
-  const candidates = await activeStaff(restaurantId, roles);
-  const loadOf = food
-    ? (n: string) => waiterLoad(restaurantId, n)
-    : async (n: string) => (await roomServiceLoad(restaurantId, n)) + (await housekeepingLoad(restaurantId, n));
+  const { roles } = roomServiceRoles(req.type);
+  let candidates = await activeStaff(restaurantId, roles);
+  if (!candidates.length) candidates = await activeStaff(restaurantId, ["manager"]);
+  const loadOf = async (n: string) => (await roomServiceLoad(restaurantId, n)) + (await housekeepingLoad(restaurantId, n));
   const picked = await pickLeastLoaded(candidates, loadOf);
   if (!picked) return req;
 
-  const nextStatus = food ? "accepted" : "in_progress";
+  // Assigned but not started — housekeeping taps Start in their app.
+  const nextStatus = "accepted";
   const [updated] = await db.update(roomServiceRequestsTable).set({
     assignedTo: picked.name,
     status: req.status === "pending" ? nextStatus : req.status,
@@ -190,9 +191,7 @@ export async function autoAssignRoomServiceRequest(restaurantId: number, request
     staffName: picked.name,
     staffRole: picked.role,
     title: `Room ${req.roomNumber} — ${req.type}`,
-    message: food
-      ? "Room service food request — deliver when kitchen marks ready"
-      : "Guest room service request assigned automatically",
+    message: "Guest room request assigned — start it in your app",
     metadata: { requestId, roomNumber: req.roomNumber, type: req.type, module: "room_service" },
   });
 

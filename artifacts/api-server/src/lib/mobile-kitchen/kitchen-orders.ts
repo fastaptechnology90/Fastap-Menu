@@ -1,5 +1,5 @@
 import { eq, and, desc, inArray, gte } from "drizzle-orm";
-import { db, ordersTable } from "@workspace/db";
+import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 
@@ -376,8 +376,110 @@ function buildLiveAlerts(section: string, orders: ReturnType<typeof mapOrderRow>
   };
 }
 
-export async function getDashboard(restaurantId: number, section = "All") {
-  const orders = await fetchKitchenOrders(restaurantId);
+// ─── Room-service & housekeeping requests (non-food) ───────────────────────
+// A guest in a room can ask for non-food things (towels, cleaning, laundry).
+// Those live in their own tables; we surface the ones assigned to the current
+// housekeeping staff as "deliveries" in their app, carrying the guest's message.
+function requestMobileStatus(status: string): string {
+  switch (status) {
+    case "pending":
+    case "accepted": return "ready";
+    case "in_progress": return "serving";
+    case "completed": return "served";
+    default: return "ready";
+  }
+}
+
+function roomRequestOrder(p: {
+  id: string; roomNumber: string; itemNames: string[]; message?: string | null;
+  statusMobile: string; assignedTo?: string | null; section: string; createdAt: Date;
+}) {
+  const status = p.statusMobile;
+  const location = `Room ${p.roomNumber}`;
+  const seconds = KITCHEN_ACTIVE.has(status)
+    ? Math.max(0, Math.floor((Date.now() - p.createdAt.getTime()) / 1000))
+    : 0;
+  return {
+    id: p.id,
+    orderId: p.id,
+    kotNumber: location,
+    title: location,
+    location,
+    section: p.section,
+    category: p.section,
+    assignedChef: "Room service",
+    guestType: "Room",
+    deliveryType: "Room service",
+    items: p.itemNames,
+    addOns: [] as string[],
+    modifiers: [] as string[],
+    cookingNotes: p.message ? [p.message] : [],
+    status,
+    priority: "normal",
+    timerSeconds: seconds,
+    timer: formatDuration(seconds),
+    progress: progressFor(status, seconds),
+    sortOrder: 0,
+    vip: false,
+    allergy: false,
+    reFireRequested: false,
+    tableNumber: undefined as string | undefined,
+    roomNumber: String(p.roomNumber),
+    isRoom: true,
+    waiterName: p.assignedTo ?? undefined,
+    statusLabel: undefined as string | undefined,
+    lineItems: p.itemNames.map(name => ({ name, status: "active", modifiable: false })),
+    held: false,
+    availableActions: status === "ready" ? ["serve"] : status === "serving" ? ["deliver"] : [],
+  };
+}
+
+async function fetchRoomRequests(restaurantId: number, assignedTo?: string | null) {
+  if (!assignedTo) return [];
+  const since = new Date(Date.now() - DISPLAY_WINDOW_MS);
+  const [rsr, hkt] = await Promise.all([
+    db.select().from(roomServiceRequestsTable).where(and(
+      eq(roomServiceRequestsTable.restaurantId, restaurantId),
+      eq(roomServiceRequestsTable.assignedTo, assignedTo),
+      inArray(roomServiceRequestsTable.status, ["pending", "accepted", "in_progress", "completed"]),
+      gte(roomServiceRequestsTable.createdAt, since),
+    )).orderBy(desc(roomServiceRequestsTable.createdAt)).limit(50),
+    db.select().from(housekeepingTasksTable).where(and(
+      eq(housekeepingTasksTable.restaurantId, restaurantId),
+      eq(housekeepingTasksTable.assignedTo, assignedTo),
+      inArray(housekeepingTasksTable.status, ["pending", "in_progress", "completed"]),
+      gte(housekeepingTasksTable.createdAt, since),
+    )).orderBy(desc(housekeepingTasksTable.createdAt)).limit(50),
+  ]);
+  const rsrOrders = rsr.map(r => {
+    const items = Array.isArray(r.items) ? (r.items as any[]) : [];
+    const itemNames = items.length
+      ? items.map(i => typeof i === "string" ? i : `${i.quantity ?? 1}x ${i.name ?? "Item"}`)
+      : [`${r.type ?? "Room service"} request`];
+    return roomRequestOrder({
+      id: `RSR-${r.id}`, roomNumber: r.roomNumber, itemNames, message: r.notes,
+      statusMobile: requestMobileStatus(r.status), assignedTo: r.assignedTo,
+      section: "Room service", createdAt: r.createdAt,
+    });
+  });
+  const hktOrders = hkt.map(t => roomRequestOrder({
+    id: `HKT-${t.id}`, roomNumber: t.roomNumber ?? t.location, itemNames: [t.title],
+    message: t.notes ?? t.description, statusMobile: requestMobileStatus(t.status),
+    assignedTo: t.assignedTo, section: "Housekeeping", createdAt: t.createdAt,
+  }));
+  return [...rsrOrders, ...hktOrders];
+}
+
+export async function getDashboard(
+  restaurantId: number,
+  section = "All",
+  assignee?: { role?: string; name?: string },
+) {
+  let orders = await fetchKitchenOrders(restaurantId);
+  // Housekeeping also sees their assigned non-food room requests (with message).
+  if (assignee?.role === "housekeeping" && assignee.name) {
+    orders = [...orders, ...await fetchRoomRequests(restaurantId, assignee.name)];
+  }
   return buildDashboard(section, orders);
 }
 
@@ -396,7 +498,43 @@ export async function getLiveAlerts(restaurantId: number, section = "All") {
   return buildLiveAlerts(section, orders);
 }
 
+// Housekeeping acting on a non-food room request: serve = start (in progress),
+// deliver = completed. Mirrors the delivery flow but on the request tables.
+async function applyRoomRequestAction(restaurantId: number, orderIdRaw: string, action: string) {
+  const isRsr = orderIdRaw.startsWith("RSR-");
+  const id = parseInt(orderIdRaw.replace(/^(RSR|HKT)-/, ""), 10);
+  if (!Number.isFinite(id)) throw new Error("ORDER_NOT_FOUND");
+  const nextStatus = action === "deliver" ? "completed" : action === "serve" ? "in_progress" : null;
+  const patch: Record<string, unknown> = {};
+  if (nextStatus) {
+    patch.status = nextStatus;
+    if (nextStatus === "completed") patch.completedAt = new Date();
+  }
+
+  if (isRsr) {
+    const [existing] = await db.select().from(roomServiceRequestsTable)
+      .where(and(eq(roomServiceRequestsTable.id, id), eq(roomServiceRequestsTable.restaurantId, restaurantId))).limit(1);
+    if (!existing) throw new Error("ORDER_NOT_FOUND");
+    if (nextStatus) await db.update(roomServiceRequestsTable).set(patch).where(eq(roomServiceRequestsTable.id, id));
+    const [u] = await db.select().from(roomServiceRequestsTable).where(eq(roomServiceRequestsTable.id, id)).limit(1);
+    const items = Array.isArray(u.items) ? (u.items as any[]) : [];
+    const itemNames = items.length
+      ? items.map(i => typeof i === "string" ? i : `${i.quantity ?? 1}x ${i.name ?? "Item"}`)
+      : [`${u.type ?? "Room service"} request`];
+    return roomRequestOrder({ id: orderIdRaw, roomNumber: u.roomNumber, itemNames, message: u.notes, statusMobile: requestMobileStatus(u.status), assignedTo: u.assignedTo, section: "Room service", createdAt: u.createdAt });
+  }
+  const [existing] = await db.select().from(housekeepingTasksTable)
+    .where(and(eq(housekeepingTasksTable.id, id), eq(housekeepingTasksTable.restaurantId, restaurantId))).limit(1);
+  if (!existing) throw new Error("ORDER_NOT_FOUND");
+  if (nextStatus) await db.update(housekeepingTasksTable).set(patch).where(eq(housekeepingTasksTable.id, id));
+  const [u] = await db.select().from(housekeepingTasksTable).where(eq(housekeepingTasksTable.id, id)).limit(1);
+  return roomRequestOrder({ id: orderIdRaw, roomNumber: u.roomNumber ?? u.location, itemNames: [u.title], message: u.notes ?? u.description, statusMobile: requestMobileStatus(u.status), assignedTo: u.assignedTo, section: "Housekeeping", createdAt: u.createdAt });
+}
+
 export async function applyKdsAction(restaurantId: number, orderIdRaw: string, action: string) {
+  if (orderIdRaw.startsWith("RSR-") || orderIdRaw.startsWith("HKT-")) {
+    return applyRoomRequestAction(restaurantId, orderIdRaw, action);
+  }
   const orderId = parseInt(orderIdRaw.replace(/^ORD-/, ""), 10);
   if (!Number.isFinite(orderId)) throw new Error("ORDER_NOT_FOUND");
 
