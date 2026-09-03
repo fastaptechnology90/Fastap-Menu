@@ -80,14 +80,23 @@ class CompactOrderTile extends StatelessWidget {
         onTap: () => _showDetail(context),
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            // Subtle status-tinted card so the queue reads at a glance and feels
+            // less flat/white.
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(order.color.withValues(alpha: 0.06), Colors.white),
+                Colors.white,
+              ],
+            ),
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-            border: Border.all(color: AppColors.panelBorder),
+            border: Border.all(color: order.color.withValues(alpha: 0.18)),
             boxShadow: [
               BoxShadow(
-                color: order.color.withValues(alpha: 0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: order.color.withValues(alpha: 0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
@@ -397,7 +406,7 @@ class CompactOrderTile extends StatelessWidget {
             ],
             if (deliveryMode && onAction != null) ...[
               const SizedBox(height: 16),
-              if (order.paymentStatus == 'paid')
+              if (order.paymentStatus == 'paid') ...[
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -416,27 +425,29 @@ class CompactOrderTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                )
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 10),
+                _outlinedAction(context, messenger, Icons.table_restaurant_outlined,
+                    'Clear Table', 'clear_table', 'Table cleared for the next guest'),
+              ] else ...[
+                _outlinedAction(context, messenger, Icons.receipt_long_outlined,
+                    'Request Payment from Guest', 'request_payment', 'Payment requested from the guest'),
+                const SizedBox(height: 12),
+                Text(
+                  'Payment received · ₹${order.total.toStringAsFixed(0)} — how did the guest pay?',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    Text(
-                      'Payment received · ₹${order.total.toStringAsFixed(0)} — how did the guest pay?',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _payButton(context, messenger, 'Cash', 'collect_cash'),
-                        const SizedBox(width: 8),
-                        _payButton(context, messenger, 'UPI', 'collect_upi'),
-                        const SizedBox(width: 8),
-                        _payButton(context, messenger, 'Card', 'collect_card'),
-                      ],
-                    ),
+                    _payButton(context, messenger, 'Cash', 'collect_cash'),
+                    const SizedBox(width: 8),
+                    _payButton(context, messenger, 'UPI', 'collect_upi'),
+                    const SizedBox(width: 8),
+                    _payButton(context, messenger, 'Card', 'collect_card'),
                   ],
                 ),
+              ],
             ],
             if (actions.isNotEmpty) ...[
               const SizedBox(height: 18),
@@ -521,6 +532,49 @@ class CompactOrderTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
         ),
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+
+  Widget _outlinedAction(
+    BuildContext context,
+    ScaffoldMessengerState messenger,
+    IconData icon,
+    String label,
+    String action,
+    String done,
+  ) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          Navigator.of(context).pop();
+          try {
+            await onAction!(order.id ?? '', action);
+            messenger
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(
+                content: Text(done),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(milliseconds: 1600),
+              ));
+          } catch (_) {
+            messenger
+              ..hideCurrentSnackBar()
+              ..showSnackBar(const SnackBar(
+                content: Text('Something went wrong. Check connection and try again.'),
+                backgroundColor: AppColors.danger,
+                behavior: SnackBarBehavior.floating,
+              ));
+          }
+        },
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
       ),
     );
   }

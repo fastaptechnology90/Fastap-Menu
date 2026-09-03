@@ -1,5 +1,5 @@
 import { eq, and, desc, inArray, gte } from "drizzle-orm";
-import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable } from "@workspace/db";
+import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 
@@ -559,6 +559,36 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
     broadcastEvent("order_paid", { id: orderId, restaurantId, tableName: existing.tableName });
     broadcastOrderEvent(orderId, "order_paid", { id: orderId, paymentStatus: "paid" });
     return mapOrderRow(paid);
+  }
+
+  // Waiter asks the guest to pay: flag the bill as requested and nudge the guest.
+  if (action === "request_payment") {
+    const rMeta = (existing.metadata && typeof existing.metadata === "object" ? existing.metadata : {}) as Record<string, unknown>;
+    const [flagged] = await db.update(ordersTable).set({
+      metadata: { ...rMeta, billRequested: true },
+    }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
+    broadcastEvent("bill_requested", { id: orderId, restaurantId, tableName: existing.tableName });
+    broadcastOrderEvent(orderId, "bill_requested", { id: orderId });
+    return mapOrderRow(flagged);
+  }
+
+  // Guest left: close the table's open orders and free the table for the next guest.
+  if (action === "clear_table") {
+    await db.update(ordersTable).set({ status: "completed" }).where(and(
+      eq(ordersTable.restaurantId, restaurantId),
+      existing.tableId
+        ? eq(ordersTable.tableId, existing.tableId)
+        : eq(ordersTable.tableName, existing.tableName),
+      inArray(ordersTable.status, ACTIVE_DB),
+    ));
+    if (existing.tableId) {
+      await db.update(tablesMapTable).set({ status: "free", currentGuestCount: 0 })
+        .where(and(eq(tablesMapTable.id, existing.tableId), eq(tablesMapTable.restaurantId, restaurantId)));
+    }
+    broadcastEvent("table_cleared", { restaurantId, tableName: existing.tableName });
+    const [done] = await db.select().from(ordersTable)
+      .where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).limit(1);
+    return mapOrderRow(done);
   }
 
   const meta = (existing.metadata && typeof existing.metadata === "object" ? existing.metadata : {}) as Record<string, unknown>;

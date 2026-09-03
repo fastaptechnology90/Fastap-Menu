@@ -168,6 +168,7 @@ export default function OrderTracking() {
         estimatedTime: 20,
         waiterName: data.waiterName,
         paymentStatus: data.paymentStatus,
+        billRequested: Boolean((data.metadata as { billRequested?: boolean } | undefined)?.billRequested),
       });
       applyStatus(st);
     } catch {
@@ -564,7 +565,11 @@ export default function OrderTracking() {
               </div>
             ) : (
               <div>
-                <p className="text-xs text-white/50 mb-2">Pay your bill — a waiter will collect at your table</p>
+                {displayOrder.billRequested ? (
+                  <p className="text-xs text-amber-300 font-semibold mb-2">🔔 Your bill is ready — please pay</p>
+                ) : (
+                  <p className="text-xs text-white/50 mb-2">Pay your bill — a waiter will collect at your table</p>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   {["Cash", "UPI", "Card"].map(m => (
                     <button

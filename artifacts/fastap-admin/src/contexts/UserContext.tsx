@@ -39,6 +39,7 @@ export interface Order {
   estimatedTime: number;
   waiterName?: string;
   paymentStatus?: string;
+  billRequested?: boolean;
 }
 
 export interface UserProfile {
