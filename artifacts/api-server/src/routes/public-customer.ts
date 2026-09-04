@@ -996,6 +996,14 @@ router.get("/public/orders/:orderId/status", async (req, res): Promise<void> => 
     restaurantPhone: restaurant?.phone ?? undefined,
     waiterPhone: waiterStaff[0]?.phone ?? undefined,
     waiterName: order.waiterName,
+    // The guest page polls this, so payment state has to travel with it —
+    // without these the "your bill is ready" prompt and the paid/closed state
+    // only appeared after a full page reload, and a table the waiter had
+    // already cleared still showed a live order to the guest.
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod ?? null,
+    billRequested: Boolean((order.metadata as Record<string, unknown> | null)?.billRequested),
+    tableCleared: Boolean((order.metadata as Record<string, unknown> | null)?.tableCleared),
     ...tracking,
   });
 });

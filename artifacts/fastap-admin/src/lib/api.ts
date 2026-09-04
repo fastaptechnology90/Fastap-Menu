@@ -38,6 +38,10 @@ export interface OrderTrackingResponse {
   delayMinutes: number;
   delayReason?: string;
   kitchenUpdates: { at: string; message: string; type?: string }[];
+  paymentStatus?: string;
+  paymentMethod?: string | null;
+  billRequested?: boolean;
+  tableCleared?: boolean;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

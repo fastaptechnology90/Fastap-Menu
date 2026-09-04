@@ -77,14 +77,13 @@ export function resolvePaymentStatus(
   paymentMethod: string | null | undefined,
   billing?: { partialPayNow?: number; advanceAmount?: number; grandTotal?: number },
 ): string {
-  // No method chosen is the normal dine-in case — the guest orders now and pays
-  // at the end. Treating that as "paid" marked money collected before anyone
-  // had paid, showed the order as Paid in the panel, and bucketed it under Cash
-  // in the revenue split. Only an actually-prepaid method (UPI/card at
-  // checkout) may start as paid.
-  if (!paymentMethod || paymentMethod === "cash") return "pending";
+  // A real part-payment decides the status regardless of method, so check it first.
   if (billing?.partialPayNow && billing.grandTotal && billing.partialPayNow < billing.grandTotal) return "partial";
   if (billing?.advanceAmount && billing.grandTotal && billing.advanceAmount < billing.grandTotal) return "advance";
+  // No method means nothing has been collected yet — the normal dine-in case,
+  // where the guest orders now and the waiter takes the money at the table.
+  // Treating that as "paid" marked money collected before anyone had paid.
+  if (!paymentMethod || paymentMethod === "cash") return "pending";
   return "paid";
 }
 

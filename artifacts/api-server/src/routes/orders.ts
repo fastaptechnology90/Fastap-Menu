@@ -225,9 +225,12 @@ router.post("/public/orders", async (req, res): Promise<void> => {
       : null,
   };
 
-  // Pass the method through as-is. Defaulting a missing one to "upi" made every
-  // pay-at-the-end dine-in order start life as "paid".
-  const paymentStatus = resolvePaymentStatus(paymentMethod, {
+  // The method the guest ticks in the cart is a PREFERENCE — no money moves
+  // there, the waiter collects at the table. Passing it here marked the order
+  // paid-by-UPI the moment it was placed, which also hid the waiter's
+  // "collect payment" buttons (they only show on an unpaid order). Only a real
+  // advance / part-payment, handled inside resolvePaymentStatus, changes this.
+  const paymentStatus = resolvePaymentStatus(null, {
     partialPayNow: partialPayNow != null ? parseFloat(String(partialPayNow)) : undefined,
     advanceAmount: advanceAmount != null ? parseFloat(String(advanceAmount)) : undefined,
     grandTotal: total,
@@ -278,7 +281,9 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     type: type ?? "dine_in", status: "pending", items: orderItems,
     subtotal: String(subtotal.toFixed(2)), tax: String(tax), total: String(total.toFixed(2)),
     notes: notes ?? null, deliveryAddress: deliveryAddress ?? null,
-    paymentMethod: paymentMethod ?? null,
+    // Left null until someone actually collects; the guest's cart choice is kept
+    // in metadata as a preference so staff can see what they intended to pay with.
+    paymentMethod: null,
     paymentStatus,
     tipAmount: String(tip.toFixed(2)),
     discountAmount: String(discount.toFixed(2)),
@@ -286,7 +291,11 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     orderSource: "user_web",
     nfcTagId: nfcTagId ?? null,
     qrCodeId: qrCodeId ?? null,
-    metadata: { ...enrichedMeta, ...trackingMeta, billing: billingMeta, ...(tabId ? { tabId } : {}) },
+    metadata: {
+      ...enrichedMeta, ...trackingMeta, billing: billingMeta,
+      ...(paymentMethod ? { paymentPreference: paymentMethod } : {}),
+      ...(tabId ? { tabId } : {}),
+    },
     scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
   }).returning();
 

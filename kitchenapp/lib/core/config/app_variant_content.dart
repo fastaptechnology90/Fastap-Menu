@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_colors.dart';
 import 'app_variant_config.dart';
 
 /// Variant-specific copy and onboarding content for all staff apps.
@@ -68,23 +69,44 @@ class AppVariantContent {
         StaffAppVariant.kitchen => const Color(0xff0f766e),
       };
 
-  static List<Color> get backgroundGradient => switch (AppVariantConfig.variant) {
-        StaffAppVariant.waiter => const [
-            Color(0xffeff6ff),
-            Color(0xfff8fafc),
-            Color(0xfff0f9ff),
-          ],
-        StaffAppVariant.housekeeping => const [
-            Color(0xffecfdf5),
-            Color(0xfff8fafc),
-            Color(0xffe6fffa),
-          ],
-        StaffAppVariant.kitchen => const [
-            Color(0xffecfdf5),
-            Color(0xfff5f7f4),
-            Color(0xffe6fffa),
-          ],
-      };
+  /// Splash / login backdrop. Follows the theme: these used to be fixed light
+  /// tints, so in dark mode the login and splash showed a pale background behind
+  /// dark cards and light text — half the screen light, half dark.
+  static List<Color> get backgroundGradient => AppColors.isDark
+      ? switch (AppVariantConfig.variant) {
+          StaffAppVariant.waiter => const [
+              Color(0xff0b1220),
+              Color(0xff0f1115),
+              Color(0xff0a1526),
+            ],
+          StaffAppVariant.housekeeping => const [
+              Color(0xff08160f),
+              Color(0xff0f1115),
+              Color(0xff071a13),
+            ],
+          StaffAppVariant.kitchen => const [
+              Color(0xff08161a),
+              Color(0xff0f1115),
+              Color(0xff06181a),
+            ],
+        }
+      : switch (AppVariantConfig.variant) {
+          StaffAppVariant.waiter => const [
+              Color(0xffeff6ff),
+              Color(0xfff8fafc),
+              Color(0xfff0f9ff),
+            ],
+          StaffAppVariant.housekeeping => const [
+              Color(0xffecfdf5),
+              Color(0xfff8fafc),
+              Color(0xffe6fffa),
+            ],
+          StaffAppVariant.kitchen => const [
+              Color(0xffecfdf5),
+              Color(0xfff5f7f4),
+              Color(0xffe6fffa),
+            ],
+        };
 
   static String get homeQuickActionsSubtitle => switch (AppVariantConfig.variant) {
         StaffAppVariant.waiter => 'Table service, deliveries, and floor alerts',

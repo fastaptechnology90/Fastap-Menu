@@ -77,6 +77,9 @@ export default function OrderTracking() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  // Payment + table state now arrive with every status poll, so the bill prompt
+  // and the closed-table screen update live instead of only after a reload.
+  const [live, setLive] = useState<{ paymentStatus?: string; billRequested?: boolean; tableCleared?: boolean }>({});
   const [countdownSec, setCountdownSec] = useState(20 * 60);
   const [liveConnected, setLiveConnected] = useState(false);
   const esRef = useRef<EventSource | null>(null);
@@ -103,6 +106,11 @@ export default function OrderTracking() {
       })),
     };
     setTracking(snap);
+    setLive({
+      paymentStatus: data.paymentStatus,
+      billRequested: data.billRequested,
+      tableCleared: data.tableCleared,
+    });
     setContactInfo({
       restaurantId: data.restaurantId,
       restaurantPhone: data.restaurantPhone,
@@ -329,6 +337,27 @@ export default function OrderTracking() {
         <h2 className="text-xl font-bold text-red-400">Order Cancelled</h2>
         <p className="text-white/40 text-sm">This order was cancelled. Contact staff if this was unexpected.</p>
         <button onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))} className="mt-2 px-6 py-3 rounded-xl bg-orange-500 font-semibold text-sm">Order Again</button>
+      </div>
+    );
+  }
+
+  // Once the waiter clears the table the visit is over — keep showing a live
+  // order and the guest thinks something is still coming.
+  if (live.tableCleared) {
+    return (
+      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <div className="text-6xl">🙏</div>
+        <h2 className="text-xl font-bold text-emerald-400">Thank you for visiting!</h2>
+        <p className="text-white/50 text-sm">
+          Your table has been closed{live.paymentStatus === "paid" ? " and the bill is settled" : ""}.
+          We hope to see you again soon.
+        </p>
+        <button
+          onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))}
+          className="mt-2 px-6 py-3 rounded-xl bg-orange-500 font-semibold text-sm"
+        >
+          Start a new order
+        </button>
       </div>
     );
   }

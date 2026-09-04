@@ -18,7 +18,12 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = light ? AppColors.surface : AppVariantContent.primaryColor;
+    // `light` means the logo sits on a coloured/dark backdrop, so the wordmark
+    // has to be white there. Elsewhere it follows the theme: the variant's brand
+    // colour is tuned for a light background and turns nearly unreadable on the
+    // dark one, so the icon tile carries the brand colour and the wordmark uses
+    // the theme's text colour.
+    final primary = light ? Colors.white : AppColors.primaryText;
     final accent = AppVariantContent.primaryColor;
     final sub = light ? Colors.white70 : AppColors.secondaryText;
 
