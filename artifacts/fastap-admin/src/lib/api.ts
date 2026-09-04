@@ -837,7 +837,7 @@ export const restaurantApi = {
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
     return get<{
-      from: string | null; to: string | null; total: number; orderRevenue: number; spaRevenue: number; banquetRevenue?: number; totalOrders: number;
+      from: string | null; to: string | null; total: number; orderRevenue: number; spaRevenue: number; banquetRevenue?: number; roomRevenue?: number; totalOrders: number;
       bySource: { label: string; amount: number; count: number }[];
       byType: { type: string; amount: number; count: number }[];
       byMethod: { method: string; amount: number; count: number }[];

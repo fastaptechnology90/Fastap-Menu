@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, desc, gte, lte } from "drizzle-orm";
-import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable, spaBookingsTable, banquetEventsTable } from "@workspace/db";
+import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable, spaBookingsTable, banquetEventsTable, financeTransactionsTable } from "@workspace/db";
 import { CreateRestaurantBody, UpdateRestaurantBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { createRestaurantRateLimit } from "../middlewares/rate-limit.js";
@@ -14,7 +14,7 @@ import {
   getPublicationStatus,
 } from "../lib/restaurant-publication.js";
 import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
-import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
+import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenue, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
 
 const router: IRouter = Router();
 
@@ -322,13 +322,17 @@ router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): 
   const orderRevenue = Math.round(paid.reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
   const spaRevenue = await getSpaRevenue(id, from, toEnd);   // spa folded into the total
   const banquetRevenue = await getBanquetRevenue(id, from, toEnd); // events & banquet advance
+  // Hotel rooms (rent + bar / minibar / room-service billed to the folio) belong in
+  // the same total — leaving them out made this widget disagree with the dashboard.
+  const roomRevenue = await getRoomRevenue(id, from, toEnd);
   res.json({
     from: from ? from.toISOString().slice(0, 10) : null,
     to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
-    revenue: Math.round((orderRevenue + spaRevenue + banquetRevenue) * 100) / 100,
+    revenue: Math.round((orderRevenue + spaRevenue + banquetRevenue + roomRevenue) * 100) / 100,
     orderRevenue,
     spaRevenue,
     banquetRevenue,
+    roomRevenue,
     totalOrders: paid.length,
   });
 });
@@ -368,6 +372,7 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
   const orderRevenue = round(paid.reduce((s, o) => s + orderGrossTotal(o), 0));
   const spaRevenue = await getSpaRevenue(id, from, toEnd);
   const banquetRevenue = await getBanquetRevenue(id, from, toEnd);
+  const roomRevenue = await getRoomRevenue(id, from, toEnd);
 
   // Which panel a given order type belongs to
   const sourceOf = (t: string | null | undefined): string => {
@@ -414,6 +419,7 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
   const bySource = [...sourceMap.entries()].map(([label, v]) => ({ label, amount: round(v.amount), count: v.count }));
   if (spaRevenue > 0) bySource.push({ label: "Spa", amount: round(spaRevenue), count: 0 });
   if (banquetRevenue > 0) bySource.push({ label: "Events & Banquet", amount: round(banquetRevenue), count: 0 });
+  if (roomRevenue > 0) bySource.push({ label: "Hotel / Rooms", amount: round(roomRevenue), count: 0 });
   bySource.sort((a, b) => b.amount - a.amount);
 
   const byType = [...typeMap.entries()].map(([type, v]) => ({ type, amount: round(v.amount), count: v.count })).sort((a, b) => b.amount - a.amount);
@@ -431,10 +437,13 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
     at: String((o.metadata as any)?.payment?.collectedAt || o.createdAt),
   }));
 
-  const SPA_OK = new Set(["booked", "confirmed", "in_progress", "completed"]);
-  const spaRows = await db.select({ id: spaBookingsTable.id, serviceName: spaBookingsTable.serviceName, guestName: spaBookingsTable.guestName, price: spaBookingsTable.price, status: spaBookingsTable.status, createdAt: spaBookingsTable.createdAt, metadata: spaBookingsTable.metadata })
+  // Same rule as spa revenue: only what the guest actually paid for.
+  const spaPaid = (r: { status?: string | null; paymentStatus?: string | null }) =>
+    String(r.status ?? "").toLowerCase() !== "cancelled"
+    && ["paid", "success"].includes(String(r.paymentStatus ?? "").toLowerCase());
+  const spaRows = await db.select({ id: spaBookingsTable.id, serviceName: spaBookingsTable.serviceName, guestName: spaBookingsTable.guestName, price: spaBookingsTable.price, status: spaBookingsTable.status, paymentStatus: spaBookingsTable.paymentStatus, createdAt: spaBookingsTable.createdAt, metadata: spaBookingsTable.metadata })
     .from(spaBookingsTable).where(eq(spaBookingsTable.restaurantId, id));
-  const spaPayments = spaRows.filter(s => SPA_OK.has(String(s.status ?? "").toLowerCase()) && inDateRange(s.createdAt)).map(s => {
+  const spaPayments = spaRows.filter(s => spaPaid(s) && inDateRange(s.createdAt)).map(s => {
     const pay = (s.metadata as any)?.payment ?? {};
     return {
       id: `s-${s.id}`, orderNumber: `SPA-${s.id}`, source: "Spa", type: "spa",
@@ -455,7 +464,25 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
     tableName: null, customerName: b.name || null, upiId: null, utr: null, at: String(b.createdAt),
   }));
 
-  const payments = [...orderPayments, ...spaPayments, ...banquetPayments].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  // Hotel room collections come from the finance ledger, where every folio payment
+  // (room rent + bar / minibar / room service billed to the room) is booked.
+  const roomRows = await db.select({ id: financeTransactionsTable.id, amount: financeTransactionsTable.amount, description: financeTransactionsTable.description, paymentMethod: financeTransactionsTable.paymentMethod, performedBy: financeTransactionsTable.performedBy, createdAt: financeTransactionsTable.createdAt })
+    .from(financeTransactionsTable)
+    .where(and(
+      eq(financeTransactionsTable.restaurantId, id),
+      eq(financeTransactionsTable.type, "income"),
+      eq(financeTransactionsTable.category, "room_folio_payment"),
+    ));
+  const roomPayments = roomRows.filter(r => inDateRange(r.createdAt)).map(r => ({
+    id: `r-${r.id}`, orderNumber: `ROOM-${r.id}`, source: "Hotel / Rooms", type: "room",
+    method: (r.paymentMethod || "cash").replace(/^./, c => c.toUpperCase()),
+    collector: r.performedBy || "Reception",
+    amount: round(parseMoney(r.amount)),
+    tableName: null, customerName: r.description || null, upiId: null, utr: null,
+    at: String(r.createdAt),
+  }));
+
+  const payments = [...orderPayments, ...spaPayments, ...banquetPayments, ...roomPayments].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   // Collected-by + payment-method from ALL payments (orders + spa + banquet), so every
   // method and every collector used anywhere in the restaurant is shown.
@@ -471,10 +498,11 @@ router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (r
   res.json({
     from: from ? from.toISOString().slice(0, 10) : null,
     to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
-    total: round(orderRevenue + spaRevenue + banquetRevenue),
+    total: round(orderRevenue + spaRevenue + banquetRevenue + roomRevenue),
     orderRevenue,
     spaRevenue,
     banquetRevenue,
+    roomRevenue,
     totalOrders: paid.length,
     bySource,
     byType,

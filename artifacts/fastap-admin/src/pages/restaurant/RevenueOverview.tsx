@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { restaurantApi } from "@/lib/api";
-import { TrendingUp, CalendarRange, Loader2, ShoppingBag, Utensils, Leaf, BedDouble, Wine, Package, CreditCard, Smartphone, Banknote, Wallet, User, X } from "lucide-react";
+import { TrendingUp, CalendarRange, Loader2, ShoppingBag, Utensils, Leaf, BedDouble, Wine, Package, CreditCard, Smartphone, Banknote, Wallet, User, X, Hotel, ChevronRight, PartyPopper, Bike } from "lucide-react";
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -12,12 +12,26 @@ const fmt = (n: number | undefined) => "₹" + Number(n || 0).toLocaleString("en
 const SOURCE_ICON: Record<string, typeof Utensils> = {
   "Restaurant / POS": Utensils,
   "Room Service": BedDouble,
+  "Hotel / Rooms": Hotel,
   "Bar": Wine,
   "Spa": Leaf,
   "Takeaway": ShoppingBag,
-  "Delivery": Package,
-  "Events & Banquet": Package,
+  "Delivery": Bike,
+  "Events & Banquet": PartyPopper,
 };
+
+// One accent per panel so the owner can tell them apart at a glance.
+const SOURCE_TONE: Record<string, { bg: string; text: string; bar: string }> = {
+  "Restaurant / POS": { bg: "bg-amber-500/15", text: "text-amber-400", bar: "bg-amber-500" },
+  "Hotel / Rooms": { bg: "bg-sky-500/15", text: "text-sky-400", bar: "bg-sky-500" },
+  "Room Service": { bg: "bg-cyan-500/15", text: "text-cyan-400", bar: "bg-cyan-500" },
+  "Bar": { bg: "bg-fuchsia-500/15", text: "text-fuchsia-400", bar: "bg-fuchsia-500" },
+  "Spa": { bg: "bg-emerald-500/15", text: "text-emerald-400", bar: "bg-emerald-500" },
+  "Takeaway": { bg: "bg-orange-500/15", text: "text-orange-400", bar: "bg-orange-500" },
+  "Delivery": { bg: "bg-blue-500/15", text: "text-blue-400", bar: "bg-blue-500" },
+  "Events & Banquet": { bg: "bg-violet-500/15", text: "text-violet-400", bar: "bg-violet-500" },
+};
+const DEFAULT_TONE = { bg: "bg-white/10", text: "text-white/50", bar: "bg-white/40" };
 const METHOD_ICON: Record<string, typeof Banknote> = {
   Cash: Banknote, UPI: Smartphone, Card: CreditCard, Wallet: Wallet, "Room bill": BedDouble,
 };
@@ -64,12 +78,17 @@ export default function RevenueOverview() {
   const pct = (a: number) => (total > 0 ? Math.round((a / total) * 100) : 0);
 
   // Full canonical panel list so the table always shows every source (even ₹0 ones).
-  const CANON = ["Restaurant / POS", "Room Service", "Bar", "Takeaway", "Delivery", "Events & Banquet", "Spa"];
+  const CANON = ["Restaurant / POS", "Hotel / Rooms", "Room Service", "Bar", "Takeaway", "Delivery", "Events & Banquet", "Spa"];
   const rows = CANON.map(label => {
     const found = (data?.bySource ?? []).find(s => s.label === label);
-    const amount = found?.amount ?? (label === "Spa" ? (data?.spaRevenue ?? 0) : label === "Events & Banquet" ? (data?.banquetRevenue ?? 0) : 0);
-    return { label, amount, count: found?.count ?? 0 };
-  });
+    const fallback = label === "Spa" ? (data?.spaRevenue ?? 0)
+      : label === "Events & Banquet" ? (data?.banquetRevenue ?? 0)
+      : label === "Hotel / Rooms" ? (data?.roomRevenue ?? 0)
+      : 0;
+    return { label, amount: found?.amount ?? fallback, count: found?.count ?? 0 };
+  })
+    // Earning panels first, empty ones after — the owner cares about what made money.
+    .sort((a, b) => b.amount - a.amount);
 
   return (
     <div className="p-4 lg:p-6 space-y-5 text-white">
@@ -103,70 +122,71 @@ export default function RevenueOverview() {
         <div className="flex flex-wrap gap-4 mt-3 text-sm">
           <span className="text-white/70"><Utensils className="h-3.5 w-3.5 inline mb-0.5 text-cyan-400" /> Orders: <b>{fmt(data?.orderRevenue)}</b></span>
           <span className="text-white/70"><Leaf className="h-3.5 w-3.5 inline mb-0.5 text-emerald-400" /> Spa: <b>{fmt(data?.spaRevenue)}</b></span>
-          {(data?.banquetRevenue ?? 0) > 0 && <span className="text-white/70"><Package className="h-3.5 w-3.5 inline mb-0.5 text-violet-400" /> Events: <b>{fmt(data?.banquetRevenue)}</b></span>}
+          {(data?.roomRevenue ?? 0) > 0 && <span className="text-white/70"><Hotel className="h-3.5 w-3.5 inline mb-0.5 text-sky-400" /> Rooms: <b>{fmt(data?.roomRevenue)}</b></span>}
+          {(data?.banquetRevenue ?? 0) > 0 && <span className="text-white/70"><PartyPopper className="h-3.5 w-3.5 inline mb-0.5 text-violet-400" /> Events: <b>{fmt(data?.banquetRevenue)}</b></span>}
           <span className="text-white/40">· {data?.totalOrders ?? 0} paid orders</span>
         </div>
       </div>
 
-      {/* Full revenue table — every source in one place */}
-      <div className="rounded-2xl bg-[#0e1520] border border-white/8 overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/8">
-          <h2 className="text-sm font-bold">Revenue by source — full table</h2>
-          <p className="text-[11px] text-white/40">Orders · Cashier/POS · Room Service · Bar · Spa · Events — all in one place</p>
+      {/* Every panel as its own card — amount, share of the day, and a tap for detail */}
+      <div>
+        <div className="flex items-end justify-between mb-2.5">
+          <div>
+            <h2 className="text-sm font-bold">Revenue by panel</h2>
+            <p className="text-[11px] text-white/40">Restaurant · Hotel rooms · Room service · Bar · Spa · Events — kis panel se kitna aaya</p>
+          </div>
+          <span className="text-[11px] text-white/30">kisi bhi card pe tap karo → poori detail</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-white/40 border-b border-white/5 bg-white/[0.02]">
-                <th className="px-4 py-2.5 font-medium">Source / Panel</th>
-                <th className="px-4 py-2.5 font-medium text-right">Orders</th>
-                <th className="px-4 py-2.5 font-medium text-right">Amount</th>
-                <th className="px-4 py-2.5 font-medium text-right">Share</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {rows.map(r => {
-                const Icon = SOURCE_ICON[r.label] || Utensils;
-                const clickable = r.amount > 0;
-                return (
-                  <tr key={r.label} onClick={() => clickable && setDrill({ kind: "source", value: r.label })} title={clickable ? "Click to see payments" : undefined} className={`${r.amount > 0 ? "" : "opacity-45"} ${clickable ? "cursor-pointer hover:bg-white/5" : ""} transition-colors`}>
-                    <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/40" /> {r.label}{clickable && <span className="text-white/25 text-xs">›</span>}</span></td>
-                    <td className="px-4 py-2.5 text-right text-white/60">{r.label === "Spa" ? "—" : r.count}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-amber-400">{fmt(r.amount)}</td>
-                    <td className="px-4 py-2.5 text-right text-white/50">{pct(r.amount)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-white/15 font-bold bg-white/[0.03]">
-                <td className="px-4 py-3">Total revenue</td>
-                <td className="px-4 py-3 text-right text-white/60">{data?.totalOrders ?? 0}</td>
-                <td className="px-4 py-3 text-right text-amber-400 text-base">{fmt(total)}</td>
-                <td className="px-4 py-3 text-right">100%</td>
-              </tr>
-            </tfoot>
-          </table>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map(r => {
+            const Icon = SOURCE_ICON[r.label] || Utensils;
+            const tone = SOURCE_TONE[r.label] ?? DEFAULT_TONE;
+            const clickable = r.amount > 0;
+            return (
+              <button
+                key={r.label}
+                type="button"
+                disabled={!clickable}
+                onClick={() => clickable && setDrill({ kind: "source", value: r.label })}
+                className={`text-left rounded-2xl border p-4 transition-all ${
+                  clickable
+                    ? "bg-[#0e1520] border-white/10 hover:border-white/25 hover:-translate-y-0.5 cursor-pointer"
+                    : "bg-white/[0.02] border-white/5 opacity-50 cursor-default"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tone.bg}`}>
+                      <Icon className={`h-4 w-4 ${tone.text}`} />
+                    </span>
+                    <span className="text-sm font-semibold truncate">{r.label}</span>
+                  </span>
+                  {clickable && <ChevronRight className="h-4 w-4 text-white/25 shrink-0 mt-2" />}
+                </div>
+
+                <p className={`text-2xl font-extrabold mt-3 ${clickable ? tone.text : "text-white/40"}`}>{fmt(r.amount)}</p>
+
+                <div className="mt-2.5 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div className={`h-full rounded-full ${tone.bar} transition-all`} style={{ width: `${pct(r.amount)}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-white/40 mt-1.5">
+                  <span>{r.count > 0 ? `${r.count} orders` : "—"}</span>
+                  <span>{pct(r.amount)}% of total</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 rounded-2xl bg-white/[0.03] border border-white/10 px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-bold">Total revenue</span>
+          <span className="flex items-center gap-4">
+            <span className="text-xs text-white/40">{data?.totalOrders ?? 0} paid orders</span>
+            <span className="text-lg font-extrabold text-amber-400">{fmt(total)}</span>
+          </span>
         </div>
       </div>
-
-      {/* By source / panel */}
-      <Section title="By panel / source" subtitle="Revenue from each panel">
-        {(data?.bySource ?? []).length === 0 ? <Empty /> : (data?.bySource ?? []).map((s, i) => {
-          const Icon = SOURCE_ICON[s.label] || Utensils;
-          return (
-            <div key={s.label} className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2"><Icon className="h-4 w-4 text-white/50" /> {s.label} {s.count > 0 && <span className="text-white/30 text-xs">· {s.count}</span>}</span>
-                <span className="font-bold">{fmt(s.amount)} <span className="text-white/40 text-xs font-normal">({pct(s.amount)}%)</span></span>
-              </div>
-              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                <div className={`h-full rounded-full ${BAR_COLORS[i % BAR_COLORS.length]}`} style={{ width: `${pct(s.amount)}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </Section>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* By payment method — every method used across the whole restaurant */}

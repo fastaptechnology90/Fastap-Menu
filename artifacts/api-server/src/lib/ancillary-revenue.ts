@@ -103,6 +103,25 @@ export async function getBanquetRevenueBuckets(restaurantId: number, sinces: (Da
  * Reads the finance ledger, where every folio collection is now booked, so this
  * counts what was actually collected rather than what was merely charged.
  */
+export async function getRoomRevenue(
+  restaurantId: number | null,
+  from?: Date | null,
+  to?: Date | null,
+): Promise<number> {
+  const conds = [
+    eq(financeTransactionsTable.type, "income"),
+    eq(financeTransactionsTable.category, "room_folio_payment"),
+  ];
+  if (restaurantId != null) conds.push(eq(financeTransactionsTable.restaurantId, restaurantId));
+  if (from) conds.push(gte(financeTransactionsTable.createdAt, from));
+  if (to) conds.push(lte(financeTransactionsTable.createdAt, to));
+  const rows = await db
+    .select({ amount: financeTransactionsTable.amount })
+    .from(financeTransactionsTable)
+    .where(and(...conds));
+  return roundMoney(rows.reduce((s, r) => s + parseMoney(r.amount), 0));
+}
+
 export async function getRoomRevenueBuckets(restaurantId: number, sinces: (Date | null)[]): Promise<number[]> {
   const rows = await db
     .select({ amount: financeTransactionsTable.amount, createdAt: financeTransactionsTable.createdAt })
