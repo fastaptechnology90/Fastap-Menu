@@ -6,7 +6,7 @@ import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
 import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic.js";
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
-import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
+import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 
 const router: IRouter = Router();
 
@@ -143,6 +143,11 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
       reference: (utr || upiId || null) as string | null,
       performedBy: (collectedBy || collectedFrom || null) as string | null,
     });
+  }
+  // Revenue already drops a cancelled order; the ledger has to let go of it too,
+  // otherwise Finance keeps money that was handed back.
+  if (String(order.status ?? "").toLowerCase() === "cancelled") {
+    await reverseOrderPaymentInLedger({ restaurantId, order, reason: req.body?.cancelReason });
   }
 
   if (status === "ready" && !order.waiterName) {

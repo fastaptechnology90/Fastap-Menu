@@ -37,12 +37,21 @@ router.get("/restaurants/:restaurantId/finance/summary", requireAuth, async (req
   if (access.kind === "unpublished") { res.json(emptyFinanceSummary()); return; }
 
   const txs = await db.select().from(financeTransactionsTable).where(eq(financeTransactionsTable.restaurantId, id));
-  const totalIncome = txs.filter(t => t.type === "income").reduce((s, t) => s + parseFloat(String(t.amount)), 0);
-  const totalExpense = txs.filter(t => t.type === "expense").reduce((s, t) => s + parseFloat(String(t.amount)), 0);
-  const netProfit = totalIncome - totalExpense;
+  const sum = (rows: typeof txs) => rows.reduce((s, t) => s + parseFloat(String(t.amount)), 0);
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayIncome = txs.filter(t => t.type === "income" && new Date(t.createdAt) >= todayStart).reduce((s, t) => s + parseFloat(String(t.amount)), 0);
-  res.json({ totalIncome, totalExpense, netProfit, todayIncome, transactionCount: txs.length });
+  const isToday = (t: typeof txs[number]) => new Date(t.createdAt) >= todayStart;
+
+  // A cancelled order books a matching "refund" row. Netting it off here keeps
+  // Finance in step with Revenue, which drops a cancelled order outright —
+  // otherwise money handed back to the guest kept showing as income.
+  const grossIncome = sum(txs.filter(t => t.type === "income"));
+  const totalRefund = sum(txs.filter(t => t.type === "refund"));
+  const totalIncome = grossIncome - totalRefund;
+  const totalExpense = sum(txs.filter(t => t.type === "expense"));
+  const netProfit = totalIncome - totalExpense;
+  const todayIncome = sum(txs.filter(t => t.type === "income" && isToday(t)))
+    - sum(txs.filter(t => t.type === "refund" && isToday(t)));
+  res.json({ totalIncome, totalExpense, totalRefund, netProfit, todayIncome, transactionCount: txs.length });
 });
 
 router.get("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, res): Promise<void> => {

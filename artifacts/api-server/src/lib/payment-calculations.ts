@@ -28,7 +28,15 @@ export function orderGrossTotal(order: OrderLike): number {
   return parseMoney(order.total);
 }
 
-/** Count toward platform revenue / settlements when payment succeeded or is in-flight (not failed/refunded). */
+/**
+ * Counts toward revenue / settlements only once the money is actually in —
+ * cash basis, as the owner asked for. An order the kitchen accepted, or even
+ * delivered, is not revenue until someone collects for it; it starts counting
+ * the moment a waiter (in the app) or the panel marks it paid.
+ *
+ * Before this, any in-flight order counted, so the dashboard showed money that
+ * had never been collected.
+ */
 export function isPaidOrder(order: OrderLike): boolean {
   const ps = String(order.paymentStatus ?? "").toLowerCase();
   // A cancelled (voided) order is never revenue — even if it was marked paid before it was
@@ -36,15 +44,7 @@ export function isPaidOrder(order: OrderLike): boolean {
   // stale paymentStatus="paid" can't slip a cancelled order into revenue totals.
   if (String(order.status ?? "").toLowerCase() === "cancelled") return false;
   if (ps === "refunded" || ps === "failed") return false;
-  if (ps === "paid" || ps === "success") return true;
-  const st = String(order.status ?? "").toLowerCase();
-  if (ps === "pending" || ps === "") {
-    // "serving" (waiter is carrying it to the table) and "delayed" belong here
-    // too — leaving them out made revenue drop while an order was out for
-    // delivery and jump back once it was marked delivered.
-    return ["preparing", "ready", "confirmed", "accepted", "serving", "served", "delayed", "billing", "completed", "delivered"].includes(st);
-  }
-  return false;
+  return ps === "paid" || ps === "success";
 }
 
 export function isRefundedOrder(order: OrderLike): boolean {

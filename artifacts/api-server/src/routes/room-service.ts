@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, roomServiceRequestsTable, hotelRoomsTable, menuItemsTable, categoriesTable, ordersTable, DEFAULT_ROOM_CONTROLS } from "@workspace/db";
+import { recordAncillaryPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { requireAuth } from "../middlewares/auth";
 import { getSettingsSection } from "../lib/restaurant-settings";
 import { autoAssignRoomServiceRequest } from "../lib/staff-auto-assignment.js";
@@ -118,6 +119,21 @@ router.post("/restaurants/:restaurantId/rooms/:roomNumber/payment", requireAuth,
   await db.update(hotelRoomsTable)
     .set({ roomControls: mergeRoomBilling(room.roomControls ?? DEFAULT_ROOM_CONTROLS, { paid: newPaid }) })
     .where(and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)));
+
+  // Room money (room rent + bar / minibar / room-service charged to the folio) only
+  // ever lived on the room record, so none of it reached Finance or the Cash
+  // Counter. Book each collection like any other payment. The reference carries
+  // the running paid total, so each part-payment books once.
+  await recordAncillaryPaymentInLedger({
+    restaurantId,
+    reference: `ROOM-${roomNumber}-${newPaid.toFixed(2)}`,
+    amount,
+    category: "room_folio_payment",
+    description: `Room ${roomNumber} folio${room.guestName ? ` — ${room.guestName}` : ""}`,
+    method: (req.body?.method as string) || "cash",
+    performedBy: (req.body?.collectedBy as string) ?? null,
+  });
+
   const folio = await computeRoomFolio(restaurantId, roomNumber);
   res.json({ recorded: true, paid: newPaid, folio });
 });

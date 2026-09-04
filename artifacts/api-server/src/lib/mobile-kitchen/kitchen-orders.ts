@@ -1,7 +1,7 @@
 import { eq, and, desc, inArray, gte, sql } from "drizzle-orm";
 import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
-import { recordOrderPaymentInLedger } from "../order-payment-ledger.js";
+import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../order-payment-ledger.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 
 export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar", "Dessert", "Bakery", "Floor"];
@@ -634,6 +634,12 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
   }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
 
   if (!updated) throw new Error("ORDER_NOT_FOUND");
+
+  // Cancelling here has to release the money too, exactly as the web panel does
+  // — otherwise Revenue drops the order but Finance keeps the collected amount.
+  if (mapped.status === "cancelled") {
+    await reverseOrderPaymentInLedger({ restaurantId, order: updated, reason: `cancelled from app (${action})` });
+  }
 
   // Mirror the web-panel behaviour in orders.ts: once the kitchen marks an order
   // ready, hand it to a waiter and notify them (see BUG.md #3).

@@ -14,7 +14,7 @@ import {
   getPublicationStatus,
 } from "../lib/restaurant-publication.js";
 import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
-import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue } from "../lib/ancillary-revenue.js";
+import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
 
 const router: IRouter = Router();
 
@@ -228,8 +228,19 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount * 0.5);
   const pendingSettlement = Math.round(Math.max(0, onlineBalance * 0.15));
 
-  // Fold spa revenue into the same buckets so the restaurant total includes it (one query).
-  const [spaToday, spaWeek, spaFortnight, spaMonth] = await getSpaRevenueBuckets(id, [today, weekStart, fortnightStart, monthStart]);
+  // Fold every other revenue stream into the same buckets so the owner's total is
+  // the whole business, not just restaurant orders: spa, hotel rooms (rent + bar /
+  // minibar / room-service billed to the folio) and banquet advances. Rooms and
+  // banquet were missing entirely — a hotel could take ₹4,000 at checkout and the
+  // dashboard would still read ₹0.
+  const buckets = [today, weekStart, fortnightStart, monthStart];
+  const [spaB, roomB, banquetB] = await Promise.all([
+    getSpaRevenueBuckets(id, buckets),
+    getRoomRevenueBuckets(id, buckets),
+    getBanquetRevenueBuckets(id, buckets),
+  ]);
+  const [spaToday, spaWeek, spaFortnight, spaMonth] = spaB;
+  const extra = (i: number) => roomB[i] + banquetB[i];
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   res.json({
@@ -239,13 +250,15 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     weekOrders: weekOrders.length,
     fortnightOrders: fortnightOrders.length,
     monthOrders: monthOrders.length,
-    todayRevenue: r2(sumTotal(todayOrders) + spaToday),
-    weekRevenue: r2(sumTotal(weekOrders) + spaWeek),
-    fortnightRevenue: r2(sumTotal(fortnightOrders) + spaFortnight),
-    monthRevenue: r2(sumTotal(monthOrders) + spaMonth),
-    netRevenue: r2(sumTotal(monthOrders) + spaMonth),
-    grossRevenue: r2(sumTotal(monthOrders) + spaMonth),
+    todayRevenue: r2(sumTotal(todayOrders) + spaToday + extra(0)),
+    weekRevenue: r2(sumTotal(weekOrders) + spaWeek + extra(1)),
+    fortnightRevenue: r2(sumTotal(fortnightOrders) + spaFortnight + extra(2)),
+    monthRevenue: r2(sumTotal(monthOrders) + spaMonth + extra(3)),
+    netRevenue: r2(sumTotal(monthOrders) + spaMonth + extra(3)),
+    grossRevenue: r2(sumTotal(monthOrders) + spaMonth + extra(3)),
     spaRevenueMonth: spaMonth,
+    roomRevenueMonth: roomB[3],
+    banquetRevenueMonth: banquetB[3],
     activeOrders: activeOrders.length,
     cancelledOrders: cancelledOrders.length,
     totalCustomers: customers[0]?.count ?? 0,

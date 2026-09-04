@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, spaServicesTable, spaBookingsTable, roomServiceRequestsTable } from "@workspace/db";
+import { recordAncillaryPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { requireAuth } from "../middlewares/auth";
 import { parseMoney } from "../lib/payment-calculations.js";
 
@@ -99,6 +100,22 @@ router.put("/restaurants/:restaurantId/spa/bookings/:bookingId", requireAuth, as
   }
   const [booking] = await db.update(spaBookingsTable).set(updates).where(and(eq(spaBookingsTable.id, bookingId), eq(spaBookingsTable.restaurantId, restaurantId))).returning();
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+
+  // Spa money used to stop here — it never reached Finance or the Cash Counter,
+  // so the owner's ledger only showed restaurant orders. Book it like any other
+  // collection (de-duplicated, so re-saving the booking books it once).
+  if (String(booking.paymentStatus ?? "").toLowerCase() === "paid") {
+    const pay = (payment && typeof payment === "object" ? payment : {}) as Record<string, unknown>;
+    await recordAncillaryPaymentInLedger({
+      restaurantId,
+      reference: `SPA-${booking.id}`,
+      amount: booking.price,
+      category: "spa_payment",
+      description: `Spa · ${booking.serviceName} — ${booking.guestName}`,
+      method: (pay.method as string) || "cash",
+      performedBy: (pay.collectedBy as string) ?? null,
+    });
+  }
   res.json(booking);
 });
 
