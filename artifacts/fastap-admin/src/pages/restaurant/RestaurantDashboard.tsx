@@ -27,7 +27,11 @@ const PAY_CHIP: Record<string, { label: string; cls: string }> = {
   wallet: { label: "Wallet", cls: "bg-pink-500/15 text-pink-400" },
 };
 function payChip(mode?: string) {
-  const m = (mode || "cash").toLowerCase();
+  // Same as the order list: an order with no method has not been paid yet.
+  if (!mode) {
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-white/10 text-white/40">Unpaid</span>;
+  }
+  const m = mode.toLowerCase();
   const c = PAY_CHIP[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor"))
     ? { label: "Gateway", cls: "bg-violet-500/15 text-violet-400" }
     : { label: mode || "Cash", cls: "bg-white/10 text-white/50" });

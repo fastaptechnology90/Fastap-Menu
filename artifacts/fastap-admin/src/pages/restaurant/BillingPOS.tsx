@@ -63,7 +63,8 @@ export default function BillingPOS() {
             amount: parseFloat(String(o.total ?? o.totalAmount ?? 0)),
             // Fall back to cash (not upi) when no method was recorded, so this
             // matches Order Management and Revenue for the same order.
-            method: (o.paymentMethod || pay.method || "cash") as string,
+            // Blank until it is actually collected — see payMethodBadge in OrderManagement.
+            method: (o.paymentMethod || pay.method || "") as string,
             time: o.updatedAt ? new Date(o.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—",
             status: "paid",
             reference: pay.utr || pay.upiId || o.invoiceNumber || undefined,

@@ -75,7 +75,8 @@ export interface LiveOrder {
   guests: number;
   specialReq?: string;
   // Payment tracking: how it was paid, who, and whether it's a room order.
-  paymentMethod: string;
+  // Undefined until someone actually collects — a fresh order has no method yet.
+  paymentMethod?: string;
   paymentStatus?: string;
   customerName?: string;
   customerPhone?: string;
@@ -224,7 +225,7 @@ function mapApiOrder(o: any): LiveOrder {
     total: parseFloat(String(o.total)),
     guests: o.guestCount ?? o.guest_count ?? 1,
     specialReq: o.notes || undefined,
-    paymentMethod: o.paymentMethod || o.payment_method || (o.metadata?.payment?.method) || "cash",
+    paymentMethod: o.paymentMethod || o.payment_method || (o.metadata?.payment?.method) || undefined,
     paymentStatus: o.paymentStatus || o.payment_status || undefined,
     customerName: o.customerName || o.customer_name || undefined,
     customerPhone: o.customerPhone || o.customer_phone || undefined,

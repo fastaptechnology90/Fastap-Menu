@@ -28,7 +28,13 @@ const PAY_LABEL: Record<string, string> = {
   wallet: "Wallet", nfc: "NFC", room_bill: "Room Bill", aggregator: "Aggregator",
 };
 function payMethodBadge(mode?: string) {
-  const m = (mode || "cash").toLowerCase();
+  // No method yet means nobody has collected — the waiter asks the guest at the
+  // table and picks it then. Falling back to "Cash" here labelled every brand-new
+  // order as paid by cash the moment it was placed.
+  if (!mode) {
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-white/10 text-white/40">Unpaid</span>;
+  }
+  const m = mode.toLowerCase();
   const label = PAY_LABEL[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway" : (mode || "Cash"));
   const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-400"
     : m === "cash" ? "bg-amber-500/15 text-amber-400"
@@ -75,7 +81,7 @@ export default function OrderManagement() {
         customerName: newOrder.customerName || "Walk-in",
         type: newOrder.type,
         items: [{ menuItemId: parseInt(newOrder.menuItemId, 10), quantity: newOrder.qty }],
-        paymentMethod: "cash",
+        // No method here — the waiter picks how the guest actually pays when collecting.
         metadata: { source: "restaurant_panel", waiter: currentStaff?.name },
       });
       setNewOrderForm(false);
