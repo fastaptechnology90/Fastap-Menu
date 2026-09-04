@@ -13,19 +13,19 @@ const router: IRouter = Router();
 export const APP_CATALOG: Record<string, { name: string; tagline: string; role: string; accent: string }> = {
   kitchen: {
     name: "Fastap Kitchen",
-    tagline: "Chef ke liye — naye order, cooking timer, ready mark",
+    tagline: "For chefs — incoming orders, cooking timers, mark ready",
     role: "Chef / Kitchen staff",
     accent: "#f97316",
   },
   waiter: {
     name: "Fastap Waiter",
-    tagline: "Waiter ke liye — order serve, payment collect, table clear",
+    tagline: "For waiters — serve orders, collect payment, clear tables",
     role: "Waiter / Steward",
     accent: "#3b82f6",
   },
   housekeeping: {
     name: "Fastap Housekeeping",
-    tagline: "Housekeeping ke liye — room cleaning, maintenance tasks",
+    tagline: "For housekeeping — room cleaning and maintenance tasks",
     role: "Housekeeping staff",
     accent: "#10b981",
   },

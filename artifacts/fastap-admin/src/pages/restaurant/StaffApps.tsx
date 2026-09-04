@@ -43,10 +43,10 @@ function formatSize(bytes?: number) {
 }
 
 const INSTALL_STEPS = [
-  "Phone se neeche wala QR code scan kijiye (ya link bhej dijiye).",
-  "APK file download hone dijiye — Chrome \"file harmful ho sakti hai\" pooche to Download anyway dabaiye.",
-  "Download par tap kijiye. Android \"unknown apps install\" ki permission maange to Settings me jaakar Allow kar dijiye.",
-  "Install ke baad app khol kar staff ke email aur password se login kijiye.",
+  "Scan the QR code below with the staff member's phone, or send them the link.",
+  "Let the APK finish downloading. If Chrome warns that the file may be harmful, choose Download anyway.",
+  "Tap the download. If Android asks for permission to install unknown apps, open Settings and allow it.",
+  "Open the app and sign in with that staff member's email and password.",
 ];
 
 export default function StaffApps() {
@@ -95,9 +95,9 @@ export default function StaffApps() {
       await navigator.clipboard.writeText(url);
       setCopied(app.appKey);
       setTimeout(() => setCopied(c => (c === app.appKey ? null : c)), 1800);
-      toast({ title: "Link copy ho gaya", description: "Staff ko WhatsApp par bhej dijiye" });
+      toast({ title: "Link copied", description: "Send it to your staff on WhatsApp" });
     } catch {
-      toast({ title: "Copy nahi hua", description: url, variant: "destructive" });
+      toast({ title: "Could not copy", description: url, variant: "destructive" });
     }
   }
 
@@ -111,7 +111,7 @@ export default function StaffApps() {
           <div>
             <h1 className="text-xl font-extrabold">Staff Apps</h1>
             <p className="text-sm text-white/50 mt-0.5 max-w-xl">
-              Apne staff ke phone me ye apps install karwaiye. QR scan kijiye ya link bhej dijiye — Play Store ki zaroorat nahi.
+              Install these apps on your staff phones. Scan the QR code or send the link — no Play Store needed.
             </p>
           </div>
         </div>
@@ -127,9 +127,9 @@ export default function StaffApps() {
       ) : apps.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/15 p-12 text-center">
           <PackageOpen className="mx-auto h-10 w-10 text-white/25" />
-          <h3 className="mt-3 font-bold">Abhi koi app available nahi hai</h3>
+          <h3 className="mt-3 font-bold">No apps available yet</h3>
           <p className="text-sm text-white/45 mt-1">
-            Fastap team ne aapke restaurant ke liye abhi koi staff app enable nahi ki. Support se baat kijiye.
+            The Fastap team has not enabled any staff app for your restaurant yet. Please contact support.
           </p>
         </div>
       ) : (
@@ -167,7 +167,7 @@ export default function StaffApps() {
 
                       {app.changelog ? (
                         <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-[11px] font-bold text-white/50 uppercase tracking-wide">Kya naya hai</p>
+                          <p className="text-[11px] font-bold text-white/50 uppercase tracking-wide">What's new</p>
                           <p className="text-xs text-white/70 mt-1 whitespace-pre-line">{app.changelog}</p>
                         </div>
                       ) : null}
@@ -178,7 +178,7 @@ export default function StaffApps() {
                         ) : (
                           <div className="h-36 w-36 rounded-lg bg-white/5 animate-pulse" />
                         )}
-                        <p className="text-[11px] text-white/45 text-center">Staff ke phone se scan kijiye</p>
+                        <p className="text-[11px] text-white/45 text-center">Scan with the staff phone</p>
                       </div>
 
                       <div className="mt-4 flex items-center gap-2">
@@ -186,7 +186,7 @@ export default function StaffApps() {
                           className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${style.btn}`}>
                           <Download className="h-4 w-4" /> Download APK
                         </a>
-                        <button onClick={() => copyLink(app)} title="Link copy karein"
+                        <button onClick={() => copyLink(app)} title="Copy download link"
                           className="rounded-xl border border-white/10 p-2.5 hover:bg-white/5">
                           {copied === app.appKey ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                         </button>
@@ -194,8 +194,8 @@ export default function StaffApps() {
                     </>
                   ) : (
                     <div className="mt-4 rounded-xl border border-dashed border-white/15 p-6 text-center">
-                      <p className="text-sm font-semibold text-white/60">Jaldi aa rahi hai</p>
-                      <p className="text-xs text-white/40 mt-1">Is app ki koi version abhi publish nahi hui.</p>
+                      <p className="text-sm font-semibold text-white/60">Coming soon</p>
+                      <p className="text-xs text-white/40 mt-1">No version of this app has been published yet.</p>
                     </div>
                   )}
                 </div>
@@ -209,7 +209,7 @@ export default function StaffApps() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
           <div className="flex items-center gap-2">
             <Info className="h-4 w-4 text-primary" />
-            <h3 className="font-bold text-sm">Install kaise karein</h3>
+            <h3 className="font-bold text-sm">How to install</h3>
           </div>
           <ol className="mt-3 space-y-2">
             {INSTALL_STEPS.map((step, i) => (
@@ -226,13 +226,13 @@ export default function StaffApps() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            <h3 className="font-bold text-sm">Dhyan dene wali baatein</h3>
+            <h3 className="font-bold text-sm">Good to know</h3>
           </div>
           <ul className="mt-3 space-y-2 text-sm text-white/65">
-            <li>• Ye apps sirf Android par chalti hain. iPhone ke liye staff browser me panel khol sakta hai.</li>
-            <li>• Har staff apne hi email-password se login karega — ek hi account sab ke saath share mat kijiye.</li>
-            <li>• Nayi version aane par yahi page apne aap update ho jayega; staff ko sirf dobara download karna hoga.</li>
-            <li>• Download link kisi bahar wale ko mat bhejiye — app aapke restaurant ke live orders dikhati hai.</li>
+            <li>• These apps run on Android only. On iPhone, staff can open the panel in a browser instead.</li>
+            <li>• Each staff member signs in with their own email and password — never share one account.</li>
+            <li>• When a new version is released this page updates on its own — staff just download it again.</li>
+            <li>• Do not share the download link outside your team — the app shows your live orders.</li>
           </ul>
         </div>
       </div>

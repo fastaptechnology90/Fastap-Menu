@@ -88,15 +88,15 @@ export default function AppReleases() {
 
   async function submitUpload() {
     if (!form.version.trim()) {
-      toast.error("Version number daaliye (jaise 1.4.0)");
+      toast.error("Enter a version number, e.g. 1.4.0");
       return;
     }
     if (form.mode === "file" && !form.file) {
-      toast.error("APK file choose kijiye");
+      toast.error("Choose an APK file");
       return;
     }
     if (form.mode === "link" && !/^https?:\/\//i.test(form.downloadUrl.trim())) {
-      toast.error("Ek valid https link daaliye");
+      toast.error("Enter a valid https link");
       return;
     }
 
@@ -120,12 +120,12 @@ export default function AppReleases() {
       }
 
       await api.appReleases.publish(release.id);
-      toast.success(`${form.version} live ho gaya — sabhi restaurants ko dikhega`);
+      toast.success(`${form.version} is live — every restaurant will see it`);
       setDialogOpen(false);
       setForm(EMPTY_FORM);
       qc.invalidateQueries({ queryKey: ["app-releases"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload fail ho gaya");
+      toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -135,10 +135,10 @@ export default function AppReleases() {
     setBusyId(id);
     try {
       await api.appReleases.publish(id);
-      toast.success("Ye version ab live hai");
+      toast.success("This version is now live");
       qc.invalidateQueries({ queryKey: ["app-releases"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Publish fail");
+      toast.error(e instanceof Error ? e.message : "Publish failed");
     } finally {
       setBusyId(null);
     }
@@ -148,10 +148,10 @@ export default function AppReleases() {
     setBusyId(id);
     try {
       await api.appReleases.remove(id);
-      toast.success("Build delete ho gayi");
+      toast.success("Build deleted");
       qc.invalidateQueries({ queryKey: ["app-releases"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete fail");
+      toast.error(e instanceof Error ? e.message : "Delete failed");
     } finally {
       setBusyId(null);
     }
@@ -165,7 +165,7 @@ export default function AppReleases() {
     try {
       await api.appReleases.setVisibility(restaurantId, appKey, visible);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Save fail");
+      toast.error(e instanceof Error ? e.message : "Could not save");
       qc.invalidateQueries({ queryKey: ["app-releases-visibility"] });
     }
   }
@@ -173,17 +173,17 @@ export default function AppReleases() {
   async function toggleAll(appKey: string, visible: boolean) {
     try {
       const res = await api.appReleases.setVisibilityForAll(appKey, visible);
-      toast.success(`${res.updated} restaurants me ${visible ? "on" : "off"} kar diya`);
+      toast.success(`Turned ${visible ? "on" : "off"} for ${res.updated} restaurants`);
       qc.invalidateQueries({ queryKey: ["app-releases-visibility"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Save fail");
+      toast.error(e instanceof Error ? e.message : "Could not save");
     }
   }
 
   return (
     <PageShell
       title="Staff App Releases"
-      description="APK upload kijiye, publish kijiye — har restaurant ke owner panel me apne aap update ho jayega. Neeche har restaurant ke liye alag-alag app on/off kar sakte hain."
+      description="Upload an APK and publish it — every restaurant's owner panel updates on its own. Below, turn each app on or off per restaurant."
       icon={<Smartphone className="h-6 w-6" />}
       accent="violet"
       loading={releasesQuery.isLoading}
@@ -220,7 +220,7 @@ export default function AppReleases() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
-                  Abhi tak koi version publish nahi hua
+                  No version published yet
                 </div>
               )}
 
@@ -228,11 +228,11 @@ export default function AppReleases() {
                 <Button size="sm" className="rounded-xl flex-1" onClick={() => openUpload(app.appKey)}>
                   <Upload className="mr-2 h-4 w-4" /> New version
                 </Button>
-                <Button size="sm" variant="outline" className="rounded-xl" title="Sabhi restaurants me dikhaayein"
+                <Button size="sm" variant="outline" className="rounded-xl" title="Show for all restaurants"
                   onClick={() => toggleAll(app.appKey, true)}>
                   <Eye className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="outline" className="rounded-xl" title="Sabhi restaurants me chhupayein"
+                <Button size="sm" variant="outline" className="rounded-xl" title="Hide for all restaurants"
                   onClick={() => toggleAll(app.appKey, false)}>
                   <EyeOff className="h-4 w-4" />
                 </Button>
@@ -243,10 +243,10 @@ export default function AppReleases() {
       </div>
 
       {/* ── Every build ever uploaded ── */}
-      <PanelCard title="Version history" description="Purani build rollback ke liye rakhi jaati hai. Live build delete nahi hoti.">
+      <PanelCard title="Version history" description="The previous build is kept for rollback. A live build cannot be deleted.">
         {releases.length === 0 ? (
-          <EmptyState icon={<Smartphone className="h-8 w-8" />} title="Abhi koi build upload nahi hui"
-            description="Upar kisi bhi app pe 'New version' dabaiye." />
+          <EmptyState icon={<Smartphone className="h-8 w-8" />} title="No builds uploaded yet"
+            description="Pick an app above and hit 'New version'." />
         ) : (
           <div className="space-y-2">
             {releases.map(r => {
@@ -294,12 +294,12 @@ export default function AppReleases() {
 
       {/* ── Per-restaurant show / hide ── */}
       <PanelCard
-        title="Kis restaurant ko kaun si app dikhe"
-        description="Switch off karte hi us restaurant ke owner panel se wo app hat jayegi aur uska download link bhi band ho jayega."
+        title="Which restaurant sees which app"
+        description="Switching an app off removes it from that restaurant's owner panel and disables its download link."
         action={
           <div className="relative w-56 max-w-[45vw]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Restaurant dhoondhein"
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search restaurants"
               className="h-9 pl-9 rounded-xl" />
           </div>
         }
@@ -307,7 +307,7 @@ export default function AppReleases() {
         {visibilityQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : filteredRestaurants.length === 0 ? (
-          <EmptyState icon={<Search className="h-8 w-8" />} title="Koi restaurant nahi mila" />
+          <EmptyState icon={<Search className="h-8 w-8" />} title="No restaurant found" />
         ) : (
           <div className="space-y-2">
             {filteredRestaurants.map(r => (
@@ -342,9 +342,9 @@ export default function AppReleases() {
       <Dialog open={dialogOpen} onOpenChange={o => { if (!uploading) setDialogOpen(o); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="capitalize">{form.appKey} app — nayi version</DialogTitle>
+            <DialogTitle className="capitalize">{form.appKey} app — new version</DialogTitle>
             <DialogDescription>
-              Publish karte hi ye build har us restaurant ko dikhne lagegi jiske liye ye app on hai.
+              Once published, this build appears for every restaurant that has this app switched on.
             </DialogDescription>
           </DialogHeader>
 
@@ -352,11 +352,11 @@ export default function AppReleases() {
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" variant={form.mode === "file" ? "default" : "outline"} className="rounded-xl"
                 onClick={() => setForm(f => ({ ...f, mode: "file" }))} disabled={uploading}>
-                <Upload className="mr-2 h-4 w-4" /> APK upload
+                <Upload className="mr-2 h-4 w-4" /> Upload APK
               </Button>
               <Button type="button" variant={form.mode === "link" ? "default" : "outline"} className="rounded-xl"
                 onClick={() => setForm(f => ({ ...f, mode: "link" }))} disabled={uploading}>
-                <Link2 className="mr-2 h-4 w-4" /> Link paste
+                <Link2 className="mr-2 h-4 w-4" /> Paste link
               </Button>
             </div>
 
@@ -382,7 +382,7 @@ export default function AppReleases() {
                     </span>
                   ) : (
                     <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Upload className="h-4 w-4" /> Click karke .apk file choose kijiye
+                      <Upload className="h-4 w-4" /> Click to choose an .apk file
                     </span>
                   )}
                 </button>
@@ -393,26 +393,26 @@ export default function AppReleases() {
                 <Input value={form.downloadUrl} onChange={e => setForm(f => ({ ...f, downloadUrl: e.target.value }))}
                   placeholder="https://…/Fastap-Kitchen.apk" className="h-9 mt-1 rounded-xl" disabled={uploading} />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  File kahin aur host hai (GitHub Release, Drive) to seedha link daal dijiye.
+                  If the file is hosted elsewhere (GitHub Release, Drive), paste the direct link.
                 </p>
               </div>
             )}
 
             <div>
-              <Label className="text-xs">Kya naya hai (owner ko dikhega)</Label>
+              <Label className="text-xs">What's new (shown to owners)</Label>
               <Textarea value={form.changelog} onChange={e => setForm(f => ({ ...f, changelog: e.target.value }))}
                 rows={3} className="mt-1 rounded-xl" disabled={uploading}
-                placeholder="Naya login screen, payment options waiter app me, bug fixes" />
+                placeholder="New login screen, payment options in the waiter app, bug fixes" />
             </div>
 
             {uploading && (
               <div>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Upload ho rahi hai…</span>
+                  <span className="text-muted-foreground">Uploading…</span>
                   <span className="font-semibold">{progress}%</span>
                 </div>
                 <Progress value={progress} />
-                <p className="text-[11px] text-muted-foreground mt-1">Ye window band mat kijiye.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Please keep this window open.</p>
               </div>
             )}
 
