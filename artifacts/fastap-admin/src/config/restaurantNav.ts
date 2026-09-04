@@ -58,6 +58,7 @@ export const restaurantNavGroups: RestaurantNavGroup[] = [
   {
     group: "Staff & HR",
     items: [
+      { path: "/restaurant/staff-apps", label: "Staff Apps", icon: "smartphone" },
       { path: "/restaurant/staff", label: "Staff", icon: "badge" },
       { path: "/restaurant/commissions", label: "Commissions & Chat", icon: "chat" },
       { path: "/restaurant/tasks-sop", label: "Tasks & SOP", icon: "checklist" },

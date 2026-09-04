@@ -40,6 +40,7 @@ const ROLE_NAME_MAP: Record<string, AdminRole> = {
 
 /** Route prefix → permission required (GET = view, mutations need same module) */
 export const ROUTE_MODULE_MAP: Record<string, PermissionKey> = {
+  "/superadmin/app-releases": "platform",
   "/superadmin/stats": "overview",
   "/superadmin/live-feed": "overview",
   "/superadmin/search": "overview",
@@ -213,6 +214,7 @@ export const NAV_PATH_PERMISSION: Record<string, PermissionKey> = {
   "/sandbox": "platform",
   "/data-archival": "platform",
   "/feature-releases": "platform",
+  "/app-releases": "platform",
   "/legal": "compliance",
   "/white-label": "platform",
   "/settings": "platform",

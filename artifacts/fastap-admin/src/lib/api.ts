@@ -974,3 +974,25 @@ export const platformApi = {
   apiKeys: (rid: number) => get<any>(`/restaurants/${rid}/platform/api-keys`),
   regenerateApiKey: (rid: number) => post<any>(`/restaurants/${rid}/platform/api-keys/regenerate`, {}),
 };
+
+/** Staff apps (Kitchen / Waiter / Housekeeping) a restaurant is allowed to install. */
+export type StaffAppEntry = {
+  appKey: string;
+  name: string;
+  tagline: string;
+  role: string;
+  accent: string;
+  available: boolean;
+  version?: string;
+  changelog?: string;
+  fileName?: string;
+  fileSize?: number;
+  downloads?: number;
+  publishedAt?: string | null;
+  downloadPath?: string;
+};
+
+export const staffAppsApi = {
+  list: (restaurantId: number) =>
+    get<{ apps: StaffAppEntry[]; restaurantSlug: string }>(`/restaurants/${restaurantId}/staff-apps`),
+};

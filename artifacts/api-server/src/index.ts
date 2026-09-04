@@ -47,6 +47,42 @@ async function ensureSchemaColumns() {
   const guards = [
     `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS room_number text`,
     `ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule jsonb DEFAULT '{}'::jsonb`,
+    // Staff-app distribution: super admin uploads an APK here, every restaurant
+    // panel offers it for install. Created on boot so a deploy needs no db:push.
+    `CREATE TABLE IF NOT EXISTS app_releases (
+      id serial PRIMARY KEY,
+      app_key text NOT NULL,
+      version text NOT NULL,
+      changelog text,
+      file_name text,
+      file_size integer NOT NULL DEFAULT 0,
+      content_type text NOT NULL DEFAULT 'application/vnd.android.package-archive',
+      storage text NOT NULL DEFAULT 'db',
+      download_url text,
+      status text NOT NULL DEFAULT 'draft',
+      uploaded_bytes integer NOT NULL DEFAULT 0,
+      downloads integer NOT NULL DEFAULT 0,
+      published_at timestamptz,
+      published_by text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS app_releases_app_key_idx ON app_releases (app_key, status)`,
+    `CREATE TABLE IF NOT EXISTS app_release_chunks (
+      id serial PRIMARY KEY,
+      release_id integer NOT NULL REFERENCES app_releases(id) ON DELETE CASCADE,
+      idx integer NOT NULL,
+      data bytea NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS app_release_chunks_release_idx ON app_release_chunks (release_id, idx)`,
+    `CREATE TABLE IF NOT EXISTS app_release_visibility (
+      id serial PRIMARY KEY,
+      restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      app_key text NOT NULL,
+      visible boolean NOT NULL DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS app_release_visibility_unique ON app_release_visibility (restaurant_id, app_key)`,
   ];
   for (const sql of guards) {
     try {

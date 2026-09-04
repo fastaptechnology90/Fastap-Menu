@@ -36,3 +36,4 @@ export * from "./support_tickets";
 export * from "./guest_sessions";
 export * from "./table_seating_requests";
 export * from "./platform";
+export * from "./app_releases";

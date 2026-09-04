@@ -490,6 +490,92 @@ export const api = {
     renew: (vendorId: number) =>
       request<any>("/superadmin/vendor-crm/renew", { method: "POST", body: JSON.stringify({ vendorId }) }),
   },
+  appReleases: {
+    list: () => request<AppReleasesResponse>("/superadmin/app-releases"),
+    create: (data: {
+      appKey: string; version: string; changelog?: string;
+      fileName?: string; fileSize?: number; storage: "db" | "link"; downloadUrl?: string;
+    }) => request<{ release: AppRelease }>("/superadmin/app-releases", { method: "POST", body: JSON.stringify(data) }),
+    publish: (id: number) => request<any>(`/superadmin/app-releases/${id}/publish`, { method: "POST" }),
+    remove: (id: number) => request<any>(`/superadmin/app-releases/${id}`, { method: "DELETE" }),
+    visibility: () => request<{ restaurants: AppVisibilityRow[] }>("/superadmin/app-releases/visibility"),
+    setVisibility: (restaurantId: number, appKey: string, visible: boolean) =>
+      request<any>("/superadmin/app-releases/visibility", {
+        method: "PUT", body: JSON.stringify({ restaurantId, appKey, visible }),
+      }),
+    setVisibilityForAll: (appKey: string, visible: boolean) =>
+      request<{ updated: number }>("/superadmin/app-releases/visibility/bulk", {
+        method: "PUT", body: JSON.stringify({ appKey, visible }),
+      }),
+    /**
+     * Send the APK up in slices. An 80 MB file cannot go in one request — the body
+     * limit would reject it and a dropped connection would lose the whole upload.
+     */
+    uploadFile: async (
+      releaseId: number,
+      file: File,
+      onProgress?: (sentBytes: number, totalBytes: number) => void,
+      signal?: AbortSignal,
+    ) => {
+      const CHUNK = 4 * 1024 * 1024;
+      let sent = 0;
+      for (let idx = 0; idx * CHUNK < file.size; idx++) {
+        if (signal?.aborted) throw new Error("Upload cancelled");
+        const slice = file.slice(idx * CHUNK, Math.min((idx + 1) * CHUNK, file.size));
+        const res = await fetch(`${API_BASE}/superadmin/app-releases/${releaseId}/chunk?index=${idx}`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: slice,
+          signal,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error || `Upload failed at part ${idx + 1}`);
+        }
+        sent += slice.size;
+        onProgress?.(sent, file.size);
+      }
+      return { sent };
+    },
+  },
+};
+
+export type AppRelease = {
+  id: number;
+  appKey: string;
+  version: string;
+  changelog: string | null;
+  fileName: string | null;
+  fileSize: number;
+  storage: "db" | "link";
+  downloadUrl: string | null;
+  status: "draft" | "ready" | "published" | "archived";
+  uploadedBytes: number;
+  downloads: number;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  createdAt: string;
+};
+
+export type AppCatalogEntry = {
+  appKey: string;
+  name: string;
+  tagline: string;
+  role: string;
+  accent: string;
+  liveReleaseId: number | null;
+};
+
+export type AppReleasesResponse = { catalog: AppCatalogEntry[]; releases: AppRelease[] };
+
+export type AppVisibilityRow = {
+  id: number;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  plan: string;
+  apps: Record<string, boolean>;
 };
 
 export interface KYCRecord {

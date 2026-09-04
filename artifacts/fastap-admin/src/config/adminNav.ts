@@ -83,6 +83,7 @@ export const adminNavGroups: AdminNavGroup[] = [
       { title: "Sandbox", href: "/sandbox", icon: "science" },
       { title: "Data Archival", href: "/data-archival", icon: "archive" },
       { title: "Feature Releases", href: "/feature-releases", icon: "new_releases" },
+      { title: "Staff App Releases", href: "/app-releases", icon: "smartphone" },
       { title: "Legal & Compliance", href: "/legal", icon: "gavel" },
       { title: "White Label", href: "/white-label", icon: "palette" },
       { title: "Settings", href: "/settings", icon: "settings" },

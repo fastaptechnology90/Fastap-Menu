@@ -68,6 +68,7 @@ import barAdminRouter from "./bar-admin";
 import restaurantPlatformRouter from "./restaurant-platform";
 import aiRouter from "./ai";
 import mobileKitchenRouter from "./mobile-kitchen";
+import appReleasesRouter from "./app-releases";
 import featureModulesRouter, {
   registerRestaurantFeatureRoutes,
 } from "./feature-modules";
@@ -148,6 +149,7 @@ router.use(promoCodesRouter);
 router.use(barAdminRouter);
 router.use(restaurantPlatformRouter);
 router.use(aiRouter);
+router.use(appReleasesRouter);
 router.use("/v1", mobileKitchenRouter);
 
 export default router;

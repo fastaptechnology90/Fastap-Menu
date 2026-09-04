@@ -361,6 +361,7 @@ export const RESTAURANT_PANEL_PATHS = [
   "/restaurant/spa-bar",
   "/restaurant/events",
   "/restaurant/staff",
+  "/restaurant/staff-apps",
   "/restaurant/commissions",
   "/restaurant/tasks-sop",
   "/restaurant/analytics",

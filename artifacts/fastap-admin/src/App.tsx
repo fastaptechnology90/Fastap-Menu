@@ -113,6 +113,8 @@ import DormantVendors from "@/pages/DormantVendors";
 import RestaurantLogin from "@/pages/restaurant/RestaurantLogin";
 import RestaurantRegister from "@/pages/restaurant/RestaurantRegister";
 import RestaurantSubscription from "@/pages/restaurant/RestaurantSubscription";
+import StaffApps from "@/pages/restaurant/StaffApps";
+import AppReleases from "@/pages/AppReleases";
 import RestaurantDashboard from "@/pages/restaurant/RestaurantDashboard";
 import OrderManagement from "@/pages/restaurant/OrderManagement";
 import TableManagement from "@/pages/restaurant/TableManagement";
@@ -326,6 +328,7 @@ function AppRoutes() {
       <Route path="/restaurant/queue">{() => <RestaurantProtectedRoute><QueueWaitlist /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/waiter">{() => <RestaurantProtectedRoute><WaiterAutomation /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/cash-counter">{() => <RestaurantProtectedRoute><CashCounter /></RestaurantProtectedRoute>}</Route>
+      <Route path="/restaurant/staff-apps">{() => <RestaurantProtectedRoute><StaffApps /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/ai-features">{() => <RestaurantProtectedRoute><AIFeatures /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/room-service">{() => <RestaurantProtectedRoute><RoomService /></RestaurantProtectedRoute>}</Route>
       <Route path="/restaurant/housekeeping">{() => <RestaurantProtectedRoute><HousekeepingMaintenance /></RestaurantProtectedRoute>}</Route>
@@ -420,6 +423,7 @@ function AppRoutes() {
       <Route path="/sandbox">{() => <ProtectedRoute><AdminSandbox /></ProtectedRoute>}</Route>
       <Route path="/data-archival">{() => <ProtectedRoute><DataArchival /></ProtectedRoute>}</Route>
       <Route path="/feature-releases">{() => <ProtectedRoute><FeatureReleases /></ProtectedRoute>}</Route>
+      <Route path="/app-releases">{() => <ProtectedRoute><AppReleases /></ProtectedRoute>}</Route>
       <Route path="/revenue-leakage">{() => <ProtectedRoute><RevenueLeakage /></ProtectedRoute>}</Route>
       <Route path="/restaurant-revenues">{() => <ProtectedRoute><RestaurantRevenues /></ProtectedRoute>}</Route>
       <Route path="/dormant-vendors">{() => <ProtectedRoute><DormantVendors /></ProtectedRoute>}</Route>
