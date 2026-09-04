@@ -89,7 +89,7 @@ class _HeaderChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontSize: 11,
               fontWeight: FontWeight.w700,

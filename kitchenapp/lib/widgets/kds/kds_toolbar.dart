@@ -28,7 +28,7 @@ class KdsToolbar extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 12 : 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(compact ? 16 : 10),
         border: Border.all(color: AppColors.panelBorder),
         boxShadow: compact
@@ -51,7 +51,7 @@ class KdsToolbar extends StatelessWidget {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -120,7 +120,7 @@ class KdsToolbar extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Live KDS',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
@@ -133,7 +133,7 @@ class KdsToolbar extends StatelessWidget {
                           '${stats.total} KOTs · auto-sync',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -330,7 +330,7 @@ class _SyncChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w700,
               fontSize: 12,

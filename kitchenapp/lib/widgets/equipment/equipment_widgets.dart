@@ -26,7 +26,7 @@ class EquipmentAssetCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: healthColor.withValues(alpha: 0.35)),
       ),
@@ -38,7 +38,7 @@ class EquipmentAssetCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   asset.assetName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class EquipmentAssetCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${asset.section} · Health ${asset.healthPercent}% · Last service ${asset.lastService}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -128,7 +128,7 @@ class AmcReminderList extends StatelessWidget {
                       children: [
                         Text(
                           item.assetName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -136,7 +136,7 @@ class AmcReminderList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${item.section} · ${item.provider} · due in ${item.dueInDays} days',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -179,7 +179,7 @@ class MaintenanceTicketList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -191,7 +191,7 @@ class MaintenanceTicketList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           ticket.assetName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -210,7 +210,7 @@ class MaintenanceTicketList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${ticket.section} · ${ticket.issueSummary}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -281,7 +281,7 @@ class BreakdownAlertList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           alert.assetName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -295,7 +295,7 @@ class BreakdownAlertList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${alert.section} · ${alert.alertType}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -351,7 +351,7 @@ class UsageAnalyticsList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -363,7 +363,7 @@ class UsageAnalyticsList extends StatelessWidget {
                       children: [
                         Text(
                           entry.assetName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -371,7 +371,7 @@ class UsageAnalyticsList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${entry.section} · ${entry.usageHours}h · peak ${entry.peakWindow}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -419,14 +419,14 @@ class EquipmentSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Equipment metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -443,7 +443,7 @@ class EquipmentSidePanel extends StatelessWidget {
           _StatRow('High utilization', '${stats.highUtilization}'),
           _StatRow('Resolved today', '${stats.resolvedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active equipment modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -512,7 +512,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -520,7 +520,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -574,13 +574,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

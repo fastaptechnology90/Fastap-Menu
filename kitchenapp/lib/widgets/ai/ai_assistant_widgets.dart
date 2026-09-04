@@ -22,7 +22,7 @@ class AiSuggestionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -31,7 +31,7 @@ class AiSuggestionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lightbulb_outline,
                 color: AppColors.premium,
                 size: 18,
@@ -40,7 +40,7 @@ class AiSuggestionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   suggestion.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class AiSuggestionCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             suggestion.detail,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -60,7 +60,7 @@ class AiSuggestionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${suggestion.category} · ${(suggestion.confidence * 100).round()}% confidence',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.premium,
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -88,7 +88,7 @@ class AiInsightList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (insights.isEmpty) {
-      return const Text(
+      return Text(
         'No AI insights for this section.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -121,7 +121,7 @@ class AiInsightList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     insight.detail,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -212,7 +212,7 @@ class AiPredictionsPanel extends StatelessWidget {
           title: 'Recommended chef',
           child: Text(
             predictions.recommendedChef,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
               fontSize: 16,
@@ -267,7 +267,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -276,7 +276,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -350,7 +350,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -358,7 +358,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

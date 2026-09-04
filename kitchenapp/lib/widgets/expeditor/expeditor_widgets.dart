@@ -28,7 +28,7 @@ class ExpeditorTicketCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor),
       ),
@@ -40,7 +40,7 @@ class ExpeditorTicketCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   ticket.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class ExpeditorTicketCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${ticket.summary} · ${ticket.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -134,7 +134,7 @@ class CoordinationGroupCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color),
       ),
@@ -146,7 +146,7 @@ class CoordinationGroupCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   group.location,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -164,7 +164,7 @@ class CoordinationGroupCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${section.kotNumber} · ${section.section}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -216,7 +216,7 @@ class TableSyncList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -228,7 +228,7 @@ class TableSyncList extends StatelessWidget {
                       children: [
                         Text(
                           entry.location,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -236,7 +236,7 @@ class TableSyncList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${entry.kotCount} KOTs · ${entry.syncStatus}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -280,14 +280,14 @@ class ExpeditorSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Expeditor metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -303,7 +303,7 @@ class ExpeditorSidePanel extends StatelessWidget {
           _StatRow('Dispatched today', '${stats.dispatchedToday}'),
           _StatRow('Tables synced', '${stats.tablesSynced}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active expeditor modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -332,7 +332,7 @@ class ExpeditorSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -377,7 +377,7 @@ class _Check extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.bodyText,
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -403,7 +403,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -412,7 +412,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -460,13 +460,13 @@ class _EmptyList extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

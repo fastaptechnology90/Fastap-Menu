@@ -20,7 +20,7 @@ class ProcessingOrderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: order.held ? AppColors.warning : AppColors.panelBorder,
@@ -40,7 +40,7 @@ class ProcessingOrderCard extends StatelessWidget {
                   base.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -55,10 +55,10 @@ class ProcessingOrderCard extends StatelessWidget {
             runSpacing: 6,
             children: [
               if (order.held)
-                const _Tag(label: 'On hold', color: AppColors.warning),
-              if (base.vip) const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'On hold', color: AppColors.warning),
+              if (base.vip) _Tag(label: 'VIP', color: AppColors.premium),
               if (base.allergy)
-                const _Tag(label: 'Allergy', color: AppColors.danger),
+                _Tag(label: 'Allergy', color: AppColors.danger),
             ],
           ),
           const SizedBox(height: 8),
@@ -66,7 +66,7 @@ class ProcessingOrderCard extends StatelessWidget {
             '${base.location} · ${base.section} · ${base.status}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -99,7 +99,7 @@ class ProcessingOrderCard extends StatelessWidget {
                   .where((item) => item.modification != null)
                   .map((item) => '${item.name}: ${item.modification}')
                   .join(' · '),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.info,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -250,7 +250,7 @@ class ProcessingSmartPanel extends StatelessWidget {
         _Panel(
           title: 'Batch cooking',
           child: batchCooking.isEmpty
-              ? const Text(
+              ? Text(
                   'No batch groups detected for current queue.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -274,7 +274,7 @@ class ProcessingSmartPanel extends StatelessWidget {
         _Panel(
           title: 'Cooking sequence',
           child: cookingSequence.isEmpty
-              ? const Text(
+              ? Text(
                   'Sequence will appear when prep queue is active.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -288,7 +288,7 @@ class ProcessingSmartPanel extends StatelessWidget {
                             backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                             child: Text(
                               '${step.etaMinutes}m',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
@@ -337,7 +337,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -346,7 +346,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -394,7 +394,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -402,7 +402,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

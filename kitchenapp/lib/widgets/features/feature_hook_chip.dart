@@ -18,7 +18,7 @@ class FeatureHookChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.cable_outlined,
             color: AppColors.info,
             size: 15,
@@ -26,7 +26,7 @@ class FeatureHookChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.info,
               fontSize: 12,
               fontWeight: FontWeight.w800,

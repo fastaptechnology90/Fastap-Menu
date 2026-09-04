@@ -74,10 +74,15 @@ export function computeBillQuote(input: {
 }
 
 export function resolvePaymentStatus(
-  paymentMethod: string,
+  paymentMethod: string | null | undefined,
   billing?: { partialPayNow?: number; advanceAmount?: number; grandTotal?: number },
 ): string {
-  if (paymentMethod === "cash") return "pending";
+  // No method chosen is the normal dine-in case — the guest orders now and pays
+  // at the end. Treating that as "paid" marked money collected before anyone
+  // had paid, showed the order as Paid in the panel, and bucketed it under Cash
+  // in the revenue split. Only an actually-prepaid method (UPI/card at
+  // checkout) may start as paid.
+  if (!paymentMethod || paymentMethod === "cash") return "pending";
   if (billing?.partialPayNow && billing.grandTotal && billing.partialPayNow < billing.grandTotal) return "partial";
   if (billing?.advanceAmount && billing.grandTotal && billing.advanceAmount < billing.grandTotal) return "advance";
   return "paid";

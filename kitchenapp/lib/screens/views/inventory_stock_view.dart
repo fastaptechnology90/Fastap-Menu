@@ -36,7 +36,7 @@ class InventoryStockView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class InventoryStockView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class InventoryStockView extends StatelessWidget {
             ),
             child: Text(
               controller.inventoryActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class InventoryStockView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Ingredient stock',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -122,7 +122,7 @@ class InventoryStockView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Batch & expiry tracking',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -133,7 +133,7 @@ class InventoryStockView extends StatelessWidget {
                 const SizedBox(height: 12),
                 InventoryBatchList(batches: snapshot.batches),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Ingredient alerts',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -152,7 +152,7 @@ class InventoryStockView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Substitution suggestions',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -220,7 +220,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

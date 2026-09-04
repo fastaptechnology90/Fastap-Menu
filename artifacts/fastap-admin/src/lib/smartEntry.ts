@@ -159,6 +159,23 @@ export function loadEntryContext(): Partial<SmartEntryState> | null {
   }
 }
 
+/**
+ * Table/room/section to load a venue with. Only the first page after a scan
+ * carries ?table=/?room= in the URL — on a later reload (e.g. /user/cart) they
+ * are gone, so fall back to the context saved at scan time. Without this the
+ * venue reloads with no table and the order silently drops from dine-in to
+ * takeaway with a null table name.
+ */
+export function entryParamsForVenue(): { table?: string; room?: string; section?: string } {
+  const p = parseEntryFromUrl();
+  const saved = loadEntryContext()?.params;
+  return {
+    table: p.table ?? saved?.table,
+    room: p.room ?? saved?.room,
+    section: p.section ?? saved?.section,
+  };
+}
+
 export function clearEntryContext() {
   localStorage.removeItem(ENTRY_KEY);
   localStorage.removeItem(SESSION_KEY);

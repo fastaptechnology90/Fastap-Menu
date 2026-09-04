@@ -23,14 +23,14 @@ class HiddenEnterpriseSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Hidden systems metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -48,7 +48,7 @@ class HiddenEnterpriseSidePanel extends StatelessWidget {
           _StatRow('Lockdown armed', '${stats.lockdownArmed}'),
           _StatRow('Queue recoveries', '${stats.queueRecoveries}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Hidden systems',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -103,7 +103,7 @@ class HiddenEnterpriseSection extends StatelessWidget {
           padding: const EdgeInsets.only(top: 8, bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
               fontSize: 16,
@@ -276,7 +276,7 @@ class _HiddenCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -288,7 +288,7 @@ class _HiddenCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w800,
                   ),
@@ -300,7 +300,7 @@ class _HiddenCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -408,7 +408,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -416,7 +416,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -472,13 +472,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

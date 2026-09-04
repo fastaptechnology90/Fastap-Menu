@@ -84,6 +84,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const ProfileSectionTitle(
+                  'Appearance',
+                  subtitle: 'Theme for this device',
+                ),
+                _SettingsToggleTile(
+                  icon: Icons.dark_mode_outlined,
+                  title: 'Dark mode',
+                  subtitle: 'Switch between the dark and light look',
+                  value: appDarkMode.value,
+                  onChanged: (value) async {
+                    await setDarkMode(value);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const ProfileSectionTitle(
                   'Notifications',
                   subtitle: 'Control alerts on this device',
                 ),
@@ -202,7 +217,7 @@ class _SettingsToggleTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         child: Ink(
           padding: const EdgeInsets.symmetric(
@@ -231,7 +246,7 @@ class _SettingsToggleTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: AppColors.primaryText,
                       ),
@@ -240,7 +255,7 @@ class _SettingsToggleTile extends StatelessWidget {
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.secondaryText,
                         fontSize: 12,
                       ),

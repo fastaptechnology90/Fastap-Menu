@@ -40,7 +40,7 @@ class MetricGrid extends StatelessWidget {
                 children: [
                   Text(
                     metric.value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontSize: 30,
                       fontWeight: FontWeight.w900,

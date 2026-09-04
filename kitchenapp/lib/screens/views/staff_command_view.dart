@@ -111,7 +111,7 @@ class _ChefTaskPreviewPanel extends StatelessWidget {
       icon: Icons.assignment_ind_outlined,
       expandChild: false,
       child: tasks.isEmpty
-          ? const Text(
+          ? Text(
               'No active chef tasks for your section.',
               style: TextStyle(color: AppColors.secondaryText, fontSize: 13),
             )
@@ -216,12 +216,12 @@ class _StaffCommandError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined, color: AppColors.secondaryText),
+            Icon(Icons.cloud_off_outlined, color: AppColors.secondaryText),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.secondaryText),
+              style: TextStyle(color: AppColors.secondaryText),
             ),
             const SizedBox(height: 16),
             OutlinedButton(onPressed: onRetry, child: const Text('Retry')),

@@ -10,6 +10,19 @@ import { isRestaurantPublished as checkRestaurantPublished } from "@/lib/restaur
 
 export type StaffRole = "owner" | "manager" | "cashier" | "waiter" | "kitchen" | "chef" | "housekeeping" | "reception" | "spa" | "bar" | "finance" | "hr" | "franchise";
 
+/** SSE events that change an order row the panel is displaying. */
+const ORDER_CHANGING_EVENTS = new Set([
+  "new_order",
+  "order_status",
+  "order_updated",
+  "order_paid",
+  "bill_requested",
+  "table_cleared",
+  "waiter_assigned",
+  "housekeeping_assigned",
+  "room_service_assigned",
+]);
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -301,7 +314,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   refreshOrdersRef.current = refreshOrders;
 
   const onSSE = useCallback((event: string) => {
-    if (event === "new_order" || event === "order_status") {
+    if (ORDER_CHANGING_EVENTS.has(event)) {
       refreshOrdersRef.current();
     }
   }, []);

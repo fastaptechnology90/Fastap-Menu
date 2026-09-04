@@ -37,7 +37,7 @@ class OrderProcessingView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -47,7 +47,7 @@ class OrderProcessingView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -90,7 +90,7 @@ class OrderProcessingView extends StatelessWidget {
             ),
             child: Text(
               controller.processingActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -284,7 +284,7 @@ class _QueuePanel extends StatelessWidget {
       children: [
         Text(
           'Processing queue · ${snapshot.orders.length} KOTs',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 16,
@@ -296,11 +296,11 @@ class _QueuePanel extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.panelBorder),
             ),
-            child: const Text(
+            child: Text(
               'No orders in the processing queue for this section.',
               style: TextStyle(color: AppColors.secondaryText),
             ),
@@ -332,7 +332,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

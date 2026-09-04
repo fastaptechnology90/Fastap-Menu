@@ -18,7 +18,7 @@ class PriorityOrderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: order.flashAlert ? AppColors.warning : AppColors.panelBorder,
@@ -35,7 +35,7 @@ class PriorityOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.base.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -47,7 +47,7 @@ class PriorityOrderCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${order.base.location} · ${order.base.section}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -104,7 +104,7 @@ class PriorityLanesPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (lanes.isEmpty) {
-      return const Text(
+      return Text(
         'No active priority lanes for this section.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -128,7 +128,7 @@ class PriorityLanesPanel extends StatelessWidget {
                 children: [
                   Text(
                     lane.label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w800,
                       fontSize: 12,
@@ -137,7 +137,7 @@ class PriorityLanesPanel extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     '${lane.count} orders',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.premium,
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
@@ -160,7 +160,7 @@ class PriorityAlertsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (alerts.isEmpty) {
-      return const Text(
+      return Text(
         'No active flash, sound, or escalation alerts.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -288,7 +288,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -297,7 +297,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -325,7 +325,7 @@ class _PriorityTag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.premium,
           fontWeight: FontWeight.w800,
           fontSize: 11,
@@ -385,7 +385,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -393,7 +393,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

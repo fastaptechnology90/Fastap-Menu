@@ -4,7 +4,7 @@ import { resolveGuestSlug } from "@/lib/guestDemo";
 import { publicApi } from "@/lib/api";
 import { setAppTimezone } from "@/lib/appTimezone";
 import {
-  parseEntryFromUrl, persistEntryContext, getDeviceId, clearEntryContext,
+  parseEntryFromUrl, persistEntryContext, getDeviceId, clearEntryContext, entryParamsForVenue,
   detectAccessMethodClient, detectServiceModeClient,
   type SmartEntryState,
 } from "@/lib/smartEntry";
@@ -600,21 +600,15 @@ function UserVenueSync({
 
   useEffect(() => {
     if (!location.startsWith("/user")) return;
-    const params = parseEntryFromUrl();
+    // Falls back to the scan-time context when the URL has no ?table=/?room=
+    // (every page after the first one), so a reload keeps the guest's table.
+    const params = entryParamsForVenue();
     const slug = resolveGuestSlug();
     if (!slug) {
-      loadVenue("", {
-        table: params.table,
-        room: params.room,
-        section: params.section,
-      }).catch(() => {});
+      loadVenue("", params).catch(() => {});
       return;
     }
-    loadVenue(slug, {
-      table: params.table,
-      room: params.room,
-      section: params.section,
-    }).catch(() => {});
+    loadVenue(slug, params).catch(() => {});
   }, [location, locationKey, loadVenue]);
 
   return <>{children}</>;

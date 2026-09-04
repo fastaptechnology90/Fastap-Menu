@@ -20,7 +20,7 @@ class ChefTaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor.withValues(alpha: 0.45), width: 1.5),
       ),
@@ -34,7 +34,7 @@ class ChefTaskCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   task.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -43,13 +43,13 @@ class ChefTaskCard extends StatelessWidget {
               ),
               _Tag(label: task.statusLabel, color: statusColor),
               if (task.priority == 'vip')
-                const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'VIP', color: AppColors.premium),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${task.kotNumber} · ${task.section} · ${task.assignedChef}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -78,7 +78,7 @@ class ChefTaskCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               task.coordination.join(' · '),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.info,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -170,7 +170,7 @@ class ChefTaskBoardPanel extends StatelessWidget {
         _Panel(
           title: 'Chef workload board',
           child: workloadBoard.isEmpty
-              ? const Text(
+              ? Text(
                   'No chef workload for this filter.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -246,7 +246,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -255,7 +255,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -310,7 +310,7 @@ class _MetaChip extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -334,7 +334,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -342,7 +342,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

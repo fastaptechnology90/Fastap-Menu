@@ -60,7 +60,7 @@ class _MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.panelBorder),
         boxShadow: [
@@ -100,7 +100,7 @@ class _MetricCard extends StatelessWidget {
                   metric.label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.secondaryText,
@@ -117,7 +117,7 @@ class _MetricCard extends StatelessWidget {
                         child: Text(
                           metric.value,
                           maxLines: 1,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
                             color: AppColors.primaryText,

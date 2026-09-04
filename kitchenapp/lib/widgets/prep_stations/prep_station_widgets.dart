@@ -24,7 +24,7 @@ class PrepStationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: overloaded ? AppColors.warning : AppColors.panelBorder,
@@ -40,7 +40,7 @@ class PrepStationCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   station.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class PrepStationCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${station.kitchenSection} · ${station.assignedStaff}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -144,14 +144,14 @@ class PrepStationSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Station operations',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -249,7 +249,7 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       '$label: $value',
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.secondaryText,
         fontWeight: FontWeight.w700,
         fontSize: 12,
@@ -271,7 +271,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -279,7 +279,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

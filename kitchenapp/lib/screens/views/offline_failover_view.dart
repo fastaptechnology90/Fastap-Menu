@@ -42,7 +42,7 @@ class OfflineFailoverView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -55,7 +55,7 @@ class OfflineFailoverView extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'System 38 · Offline Mode & Failover System',
                     style: TextStyle(
                       color: AppColors.primaryText,
@@ -95,7 +95,7 @@ class OfflineFailoverView extends StatelessWidget {
             ),
             child: Text(
               controller.offlineFailoverActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.info,
                 fontWeight: FontWeight.w700,
               ),
@@ -109,7 +109,7 @@ class OfflineFailoverView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Offline modules',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -128,7 +128,7 @@ class OfflineFailoverView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Failover queue',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -145,7 +145,7 @@ class OfflineFailoverView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Queue recovery jobs',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -209,7 +209,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

@@ -21,7 +21,7 @@ class StaffRoleDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Staff role',
           style: TextStyle(
             color: AppColors.primaryText,
@@ -35,19 +35,19 @@ class StaffRoleDropdown extends StatelessWidget {
           isExpanded: true,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.surface,
             prefixIcon: Icon(value.icon, color: AppColors.primary),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.panelBorder),
+              borderSide: BorderSide(color: AppColors.panelBorder),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.panelBorder),
+              borderSide: BorderSide(color: AppColors.panelBorder),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
@@ -62,7 +62,7 @@ class StaffRoleDropdown extends StatelessWidget {
                       Expanded(
                         child: Text(
                           role.label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w600,
                           ),

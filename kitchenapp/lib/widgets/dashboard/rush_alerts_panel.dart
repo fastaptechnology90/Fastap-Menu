@@ -15,7 +15,7 @@ class RushAlertsPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(
           color: alerts.isEmpty
@@ -42,7 +42,7 @@ class RushAlertsPanel extends StatelessWidget {
                 size: 22,
               ),
               const SizedBox(width: AppSpacing.sm),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Rush alerts',
                   style: TextStyle(
@@ -79,7 +79,7 @@ class RushAlertsPanel extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.check_circle_outline, color: AppColors.primary),
                   SizedBox(width: AppSpacing.sm),
@@ -137,7 +137,7 @@ class RushAlertsPanel extends StatelessWidget {
                             alert.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: AppColors.primaryText,
                             ),
@@ -147,7 +147,7 @@ class RushAlertsPanel extends StatelessWidget {
                             alert.message,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               color: AppColors.secondaryText,
                               height: 1.35,

@@ -27,7 +27,7 @@ class BeverageDrinkCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor),
       ),
@@ -39,7 +39,7 @@ class BeverageDrinkCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   drink.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -51,7 +51,7 @@ class BeverageDrinkCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${drink.drinkName} · ${drink.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -69,7 +69,7 @@ class BeverageDrinkCard extends StatelessWidget {
           ),
           if (drink.recipeGuidance.isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'Recipe guidance',
               style: TextStyle(
                 color: AppColors.primaryText,
@@ -84,12 +84,12 @@ class BeverageDrinkCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.arrow_right, size: 16, color: AppColors.info),
+                    Icon(Icons.arrow_right, size: 16, color: AppColors.info),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         step,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.bodyText,
                           fontWeight: FontWeight.w600,
                           fontSize: 11,
@@ -155,7 +155,7 @@ class BartenderPanel extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -167,7 +167,7 @@ class BartenderPanel extends StatelessWidget {
                       children: [
                         Text(
                           bartender.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -175,7 +175,7 @@ class BartenderPanel extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           bartender.specialty,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -219,14 +219,14 @@ class BarSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Bar metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -242,7 +242,7 @@ class BarSidePanel extends StatelessWidget {
           _StatRow('Available bartenders', '${stats.availableBartenders}'),
           _StatRow('Avg prep', '${stats.avgPrepMinutes}m'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active bar modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -271,7 +271,7 @@ class BarSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -310,7 +310,7 @@ class _Meta extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 10,
@@ -318,7 +318,7 @@ class _Meta extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 12,
@@ -344,7 +344,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -353,7 +353,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -401,13 +401,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

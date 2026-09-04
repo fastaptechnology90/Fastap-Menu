@@ -43,7 +43,7 @@ class DelayEscalationView extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.panelBorder),
             ),
@@ -53,7 +53,7 @@ class DelayEscalationView extends StatelessWidget {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -96,7 +96,7 @@ class DelayEscalationView extends StatelessWidget {
             ),
             child: Text(
               controller.delayEscalationActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.danger,
                 fontWeight: FontWeight.w700,
               ),
@@ -110,7 +110,7 @@ class DelayEscalationView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Delayed orders',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -133,7 +133,7 @@ class DelayEscalationView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Active escalations',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -146,7 +146,7 @@ class DelayEscalationView extends StatelessWidget {
                   (alert) => EscalationAlertCard(alert: alert),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Bottleneck detection',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -157,7 +157,7 @@ class DelayEscalationView extends StatelessWidget {
                 const SizedBox(height: 12),
                 BottleneckList(bottlenecks: snapshot.bottlenecks),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Delay history',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -214,7 +214,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

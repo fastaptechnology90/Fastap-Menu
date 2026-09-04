@@ -27,7 +27,7 @@ class CommunicationThreadCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.08)
-              : Colors.white,
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.panelBorder,
@@ -41,7 +41,7 @@ class CommunicationThreadCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     thread.waiterName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,
                     ),
@@ -65,7 +65,7 @@ class CommunicationThreadCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '${thread.kotNumber} · ${thread.location}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -86,7 +86,7 @@ class CommunicationMessageList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (messages.isEmpty) {
-      return const Text(
+      return Text(
         'No messages in this thread yet.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -124,7 +124,7 @@ class CommunicationMessageList extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           message.sender,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
@@ -135,7 +135,7 @@ class CommunicationMessageList extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       message.body,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                       ),
@@ -183,7 +183,7 @@ class CommunicationAlertCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             alert.detail,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -234,7 +234,7 @@ class AnnouncementList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (announcements.isEmpty) {
-      return const Text(
+      return Text(
         'No chef announcements.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -248,7 +248,7 @@ class AnnouncementList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -257,7 +257,7 @@ class AnnouncementList extends StatelessWidget {
                 children: [
                   Text(
                     item.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w800,
                     ),
@@ -265,7 +265,7 @@ class AnnouncementList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     item.body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -274,7 +274,7 @@ class AnnouncementList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${item.author} · ${item.scope}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
@@ -297,7 +297,7 @@ class BroadcastList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (broadcasts.isEmpty) {
-      return const Text(
+      return Text(
         'No broadcast messages.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -320,7 +320,7 @@ class BroadcastList extends StatelessWidget {
                 children: [
                   Text(
                     item.message,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w700,
                     ),
@@ -328,7 +328,7 @@ class BroadcastList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${item.author} · ${item.scope}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
@@ -359,14 +359,14 @@ class CommunicationStatsPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Communication hub',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -419,7 +419,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -427,7 +427,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

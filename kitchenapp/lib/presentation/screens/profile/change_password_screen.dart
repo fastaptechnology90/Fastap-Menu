@@ -102,7 +102,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ProfileInfoBanner(
+          ProfileInfoBanner(
             icon: Icons.shield_outlined,
             color: AppColors.primary,
             message:

@@ -1,59 +1,94 @@
 import 'package:flutter/material.dart';
 
-import '../config/app_variant_content.dart';
 import '../constants/app_colors.dart';
 
+/// Light + dark "Modern POS" themes shared by all three apps. The active one is
+/// chosen by `themeMode` in each app root, kept in sync with [appDarkMode] so
+/// the ThemeData and the [AppColors] getters always agree.
 class AppTheme {
   const AppTheme._();
 
-  static ThemeData get light {
-    final accent = AppVariantContent.primaryColor;
+  static ThemeData get light => _build(
+        brightness: Brightness.light,
+        accent: const Color(0xff0f766e),
+        scaffold: const Color(0xfff5f7f4),
+        surface: Colors.white,
+        onSurface: const Color(0xff17211d),
+        muted: const Color(0xff5a6762),
+        border: const Color(0xffd9e2dc),
+      );
+
+  static ThemeData get dark => _build(
+        brightness: Brightness.dark,
+        accent: const Color(0xff14b8a6),
+        scaffold: const Color(0xff0f1115),
+        surface: const Color(0xff1a1d24),
+        onSurface: const Color(0xffe8ecf1),
+        muted: const Color(0xff97a2ad),
+        border: const Color(0xff2a2f38),
+      );
+
+  static ThemeData _build({
+    required Brightness brightness,
+    required Color accent,
+    required Color scaffold,
+    required Color surface,
+    required Color onSurface,
+    required Color muted,
+    required Color border,
+  }) {
     final scheme = ColorScheme.fromSeed(
       seedColor: accent,
-      brightness: Brightness.light,
+      brightness: brightness,
+    ).copyWith(
+      surface: surface,
+      onSurface: onSurface,
     );
 
     return ThemeData(
       useMaterial3: true,
+      brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: AppColors.scaffold,
+      scaffoldBackgroundColor: scaffold,
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: AppColors.scaffold,
-        foregroundColor: AppColors.primaryText,
-        surfaceTintColor: accent,
+        backgroundColor: scaffold,
+        foregroundColor: onSurface,
+        surfaceTintColor: Colors.transparent,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        indicatorColor: accent.withValues(alpha: 0.12),
+        backgroundColor: surface,
+        indicatorColor: accent.withValues(alpha: 0.16),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             fontSize: 12,
-            color: selected ? accent : AppColors.secondaryText,
+            color: selected ? accent : muted,
           );
         }),
       ),
       cardTheme: CardThemeData(
+        color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.panelBorder),
+          side: BorderSide(color: border),
         ),
       ),
+      dividerColor: border,
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.panelBorder),
+          borderSide: BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.panelBorder),
+          borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -72,18 +107,10 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      textTheme: const TextTheme(
-        headlineSmall: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: AppColors.primaryText,
-        ),
-        titleMedium: TextStyle(
-          fontWeight: FontWeight.w800,
-          color: AppColors.primaryText,
-        ),
-        bodyMedium: TextStyle(
-          color: AppColors.bodyText,
-        ),
+      textTheme: TextTheme(
+        headlineSmall: TextStyle(fontWeight: FontWeight.w900, color: onSurface),
+        titleMedium: TextStyle(fontWeight: FontWeight.w800, color: onSurface),
+        bodyMedium: TextStyle(color: onSurface),
       ),
     );
   }

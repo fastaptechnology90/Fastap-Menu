@@ -89,7 +89,7 @@ class _LiveChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -201,7 +201,7 @@ class KitchenOpenModuleButton extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w900,
                         color: AppColors.primaryText,
                         fontSize: 15,
@@ -209,7 +209,7 @@ class KitchenOpenModuleButton extends StatelessWidget {
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.secondaryText,
                       ),
@@ -217,7 +217,7 @@ class KitchenOpenModuleButton extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.secondaryText,
               ),

@@ -36,7 +36,7 @@ class EquipmentView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class EquipmentView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class EquipmentView extends StatelessWidget {
             ),
             child: Text(
               controller.equipmentActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class EquipmentView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Equipment health tracking',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -122,7 +122,7 @@ class EquipmentView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'AMC reminders',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -133,7 +133,7 @@ class EquipmentView extends StatelessWidget {
                 const SizedBox(height: 12),
                 AmcReminderList(reminders: snapshot.amcReminders),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Maintenance tickets',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -150,7 +150,7 @@ class EquipmentView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Breakdown alerts',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -167,7 +167,7 @@ class EquipmentView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Usage analytics',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -224,7 +224,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

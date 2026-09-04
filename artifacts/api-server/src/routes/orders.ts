@@ -6,6 +6,7 @@ import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
 import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic.js";
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
+import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 
 const router: IRouter = Router();
 
@@ -135,40 +136,13 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
   const wasPaid = existing.paymentStatus === "paid" || existing.status === "completed";
   const nowPaid = order.paymentStatus === "paid" || order.status === "completed";
   if (!wasPaid && nowPaid) {
-    try {
-      const amount = String(parseFloat(String(order.total ?? "0")).toFixed(2));
-      const method = (order.paymentMethod || paymentMethod || "cash") as string;
-      // Guard against a duplicate ledger row if this transition somehow fires twice.
-      const [dup] = await db.select({ id: financeTransactionsTable.id })
-        .from(financeTransactionsTable)
-        .where(and(eq(financeTransactionsTable.orderId, order.id), eq(financeTransactionsTable.type, "income")))
-        .limit(1);
-      if (!dup) {
-        await db.insert(financeTransactionsTable).values({
-          restaurantId,
-          type: "income",
-          category: "order_payment",
-          description: `Order #${order.id}${order.tableName ? ` · ${order.tableName}` : ""} — ${method}`,
-          amount,
-          paymentMethod: method,
-          reference: (utr || upiId || order.invoiceNumber || null) as string | null,
-          orderId: order.id,
-          performedBy: (collectedBy || collectedFrom || null) as string | null,
-        });
-        if (method === "cash") {
-          const [shift] = await db.select().from(cashShiftsTable)
-            .where(and(eq(cashShiftsTable.restaurantId, restaurantId), eq(cashShiftsTable.status, "open")))
-            .orderBy(desc(cashShiftsTable.openedAt)).limit(1);
-          if (shift) {
-            const newSales = (parseFloat(String(shift.cashSales ?? "0")) + parseFloat(amount)).toFixed(2);
-            await db.update(cashShiftsTable).set({ cashSales: newSales }).where(eq(cashShiftsTable.id, shift.id));
-          }
-        }
-      }
-    } catch (e) {
-      // Never fail the order update because the ledger write hit a snag.
-      console.error("finance ledger write failed for order", order.id, e);
-    }
+    await recordOrderPaymentInLedger({
+      restaurantId,
+      order,
+      method: order.paymentMethod || paymentMethod,
+      reference: (utr || upiId || null) as string | null,
+      performedBy: (collectedBy || collectedFrom || null) as string | null,
+    });
   }
 
   if (status === "ready" && !order.waiterName) {
@@ -246,7 +220,9 @@ router.post("/public/orders", async (req, res): Promise<void> => {
       : null,
   };
 
-  const paymentStatus = resolvePaymentStatus(paymentMethod ?? "upi", {
+  // Pass the method through as-is. Defaulting a missing one to "upi" made every
+  // pay-at-the-end dine-in order start life as "paid".
+  const paymentStatus = resolvePaymentStatus(paymentMethod, {
     partialPayNow: partialPayNow != null ? parseFloat(String(partialPayNow)) : undefined,
     advanceAmount: advanceAmount != null ? parseFloat(String(advanceAmount)) : undefined,
     grandTotal: total,
@@ -280,8 +256,19 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     }
   }
 
+  // The guest app reliably knows the table NAME but not always its id, so
+  // resolve it here. Without this the order stored tableId = null and the table
+  // was never marked occupied — it stayed "free" while guests were seated.
+  let resolvedTableId: number | null = tableId ?? null;
+  if (!resolvedTableId && tableName) {
+    const [tableRow] = await db.select({ id: tablesMapTable.id }).from(tablesMapTable)
+      .where(and(eq(tablesMapTable.restaurantId, restaurantId), eq(tablesMapTable.name, String(tableName))))
+      .limit(1);
+    if (tableRow) resolvedTableId = tableRow.id;
+  }
+
   const [order] = await db.insert(ordersTable).values({
-    restaurantId, tableId: tableId ?? null, tableName: tableName ?? null,
+    restaurantId, tableId: resolvedTableId, tableName: tableName ?? null,
     customerName: customerName ?? null, customerPhone: customerPhone ?? null, customerEmail: customerEmail ?? null,
     type: type ?? "dine_in", status: "pending", items: orderItems,
     subtotal: String(subtotal.toFixed(2)), tax: String(tax), total: String(total.toFixed(2)),
@@ -325,14 +312,14 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     }
   }
 
-  if (tableId) {
+  if (resolvedTableId) {
     await db.update(tablesMapTable).set({
       status: "occupied",
       currentOrderId: order.id,
       currentCustomerName: customerName ?? null,
       currentGuestCount: req.body.guestCount ?? 1,
       occupiedSince: new Date(),
-    }).where(and(eq(tablesMapTable.id, tableId), eq(tablesMapTable.restaurantId, restaurantId)));
+    }).where(and(eq(tablesMapTable.id, resolvedTableId), eq(tablesMapTable.restaurantId, restaurantId)));
   }
 
   broadcastEvent("new_order", { id: order.id, restaurantId, tableName, total, status: "pending" });

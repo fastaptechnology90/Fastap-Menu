@@ -27,7 +27,7 @@ class DessertJobCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: typeColor),
       ),
@@ -39,7 +39,7 @@ class DessertJobCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   job.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -53,7 +53,7 @@ class DessertJobCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${job.itemName} · ${job.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -124,7 +124,7 @@ class ProductionBatchList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -136,7 +136,7 @@ class ProductionBatchList extends StatelessWidget {
                       children: [
                         Text(
                           batch.itemName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -144,7 +144,7 @@ class ProductionBatchList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${batch.quantity} units · ${batch.expiryMinutes}m expiry',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -196,7 +196,7 @@ class EventPlanList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           plan.eventName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -208,7 +208,7 @@ class EventPlanList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${plan.totalServings} servings · ${plan.location}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -217,7 +217,7 @@ class EventPlanList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     plan.items.join(' · '),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -252,14 +252,14 @@ class BakerySidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Bakery metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -275,7 +275,7 @@ class BakerySidePanel extends StatelessWidget {
           _StatRow('Active batches', '${stats.activeBatches}'),
           _StatRow('Completed today', '${stats.completedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active bakery modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -303,7 +303,7 @@ class BakerySidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -342,7 +342,7 @@ class _Meta extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 10,
@@ -350,7 +350,7 @@ class _Meta extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 12,
@@ -376,7 +376,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -385,7 +385,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -433,13 +433,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

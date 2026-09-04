@@ -20,7 +20,7 @@ class SectionFilter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Section filter',
           style: TextStyle(
             fontSize: 11,
@@ -59,7 +59,7 @@ class SectionFilter extends StatelessWidget {
                               ],
                             )
                           : null,
-                      color: active ? null : Colors.white,
+                      color: active ? null : AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: active

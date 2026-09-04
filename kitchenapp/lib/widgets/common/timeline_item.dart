@@ -45,7 +45,7 @@ class TimelineItem extends StatelessWidget {
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.secondaryText),
+                  style: TextStyle(color: AppColors.secondaryText),
                 ),
               ],
             ),

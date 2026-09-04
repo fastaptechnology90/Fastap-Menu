@@ -27,7 +27,7 @@ class StaffShiftCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor.withValues(alpha: 0.35)),
       ),
@@ -39,7 +39,7 @@ class StaffShiftCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   record.staffName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -53,7 +53,7 @@ class StaffShiftCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${record.role} · ${record.section} · attendance ${record.attendanceStatus}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -144,7 +144,7 @@ class ShiftSwapList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           swap.requesterName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -156,7 +156,7 @@ class ShiftSwapList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${swap.section} · ${swap.shiftLabel} · swap with ${swap.targetStaffName}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -223,7 +223,7 @@ class ShiftHandoverList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -235,7 +235,7 @@ class ShiftHandoverList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           '${note.fromStaff} → ${note.toStaff}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -247,7 +247,7 @@ class ShiftHandoverList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${note.section} · ${note.notePreview}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -305,14 +305,14 @@ class StaffShiftSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Shift metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -328,7 +328,7 @@ class StaffShiftSidePanel extends StatelessWidget {
           _StatRow('Pending swaps', '${stats.pendingSwaps}'),
           _StatRow('Open handovers', '${stats.openHandovers}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -370,7 +370,7 @@ class _MetricChip extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -378,7 +378,7 @@ class _MetricChip extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 14,
@@ -430,7 +430,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -438,7 +438,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -492,13 +492,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

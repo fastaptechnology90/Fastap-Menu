@@ -17,7 +17,7 @@ class FinalSummaryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Fastap Kitchen App includes',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -32,7 +32,7 @@ class FinalSummaryPanel extends StatelessWidget {
                 FinalSystemSummary.includedCapabilities.map(MiniChip.new).toList(),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'System scalable for',
             style: TextStyle(
               color: AppColors.primaryText,

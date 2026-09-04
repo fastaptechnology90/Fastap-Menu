@@ -87,7 +87,7 @@ class SmartRoutingPanel extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         split.reason,
-                        style: const TextStyle(color: AppColors.secondaryText),
+                        style: TextStyle(color: AppColors.secondaryText),
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -176,7 +176,7 @@ class SmartRoutingPanel extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.fiber_manual_record,
                       size: 10,
                       color: AppColors.primary,
@@ -185,7 +185,7 @@ class SmartRoutingPanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         entry.message,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.bodyText,
                           fontWeight: FontWeight.w600,
                         ),

@@ -9,11 +9,16 @@ class FastapKitchenApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: AppConstants.appTitle,
-      theme: AppTheme.light,
-      home: const AuthGate(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: appDarkMode,
+      builder: (context, isDark, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: AppConstants.appTitle,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+        home: const AuthGate(),
+      ),
     );
   }
 }

@@ -89,7 +89,7 @@ class _ModuleSwitcherDialogState extends State<ModuleSwitcherDialog> {
             const SizedBox(height: 12),
             Expanded(
               child: _results.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'No modules match your search.',
                         style: TextStyle(
@@ -136,7 +136,7 @@ class _ModuleSwitcherDialogState extends State<ModuleSwitcherDialog> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           trailing: selected
-                              ? const Icon(
+                              ? Icon(
                                   Icons.check_circle,
                                   color: AppColors.primary,
                                 )

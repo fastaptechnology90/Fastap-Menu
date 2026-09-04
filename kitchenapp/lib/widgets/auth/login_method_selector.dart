@@ -46,7 +46,7 @@ class LoginMethodSelector extends StatelessWidget {
                 color: isSelected ? Colors.white : AppColors.bodyText,
               ),
               selectedColor: AppColors.primary,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface,
               side: BorderSide(
                 color: isSelected ? AppColors.primary : AppColors.panelBorder,
               ),

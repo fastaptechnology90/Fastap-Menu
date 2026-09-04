@@ -143,19 +143,35 @@ class _KitchenTabPanelsState extends State<_KitchenTabPanels>
   void initState() {
     super.initState();
     _tabController = TabController(length: widget.tabs.length, vsync: this);
+    _tabController.addListener(_syncSelectedNav);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncSelectedNav());
+  }
+
+  // Tell the controller which board is on screen. Its 15-second poll only
+  // refreshes the board matching `selectedNav`, and nothing ever set it — so
+  // the KDS went stale until someone pulled to refresh.
+  void _syncSelectedNav() {
+    if (!mounted || _tabController.indexIsChanging) return;
+    final index = _tabController.index;
+    if (index < 0 || index >= widget.tabs.length) return;
+    widget.controller.selectNav(widget.tabs[index].navIndex);
   }
 
   @override
   void didUpdateWidget(covariant _KitchenTabPanels oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tabs.length != widget.tabs.length) {
+      _tabController.removeListener(_syncSelectedNav);
       _tabController.dispose();
       _tabController = TabController(length: widget.tabs.length, vsync: this);
+      _tabController.addListener(_syncSelectedNav);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncSelectedNav());
     }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_syncSelectedNav);
     _tabController.dispose();
     super.dispose();
   }

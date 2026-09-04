@@ -39,7 +39,10 @@ export function isPaidOrder(order: OrderLike): boolean {
   if (ps === "paid" || ps === "success") return true;
   const st = String(order.status ?? "").toLowerCase();
   if (ps === "pending" || ps === "") {
-    return ["preparing", "ready", "confirmed", "accepted", "served", "billing", "completed", "delivered"].includes(st);
+    // "serving" (waiter is carrying it to the table) and "delayed" belong here
+    // too — leaving them out made revenue drop while an order was out for
+    // delivery and jump back once it was marked delivered.
+    return ["preparing", "ready", "confirmed", "accepted", "serving", "served", "delayed", "billing", "completed", "delivered"].includes(st);
   }
   return false;
 }

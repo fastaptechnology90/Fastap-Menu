@@ -29,7 +29,7 @@ class RoleAccessDenied extends StatelessWidget {
                 color: AppColors.warning.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.lock_outline_rounded,
                 color: AppColors.warning,
               ),
@@ -38,7 +38,7 @@ class RoleAccessDenied extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w900,
                 color: AppColors.primaryText,
                 fontSize: 16,
@@ -48,7 +48,7 @@ class RoleAccessDenied extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 height: 1.4,
               ),

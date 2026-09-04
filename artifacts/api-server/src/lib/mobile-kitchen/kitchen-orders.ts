@@ -1,6 +1,7 @@
 import { eq, and, desc, inArray, gte, sql } from "drizzle-orm";
 import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable } from "@workspace/db";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
+import { recordOrderPaymentInLedger } from "../order-payment-ledger.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 
 export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar", "Dessert", "Bakery", "Floor"];
@@ -558,6 +559,16 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
       paymentStatus: "paid",
       paymentMethod: method,
     }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
+    // Put it in the finance ledger too, exactly like the web panel does —
+    // otherwise money a waiter collects in the app never reaches Finance or the
+    // Cash Counter. The helper de-duplicates, so an order paid here and later
+    // touched from the web still books exactly one income row.
+    await recordOrderPaymentInLedger({
+      restaurantId,
+      order: paid,
+      method,
+      performedBy: paid.waiterName ?? null,
+    });
     broadcastEvent("order_paid", { id: orderId, restaurantId, tableName: existing.tableName });
     broadcastOrderEvent(orderId, "order_paid", { id: orderId, paymentStatus: "paid" });
     return mapOrderRow(paid);

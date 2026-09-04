@@ -24,7 +24,7 @@ class RoomOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: priorityColor.withValues(alpha: 0.35)),
       ),
@@ -36,7 +36,7 @@ class RoomOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Room ${order.roomNumber} · ${order.kotNumber}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -50,7 +50,7 @@ class RoomOrderCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             order.itemSummary,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -138,7 +138,7 @@ class VipRoomAlertList extends StatelessWidget {
                       children: [
                         Text(
                           'Room ${alert.roomNumber}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -146,7 +146,7 @@ class VipRoomAlertList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${alert.guestName} · ${alert.alertType}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -184,7 +184,7 @@ class ScheduledDeliveryList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -196,7 +196,7 @@ class ScheduledDeliveryList extends StatelessWidget {
                       children: [
                         Text(
                           'Room ${delivery.roomNumber} · ${delivery.kotNumber}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -204,7 +204,7 @@ class ScheduledDeliveryList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${delivery.scheduledTime} · ${delivery.itemSummary}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -242,7 +242,7 @@ class TrayAssignmentList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -254,7 +254,7 @@ class TrayAssignmentList extends StatelessWidget {
                       children: [
                         Text(
                           '${tray.trayId} · Room ${tray.roomNumber}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -262,7 +262,7 @@ class TrayAssignmentList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${tray.kotNumber} · ${tray.staffName}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -305,7 +305,7 @@ class MiniBarSyncList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -317,7 +317,7 @@ class MiniBarSyncList extends StatelessWidget {
                       children: [
                         Text(
                           'Room ${item.roomNumber} · ${item.itemName}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -325,7 +325,7 @@ class MiniBarSyncList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           'Qty ${item.quantity} · ${item.lastSyncedAt}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -369,14 +369,14 @@ class RoomServiceSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Room service metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -392,7 +392,7 @@ class RoomServiceSidePanel extends StatelessWidget {
           _StatRow('Mini-bar pending', '${stats.miniBarPending}'),
           _StatRow('Completed today', '${stats.completedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active room modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -459,7 +459,7 @@ class _Meta extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -467,7 +467,7 @@ class _Meta extends StatelessWidget {
           ),
           TextSpan(
             text: value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
               fontSize: 12,
@@ -494,7 +494,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -502,7 +502,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -556,13 +556,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

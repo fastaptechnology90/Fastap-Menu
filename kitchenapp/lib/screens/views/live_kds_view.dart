@@ -238,7 +238,7 @@ class _PrimaryScrollBody extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
             child: Text(
               group.label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primaryText,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
@@ -323,11 +323,11 @@ class _EmptyOrdersCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.panelBorder),
       ),
-      child: const Text(
+      child: Text(
         'No KOTs match this view and filter.',
         style: TextStyle(color: AppColors.secondaryText),
       ),
@@ -362,7 +362,7 @@ class _KdsBody extends StatelessWidget {
               children: [
                 Text(
                   group.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -509,18 +509,18 @@ class _EmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         children: [
-          const Icon(Icons.monitor_outlined, size: 48, color: AppColors.primary),
+          Icon(Icons.monitor_outlined, size: 48, color: AppColors.primary),
           const SizedBox(height: 12),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.bodyText),
+            style: TextStyle(color: AppColors.bodyText),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -556,12 +556,12 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          Icon(Icons.warning_amber_rounded, color: AppColors.warning),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontWeight: FontWeight.w600,
               ),

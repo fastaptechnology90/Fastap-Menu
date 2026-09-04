@@ -21,7 +21,7 @@ class FeatureWorkflowRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle,
             color: AppColors.primary,
             size: 18,
@@ -30,14 +30,14 @@ class FeatureWorkflowRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'Enabled',
             style: TextStyle(
               color: AppColors.primary,

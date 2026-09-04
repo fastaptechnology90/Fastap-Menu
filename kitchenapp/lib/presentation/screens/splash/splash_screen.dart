@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: const AppLogo(size: 96),
                 ),
                 const Spacer(flex: 2),
-                const SizedBox(
+                SizedBox(
                   width: 32,
                   height: 32,
                   child: CircularProgressIndicator(

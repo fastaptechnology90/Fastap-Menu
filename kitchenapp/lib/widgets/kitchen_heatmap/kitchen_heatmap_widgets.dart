@@ -50,7 +50,7 @@ class StationHeatmapList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           station.stationName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -65,7 +65,7 @@ class StationHeatmapList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${station.section} · ${station.loadPercent}% load · ${station.ordersQueued} queued',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -249,14 +249,14 @@ class KitchenHeatmapSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Heatmap metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -272,7 +272,7 @@ class KitchenHeatmapSidePanel extends StatelessWidget {
           _StatRow('Active rush zones', '${stats.activeRushZones}'),
           _StatRow('Avg load', '${stats.avgLoadPercent}%'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Heatmap modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -325,7 +325,7 @@ class _HeatmapActionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -337,7 +337,7 @@ class _HeatmapActionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w800,
                   ),
@@ -349,7 +349,7 @@ class _HeatmapActionCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -436,7 +436,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -444,7 +444,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -498,13 +498,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

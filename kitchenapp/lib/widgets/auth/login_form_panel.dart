@@ -331,7 +331,7 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                   ApiConfig.useMockApi
                       ? 'Demo mode · Mock API active — use Password login below'
                       : 'Live API · ${ApiConfig.activeBaseUrl}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.bodyText,
@@ -361,7 +361,7 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                 children: [
                   Text(
                     _method.label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -369,7 +369,7 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                   ),
                   Text(
                     _methodHint(_method),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 12,
                     ),
@@ -414,7 +414,7 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
             ),
             child: Text(
               widget.auth.errorMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.danger,
                 fontWeight: FontWeight.w700,
               ),
@@ -427,12 +427,12 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
           child: FilledButton.icon(
             onPressed: _loading ? null : _submit,
             icon: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: AppColors.surface,
                     ),
                   )
                 : Icon(_submitIcon()),
@@ -519,13 +519,13 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
             ),
             child: Column(
               children: [
-                const Icon(
+                Icon(
                   Icons.qr_code_scanner_rounded,
                   size: 64,
                   color: AppColors.primary,
                 ),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   'Scan staff badge QR or enter token below',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -563,9 +563,9 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
             ),
             child: Column(
               children: [
-                const Icon(Icons.nfc, size: 56, color: AppColors.primary),
+                Icon(Icons.nfc, size: 56, color: AppColors.primary),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   'Hold your NFC staff badge near the device reader',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -603,14 +603,14 @@ class _LoginFormPanelState extends State<LoginFormPanel> {
                       ? 'Device face recognition verifies you first, then the server confirms your shift.'
                       : 'Place your registered finger on the sensor to verify, then sign in.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (_biometricVerified) ...[
                   const SizedBox(height: 12),
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.check_circle, color: AppColors.primary, size: 18),
@@ -720,7 +720,7 @@ class _DemoCredentialsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Local mock API',
             style: TextStyle(
               color: AppColors.info,
@@ -730,7 +730,7 @@ class _DemoCredentialsCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             _mockApiHintText(),
-            style: const TextStyle(color: AppColors.bodyText, height: 1.5),
+            style: TextStyle(color: AppColors.bodyText, height: 1.5),
           ),
         ],
       ),

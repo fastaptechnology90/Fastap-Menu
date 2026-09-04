@@ -58,7 +58,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const ProfileInfoBanner(
+          ProfileInfoBanner(
             icon: Icons.security_rounded,
             color: AppColors.primary,
             message:
@@ -83,7 +83,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                     border: Border.all(color: AppColors.panelBorder),
                   ),
@@ -109,7 +109,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                           children: [
                             Text(
                               _labelFor(permission),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primaryText,
                               ),
@@ -118,7 +118,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                               permission,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.secondaryText,
                                 fontSize: 11,
                               ),
@@ -126,7 +126,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.check_circle_rounded,
                         color: AppColors.primary,
                         size: 20,
@@ -170,11 +170,11 @@ class _PermissionsEmpty extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.panelBorder),
       ),
-      child: const Column(
+      child: Column(
         children: [
           Icon(Icons.lock_open_rounded, color: AppColors.secondaryText, size: 40),
           SizedBox(height: 12),
@@ -217,7 +217,7 @@ class _PermissionsError extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.bodyText),
+            style: TextStyle(color: AppColors.bodyText),
           ),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),

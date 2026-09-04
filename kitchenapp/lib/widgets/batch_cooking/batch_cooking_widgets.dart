@@ -22,7 +22,7 @@ class BatchCookingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: urgent ? AppColors.danger : AppColors.panelBorder,
@@ -36,7 +36,7 @@ class BatchCookingCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   batch.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -48,7 +48,7 @@ class BatchCookingCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${batch.section} · ${batch.remainingQuantity.toStringAsFixed(0)} / ${batch.quantity.toStringAsFixed(0)} ${batch.unit}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -112,7 +112,7 @@ class ProductionForecastList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (forecasts.isEmpty) {
-      return const Text(
+      return Text(
         'No production forecasts for this section.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -135,7 +135,7 @@ class ProductionForecastList extends StatelessWidget {
                 children: [
                   Text(
                     forecast.label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w800,
                     ),
@@ -143,7 +143,7 @@ class ProductionForecastList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${forecast.section} · ${forecast.forecastCovers} covers · batch ${forecast.recommendedBatchSize} · in ${forecast.startInMinutes}m',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -152,7 +152,7 @@ class ProductionForecastList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${(forecast.confidence * 100).round()}% confidence',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.premium,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
@@ -187,14 +187,14 @@ class BatchCookingSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Batch operations',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -287,7 +287,7 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       '$label: $value',
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.secondaryText,
         fontWeight: FontWeight.w700,
         fontSize: 12,
@@ -309,7 +309,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -317,7 +317,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

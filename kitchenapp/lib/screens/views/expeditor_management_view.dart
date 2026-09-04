@@ -36,7 +36,7 @@ class ExpeditorManagementView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class ExpeditorManagementView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class ExpeditorManagementView extends StatelessWidget {
             ),
             child: Text(
               controller.expeditorActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.info,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class ExpeditorManagementView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Expeditor pass queue',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -117,11 +117,11 @@ class ExpeditorManagementView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.panelBorder),
                     ),
-                    child: const Text(
+                    child: Text(
                       'No tickets awaiting expeditor pass',
                       style: TextStyle(
                         color: AppColors.secondaryText,
@@ -140,7 +140,7 @@ class ExpeditorManagementView extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Multi-section coordination',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -161,7 +161,7 @@ class ExpeditorManagementView extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Table synchronization',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -221,7 +221,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
@@ -241,13 +241,13 @@ class _EmptyList extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

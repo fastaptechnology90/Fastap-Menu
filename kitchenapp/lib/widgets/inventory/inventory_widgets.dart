@@ -22,7 +22,7 @@ class InventoryItemCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: low ? AppColors.warning : AppColors.panelBorder,
@@ -36,20 +36,20 @@ class InventoryItemCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
               if (low)
-                const _Tag(label: 'Low stock', color: AppColors.warning),
+                _Tag(label: 'Low stock', color: AppColors.warning),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${item.section} · batch ${item.batchId}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -84,7 +84,7 @@ class InventoryBatchList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (batches.isEmpty) {
-      return const Text(
+      return Text(
         'No batch records for this section.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -106,7 +106,7 @@ class InventoryBatchList extends StatelessWidget {
               ),
               child: Text(
                 '${batch.itemName} · ${batch.quantity.toStringAsFixed(1)} ${batch.unit} · expires in ${batch.expiryDays}d',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -156,7 +156,7 @@ class InventoryAlertCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             alert.detail,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -199,7 +199,7 @@ class SubstitutionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -208,7 +208,7 @@ class SubstitutionCard extends StatelessWidget {
         children: [
           Text(
             '${substitution.itemName} → ${substitution.substituteName}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
             ),
@@ -216,7 +216,7 @@ class SubstitutionCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             substitution.reason,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -225,7 +225,7 @@ class SubstitutionCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${(substitution.confidence * 100).round()}% confidence',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.premium,
               fontWeight: FontWeight.w700,
               fontSize: 12,
@@ -271,14 +271,14 @@ class InventorySidePanel extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Stock ledger',
                 style: TextStyle(
                   color: AppColors.primaryText,
@@ -337,7 +337,7 @@ class InventorySidePanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'AI shortage prediction',
           style: TextStyle(
             color: AppColors.primaryText,
@@ -357,7 +357,7 @@ class InventorySidePanel extends StatelessWidget {
             ),
             child: Text(
               '${prediction.itemName} · shortage in ${prediction.predictedShortageHours}h · ${(prediction.confidence * 100).round()}%',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.premium,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -366,7 +366,7 @@ class InventorySidePanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Recent deductions',
           style: TextStyle(
             color: AppColors.primaryText,
@@ -376,7 +376,7 @@ class InventorySidePanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         if (deductions.isEmpty)
-          const Text(
+          Text(
             'No live deductions yet.',
             style: TextStyle(color: AppColors.secondaryText),
           )
@@ -386,7 +386,7 @@ class InventorySidePanel extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 '${deduction.itemName} -${deduction.quantity} ${deduction.unit}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -435,7 +435,7 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       '$label: $value',
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.secondaryText,
         fontWeight: FontWeight.w700,
         fontSize: 12,
@@ -457,7 +457,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -465,7 +465,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

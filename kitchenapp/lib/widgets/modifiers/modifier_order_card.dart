@@ -20,7 +20,7 @@ class ModifierOrderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: hasFlash
@@ -47,7 +47,7 @@ class ModifierOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -55,15 +55,15 @@ class ModifierOrderCard extends StatelessWidget {
                 ),
               ),
               if (order.vip)
-                const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'VIP', color: AppColors.premium),
               if (order.allergy)
-                const _Tag(label: 'Allergy', color: AppColors.danger),
+                _Tag(label: 'Allergy', color: AppColors.danger),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${order.location} · ${order.section} · ${order.status}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -71,7 +71,7 @@ class ModifierOrderCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             order.items.join(', '),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -80,7 +80,7 @@ class ModifierOrderCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Modifiers',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
             ),
@@ -104,7 +104,7 @@ class ModifierOrderCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Customizations',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primaryText,
                 fontWeight: FontWeight.w800,
               ),
@@ -113,7 +113,7 @@ class ModifierOrderCard extends StatelessWidget {
             ...order.customizations.map(
               (item) => Text(
                 '${item.item} · ${item.label}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.info,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -334,7 +334,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -343,7 +343,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -444,7 +444,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -452,7 +452,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

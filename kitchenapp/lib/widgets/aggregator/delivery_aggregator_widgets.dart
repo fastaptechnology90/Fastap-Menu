@@ -27,7 +27,7 @@ class AggregatorOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: order.riderWaiting ? AppColors.danger : platformColor,
@@ -41,7 +41,7 @@ class AggregatorOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -50,14 +50,14 @@ class AggregatorOrderCard extends StatelessWidget {
               _Tag(label: order.platform, color: platformColor),
               if (order.riderWaiting) ...[
                 const SizedBox(width: 8),
-                const _Tag(label: 'Rider waiting', color: AppColors.danger),
+                _Tag(label: 'Rider waiting', color: AppColors.danger),
               ],
             ],
           ),
           const SizedBox(height: 6),
           Text(
             order.itemsSummary,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -143,7 +143,7 @@ class RiderAlertList extends StatelessWidget {
                       children: [
                         Text(
                           '${alert.kotNumber} · ${alert.platform}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -151,7 +151,7 @@ class RiderAlertList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           alert.message,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.bodyText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -194,7 +194,7 @@ class DispatchTrackingList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -203,7 +203,7 @@ class DispatchTrackingList extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${entry.kotNumber} · ${entry.platform}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w800,
                       ),
@@ -239,14 +239,14 @@ class AggregatorSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Aggregator metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -263,7 +263,7 @@ class AggregatorSidePanel extends StatelessWidget {
           _StatRow('Awaiting pickup', '${stats.awaitingPickup}'),
           _StatRow('Dispatched today', '${stats.dispatchedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Platforms & modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -295,7 +295,7 @@ class AggregatorSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -334,7 +334,7 @@ class _Meta extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 10,
@@ -342,7 +342,7 @@ class _Meta extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 12,
@@ -368,7 +368,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -377,7 +377,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -425,13 +425,13 @@ class _EmptyList extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

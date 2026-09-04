@@ -27,7 +27,7 @@ class EnterpriseSystemCapabilitiesExpandable extends StatelessWidget {
         childrenPadding: const EdgeInsets.only(bottom: 8),
         title: Text(
           'System $systemNumber · ${system.title}',
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w800,
             color: AppColors.primaryText,
             fontSize: 14,
@@ -35,7 +35,7 @@ class EnterpriseSystemCapabilitiesExpandable extends StatelessWidget {
         ),
         subtitle: Text(
           '$featureTotal features · ${status.label}',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontSize: 12,
           ),
@@ -67,7 +67,7 @@ class _FeatureSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w900,
             color: AppColors.primaryText,
             fontSize: 13,
@@ -89,7 +89,7 @@ class _FeatureSection extends StatelessWidget {
                   ),
                   child: Text(
                     item,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,

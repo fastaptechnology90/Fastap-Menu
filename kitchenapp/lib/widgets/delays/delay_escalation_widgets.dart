@@ -22,7 +22,7 @@ class DelayedOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: order.escalated ? AppColors.danger : AppColors.warning,
@@ -36,20 +36,20 @@ class DelayedOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
               if (order.escalated)
-                const _Tag(label: 'Escalated', color: AppColors.danger),
+                _Tag(label: 'Escalated', color: AppColors.danger),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${order.location} · ${order.section}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -133,7 +133,7 @@ class EscalationAlertCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${alert.kotNumber} · ${alert.reason}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -153,7 +153,7 @@ class DelayHistoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (history.isEmpty) {
-      return const Text(
+      return Text(
         'No delay history logged yet.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -173,7 +173,7 @@ class DelayHistoryList extends StatelessWidget {
               ),
               child: Text(
                 '${entry.kotNumber} · ${entry.reason}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -194,7 +194,7 @@ class BottleneckList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bottlenecks.isEmpty) {
-      return const Text(
+      return Text(
         'No bottlenecks detected.',
         style: TextStyle(color: AppColors.secondaryText),
       );
@@ -215,7 +215,7 @@ class BottleneckList extends StatelessWidget {
               ),
               child: Text(
                 '${item.section} · ${item.delayedOrders} delayed · ${item.bottleneck}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -248,14 +248,14 @@ class DelayEscalationSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Escalation overview',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -342,7 +342,7 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       '$label: $value',
-      style: const TextStyle(
+      style: TextStyle(
         color: AppColors.secondaryText,
         fontWeight: FontWeight.w700,
         fontSize: 12,
@@ -364,7 +364,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           '$value',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -372,7 +372,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

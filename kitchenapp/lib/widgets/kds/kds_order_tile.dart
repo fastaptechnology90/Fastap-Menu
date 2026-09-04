@@ -109,7 +109,7 @@ class _KdsOrderTileState extends State<KdsOrderTile>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: ColoredBox(
-          color: Colors.white,
+          color: AppColors.surface,
           child: Padding(
             padding: EdgeInsets.all(widget.dense ? 12 : 14),
             child: Column(
@@ -143,7 +143,7 @@ class _KdsOrderTileState extends State<KdsOrderTile>
                           '${order.orderId} · ${order.assignedChef}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w700,
                             fontSize: 11,
@@ -230,7 +230,7 @@ class _KdsOrderTileState extends State<KdsOrderTile>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.end,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.secondaryText,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 11,
@@ -335,7 +335,7 @@ class _Header extends StatelessWidget {
             order.kotNumber,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
               fontSize: 15,
@@ -345,7 +345,7 @@ class _Header extends StatelessWidget {
         if (enableReorder && !narrow) ...[
           ReorderableDragStartListener(
             index: index,
-            child: const Icon(
+            child: Icon(
               Icons.drag_handle,
               color: AppColors.secondaryText,
               size: 20,
@@ -387,7 +387,7 @@ class _Header extends StatelessWidget {
             if (enableReorder)
               ReorderableDragStartListener(
                 index: index,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.only(left: 8),
                   child: Icon(
                     Icons.drag_handle,

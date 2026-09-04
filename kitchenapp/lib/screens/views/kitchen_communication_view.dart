@@ -80,7 +80,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.panelBorder),
             ),
@@ -90,7 +90,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -133,7 +133,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
             ),
             child: Text(
               controller.communicationActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -200,7 +200,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
                   },
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Smart alerts',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -220,7 +220,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Chef announcements',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -231,7 +231,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
                 const SizedBox(height: 12),
                 AnnouncementList(announcements: snapshot.announcements),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Broadcast messages',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -294,7 +294,7 @@ class _ChatPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Waiter ↔ kitchen chat',
           style: TextStyle(
             color: AppColors.primaryText,
@@ -316,7 +316,7 @@ class _ChatPanel extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.panelBorder),
             ),
@@ -325,7 +325,7 @@ class _ChatPanel extends StatelessWidget {
               children: [
                 Text(
                   '${selectedThread!.waiterName} · ${selectedThread!.kotNumber}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -392,14 +392,14 @@ class _ComposerPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Post announcement',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -429,7 +429,7 @@ class _ComposerPanel extends StatelessWidget {
             child: const Text('Post chef announcement'),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Broadcast message',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -468,7 +468,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

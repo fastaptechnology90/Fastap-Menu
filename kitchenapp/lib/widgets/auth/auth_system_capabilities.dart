@@ -17,7 +17,7 @@ class AuthSystemCapabilitiesExpandable extends StatelessWidget {
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
-        title: const Text(
+        title: Text(
           AuthSystemCatalog.title,
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -29,7 +29,7 @@ class AuthSystemCapabilitiesExpandable extends StatelessWidget {
           '${AuthSystemCatalog.loginMethodCount} login methods · '
           '${StaffRoleRegistry.rolesForCurrentApp.length} staff roles · '
           '${AuthSystemCatalog.securityFeatureCount} security controls',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontSize: 12,
           ),

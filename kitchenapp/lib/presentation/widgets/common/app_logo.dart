@@ -18,7 +18,7 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = light ? Colors.white : AppVariantContent.primaryColor;
+    final primary = light ? AppColors.surface : AppVariantContent.primaryColor;
     final accent = AppVariantContent.primaryColor;
     final sub = light ? Colors.white70 : AppColors.secondaryText;
 

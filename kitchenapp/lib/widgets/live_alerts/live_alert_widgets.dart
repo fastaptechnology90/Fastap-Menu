@@ -29,7 +29,7 @@ class LiveAlertCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: alert.severity == 'critical'
             ? AppColors.danger.withValues(alpha: 0.05)
-            : Colors.white,
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: severityColor.withValues(alpha: 0.35)),
       ),
@@ -41,7 +41,7 @@ class LiveAlertCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   alert.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -55,7 +55,7 @@ class LiveAlertCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${alert.section} · ${alert.severity} · ${alert.triggeredAt}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -64,7 +64,7 @@ class LiveAlertCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             alert.message,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -140,14 +140,14 @@ class LiveAlertSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Alert engine metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -163,7 +163,7 @@ class LiveAlertSidePanel extends StatelessWidget {
           _StatRow('Emergency', '${stats.emergencyAlerts}'),
           _StatRow('Resolved today', '${stats.resolvedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Alert channels',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -233,7 +233,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -241,7 +241,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),

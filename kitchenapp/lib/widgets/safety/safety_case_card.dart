@@ -20,7 +20,7 @@ class SafetyCaseCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor, width: 1.5),
         boxShadow: safetyCase.severity == 'critical'
@@ -52,13 +52,13 @@ class SafetyCaseCard extends StatelessWidget {
               ),
               _Tag(label: safetyCase.statusLabel, color: borderColor),
               if (safetyCase.vip)
-                const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'VIP', color: AppColors.premium),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${safetyCase.location} · ${safetyCase.section} · ${safetyCase.assignedChef}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -74,7 +74,7 @@ class SafetyCaseCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             safetyCase.items.join(', '),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -94,12 +94,12 @@ class SafetyCaseCard extends StatelessWidget {
                 color: safetyCase.sopAcknowledged ? AppColors.primary : AppColors.warning,
               ),
               if (safetyCase.crossContaminationRisk)
-                const _StatusChip(
+                _StatusChip(
                   label: 'Cross-contam risk',
                   color: AppColors.danger,
                 ),
               if (safetyCase.dedicatedPrepRequired)
-                const _StatusChip(
+                _StatusChip(
                   label: 'Dedicated prep',
                   color: AppColors.info,
                 ),
@@ -226,7 +226,7 @@ class SafetyBoardPanel extends StatelessWidget {
             children: allergyTypes
                 .map(
                   (type) => Chip(
-                    avatar: const Icon(
+                    avatar: Icon(
                       Icons.coronavirus_outlined,
                       size: 16,
                       color: AppColors.danger,
@@ -255,7 +255,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -264,7 +264,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -365,7 +365,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -373,7 +373,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

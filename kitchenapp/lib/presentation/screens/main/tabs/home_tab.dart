@@ -22,7 +22,7 @@ class HomeTab extends StatelessWidget {
   final KitchenCommandController controller;
   final AuthController auth;
 
-  static const _quickActionCatalog = <int, HomeQuickAction>{
+  static final _quickActionCatalog = <int, HomeQuickAction>{
     0: HomeQuickAction(
       'Dashboard',
       Icons.dashboard_rounded,
@@ -171,7 +171,7 @@ class HomeTab extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: controller.refreshDashboard,
           color: AppColors.primary,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: ClampingScrollPhysics(),
@@ -391,7 +391,7 @@ class _HomeHeader extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               initials,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w900,
                 fontSize: 20,
@@ -405,7 +405,7 @@ class _HomeHeader extends StatelessWidget {
               children: [
                 Text(
                   _greeting,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -417,7 +417,7 @@ class _HomeHeader extends StatelessWidget {
                   firstName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -429,7 +429,7 @@ class _HomeHeader extends StatelessWidget {
                   '$role · $section',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -452,7 +452,7 @@ class _HomeHeader extends StatelessWidget {
                       Container(
                         width: 6,
                         height: 6,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
@@ -460,7 +460,7 @@ class _HomeHeader extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         apiMode,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.bodyText,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -476,6 +476,28 @@ class _HomeHeader extends StatelessWidget {
             color: AppColors.chipBackground,
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
+              onTap: () => setDarkMode(!appDarkMode.value),
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Icon(
+                    appDarkMode.value
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Material(
+            color: AppColors.chipBackground,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
               onTap: loading ? null : onRefresh,
               borderRadius: BorderRadius.circular(14),
               child: SizedBox(
@@ -483,7 +505,7 @@ class _HomeHeader extends StatelessWidget {
                 height: 44,
                 child: Center(
                   child: loading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
@@ -491,7 +513,7 @@ class _HomeHeader extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.refresh_rounded,
                           color: AppColors.primary,
                           size: 22,
@@ -528,7 +550,7 @@ class _AlertStrip extends StatelessWidget {
               color: AppColors.warning.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.campaign_rounded,
               color: AppColors.warning,
               size: 22,
@@ -541,7 +563,7 @@ class _AlertStrip extends StatelessWidget {
               children: [
                 Text(
                   '$count rush alert${count == 1 ? '' : 's'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w900,
                     color: AppColors.primaryText,
                     fontSize: 14,
@@ -549,7 +571,7 @@ class _AlertStrip extends StatelessWidget {
                 ),
                 Text(
                   AppVariantContent.rushAlertHint,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.secondaryText,
                   ),
@@ -557,7 +579,7 @@ class _AlertStrip extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             Icons.chevron_right_rounded,
             color: AppColors.warning,
           ),
@@ -595,7 +617,7 @@ class _LoadingStatCard extends StatelessWidget {
     return Container(
       height: HomeWidgetStrip.cardMinHeight,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -621,7 +643,7 @@ class _EmptyStats extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(color: AppColors.panelBorder),
         boxShadow: [HomeDecor.softShadow()],
@@ -635,7 +657,7 @@ class _EmptyStats extends StatelessWidget {
               color: AppColors.secondaryText.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.cloud_off_outlined,
               color: AppColors.secondaryText,
             ),
@@ -643,7 +665,7 @@ class _EmptyStats extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Text(
             AppVariantContent.emptyStatsMessage,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w700,
             ),

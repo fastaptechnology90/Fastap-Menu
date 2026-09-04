@@ -31,7 +31,7 @@ class QcPendingCheckCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor),
       ),
@@ -43,7 +43,7 @@ class QcPendingCheckCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   check.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -57,7 +57,7 @@ class QcPendingCheckCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${check.dishName} · ${check.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -67,7 +67,7 @@ class QcPendingCheckCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               'Supervisor: ${check.assignedSupervisor ?? 'Required'}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.warning,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -75,7 +75,7 @@ class QcPendingCheckCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Quality checklist',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -191,7 +191,7 @@ class QcChecklistRow extends StatelessWidget {
             Expanded(
               child: Text(
                 item.label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -226,14 +226,14 @@ class QcSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'QC scoreboard',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -250,7 +250,7 @@ class QcSidePanel extends StatelessWidget {
           _StatRow('Rejections today', '${stats.rejectionsToday}'),
           _StatRow('Random audits', '${stats.randomAudits}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active QC modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -283,7 +283,7 @@ class QcSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -328,7 +328,7 @@ class QcAuditList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -340,7 +340,7 @@ class QcAuditList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           audit.dishName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -352,7 +352,7 @@ class QcAuditList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${audit.section} · ${audit.auditor}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -361,7 +361,7 @@ class QcAuditList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     audit.notes,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontSize: 12,
                     ),
@@ -408,7 +408,7 @@ class QcComplaintList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           complaint.kotNumber,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -425,7 +425,7 @@ class QcComplaintList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     complaint.reason,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -470,7 +470,7 @@ class QcRejectionList extends StatelessWidget {
                 children: [
                   Text(
                     '${rejection.kotNumber} · ${rejection.dishName}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w800,
                     ),
@@ -478,7 +478,7 @@ class QcRejectionList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     rejection.reason,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -487,7 +487,7 @@ class QcRejectionList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${rejection.rejectedBy} · ${rejection.disposition}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -517,7 +517,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -526,7 +526,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -552,7 +552,7 @@ class _CategoryChip extends StatelessWidget {
       ),
       child: Text(
         category,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w700,
           fontSize: 10,
@@ -599,13 +599,13 @@ class _EmptyList extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

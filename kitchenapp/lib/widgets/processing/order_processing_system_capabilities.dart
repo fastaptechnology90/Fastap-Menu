@@ -14,7 +14,7 @@ class OrderProcessingSystemCapabilitiesExpandable extends StatelessWidget {
         initiallyExpanded: false,
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
-        title: const Text(
+        title: Text(
           OrderProcessingSystemCatalog.title,
           style: TextStyle(
             fontWeight: FontWeight.w800,
@@ -25,7 +25,7 @@ class OrderProcessingSystemCapabilitiesExpandable extends StatelessWidget {
         subtitle: Text(
           '${OrderProcessingSystemCatalog.orderActionCount} order actions · '
           '${OrderProcessingSystemCatalog.smartProcessingFeatureCount} smart features',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontSize: 12,
           ),
@@ -59,7 +59,7 @@ class _FeatureSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w900,
             color: AppColors.primaryText,
             fontSize: 13,
@@ -81,7 +81,7 @@ class _FeatureSection extends StatelessWidget {
                   ),
                   child: Text(
                     item,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,

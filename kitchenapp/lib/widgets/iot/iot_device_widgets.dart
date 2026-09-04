@@ -26,7 +26,7 @@ class SmartDeviceCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor.withValues(alpha: 0.35)),
       ),
@@ -38,7 +38,7 @@ class SmartDeviceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   device.deviceName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class SmartDeviceCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${device.section} · ${device.firmwareVersion} · synced ${device.lastSyncedAt}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -115,7 +115,7 @@ class TemperatureReadingList extends StatelessWidget {
               decoration: BoxDecoration(
                 color: reading.status == 'alert'
                     ? AppColors.danger.withValues(alpha: 0.06)
-                    : Colors.white,
+                    : AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: reading.status == 'alert'
@@ -131,7 +131,7 @@ class TemperatureReadingList extends StatelessWidget {
                       children: [
                         Text(
                           reading.deviceName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -139,7 +139,7 @@ class TemperatureReadingList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${reading.section} · ${reading.currentTemp} (target ${reading.targetTemp})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -201,7 +201,7 @@ class IotMaintenanceAlertList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           alert.deviceName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -213,7 +213,7 @@ class IotMaintenanceAlertList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${alert.section} · ${alert.alertType} · due in ${alert.dueInDays} days',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -269,7 +269,7 @@ class IotUsageAnalyticsList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -281,7 +281,7 @@ class IotUsageAnalyticsList extends StatelessWidget {
                       children: [
                         Text(
                           metric.deviceName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -289,7 +289,7 @@ class IotUsageAnalyticsList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${metric.section} · ${metric.cyclesToday} cycles · ${metric.uptimeHours}h uptime',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -337,14 +337,14 @@ class IotDeviceSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'IoT metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -360,7 +360,7 @@ class IotDeviceSidePanel extends StatelessWidget {
           _StatRow('Avg efficiency', '${stats.avgEfficiency}%'),
           _StatRow('Synced today', '${stats.syncedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active IoT modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -431,7 +431,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -439,7 +439,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -493,13 +493,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

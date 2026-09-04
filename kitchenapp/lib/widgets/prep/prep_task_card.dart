@@ -21,7 +21,7 @@ class PrepTaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: overdue
@@ -46,7 +46,7 @@ class PrepTaskCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   task.dishName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -55,15 +55,15 @@ class PrepTaskCard extends StatelessWidget {
               ),
               _Tag(label: task.modeLabel, color: AppColors.info),
               if (task.vip)
-                const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'VIP', color: AppColors.premium),
               if (task.allergy)
-                const _Tag(label: 'Allergy', color: AppColors.danger),
+                _Tag(label: 'Allergy', color: AppColors.danger),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${task.kotNumber} · ${task.location} · ${task.section} · ${task.statusLabel}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -112,7 +112,7 @@ class PrepTaskCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Step-by-step flow',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
             ),
@@ -145,7 +145,7 @@ class PrepTaskCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Ingredient checklist',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
             ),
@@ -264,7 +264,7 @@ class PrepBoardPanel extends StatelessWidget {
         _Panel(
           title: 'Preparation modes',
           child: prepModes.isEmpty
-              ? const Text(
+              ? Text(
                   'No active preparation modes.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -286,7 +286,7 @@ class PrepBoardPanel extends StatelessWidget {
         _Panel(
           title: 'Station load',
           child: stationLoad.isEmpty
-              ? const Text(
+              ? Text(
                   'No station load for this filter.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -347,7 +347,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -356,7 +356,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -411,7 +411,7 @@ class _MetaChip extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -435,7 +435,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -443,7 +443,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

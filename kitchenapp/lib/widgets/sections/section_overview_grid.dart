@@ -100,7 +100,7 @@ class SectionCard extends StatelessWidget {
             'Head chef · ${section.headChef}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w700,
               fontSize: 12,

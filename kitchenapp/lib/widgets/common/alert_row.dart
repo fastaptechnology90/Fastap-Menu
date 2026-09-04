@@ -41,7 +41,7 @@ class AlertRow extends StatelessWidget {
                   body,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.secondaryText),
+                  style: TextStyle(color: AppColors.secondaryText),
                 ),
               ],
             ),

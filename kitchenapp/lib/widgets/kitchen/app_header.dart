@@ -45,7 +45,7 @@ class AppHeader extends StatelessWidget {
               children: [
                 Text(
                   AppConstants.brandName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -55,7 +55,7 @@ class AppHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   AppConstants.commandCenterTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -65,7 +65,7 @@ class AppHeader extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   EnterpriseSystemNavRegistry.moduleLabelForNavIndex(selectedNav),
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -80,7 +80,7 @@ class AppHeader extends StatelessWidget {
                     children: [
                       Text(
                         user.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.bodyText,
                           fontWeight: FontWeight.w800,
                         ),
@@ -137,7 +137,7 @@ class AppHeader extends StatelessWidget {
                       await auth.logout(emergency: true);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text('Emergency logout executed'),
                             backgroundColor: AppColors.danger,
                           ),
@@ -155,7 +155,7 @@ class AppHeader extends StatelessWidget {
                       ),
                     ),
                     if (auth.canEmergencyLogout)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'emergency',
                         child: ListTile(
                           leading: Icon(Icons.emergency, color: AppColors.danger),
@@ -464,7 +464,7 @@ class MiniStaffMeta extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w700,
             fontSize: 12,

@@ -67,7 +67,7 @@ class _DashboardKpiCard extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: DashboardWidgetGrid.cardMinHeight),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
           border: Border.all(color: AppColors.panelBorder),
         ),
@@ -121,7 +121,7 @@ class _DashboardKpiCard extends StatelessWidget {
                 item.label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: AppColors.secondaryText,

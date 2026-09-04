@@ -84,7 +84,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Text(
                           page.title,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
                             color: AppColors.primaryText,
@@ -94,7 +94,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Text(
                           page.subtitle,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             height: 1.5,
                             color: AppColors.secondaryText,

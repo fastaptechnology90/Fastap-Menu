@@ -27,7 +27,7 @@ class ReturnRequestCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: request.priorityRemake ? AppColors.danger : typeColor,
@@ -41,7 +41,7 @@ class ReturnRequestCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   request.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -50,14 +50,14 @@ class ReturnRequestCard extends StatelessWidget {
               _Tag(label: _typeLabel(request.returnType), color: typeColor),
               if (request.priorityRemake) ...[
                 const SizedBox(width: 8),
-                const _Tag(label: 'Priority remake', color: AppColors.danger),
+                _Tag(label: 'Priority remake', color: AppColors.danger),
               ],
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${request.dishName} · ${request.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -66,7 +66,7 @@ class ReturnRequestCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             request.reason,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -151,14 +151,14 @@ class ReturnSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Return queue metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -175,7 +175,7 @@ class ReturnSidePanel extends StatelessWidget {
           _StatRow('Burnt item cases', '${stats.burntItemCount}'),
           _StatRow('Resolved today', '${stats.resolvedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active return modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -204,7 +204,7 @@ class ReturnSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -258,7 +258,7 @@ class ComplaintTagList extends StatelessWidget {
                       children: [
                         Text(
                           entry.kotNumber,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -266,7 +266,7 @@ class ComplaintTagList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           entry.tag,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.bodyText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -309,7 +309,7 @@ class ReturnHistoryList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -318,7 +318,7 @@ class ReturnHistoryList extends StatelessWidget {
                 children: [
                   Text(
                     entry.kotNumber,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w800,
                     ),
@@ -326,7 +326,7 @@ class ReturnHistoryList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     entry.summary,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -356,7 +356,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -365,7 +365,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -413,13 +413,13 @@ class _EmptyList extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

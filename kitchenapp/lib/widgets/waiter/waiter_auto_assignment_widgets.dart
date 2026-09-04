@@ -93,7 +93,7 @@ class WaiterNotificationList extends StatelessWidget {
               decoration: BoxDecoration(
                 color: notification.status == 'new'
                     ? AppColors.info.withValues(alpha: 0.08)
-                    : Colors.white,
+                    : AppColors.surface,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: notification.status == 'new'
@@ -116,7 +116,7 @@ class WaiterNotificationList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           notification.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w800,
                             color: AppColors.primaryText,
                           ),
@@ -128,7 +128,7 @@ class WaiterNotificationList extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     notification.body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.bodyText,
                       height: 1.4,
                     ),
@@ -136,7 +136,7 @@ class WaiterNotificationList extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     notification.createdAt,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 12,
                     ),
@@ -186,7 +186,7 @@ class WaiterTaskList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -198,7 +198,7 @@ class WaiterTaskList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           '${task.kotNumber} · Table ${task.tableNumber}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w900,
                             color: AppColors.primaryText,
                           ),
@@ -210,7 +210,7 @@ class WaiterTaskList extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     task.assignedWaiter,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                     ),
@@ -291,13 +291,13 @@ class _StatChip extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 18,
               color: AppColors.primaryText,
             ),
           ),
-          Text(label, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(label, style: TextStyle(color: AppColors.secondaryText)),
         ],
       ),
     );
@@ -322,7 +322,7 @@ class _EmptyBox extends StatelessWidget {
       child: Text(
         message,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: AppColors.secondaryText),
+        style: TextStyle(color: AppColors.secondaryText),
       ),
     );
   }

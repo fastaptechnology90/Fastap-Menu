@@ -162,7 +162,7 @@ class AuthSecurityFeatureTile extends StatelessWidget {
                   subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 11,
                     height: 1.3,
@@ -201,7 +201,7 @@ class AuthSectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
               color: AppColors.primaryText,
               fontSize: 14,
@@ -210,7 +210,7 @@ class AuthSectionHeader extends StatelessWidget {
           if (subtitle != null)
             Text(
               subtitle!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontSize: 12,
               ),
@@ -244,7 +244,7 @@ class _AuthCapabilityChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: active
             ? AppColors.primary.withValues(alpha: 0.14)
-            : Colors.white,
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: active ? AppColors.primary : AppColors.panelBorder,

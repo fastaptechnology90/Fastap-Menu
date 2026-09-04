@@ -24,7 +24,7 @@ class RecipeCostingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: highCost ? AppColors.warning : AppColors.panelBorder,
@@ -38,20 +38,20 @@ class RecipeCostingCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   recipe.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
               if (highCost)
-                const _Tag(label: 'High food cost', color: AppColors.warning),
+                _Tag(label: 'High food cost', color: AppColors.warning),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${recipe.section} · ${recipe.portionStandard}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -69,7 +69,7 @@ class RecipeCostingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Ingredient quantities',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -83,7 +83,7 @@ class RecipeCostingCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 '${item.name} · ${item.quantity} · ₹${item.cost.toStringAsFixed(0)}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -92,7 +92,7 @@ class RecipeCostingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Cooking SOP',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -112,7 +112,7 @@ class RecipeCostingCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       step,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -130,7 +130,7 @@ class RecipeCostingCard extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 'Prep video · ${recipe.prepVideoUrl}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.info,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
@@ -184,14 +184,14 @@ class RecipeCostingSidePanel extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Food costing overview',
                 style: TextStyle(
                   color: AppColors.primaryText,
@@ -240,7 +240,7 @@ class RecipeCostingSidePanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Waste tracking log',
           style: TextStyle(
             color: AppColors.primaryText,
@@ -250,7 +250,7 @@ class RecipeCostingSidePanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         if (wasteLog.isEmpty)
-          const Text(
+          Text(
             'No waste recorded yet.',
             style: TextStyle(color: AppColors.secondaryText),
           )
@@ -267,7 +267,7 @@ class RecipeCostingSidePanel extends StatelessWidget {
               ),
               child: Text(
                 '${entry.recipeName} · ${entry.plates} plates · ₹${entry.cost.toStringAsFixed(0)} · ${entry.reason}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.bodyText,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -319,7 +319,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 16,
@@ -327,7 +327,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 11,

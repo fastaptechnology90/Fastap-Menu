@@ -104,9 +104,9 @@ export default function HousekeepingMaintenance() {
   const [expandedTask, setExpandedTask] = useState<string|null>(null);
   const [staffList, setStaffList] = useState<string[]>([]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     if (!restaurantId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [hk, mt, staffRows] = await Promise.all([
         housekeepingApi.tasks(restaurantId),
@@ -117,10 +117,16 @@ export default function HousekeepingMaintenance() {
       setMainTasks((Array.isArray(mt) ? mt : []).map(mapMT));
       setStaffList((Array.isArray(staffRows) ? staffRows : []).map((s: { name?: string }) => s.name || "").filter(Boolean));
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, [restaurantId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Guest housekeeping / maintenance requests arrive while this page is open.
+  // Without a poll they stayed invisible until someone reloaded the page.
+  useEffect(() => {
+    loadData();
+    const t = setInterval(() => loadData(true), 15000);
+    return () => clearInterval(t);
+  }, [loadData]);
 
   const hkStats = {
     pending: hkTasks.filter(t=>t.status==="pending").length,

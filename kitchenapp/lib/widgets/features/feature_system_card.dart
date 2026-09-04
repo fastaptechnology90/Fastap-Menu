@@ -28,7 +28,7 @@ class FeatureSystemCard extends StatelessWidget {
       expandChild: false,
       trailing: Text(
         '${system.featureCount}',
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.primary,
           fontWeight: FontWeight.w900,
         ),
@@ -64,7 +64,7 @@ class FeatureSystemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'UI + state + audit surface',
                   maxLines: 1,
@@ -82,7 +82,7 @@ class FeatureSystemCard extends StatelessWidget {
           for (final group in system.groups) ...[
             Text(
               group.title,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primaryText,
                 fontWeight: FontWeight.w900,
               ),
@@ -100,7 +100,7 @@ class FeatureSystemCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
-          const Text(
+          Text(
             'Implementation Hooks',
             style: TextStyle(
               color: AppColors.primaryText,

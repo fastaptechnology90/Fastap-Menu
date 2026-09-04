@@ -25,7 +25,7 @@ class CompactModuleCard extends StatelessWidget {
         .toList();
 
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -85,7 +85,7 @@ class CompactModuleCard extends StatelessWidget {
                             system.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w900,
                               color: AppColors.primaryText,
                               fontSize: 14,
@@ -106,7 +106,7 @@ class CompactModuleCard extends StatelessWidget {
                       ),
                       child: Text(
                         '${system.featureCount}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w900,
                           fontSize: 12,
@@ -152,7 +152,7 @@ class CompactModuleCard extends StatelessWidget {
                               item,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.secondaryText,
                                 fontWeight: FontWeight.w500,
@@ -211,7 +211,7 @@ class AlertPreviewTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         clipBehavior: Clip.antiAlias,
         child: Container(
@@ -243,7 +243,7 @@ class AlertPreviewTile extends StatelessWidget {
                             alert.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w900,
                               color: AppColors.primaryText,
                               fontSize: 14,
@@ -273,7 +273,7 @@ class AlertPreviewTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${alert.section} · ${alert.triggeredAt}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.secondaryText,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -284,7 +284,7 @@ class AlertPreviewTile extends StatelessWidget {
                       alert.message,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primaryText,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -324,7 +324,7 @@ class OpsAlertModuleTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -358,7 +358,7 @@ class OpsAlertModuleTile extends StatelessWidget {
                     children: [
                       Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           color: AppColors.primaryText,
                           fontSize: 15,
@@ -366,7 +366,7 @@ class OpsAlertModuleTile extends StatelessWidget {
                       ),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.secondaryText,
                         ),
@@ -494,12 +494,12 @@ class TabScreenHeader extends StatelessWidget {
                         height: 44,
                         child: Center(
                           child: loading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: AppColors.surface,
                                   ),
                                 )
                               : const Icon(
@@ -593,7 +593,7 @@ class StyledFilterChipRow extends StatelessWidget {
               child: Ink(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: active ? AppColors.primary : Colors.white,
+                  color: active ? AppColors.primary : AppColors.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: active

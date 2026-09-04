@@ -100,7 +100,7 @@ class FoodSafetyList extends StatelessWidget {
               decoration: BoxDecoration(
                 color: entry.status == 'alert'
                     ? AppColors.danger.withValues(alpha: 0.06)
-                    : Colors.white,
+                    : AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: entry.status == 'alert'
@@ -116,7 +116,7 @@ class FoodSafetyList extends StatelessWidget {
                       children: [
                         Text(
                           entry.checkType,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -124,7 +124,7 @@ class FoodSafetyList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${entry.section} · ${entry.reading} (limit ${entry.threshold})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -205,7 +205,7 @@ class ComplianceRecordList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -217,7 +217,7 @@ class ComplianceRecordList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           record.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -239,7 +239,7 @@ class ComplianceRecordList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${record.section} · Updated ${record.lastUpdated}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -296,14 +296,14 @@ class CleaningHygieneSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Hygiene metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -320,7 +320,7 @@ class CleaningHygieneSidePanel extends StatelessWidget {
           _StatRow('Compliance issues', '${stats.complianceIssues}'),
           _StatRow('Completed today', '${stats.completedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active hygiene modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -377,7 +377,7 @@ class _TaskCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -389,7 +389,7 @@ class _TaskCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w800,
                   ),
@@ -404,7 +404,7 @@ class _TaskCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -414,7 +414,7 @@ class _TaskCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               meta!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontWeight: FontWeight.w600,
                 fontSize: 11,
@@ -500,7 +500,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -508,7 +508,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -562,13 +562,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

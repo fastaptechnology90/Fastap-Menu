@@ -205,6 +205,17 @@ function RestaurantProtectedRoute({ children }: { children: React.ReactNode }) {
   // Preserve where the user was headed (e.g. /restaurant/kitchen when the Kitchen app opens)
   // so login can return them there instead of the role's generic default page.
   if (!currentStaff) return <Redirect to={`/restaurant/login?next=${encodeURIComponent(location)}`} />;
+  // Wait for the bootstrap to report the subscription before gating on it.
+  // currentStaff is restored from localStorage synchronously, but the
+  // subscription only arrives with /restaurant-auth/me — checking it too early
+  // bounced every refresh/direct link to /subscription and on to /dashboard.
+  if (authBootstrapping) {
+    return (
+      <div className="restaurant-panel flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+      </div>
+    );
+  }
   if (!hasActiveSubscription) return <Redirect to="/restaurant/subscription" />;
   return (
     <RestaurantLayout>

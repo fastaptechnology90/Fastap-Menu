@@ -168,9 +168,9 @@ export default function RoomService() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [otaBusy, setOtaBusy] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     if (!restaurantId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [reqData, roomData, minibarData, itemsData, catsData] = await Promise.all([
         roomServiceApi.requests(restaurantId),
@@ -196,10 +196,16 @@ export default function RoomService() {
       setRooms((Array.isArray(roomData) ? roomData : []).map(r => mapRoom(r, pendingCounts)));
       setMinibar(Array.isArray(minibarData) ? minibarData : []);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, [restaurantId]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Guest room requests arrive while this page is open. Without a poll they
+  // stayed invisible until someone reloaded the page.
+  useEffect(() => {
+    loadData();
+    const t = setInterval(() => loadData(true), 15000);
+    return () => clearInterval(t);
+  }, [loadData]);
 
   const filtered = requests.filter(r => typeFilter==="all" || r.type===typeFilter);
   const pending = requests.filter(r=>["pending","preparing","in-progress"].includes(r.status)).length;

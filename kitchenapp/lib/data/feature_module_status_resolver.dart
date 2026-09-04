@@ -8,7 +8,7 @@ class FeatureModuleStatusResolver {
 
   static FeatureModuleStatus statusFor(int systemNumber) {
     if (systemNumber >= 1 && systemNumber <= 49) {
-      return const FeatureModuleStatus(
+      return FeatureModuleStatus(
         label: 'Live · In-app',
         icon: Icons.check_circle_outline,
         color: AppColors.primary,
@@ -16,7 +16,7 @@ class FeatureModuleStatusResolver {
     }
 
     if ({1, 3, 5, 9, 14, 18, 19, 37, 38, 44, 45}.contains(systemNumber)) {
-      return const FeatureModuleStatus(
+      return FeatureModuleStatus(
         label: 'Critical workflow',
         icon: Icons.priority_high,
         color: AppColors.danger,
@@ -24,7 +24,7 @@ class FeatureModuleStatusResolver {
     }
 
     if ({11, 12, 32, 35, 39, 40, 48}.contains(systemNumber)) {
-      return const FeatureModuleStatus(
+      return FeatureModuleStatus(
         label: 'AI enabled',
         icon: Icons.psychology_alt_outlined,
         color: AppColors.premium,
@@ -32,14 +32,14 @@ class FeatureModuleStatusResolver {
     }
 
     if ({23, 31, 41, 42, 43}.contains(systemNumber)) {
-      return const FeatureModuleStatus(
+      return FeatureModuleStatus(
         label: 'Integration ready',
         icon: Icons.hub_outlined,
         color: AppColors.info,
       );
     }
 
-    return const FeatureModuleStatus(
+    return FeatureModuleStatus(
       label: 'Operational module',
       icon: Icons.task_alt,
       color: AppColors.primary,

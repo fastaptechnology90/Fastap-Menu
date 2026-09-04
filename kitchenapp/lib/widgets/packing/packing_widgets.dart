@@ -28,7 +28,7 @@ class PackingJobCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: typeColor),
       ),
@@ -40,7 +40,7 @@ class PackingJobCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   job.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -54,7 +54,7 @@ class PackingJobCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${job.itemsSummary} · ${job.customerName}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -138,7 +138,7 @@ class PackingLabelPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Packing label',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -178,14 +178,14 @@ class PackingSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Packing metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -203,7 +203,7 @@ class PackingSidePanel extends StatelessWidget {
           _StatRow('Event packs', '${stats.eventPacks}'),
           _StatRow('Spill-proof checks', '${stats.spillProofChecks}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active packing modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -233,7 +233,7 @@ class PackingSidePanel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       entry.$1,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.bodyText,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -276,7 +276,7 @@ class _LabelRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 11,
@@ -286,7 +286,7 @@ class _LabelRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontWeight: FontWeight.w700,
                 fontSize: 11,
@@ -318,7 +318,7 @@ class _Check extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.bodyText,
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -344,7 +344,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -353,7 +353,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),

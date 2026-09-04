@@ -20,7 +20,7 @@ class KitchenReportCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -32,7 +32,7 @@ class KitchenReportCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   report.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -46,7 +46,7 @@ class KitchenReportCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${report.section} · ${report.period}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -55,7 +55,7 @@ class KitchenReportCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             report.summary,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -64,7 +64,7 @@ class KitchenReportCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${report.metricLabel}: ${report.metricValue}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primary,
               fontWeight: FontWeight.w800,
             ),
@@ -152,7 +152,7 @@ class AiAnalyticsInsightList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           insight.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -167,7 +167,7 @@ class AiAnalyticsInsightList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${insight.section} · ${insight.prediction}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -233,14 +233,14 @@ class AnalyticsReportingSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Analytics metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -256,7 +256,7 @@ class AnalyticsReportingSidePanel extends StatelessWidget {
           _StatRow('Waste', '${stats.wastePercent}%'),
           _StatRow('Peak hour', stats.peakHourLabel),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Kitchen reports',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -270,7 +270,7 @@ class AnalyticsReportingSidePanel extends StatelessWidget {
           _FeatureChip('Productivity reports', flags.productivityReports),
           _FeatureChip('Peak hour reports', flags.peakHourReports),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'AI analytics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -338,7 +338,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -346,7 +346,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -400,13 +400,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

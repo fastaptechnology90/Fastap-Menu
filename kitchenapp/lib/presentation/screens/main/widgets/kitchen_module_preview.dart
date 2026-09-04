@@ -52,7 +52,7 @@ class _StatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -65,7 +65,7 @@ class _StatTile extends StatelessWidget {
             item.label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.secondaryText,
@@ -112,11 +112,11 @@ class KitchenPreviewList extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               border: Border.all(color: AppColors.panelBorder),
             ),
-            child: const Text(
+            child: Text(
               'Nothing to show for this section.',
               style: TextStyle(color: AppColors.secondaryText),
             ),
@@ -162,7 +162,7 @@ class _PreviewRow extends StatelessWidget {
         vertical: AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -186,7 +186,7 @@ class _PreviewRow extends StatelessWidget {
                   item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.primaryText,
                   ),
@@ -195,7 +195,7 @@ class _PreviewRow extends StatelessWidget {
                   item.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.secondaryText,
                   ),
@@ -247,13 +247,13 @@ class KitchenModuleError extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         children: [
-          const Icon(Icons.cloud_off_outlined, color: AppColors.secondaryText),
+          Icon(Icons.cloud_off_outlined, color: AppColors.secondaryText),
           const SizedBox(height: AppSpacing.md),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.md),

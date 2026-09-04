@@ -19,7 +19,7 @@ class SectionWorkloadPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(color: AppColors.panelBorder),
         boxShadow: [
@@ -33,7 +33,7 @@ class SectionWorkloadPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.grid_view_rounded, color: AppColors.primary, size: 22),
               SizedBox(width: AppSpacing.sm),
@@ -49,7 +49,7 @@ class SectionWorkloadPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           if (items.isEmpty)
-            const Text(
+            Text(
               'No workload data for this section.',
               style: TextStyle(color: AppColors.secondaryText),
             )

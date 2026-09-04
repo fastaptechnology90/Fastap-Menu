@@ -84,7 +84,10 @@ const STATIC_DIR = process.env.STATIC_DIR ?? path.resolve(process.cwd(), "artifa
 if (fs.existsSync(path.join(STATIC_DIR, "index.html"))) {
   app.use(express.static(STATIC_DIR));
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === "GET" && !req.path.startsWith("/api")) {
+    // Match the API prefix exactly — a plain startsWith("/api") also swallowed
+    // SPA routes that merely begin with those letters (e.g. /api-control), so
+    // that page 404'd instead of loading the app.
+    if (req.method === "GET" && req.path !== "/api" && !req.path.startsWith("/api/")) {
       res.sendFile(path.join(STATIC_DIR, "index.html"));
       return;
     }

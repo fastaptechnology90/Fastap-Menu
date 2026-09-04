@@ -36,7 +36,7 @@ class CloudKitchenView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class CloudKitchenView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class CloudKitchenView extends StatelessWidget {
             ),
             child: Text(
               controller.cloudKitchenActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class CloudKitchenView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Brand-wise segregation',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -116,7 +116,7 @@ class CloudKitchenView extends StatelessWidget {
                   (lane) => BrandLaneCard(lane: lane),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Multi-brand order management',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -139,7 +139,7 @@ class CloudKitchenView extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Delivery order handling',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -150,7 +150,7 @@ class CloudKitchenView extends StatelessWidget {
                 const SizedBox(height: 12),
                 DeliveryQueueList(entries: snapshot.deliveryQueue),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Kitchen load balancing',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -161,7 +161,7 @@ class CloudKitchenView extends StatelessWidget {
                 const SizedBox(height: 12),
                 LoadBalanceList(slots: snapshot.loadBalance),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Shared inventory visibility',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -218,7 +218,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
@@ -238,13 +238,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

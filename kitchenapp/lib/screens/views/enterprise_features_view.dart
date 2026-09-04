@@ -62,7 +62,7 @@ class _EnterpriseFeaturesViewState extends State<EnterpriseFeaturesView> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             border: Border.all(color: AppColors.panelBorder),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -71,7 +71,7 @@ class _EnterpriseFeaturesViewState extends State<EnterpriseFeaturesView> {
             runSpacing: 10,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Complete Enterprise Feature Catalog',
                 style: TextStyle(
                   color: AppColors.primaryText,
@@ -116,7 +116,7 @@ class _EnterpriseFeaturesViewState extends State<EnterpriseFeaturesView> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.verified, color: AppColors.primary, size: 20),
                 SizedBox(width: 10),
@@ -151,14 +151,14 @@ class _EnterpriseFeaturesViewState extends State<EnterpriseFeaturesView> {
                     icon: const Icon(Icons.close),
                   ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.panelBorder),
+              borderSide: BorderSide(color: AppColors.panelBorder),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.panelBorder),
+              borderSide: BorderSide(color: AppColors.panelBorder),
             ),
           ),
         ),
@@ -187,11 +187,11 @@ class _EnterpriseFeaturesViewState extends State<EnterpriseFeaturesView> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.panelBorder),
             ),
-            child: const Text(
+            child: Text(
               'No systems match your search or filter.',
               style: TextStyle(
                 color: AppColors.secondaryText,
@@ -274,7 +274,7 @@ class _CatalogStat extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primary,
               fontWeight: FontWeight.w900,
             ),
@@ -282,7 +282,7 @@ class _CatalogStat extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w800,
             ),

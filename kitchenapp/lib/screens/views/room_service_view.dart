@@ -36,7 +36,7 @@ class RoomServiceView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class RoomServiceView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class RoomServiceView extends StatelessWidget {
             ),
             child: Text(
               controller.roomServiceActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class RoomServiceView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Room-wise order tracking',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -125,7 +125,7 @@ class RoomServiceView extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'VIP room priority',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -136,7 +136,7 @@ class RoomServiceView extends StatelessWidget {
                 const SizedBox(height: 12),
                 VipRoomAlertList(alerts: snapshot.vipRoomAlerts),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Scheduled room delivery',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -147,7 +147,7 @@ class RoomServiceView extends StatelessWidget {
                 const SizedBox(height: 12),
                 ScheduledDeliveryList(deliveries: snapshot.scheduledDeliveries),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Tray management',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -158,7 +158,7 @@ class RoomServiceView extends StatelessWidget {
                 const SizedBox(height: 12),
                 TrayAssignmentList(trays: snapshot.trayAssignments),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Mini-bar synchronization',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -215,7 +215,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
@@ -235,13 +235,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

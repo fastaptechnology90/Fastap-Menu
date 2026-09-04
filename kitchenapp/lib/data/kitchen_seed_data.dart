@@ -7,7 +7,7 @@ import '../models/metric.dart';
 class KitchenSeedData {
   const KitchenSeedData._();
 
-  static const sections = [
+  static final sections = [
     'All',
     'Main',
     'Tandoor',
@@ -22,7 +22,7 @@ class KitchenSeedData {
     'Pizza',
   ];
 
-  static const liveMetrics = [
+  static final liveMetrics = [
     Metric(
       label: 'Active orders',
       value: '42',
@@ -53,7 +53,7 @@ class KitchenSeedData {
     ),
   ];
 
-  static const insightMetrics = [
+  static final insightMetrics = [
     Metric(
       label: 'Peak load',
       value: '7:45 PM',
@@ -84,7 +84,7 @@ class KitchenSeedData {
     ),
   ];
 
-  static const orders = [
+  static final orders = [
     KitchenOrder(
       title: 'KOT #1842',
       location: 'Table 12',

@@ -20,7 +20,7 @@ class FiringSessionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: session.vip ? AppColors.premium : AppColors.panelBorder,
@@ -43,7 +43,7 @@ class FiringSessionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   session.location,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -55,13 +55,13 @@ class FiringSessionCard extends StatelessWidget {
                 color: AppColors.info,
               ),
               if (session.vip)
-                const _Tag(label: 'VIP', color: AppColors.premium),
+                _Tag(label: 'VIP', color: AppColors.premium),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${session.guestType} · ${session.deliveryType} · ${session.pacing.tableMinutesSinceSeat}m seated',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
             ),
@@ -161,7 +161,7 @@ class _CourseRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   course.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.primaryText,
                   ),
@@ -173,7 +173,7 @@ class _CourseRow extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 6),
                   child: Text(
                     course.elapsed,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
@@ -185,7 +185,7 @@ class _CourseRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${course.linkedKot} · ${course.items.join(', ')}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -283,7 +283,7 @@ class FiringSmartPanel extends StatelessWidget {
         _Panel(
           title: 'Multi-course coordination',
           child: coordinationBoard.isEmpty
-              ? const Text(
+              ? Text(
                   'No active coordination lanes.',
                   style: TextStyle(color: AppColors.secondaryText),
                 )
@@ -298,7 +298,7 @@ class FiringSmartPanel extends StatelessWidget {
                                 AppColors.primary.withValues(alpha: 0.12),
                             child: Text(
                               '${item.etaMinutes}m',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
@@ -347,7 +347,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -356,7 +356,7 @@ class _Panel extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -452,7 +452,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w900,
             fontSize: 20,
@@ -460,7 +460,7 @@ class _Stat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 12,

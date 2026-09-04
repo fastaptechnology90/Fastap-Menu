@@ -37,7 +37,7 @@ class SandboxTrainingView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -47,7 +47,7 @@ class SandboxTrainingView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -91,7 +91,7 @@ class SandboxTrainingView extends StatelessWidget {
             ),
             child: Text(
               controller.sandboxTrainingActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.premium,
                 fontWeight: FontWeight.w700,
               ),
@@ -183,7 +183,7 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8, bottom: 12),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.primaryText,
           fontWeight: FontWeight.w800,
           fontSize: 16,
@@ -205,7 +205,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

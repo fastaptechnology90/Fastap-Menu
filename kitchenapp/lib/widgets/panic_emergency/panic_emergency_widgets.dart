@@ -31,7 +31,7 @@ class EmergencyIncidentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: incident.severity == 'critical'
             ? AppColors.danger.withValues(alpha: 0.06)
-            : Colors.white,
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: typeColor.withValues(alpha: 0.4)),
       ),
@@ -43,7 +43,7 @@ class EmergencyIncidentCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   incident.title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -57,7 +57,7 @@ class EmergencyIncidentCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${incident.section} · ${incident.severity} · ${incident.reportedAt} · ${incident.reportedBy}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -66,7 +66,7 @@ class EmergencyIncidentCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             incident.message,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -167,7 +167,7 @@ class EvacuationAlertList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           alert.zone,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -179,7 +179,7 @@ class EvacuationAlertList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${alert.section} · ${alert.message}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -237,7 +237,7 @@ class EmergencyBroadcastList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -249,7 +249,7 @@ class EmergencyBroadcastList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           broadcast.broadcastType,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -261,7 +261,7 @@ class EmergencyBroadcastList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${broadcast.sentAt} · ${broadcast.message}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -299,7 +299,7 @@ class PanicButtonPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Panic button',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -308,7 +308,7 @@ class PanicButtonPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Instant emergency trigger · broadcasts all stations',
             style: TextStyle(
               color: AppColors.secondaryText,
@@ -354,14 +354,14 @@ class PanicEmergencySidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Emergency metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -377,7 +377,7 @@ class PanicEmergencySidePanel extends StatelessWidget {
           _StatRow('Panic triggers', '${stats.panicTriggersToday}'),
           _StatRow('Resolved today', '${stats.resolvedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Emergency modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -471,7 +471,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -479,7 +479,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -533,13 +533,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

@@ -80,7 +80,7 @@ class HomeSectionTitle extends StatelessWidget {
                   subtitle!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.secondaryText,
                     fontWeight: FontWeight.w500,
@@ -175,7 +175,7 @@ class _HomeStatCard extends StatelessWidget {
       height: HomeWidgetStrip.cardMinHeight,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
           border: Border.all(color: AppColors.panelBorder),
         ),
@@ -223,7 +223,7 @@ class _HomeStatCard extends StatelessWidget {
                       item.label,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: AppColors.secondaryText,
@@ -269,7 +269,7 @@ class _HomeMetricCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -300,7 +300,7 @@ class _HomeMetricCard extends StatelessWidget {
                     metric.label,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: AppColors.secondaryText,
@@ -312,7 +312,7 @@ class _HomeMetricCard extends StatelessWidget {
                     metric.value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                       color: AppColors.primaryText,
@@ -405,7 +405,7 @@ class HomeOrderPreview extends StatelessWidget {
               vertical: AppSpacing.xxxl,
             ),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
               border: Border.all(color: AppColors.panelBorder),
               boxShadow: [HomeDecor.softShadow()],
@@ -419,7 +419,7 @@ class HomeOrderPreview extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check_circle_outline_rounded,
                     color: AppColors.primary,
                     size: 28,
@@ -428,7 +428,7 @@ class HomeOrderPreview extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   deliveryMode ? 'No deliveries yet' : 'All caught up!',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.primaryText,
                   ),
@@ -439,7 +439,7 @@ class HomeOrderPreview extends StatelessWidget {
                       ? 'Orders assigned to you will show here once the kitchen marks them ready.'
                       : 'No active orders right now.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontSize: 13,
                   ),
@@ -500,7 +500,7 @@ class HomeQuickActions extends StatelessWidget {
               child: Ink(
                 width: 84,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
                   border: Border.all(
                     color: action.accent.withValues(alpha: 0.2),
@@ -532,7 +532,7 @@ class HomeQuickActions extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: AppColors.primaryText,

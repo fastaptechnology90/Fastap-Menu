@@ -3,16 +3,11 @@ import { useUser } from "@/contexts/UserContext";
 import { GuestPage } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError } from "@/components/user/GuestApiState";
 import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
-import { parseEntryFromUrl } from "@/lib/smartEntry";
+import { entryParamsForVenue } from "@/lib/smartEntry";
 
-function venueLoadParams() {
-  const p = parseEntryFromUrl();
-  return {
-    table: p.table,
-    room: p.room,
-    section: p.section,
-  };
-}
+// Falls back to the scan-time context when the URL no longer carries
+// ?table=/?room= (every page after the first), so a reload keeps the table.
+const venueLoadParams = entryParamsForVenue;
 
 export function GuestVenueRequired({ children }: { children: React.ReactNode }) {
   const { venue, venueLoading, venueError, loadVenue } = useUser();

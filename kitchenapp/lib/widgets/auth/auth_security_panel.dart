@@ -67,7 +67,7 @@ class AuthSecurityPanel extends StatelessWidget {
                       user.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -78,7 +78,7 @@ class AuthSecurityPanel extends StatelessWidget {
                       '${user.staffCode} · ${user.section}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.secondaryText),
+                      style: TextStyle(color: AppColors.secondaryText),
                     ),
                     const SizedBox(height: 8),
                     RoleBadge(role: user.role, compact: true),

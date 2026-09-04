@@ -20,7 +20,7 @@ class AlertsTab extends StatelessWidget {
   final KitchenCommandController controller;
   final AuthController auth;
 
-  static const _modules = [
+  static final _modules = [
     _AlertModule(
       'Live Alerts',
       'Delay · VIP · stock · equipment',
@@ -255,12 +255,12 @@ class _AlertsUnavailableBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_off_rounded, color: AppColors.warning),
+          Icon(Icons.cloud_off_rounded, color: AppColors.warning),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primaryText,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
@@ -296,13 +296,13 @@ class _AlertsClearState extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_circle_rounded,
               color: AppColors.primary,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

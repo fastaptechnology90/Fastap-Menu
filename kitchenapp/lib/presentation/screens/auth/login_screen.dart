@@ -57,7 +57,7 @@ class _LoginColumn extends StatelessWidget {
         Text(
           AppVariantContent.loginTitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
             color: AppColors.primaryText,
@@ -67,7 +67,7 @@ class _LoginColumn extends StatelessWidget {
         Text(
           AppVariantContent.loginSubtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w500,
             height: 1.4,
@@ -92,7 +92,7 @@ class _LoginColumn extends StatelessWidget {
               ),
               child: const Text('Forgot password?'),
             ),
-            const Text('·', style: TextStyle(color: AppColors.panelBorder)),
+            Text('·', style: TextStyle(color: AppColors.panelBorder)),
             TextButton(
               onPressed: () => Navigator.push(
                 context,
@@ -199,7 +199,7 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Join the kitchen team',
               style: TextStyle(
                 fontSize: 26,
@@ -208,7 +208,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Submit your details. An administrator will approve your access.',
               style: TextStyle(color: AppColors.secondaryText, height: 1.4),
             ),
@@ -252,7 +252,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.danger,
                     fontWeight: FontWeight.w700,
                   ),
@@ -285,7 +285,7 @@ class _SignupScreenState extends State<SignupScreen> {
         hintText: hint,
         prefixIcon: Icon(icon),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.surface,
       ),
     );
   }
@@ -361,7 +361,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(Icons.lock_reset_rounded, color: AppColors.info),
                   SizedBox(width: 12),
@@ -378,23 +378,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             TextField(
               controller: _phoneController,
               enabled: !_otpSent,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Mobile number',
                 prefixIcon: Icon(Icons.phone_outlined),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: AppColors.surface,
               ),
             ),
             if (_otpSent) ...[
               const SizedBox(height: 14),
               TextField(
                 controller: _otpController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'OTP code',
                   prefixIcon: Icon(Icons.pin_outlined),
                   hintText: '6-digit OTP',
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: AppColors.surface,
                 ),
               ),
             ],

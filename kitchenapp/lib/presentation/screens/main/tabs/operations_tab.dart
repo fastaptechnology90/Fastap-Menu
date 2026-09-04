@@ -82,28 +82,28 @@ class _OperationsTabState extends State<OperationsTab> {
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: 'Search modules by name or number…',
-                    hintStyle: const TextStyle(
+                    hintStyle: TextStyle(
                       color: AppColors.secondaryText,
                       fontSize: 13,
                     ),
                     prefixIcon: const Icon(Icons.search_rounded),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: AppColors.surface,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      borderSide: const BorderSide(color: AppColors.panelBorder),
+                      borderSide: BorderSide(color: AppColors.panelBorder),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      borderSide: const BorderSide(color: AppColors.panelBorder),
+                      borderSide: BorderSide(color: AppColors.panelBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      borderSide: const BorderSide(
+                      borderSide: BorderSide(
                         color: AppColors.premium,
                         width: 1.5,
                       ),
@@ -186,7 +186,7 @@ class _OpsEmptyState extends StatelessWidget {
               color: AppColors.secondaryText.withValues(alpha: 0.5),
             ),
             const SizedBox(height: AppSpacing.md),
-            const Text(
+            Text(
               'No modules found',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
@@ -194,7 +194,7 @@ class _OpsEmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Try a different search or category filter',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.secondaryText),

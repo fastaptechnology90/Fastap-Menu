@@ -20,7 +20,7 @@ class BulkPrepJobCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
@@ -32,7 +32,7 @@ class BulkPrepJobCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   job.eventName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -44,7 +44,7 @@ class BulkPrepJobCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${job.location} · ${job.guestCount} guests',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -53,7 +53,7 @@ class BulkPrepJobCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             job.menuItems.join(' · '),
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.bodyText,
               fontWeight: FontWeight.w600,
               fontSize: 11,
@@ -119,7 +119,7 @@ class EventScheduleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -131,7 +131,7 @@ class EventScheduleCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   event.eventName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w800,
                   ),
@@ -143,7 +143,7 @@ class EventScheduleCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '${event.startTime} · ${event.mealType} · ${event.guestCount} guests · ${event.location}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -214,7 +214,7 @@ class BuffetStationList extends StatelessWidget {
                       children: [
                         Text(
                           station.stationName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -222,7 +222,7 @@ class BuffetStationList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${station.location} · ${station.courses.join(', ')}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -233,7 +233,7 @@ class BuffetStationList extends StatelessWidget {
                   ),
                   Text(
                     '${station.servingPercent}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.premium,
                       fontWeight: FontWeight.w900,
                     ),
@@ -268,7 +268,7 @@ class GuestCountPlanList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -280,7 +280,7 @@ class GuestCountPlanList extends StatelessWidget {
                       children: [
                         Text(
                           plan.eventName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -288,7 +288,7 @@ class GuestCountPlanList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${plan.confirmedGuests} confirmed · +${plan.bufferGuests} buffer · ${plan.preparedServings} prepared',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -326,7 +326,7 @@ class CounterCoordinationList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -338,7 +338,7 @@ class CounterCoordinationList extends StatelessWidget {
                       children: [
                         Text(
                           counter.counterName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -346,7 +346,7 @@ class CounterCoordinationList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${counter.assignedChef} · ${counter.linkedEvent} · queue ${counter.queueDepth}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -385,14 +385,14 @@ class BanquetSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Banquet metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -408,7 +408,7 @@ class BanquetSidePanel extends StatelessWidget {
           _StatRow('Total guests', '${stats.totalGuests}'),
           _StatRow('Completed today', '${stats.completedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active banquet modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -475,7 +475,7 @@ class _Meta extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -483,7 +483,7 @@ class _Meta extends StatelessWidget {
           ),
           TextSpan(
             text: value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
               fontSize: 12,
@@ -510,7 +510,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -518,7 +518,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -572,13 +572,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

@@ -36,7 +36,7 @@ class CleaningHygieneView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class CleaningHygieneView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class CleaningHygieneView extends StatelessWidget {
             ),
             child: Text(
               controller.cleaningHygieneActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class CleaningHygieneView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Cleaning schedules',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -122,7 +122,7 @@ class CleaningHygieneView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Hygiene checklists',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -141,7 +141,7 @@ class CleaningHygieneView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Equipment sanitization',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -160,7 +160,7 @@ class CleaningHygieneView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Food safety tracking',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -171,7 +171,7 @@ class CleaningHygieneView extends StatelessWidget {
                 const SizedBox(height: 12),
                 FoodSafetyList(entries: snapshot.foodSafetyEntries),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Deep cleaning management',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -188,7 +188,7 @@ class CleaningHygieneView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Compliance · FSSAI · audits · staff verification',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -254,7 +254,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

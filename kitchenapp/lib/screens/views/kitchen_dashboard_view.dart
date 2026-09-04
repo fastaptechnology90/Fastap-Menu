@@ -164,7 +164,7 @@ class _DashboardTabBar extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.panelBorder),
         boxShadow: [
@@ -436,7 +436,7 @@ class _OrdersList extends StatelessWidget {
                 ),
                 child: Text(
                   '${orders.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w900,
                     fontSize: 13,
@@ -470,7 +470,7 @@ class _OrdersList extends StatelessWidget {
                 ),
                 child: Text(
                   '${orders.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w900,
                     fontSize: 13,
@@ -531,7 +531,7 @@ class _OrdersEmptyState extends StatelessWidget {
             vertical: AppSpacing.xxxl,
           ),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -544,13 +544,13 @@ class _OrdersEmptyState extends StatelessWidget {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_circle_outline_rounded,
                   color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              const Text(
+              Text(
                 'Queue is clear',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
@@ -558,7 +558,7 @@ class _OrdersEmptyState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'No active orders for this section.',
                 style: TextStyle(color: AppColors.secondaryText),
               ),
@@ -585,7 +585,7 @@ class _DashboardLoading extends StatelessWidget {
         Container(
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -607,7 +607,7 @@ class _ErrorState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -620,13 +620,13 @@ class _ErrorState extends StatelessWidget {
               color: AppColors.danger.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.cloud_off_outlined, color: AppColors.danger),
+            child: Icon(Icons.cloud_off_outlined, color: AppColors.danger),
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.bodyText, height: 1.5),
+            style: TextStyle(color: AppColors.bodyText, height: 1.5),
           ),
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
@@ -663,14 +663,14 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          Icon(Icons.warning_amber_rounded, color: AppColors.warning),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               message,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,

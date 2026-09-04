@@ -42,7 +42,7 @@ class PanicEmergencyView extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.panelBorder),
             ),
@@ -52,7 +52,7 @@ class PanicEmergencyView extends StatelessWidget {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -95,7 +95,7 @@ class PanicEmergencyView extends StatelessWidget {
             ),
             child: Text(
               controller.panicEmergencyActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.danger,
                 fontWeight: FontWeight.w700,
               ),
@@ -116,7 +116,7 @@ class PanicEmergencyView extends StatelessWidget {
                   processing: controller.panicEmergencyLoading,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Active incidents',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -136,7 +136,7 @@ class PanicEmergencyView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Evacuation alerts',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -153,7 +153,7 @@ class PanicEmergencyView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Emergency broadcast log',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -210,7 +210,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

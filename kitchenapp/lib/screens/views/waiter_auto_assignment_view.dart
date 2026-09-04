@@ -43,7 +43,7 @@ class _WaiterModuleLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 48),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -82,7 +82,7 @@ class _WaiterBoard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -92,7 +92,7 @@ class _WaiterBoard extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -154,7 +154,7 @@ class _WaiterBoard extends StatelessWidget {
             ),
             child: Text(
               controller.waiterAutoAssignmentActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -166,7 +166,7 @@ class _WaiterBoard extends StatelessWidget {
         const SizedBox(height: 14),
         WaiterFeatureFlagRow(flags: snapshot.featureFlags),
         const SizedBox(height: 18),
-        const Text(
+        Text(
           'Order ready notifications',
           style: TextStyle(
             fontWeight: FontWeight.w900,
@@ -184,7 +184,7 @@ class _WaiterBoard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const Text(
+        Text(
           'Auto-assigned delivery tasks',
           style: TextStyle(
             fontWeight: FontWeight.w900,
@@ -218,7 +218,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.room_service_outlined,
             size: 48,
             color: AppColors.primary,
@@ -227,7 +227,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.bodyText),
+            style: TextStyle(color: AppColors.bodyText),
           ),
           const SizedBox(height: 16),
           FilledButton(onPressed: onRetry, child: const Text('Retry')),

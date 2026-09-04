@@ -39,7 +39,7 @@ class ProfileHeroCard extends StatelessWidget {
                   borderRadius: 22,
                   borderColor: AppColors.panelBorder,
                   backgroundColor: AppColors.chipBackground,
-                  initialsStyle: const TextStyle(
+                  initialsStyle: TextStyle(
                     color: AppColors.primary,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
@@ -52,7 +52,7 @@ class ProfileHeroCard extends StatelessWidget {
                     children: [
                       Text(
                         user?.name ?? 'Staff member',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primaryText,
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
@@ -77,7 +77,7 @@ class ProfileHeroCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Text(
                               role.label,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.bodyText,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
@@ -96,7 +96,7 @@ class ProfileHeroCard extends StatelessWidget {
                     child: InkWell(
                       onTap: onEdit,
                       borderRadius: BorderRadius.circular(14),
-                      child: const SizedBox(
+                      child: SizedBox(
                         width: 42,
                         height: 42,
                         child: Icon(Icons.edit_rounded, color: AppColors.primary),
@@ -124,7 +124,7 @@ class ProfileHeroCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.email_outlined,
                     size: 16,
                     color: AppColors.secondaryText,
@@ -135,7 +135,7 @@ class ProfileHeroCard extends StatelessWidget {
                       user!.email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.secondaryText,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -301,7 +301,7 @@ class ProfileAvatarPicker extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Profile photo',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
@@ -359,12 +359,12 @@ class ProfileAvatarPicker extends StatelessWidget {
                         color: AppColors.danger.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.delete_outline,
                         color: AppColors.danger,
                       ),
                     ),
-                    title: const Text(
+                    title: Text(
                       'Remove photo',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
@@ -463,7 +463,7 @@ class _HeroChip extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -502,7 +502,7 @@ class ProfileSectionTitle extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w900,
                   color: AppColors.primaryText,
                   fontSize: 16,
@@ -516,7 +516,7 @@ class ProfileSectionTitle extends StatelessWidget {
               padding: const EdgeInsets.only(left: 14),
               child: Text(
                 subtitle!,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.secondaryText,
                   fontSize: 12,
                 ),
@@ -535,7 +535,7 @@ class ProfileMenuTile extends StatelessWidget {
     required this.icon,
     required this.title,
     this.subtitle,
-    this.color = AppColors.primary,
+    this.color,
     this.destructive = false,
     this.onTap,
   });
@@ -543,18 +543,18 @@ class ProfileMenuTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  final Color color;
+  final Color? color;
   final bool destructive;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tone = destructive ? AppColors.danger : color;
+    final tone = destructive ? AppColors.danger : (color ?? AppColors.primary);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -599,7 +599,7 @@ class ProfileMenuTile extends StatelessWidget {
                           subtitle!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontSize: 12,
                           ),
@@ -624,32 +624,33 @@ class ProfileInfoBanner extends StatelessWidget {
     super.key,
     required this.message,
     this.icon = Icons.info_outline_rounded,
-    this.color = AppColors.info,
+    this.color,
   });
 
   final String message;
   final IconData icon;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final c = color ?? AppColors.info;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: c.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: c.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
+          Icon(icon, color: c),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.bodyText,
                 height: 1.45,
                 fontWeight: FontWeight.w500,
@@ -700,18 +701,18 @@ class ProfileFormField extends StatelessWidget {
         hintText: hint,
         prefixIcon: icon == null ? null : Icon(icon),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          borderSide: const BorderSide(color: AppColors.panelBorder),
+          borderSide: BorderSide(color: AppColors.panelBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          borderSide: const BorderSide(color: AppColors.panelBorder),
+          borderSide: BorderSide(color: AppColors.panelBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );
@@ -749,7 +750,7 @@ class ProfileScreenScaffold extends StatelessWidget {
                 subtitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: AppColors.secondaryText,

@@ -37,7 +37,7 @@ class CustomerReturnView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -47,7 +47,7 @@ class CustomerReturnView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -90,7 +90,7 @@ class CustomerReturnView extends StatelessWidget {
             ),
             child: Text(
               controller.customerReturnActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.warning,
                 fontWeight: FontWeight.w700,
               ),
@@ -104,7 +104,7 @@ class CustomerReturnView extends StatelessWidget {
             final main = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Open return requests',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -118,11 +118,11 @@ class CustomerReturnView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.panelBorder),
                     ),
-                    child: const Text(
+                    child: Text(
                       'No open return requests for this section',
                       style: TextStyle(
                         color: AppColors.secondaryText,
@@ -138,7 +138,7 @@ class CustomerReturnView extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Complaint tags',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -149,7 +149,7 @@ class CustomerReturnView extends StatelessWidget {
                 const SizedBox(height: 12),
                 ComplaintTagList(tags: snapshot.complaintTags),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Return history',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -226,7 +226,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],

@@ -27,7 +27,7 @@ class OfflineModuleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: statusColor.withValues(alpha: 0.35)),
       ),
@@ -39,7 +39,7 @@ class OfflineModuleCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   module.moduleName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -51,7 +51,7 @@ class OfflineModuleCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${module.section} · ${module.pendingCount} pending · synced ${module.lastSyncedAt}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -129,7 +129,7 @@ class FailoverQueueList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -141,7 +141,7 @@ class FailoverQueueList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${item.section} · ${item.itemType} · queued ${item.queuedAt}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -209,7 +209,7 @@ class QueueRecoveryList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -221,7 +221,7 @@ class QueueRecoveryList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           job.jobName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -233,7 +233,7 @@ class QueueRecoveryList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${job.section} · ${job.progress}% complete',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -306,14 +306,14 @@ class OfflineFailoverSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Failover metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -329,7 +329,7 @@ class OfflineFailoverSidePanel extends StatelessWidget {
           _StatRow('Synced today', '${stats.syncedToday}'),
           _StatRow('Last restore', stats.lastRestoreAt),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Offline modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -407,7 +407,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -415,7 +415,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -469,13 +469,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

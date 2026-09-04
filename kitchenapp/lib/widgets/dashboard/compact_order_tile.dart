@@ -86,8 +86,8 @@ class CompactOrderTile extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color.alphaBlend(order.color.withValues(alpha: 0.06), Colors.white),
-                Colors.white,
+                Color.alphaBlend(order.color.withValues(alpha: 0.06), AppColors.surface),
+                AppColors.surface,
               ],
             ),
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -148,7 +148,7 @@ class CompactOrderTile extends StatelessWidget {
                                     order.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       color: AppColors.primaryText,
                                     ),
@@ -164,7 +164,7 @@ class CompactOrderTile extends StatelessWidget {
                               '${order.section} · ${order.location}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.secondaryText,
                               ),
@@ -175,7 +175,7 @@ class CompactOrderTile extends StatelessWidget {
                                 order.items.take(3).join(' · '),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.primaryText,
@@ -221,7 +221,7 @@ class CompactOrderTile extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             statusText,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: AppColors.secondaryText,
@@ -301,7 +301,7 @@ class CompactOrderTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               '${order.section} · ${order.location} · ${order.timer}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontSize: 13,
               ),
@@ -310,7 +310,7 @@ class CompactOrderTile extends StatelessWidget {
             const Text('Items', style: TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             if (order.items.isEmpty)
-              const Text(
+              Text(
                 'No items listed',
                 style: TextStyle(color: AppColors.secondaryText),
               )
@@ -320,7 +320,7 @@ class CompactOrderTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.circle,
                         size: 6,
                         color: AppColors.secondaryText,
@@ -345,7 +345,7 @@ class CompactOrderTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
-                      const Icon(Icons.add_circle_outline,
+                      Icon(Icons.add_circle_outline,
                           size: 14, color: AppColors.secondaryText),
                       const SizedBox(width: 8),
                       Expanded(
@@ -359,7 +359,7 @@ class CompactOrderTile extends StatelessWidget {
             ],
             if (order.modifiers.isNotEmpty) ...[
               const SizedBox(height: 14),
-              const Text('Modifiers / Removals',
+              Text('Modifiers / Removals',
                   style: TextStyle(
                       fontWeight: FontWeight.w800, color: AppColors.primary)),
               const SizedBox(height: 6),
@@ -368,12 +368,12 @@ class CompactOrderTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
-                      const Icon(Icons.remove_circle_outline,
+                      Icon(Icons.remove_circle_outline,
                           size: 14, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(line,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.primary)),
                       ),
@@ -391,7 +391,7 @@ class CompactOrderTile extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
-                      const Icon(Icons.sticky_note_2_outlined,
+                      Icon(Icons.sticky_note_2_outlined,
                           size: 14, color: AppColors.secondaryText),
                       const SizedBox(width: 8),
                       Expanded(
@@ -441,7 +441,7 @@ class CompactOrderTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(Icons.hourglass_top, color: AppColors.primary, size: 18),
                         SizedBox(width: 8),
@@ -552,7 +552,7 @@ class CompactOrderTile extends StatelessWidget {
           } catch (_) {
             messenger
               ..hideCurrentSnackBar()
-              ..showSnackBar(const SnackBar(
+              ..showSnackBar(SnackBar(
                 content: Text('Could not mark paid. Check connection and try again.'),
                 backgroundColor: AppColors.danger,
                 behavior: SnackBarBehavior.floating,
@@ -594,7 +594,7 @@ class CompactOrderTile extends StatelessWidget {
           } catch (_) {
             messenger
               ..hideCurrentSnackBar()
-              ..showSnackBar(const SnackBar(
+              ..showSnackBar(SnackBar(
                 content: Text('Something went wrong. Check connection and try again.'),
                 backgroundColor: AppColors.danger,
                 behavior: SnackBarBehavior.floating,

@@ -11,11 +11,11 @@ class MiniChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Chip(
       visualDensity: VisualDensity.compact,
-      side: const BorderSide(color: AppColors.panelBorder),
+      side: BorderSide(color: AppColors.panelBorder),
       backgroundColor: AppColors.chipBackground,
       label: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.bodyText,
           fontSize: 12,
           fontWeight: FontWeight.w700,

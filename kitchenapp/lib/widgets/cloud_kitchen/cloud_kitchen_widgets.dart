@@ -22,7 +22,7 @@ class BrandLaneCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
@@ -34,7 +34,7 @@ class BrandLaneCard extends StatelessWidget {
               children: [
                 Text(
                   lane.brandName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -42,7 +42,7 @@ class BrandLaneCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${lane.cuisine} · ${lane.activeOrders} active',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.secondaryText,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -88,7 +88,7 @@ class BrandOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -100,7 +100,7 @@ class BrandOrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.kotNumber,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -114,7 +114,7 @@ class BrandOrderCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${order.itemSummary} · ${order.channel}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -198,7 +198,7 @@ class DeliveryQueueList extends StatelessWidget {
                       children: [
                         Text(
                           entry.kotNumber,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -206,7 +206,7 @@ class DeliveryQueueList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${entry.brandName} · ${entry.platform} · ${entry.riderEtaMinutes}m rider ETA',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -251,7 +251,7 @@ class LoadBalanceList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -263,7 +263,7 @@ class LoadBalanceList extends StatelessWidget {
                       children: [
                         Text(
                           '${slot.section} · ${slot.brandName}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -271,7 +271,7 @@ class LoadBalanceList extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           'Queue ${slot.queueDepth}/${slot.capacity}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.secondaryText,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
@@ -314,7 +314,7 @@ class SharedInventoryList extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.panelBorder),
               ),
@@ -326,7 +326,7 @@ class SharedInventoryList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.itemName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -343,7 +343,7 @@ class SharedInventoryList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${item.quantity} ${item.unit} · ${item.sharedByBrands.join(', ')}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -378,14 +378,14 @@ class CloudKitchenSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Cloud kitchen metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -401,7 +401,7 @@ class CloudKitchenSidePanel extends StatelessWidget {
           _StatRow('Shared items', '${stats.sharedItems}'),
           _StatRow('Completed today', '${stats.completedToday}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active cloud modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -471,7 +471,7 @@ class _Meta extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label: ',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -479,7 +479,7 @@ class _Meta extends StatelessWidget {
           ),
           TextSpan(
             text: value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w800,
               fontSize: 12,
@@ -506,7 +506,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -514,7 +514,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -568,13 +568,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

@@ -26,7 +26,7 @@ class StaffPerformanceCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
@@ -38,7 +38,7 @@ class StaffPerformanceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   record.staffName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w900,
                   ),
@@ -52,7 +52,7 @@ class StaffPerformanceCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${record.role} · ${record.section}',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.secondaryText,
               fontWeight: FontWeight.w600,
               fontSize: 12,
@@ -145,7 +145,7 @@ class PerformanceIncentiveList extends StatelessWidget {
                       Expanded(
                         child: Text(
                           incentive.staffName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primaryText,
                             fontWeight: FontWeight.w800,
                           ),
@@ -162,7 +162,7 @@ class PerformanceIncentiveList extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${incentive.section} · ${incentive.amountLabel} · ${incentive.reason}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.secondaryText,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -237,14 +237,14 @@ class StaffPerformanceSidePanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Performance metrics',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -260,7 +260,7 @@ class StaffPerformanceSidePanel extends StatelessWidget {
           _StatRow('Pending incentives', '${stats.incentivesPending}'),
           _StatRow('Bonuses this month', '${stats.bonusesThisMonth}'),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Active modules',
             style: TextStyle(
               color: AppColors.primaryText,
@@ -305,7 +305,7 @@ class _MetricChip extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.secondaryText,
             fontWeight: FontWeight.w600,
             fontSize: 11,
@@ -313,7 +313,7 @@ class _MetricChip extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.primaryText,
             fontWeight: FontWeight.w800,
             fontSize: 14,
@@ -365,7 +365,7 @@ class _StatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w600,
               ),
@@ -373,7 +373,7 @@ class _StatRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.primaryText,
               fontWeight: FontWeight.w900,
             ),
@@ -427,13 +427,13 @@ class _EmptyBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.panelBorder),
       ),
       child: Text(
         message,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.secondaryText,
           fontWeight: FontWeight.w600,
         ),

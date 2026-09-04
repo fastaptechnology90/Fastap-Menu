@@ -36,7 +36,7 @@ class OrderPriorityView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.panelBorder),
           ),
@@ -46,7 +46,7 @@ class OrderPriorityView extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -89,7 +89,7 @@ class OrderPriorityView extends StatelessWidget {
             ),
             child: Text(
               controller.priorityActionMessage!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -103,7 +103,7 @@ class OrderPriorityView extends StatelessWidget {
             final queue = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Priority queue',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -125,7 +125,7 @@ class OrderPriorityView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Active lanes',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -136,7 +136,7 @@ class OrderPriorityView extends StatelessWidget {
                 const SizedBox(height: 12),
                 PriorityLanesPanel(lanes: snapshot.lanes),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Live alerts',
                   style: TextStyle(
                     color: AppColors.primaryText,
@@ -193,7 +193,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(message, style: const TextStyle(color: AppColors.secondaryText)),
+          Text(message, style: TextStyle(color: AppColors.secondaryText)),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
