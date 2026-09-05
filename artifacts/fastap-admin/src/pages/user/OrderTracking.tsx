@@ -587,14 +587,17 @@ export default function OrderTracking() {
                 <Download className="h-3.5 w-3.5" /> PDF Invoice
               </button>
             </div>
-            {/* Pay bill — cash / UPI at the table; the waiter collects and marks it paid */}
-            {displayOrder.paymentStatus === "paid" ? (
+            {/* Pay bill — cash / UPI at the table; the waiter collects and marks it paid.
+                Read the payment state from `live` (the 4s status poll) rather than from the
+                order fetched on mount — the order object is never re-fetched, so reading it
+                here meant the guest only saw "bill is ready" / "Paid" after a page reload. */}
+            {(live.paymentStatus ?? displayOrder.paymentStatus) === "paid" ? (
               <div className="flex items-center gap-2 justify-center py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-bold">
                 <CheckCircle className="h-4 w-4" /> Paid · ₹{displayOrder.total}
               </div>
             ) : (
               <div>
-                {displayOrder.billRequested ? (
+                {(live.billRequested ?? displayOrder.billRequested) ? (
                   <p className="text-xs text-amber-300 font-semibold mb-2">🔔 Your bill is ready — please pay</p>
                 ) : (
                   <p className="text-xs text-white/50 mb-2">Pay your bill — a waiter will collect at your table</p>

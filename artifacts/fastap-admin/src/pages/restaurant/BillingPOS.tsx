@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, restaurantApi } from "@/lib/api";
 import { downloadText } from "@/lib/download";
@@ -38,7 +38,10 @@ export default function BillingPOS() {
   const [billDetail, setBillDetail] = useState<any | null>(null);
   const [todayStats, setTodayStats] = useState({ collection: 0, bills: 0, avgBill: 0 });
 
-  useEffect(() => {
+  // These tiles used to load once and never move again, so a bill collected while the
+  // page was open left "Today's Collection" showing a stale figure until a manual reload —
+  // and it then disagreed with the Collection widget above, which polls every 12s.
+  const loadTodayStats = useCallback(() => {
     if (!restaurantId) return;
     // Always fetch — the dashboard API already returns zeros for an unpublished restaurant;
     // gating on the context flag showed ₹0 whenever it was briefly stale after login.
@@ -49,7 +52,25 @@ export default function BillingPOS() {
         avgBill: parseFloat(String(d?.avgOrderValue ?? 0)),
       });
     }).catch(() => setTodayStats(emptyPosStatsDisplay()));
-  }, [restaurantId, isRestaurantPublished]);
+  }, [restaurantId]);
+
+  useEffect(() => {
+    loadTodayStats();
+    if (!restaurantId) return;
+    // Same 12s beat as the Collection widget above, so the two numbers stay in step.
+    const t = setInterval(loadTodayStats, 12000);
+    return () => clearInterval(t);
+  }, [loadTodayStats, restaurantId, isRestaurantPublished]);
+
+  // A payment collected anywhere (waiter app, POS, another tab) reaches the panel as an
+  // SSE order event, which refreshes liveOrders — react to that too, so the money lands
+  // straight away instead of on the next tick. Key off counts rather than the array
+  // itself: liveOrders gets a fresh identity on every 15s poll, which would otherwise
+  // refetch constantly even when nothing about the billing figures changed.
+  const paidCount = liveOrders.filter(o => o.paymentStatus === "paid").length;
+  const settledCount = liveOrders.filter(o => o.status === "billed").length;
+
+  useEffect(() => { loadTodayStats(); }, [paidCount, loadTodayStats]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -76,7 +97,7 @@ export default function BillingPOS() {
         setRecentBills(mapped);
       }
     }).catch(() => {});
-  }, [restaurantId]);
+  }, [restaurantId, settledCount]);
 
   const billableOrders = liveOrders.filter(o => ["preparing", "ready", "served", "accepted"].includes(o.status));
 

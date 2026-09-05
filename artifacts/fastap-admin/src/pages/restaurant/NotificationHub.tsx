@@ -80,9 +80,10 @@ export default function NotificationHub() {
   const [broadcast, setBroadcast] = useState({ title:"", body:"", channel:"internal", priority:"normal", audience:"all-staff" });
   const [sent, setSent] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
+  // `silent` keeps the background poll from flashing the loading skeleton every 20s.
+  const loadNotifications = useCallback(async (silent = false) => {
     if (!restaurantId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setApiError(null);
     try {
       const rows = await notificationsApi.list(restaurantId);
@@ -107,7 +108,14 @@ export default function NotificationHub() {
     }
   }, [restaurantId]);
 
-  useEffect(() => { loadNotifications(); }, [loadNotifications]);
+  // This page used to fetch once and never again, so a notification raised while it was
+  // open (an order going ready, a staff auto-assignment) simply never appeared.
+  useEffect(() => {
+    loadNotifications();
+    if (!restaurantId) return;
+    const t = setInterval(() => loadNotifications(true), 20000);
+    return () => clearInterval(t);
+  }, [loadNotifications, restaurantId]);
 
   const unread = notifications.filter(n=>!n.read).length;
 

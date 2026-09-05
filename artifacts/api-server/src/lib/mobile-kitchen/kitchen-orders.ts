@@ -6,7 +6,11 @@ import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
 
 export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar", "Dessert", "Bakery", "Floor"];
 
-const ACTIVE_DB = ["pending", "confirmed", "preparing", "ready", "serving", "delayed", "billing"];
+// "served" belongs here: the web KDS's Serve button writes that literal status, and the
+// rest of the API already treats it as an open order (orders.ts OPEN_STATUSES,
+// tables.ts ACTIVE_ORDER_STATUSES). Leaving it out made an order pressed "Served" on the
+// browser KDS vanish from the waiter's phone before anyone had delivered it.
+const ACTIVE_DB = ["pending", "confirmed", "preparing", "ready", "serving", "served", "delayed", "billing"];
 // Orders the apps display: the active ones plus recently "completed" (delivered),
 // so the waiter keeps a "Delivered" record. Everything auto-clears from both apps
 // after 24h (a display window — the rows stay in the DB, just stop showing).
@@ -28,6 +32,9 @@ function dbToMobileStatus(status: string, meta: Record<string, unknown>): string
     case "delayed": return "delayed";
     case "ready": return "ready";
     case "serving": return "serving";
+    // The kitchen has handed the food over but nobody has delivered it yet, so the waiter
+    // still needs the "Delivered" action — that is the mobile "serving" state, not "served".
+    case "served": return "serving";
     case "delivered": return "served";
     case "billing": return "ready";
     case "completed": return "served";

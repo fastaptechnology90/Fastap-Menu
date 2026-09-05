@@ -114,9 +114,17 @@ class StaffRoleAccessPolicy {
     required StaffRole role,
     required List<String> permissions,
   }) {
+    // These are NAV indices, not system numbers — the two differ by one above system 10
+    // (see EnterpriseSystemNavRegistry.navIndexForSystem). Entries written as system
+    // numbers resolved to modules the role has no access to and were silently filtered
+    // out, leaving the waiter with 3 of 6 buttons and housekeeping with 2 of 4.
+    //   waiter       : 48 = Waiter tasks (sys 49), 35 = Alerts (sys 36),
+    //                  0 = Dashboard (sys 2), 49 = Modules catalog
+    //   housekeeping : 27 = Room service (sys 28), 28 = Cleaning (sys 29),
+    //                  35 = Alerts (sys 36), 0 = Dashboard (sys 2)
     final candidates = switch (role) {
-      StaffRole.waiter => [48, 35, 36, 27, 12, 49],
-      StaffRole.housekeeping => [28, 29, 35, 36],
+      StaffRole.waiter => [48, 35, 0, 49],
+      StaffRole.housekeeping => [27, 28, 35, 0, 49],
       StaffRole.packingStaff => [1, 21, 22, 35, 49],
       StaffRole.expeditor => [1, 20, 21, 12, 35],
       StaffRole.headChef || StaffRole.kitchenManager => [

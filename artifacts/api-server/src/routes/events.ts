@@ -14,7 +14,9 @@ router.get("/events", requireAuth, (req, res): void => {
 
   res.write(`event: connected\ndata: {"clients":${getClientCount() + 1}}\n\n`);
 
-  const remove = addSSEClient(res, req.session.userId);
+  // Pass the staff member's restaurant so broadcasts can be scoped to it. A super-admin
+  // session has no staffSession, stays unscoped, and keeps seeing the whole platform.
+  const remove = addSSEClient(res, req.session.userId, req.session.staffSession?.restaurantId);
 
   const heartbeat = setInterval(() => {
     try {

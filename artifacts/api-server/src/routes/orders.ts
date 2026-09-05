@@ -167,7 +167,7 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     }
     await db.update(tablesMapTable).set(tableUpdate).where(and(eq(tablesMapTable.id, order.tableId), eq(tablesMapTable.restaurantId, restaurantId)));
   }
-  broadcastEvent("order_status", { id: order.id, tableName: order.tableName, status });
+  broadcastEvent("order_status", { id: order.id, restaurantId, tableName: order.tableName, status });
   broadcastOrderEvent(order.id, "order_status", { id: order.id, status, tableName: order.tableName });
   res.json(parseOrder(order));
 });
