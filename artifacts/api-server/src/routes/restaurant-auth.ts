@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request } from "express";
 import bcrypt from "bcryptjs";
+import { generateOtp } from "../lib/mobile-kitchen/staff-tokens.js";
 import { eq, and, sql } from "drizzle-orm";
 import {
   db,
@@ -320,7 +321,9 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
   }
 
   const { staff: staffMember, restaurant } = picked.row!;
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  // Math.random() is predictable enough to guess a six-digit login code from a couple of
+  // samples; this draws from the OS entropy source instead.
+  const otp = generateOtp();
   otpStore.set(normalized, {
     otp,
     expiresAt: Date.now() + 10 * 60 * 1000,

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lt } from "drizzle-orm";
 import { db, ordersTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { round2 } from "../lib/order-pricing.js";
@@ -27,7 +27,15 @@ function dayBounds(dateStr: string | undefined) {
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  return { start, end, label: start.toISOString().slice(0, 10) };
+  // Label the day the restaurant is actually in. toISOString() would report the UTC date,
+  // which in India is the previous day for every reading taken before 5:30am — the report
+  // would be headed with yesterday's date while covering today's takings.
+  const label = [
+    start.getFullYear(),
+    String(start.getMonth() + 1).padStart(2, "0"),
+    String(start.getDate()).padStart(2, "0"),
+  ].join("-");
+  return { start, end, label };
 }
 
 const num = (v: unknown) => {
@@ -42,7 +50,7 @@ async function buildReport(restaurantId: number, dateStr: string | undefined) {
   const orders = await db.select().from(ordersTable).where(and(
     eq(ordersTable.restaurantId, restaurantId),
     gte(ordersTable.createdAt, bounds.start),
-    lte(ordersTable.createdAt, bounds.end),
+    lt(ordersTable.createdAt, bounds.end),
   ));
 
   const settled = orders.filter(o => o.paymentStatus === "paid" || o.status === "completed");
@@ -96,7 +104,7 @@ async function buildReport(restaurantId: number, dateStr: string | undefined) {
   const shifts = await db.select().from(cashShiftsTable).where(and(
     eq(cashShiftsTable.restaurantId, restaurantId),
     gte(cashShiftsTable.openedAt, bounds.start),
-    lte(cashShiftsTable.openedAt, bounds.end),
+    lt(cashShiftsTable.openedAt, bounds.end),
   ));
 
   const cashTaken = byMethod.cash?.amount ?? 0;

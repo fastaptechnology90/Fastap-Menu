@@ -146,9 +146,51 @@ async function main() {
   const planRows = Array.isArray(plans.body) ? plans.body : (plans.body?.plans ?? []);
   const limited = planRows.find(p => Number(p.maxStaff) > 0);
   if (limited) {
-    const staffNow = (await db("select count(*)::int n from staff where restaurant_id=$1", [RID]))[0].n;
-    note("partial", "plans declare limits",
-      `e.g. ${limited.name} maxStaff=${limited.maxStaff}; venue ${RID} already has ${staffNow} staff`);
+    // Declaring a limit is not the point — enforcing it is, and it has to be checked
+    // against the plan a venue is actually on. Venue 6 is on Starter, a few staff short
+    // of its cap, and has a working owner login; a freshly registered venue cannot be
+    // used here because it is held at the KYC gate before it can add anyone.
+    const CAPPED_VENUE = 6;
+    const capVenue = (await db("select plan from restaurants where id=$1", [CAPPED_VENUE]))[0];
+    const capRow = planRows.find(p => String(p.name).toLowerCase() === String(capVenue?.plan).toLowerCase());
+    const cap = Number(capRow?.maxStaff ?? 0);
+
+    const owned = client();
+    const signIn = await owned("POST", "/restaurant-auth/login", {
+      email: "farah.mistry@bombaybun.in", password: "Fastap@2026",
+    });
+
+    if (cap > 0 && signIn.status === 200) {
+      const added = [];
+      let lastStatus = 200;
+      let lastBody = null;
+      for (let i = 0; i < cap + 2 && lastStatus < 400; i++) {
+        const add = await owned("POST", `/restaurants/${CAPPED_VENUE}/staff`, {
+          name: `AUDIT Cap ${stamp}-${i}`, email: `auditcap${stamp}-${i}@example.com`,
+          role: "waiter", phone: `95${stamp}${String(i).padStart(2, "0")}`.slice(0, 10),
+          password: "Audit@1234",
+        });
+        lastStatus = add.status;
+        lastBody = add.body;
+        if (add.status < 300 && add.body?.id) added.push(add.body.id);
+      }
+
+      const capped = lastStatus === 402 && Number(lastBody?.limit?.allowed) === cap;
+      note(capped ? "works" : "broken", "plan limits are enforced, not just declared",
+        `${capRow.name} allows ${cap} staff — creating past it returned HTTP ${lastStatus}` +
+        (lastBody?.limit ? ` at ${lastBody.limit.current}` : ""));
+
+      // Being over a cap must not lock a venue out of what it already has, or it can
+      // never reduce its way back under one it has been moved onto.
+      const stillReadable = await owned("GET", `/restaurants/${CAPPED_VENUE}/staff`);
+      note(stillReadable.status === 200 ? "works" : "broken",
+        "a venue at its cap can still manage the staff it has", `HTTP ${stillReadable.status}`);
+
+      for (const id of added) await db("delete from staff where id=$1", [id]);
+    } else {
+      note("partial", "plan limits are enforced, not just declared",
+        `could not reach a capped venue (plan ${capVenue?.plan ?? "?"}, login HTTP ${signIn.status})`);
+    }
   } else {
     note("missing", "plans declare limits", "no plan carries a staff limit");
   }
@@ -214,23 +256,106 @@ async function main() {
       `HTTP ${paid.status}, ledger rows ${ledger[0]?.n ?? "?"}`);
   }
 
-  // Everyday actions
+  // Everyday actions, exercised the way a floor actually uses them. Posting an empty
+  // body and grading a 400 as "partial" told us nothing: "a reason is required" IS the
+  // endpoint working. Each action below is given a real payload and its effect checked.
   const everyday = {
-    "move a tab to another table": ["POST", `/restaurants/${RID}/orders/${orderId}/move-table`],
-    "merge two tabs": ["POST", `/restaurants/${RID}/orders/merge`],
-    "split a bill": ["POST", `/restaurants/${RID}/orders/${orderId}/split`],
-    "void a billed item": ["POST", `/restaurants/${RID}/orders/${orderId}/void-item`],
-    "comp an item": ["POST", `/restaurants/${RID}/orders/${orderId}/comp-item`],
-    "reprint a bill": ["POST", `/restaurants/${RID}/orders/${orderId}/reprint`],
-    "refund an order": ["POST", `/restaurants/${RID}/orders/${orderId}/refund`],
     "X reading (mid-service)": ["GET", `/restaurants/${RID}/reports/x`],
-    "day-end Z report": ["GET", `/restaurants/${RID}/reports/z`],
+    "day-end Z report": ["GET", `/restaurants/${RID}/reports/z?force=true`],
     "clock in / attendance": ["GET", `/restaurants/${RID}/attendance/open`],
   };
   for (const [what, [method, path]] of Object.entries(everyday)) {
     const r = await owner(method, path, method === "GET" ? undefined : {});
     note(r.status === 404 ? "missing" : r.status < 400 ? "works" : "partial", what, `HTTP ${r.status}`);
   }
+
+  // A fresh unpaid tab of two lines, so voiding, splitting and moving have something to
+  // act on without disturbing the paid order above.
+  const dish2 = (menu.body?.categories ?? []).flatMap(c => c.items ?? [])[1] ?? dish;
+  const tab = await guest("POST", "/public/orders", {
+    restaurantId: RID, tableName: "AUDIT-FLOOR", customerName: "AUDIT Floor",
+    customerPhone: "9000099003",
+    items: [{ menuItemId: dish.id, quantity: 1 }, { menuItemId: dish2.id, quantity: 1 }],
+  });
+  const tabId = tab.body?.id;
+
+  if (tabId) {
+    const noReason = await owner("POST", `/restaurants/${RID}/orders/${tabId}/void-item`, { itemIndex: 0 });
+    note(noReason.status === 400 ? "works" : "broken",
+      "voiding without a reason is refused", `HTTP ${noReason.status}`);
+
+    const voided = await owner("POST", `/restaurants/${RID}/orders/${tabId}/void-item`,
+      { itemIndex: 0, reason: "AUDIT — keyed twice" });
+    const afterVoid = (await db("select subtotal, total from orders where id=$1", [tabId]))[0];
+    note(voided.status === 200 && Number(afterVoid.subtotal) > 0 ? "works" : "broken",
+      "void a billed item", `HTTP ${voided.status}, bill now ${afterVoid?.total}`);
+
+    const comped = await owner("POST", `/restaurants/${RID}/orders/${tabId}/comp-item`,
+      { itemIndex: 1, reason: "AUDIT — sent cold" });
+    const afterComp = (await db("select total from orders where id=$1", [tabId]))[0];
+    note(comped.status === 200 && money(afterComp.total) === 0 ? "works" : "partial",
+      "comp an item", `HTTP ${comped.status}, bill now ${afterComp?.total}`);
+
+    const history = await owner("GET", `/restaurants/${RID}/orders/${tabId}/adjustments`);
+    const entries = history.body?.adjustments ?? [];
+    note(entries.length >= 2 && entries.every(a => a.reason) ? "works" : "broken",
+      "every adjustment is recorded with a reason and a person",
+      `${entries.length} entries`);
+
+    const printed = await owner("POST", `/restaurants/${RID}/orders/${tabId}/reprint`, { kind: "bill" });
+    note(printed.status === 200 && typeof printed.body?.html === "string" ? "works" : "partial",
+      "print a bill", `HTTP ${printed.status}, copy ${printed.body?.copy ?? "?"}`);
+
+    const kot = await owner("POST", `/restaurants/${RID}/orders/${tabId}/reprint`, { kind: "kot" });
+    note(kot.status === 200 ? "works" : "partial", "print a kitchen ticket", `HTTP ${kot.status}`);
+
+    const refundEarly = await owner("POST", `/restaurants/${RID}/orders/${tabId}/refund`,
+      { reason: "AUDIT — never collected" });
+    note(refundEarly.status >= 400 ? "works" : "broken",
+      "refunding money that was never collected is refused", `HTTP ${refundEarly.status}`);
+  }
+
+  // A second unpaid tab, so split, merge and move each have a real target.
+  const tabB = await guest("POST", "/public/orders", {
+    restaurantId: RID, tableName: "AUDIT-FLOOR-B", customerName: "AUDIT Floor B",
+    customerPhone: "9000099004",
+    items: [{ menuItemId: dish.id, quantity: 2 }, { menuItemId: dish2.id, quantity: 1 }],
+  });
+  const tabBId = tabB.body?.id;
+
+  if (tabBId) {
+    const before = (await db("select total from orders where id=$1", [tabBId]))[0];
+    const split = await owner("POST", `/restaurants/${RID}/orders/${tabBId}/split`, { itemIndexes: [1] });
+    const parts = [split.body?.original?.total, split.body?.split?.total].map(Number);
+    note(split.status === 201 && parts.every(Number.isFinite) ? "works" : "partial",
+      "split a bill", `HTTP ${split.status}, ${before?.total} → ${parts.join(" + ")}`);
+
+    const childId = split.body?.split?.id;
+    if (childId) {
+      const merged = await owner("POST", `/restaurants/${RID}/orders/merge`,
+        { intoOrderId: tabBId, fromOrderIds: [childId] });
+      note(merged.status === 200 && money(merged.body?.order?.total) === money(before?.total) ? "works" : "partial",
+        "merge two tabs", `HTTP ${merged.status}, back to ${merged.body?.order?.total}`);
+    }
+
+    const freeTable = (await db(
+      "select name from tables_map where restaurant_id=$1 and current_order_id is null order by id limit 1", [RID],
+    ))[0];
+    if (freeTable) {
+      const moved = await owner("POST", `/restaurants/${RID}/orders/${tabBId}/move-table`,
+        { tableName: freeTable.name });
+      note(moved.status === 200 ? "works" : "partial",
+        "move a tab to another table", `HTTP ${moved.status} → ${moved.body?.movedTo ?? "?"}`);
+    }
+  }
+
+  // Everything this section created, including the paid order used to check the money
+  // arithmetic — an audit that leaves paid rows behind quietly moves the venue's revenue.
+  for (const id of [orderId, tabId, tabBId]) {
+    if (id) await db("delete from orders where id=$1 or (metadata->>'splitFrom')::int = $1", [id]);
+  }
+  await db("delete from orders where restaurant_id=$1 and customer_name like 'AUDIT%'", [RID]);
+  await db("update tables_map set status='free', current_order_id=null where restaurant_id=$1 and current_order_id is not null and current_order_id not in (select id from orders)", [RID]);
 
   if (orderId) await db("delete from orders where id=$1", [orderId]);
 
@@ -263,10 +388,14 @@ async function main() {
   // ───────────────────────── HOTEL CHAIN ─────────────────────────
   section("Hotel: room service to checkout");
 
+  // Room food is priced from the hotel's own menu, so the line has to name a menu row —
+  // posting a made-up dish at a made-up price is exactly what the server now refuses.
+  const hotelMenu = await guest("GET", "/public/menu/meghdoot-residency");
+  const hotelDish = (hotelMenu.body?.categories ?? []).flatMap(c => c.items ?? [])[0];
   const roomOrder = await guest("POST", "/public/room-service", {
     restaurantId: HOTEL, roomNumber: "101", guestName: "AUDIT Guest",
-    guestPhone: "9000099002", type: "food", total: 250,
-    items: [{ name: "Audit dish", qty: 1, price: 250 }],
+    guestPhone: "9000099002", type: "food",
+    items: hotelDish ? [{ menuItemId: hotelDish.id, qty: 1 }] : [],
   });
   note(roomOrder.status < 300 ? "works" : "broken", "a room guest can order", `HTTP ${roomOrder.status}`);
 
