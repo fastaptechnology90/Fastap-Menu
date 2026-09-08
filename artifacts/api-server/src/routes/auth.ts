@@ -213,9 +213,15 @@ router.post("/auth/forgot-password", loginRateLimit, async (req, res): Promise<v
     }).catch(() => {});
     done();
   } else {
-    // Demo mode — no email provider. Return the token so the reset can be completed now.
-    logger.info({ userId: user.id }, "password reset requested (demo — token returned)");
-    done({ devToken: token });
+    // No email provider configured. The reset token is the only thing standing between
+    // a stranger and this account, so it is never returned over the wire — handing it
+    // back would let anyone reset any password, including super admin, by typing an
+    // address into the form. The reset simply cannot proceed until mail is configured.
+    logger.warn(
+      { userId: user.id },
+      "password reset requested but no email provider is configured — reset not issued",
+    );
+    done();
   }
 });
 

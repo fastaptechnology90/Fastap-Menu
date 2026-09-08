@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, staffTable } from "@workspace/db";
+import { loginRateLimit } from "../middlewares/rate-limit.js";
 import {
   requireMobileAuth,
   mobileSession,
@@ -97,7 +98,9 @@ router.post("/auth/register", async (req, res) => {
   });
 });
 
-router.post("/auth/otp/request", async (req, res) => {
+// Every credential-checking route is rate limited. Without this a six-digit OTP or a
+// four-digit PIN is guessable in seconds from a script.
+router.post("/auth/otp/request", loginRateLimit, async (req, res) => {
   try {
     res.json(await requestOtp(String(req.body?.phone ?? "")));
   } catch (err) {
@@ -105,11 +108,11 @@ router.post("/auth/otp/request", async (req, res) => {
   }
 });
 
-router.post("/auth/otp/verify", (req, res) => authPost(verifyOtp, req, res));
-router.post("/auth/pin", (req, res) => authPost(loginWithPin, req, res));
-router.post("/auth/password", (req, res) => authPost(loginWithPassword, req, res));
-router.post("/auth/qr/verify", (req, res) => authPost(loginWithQr, req, res));
-router.post("/auth/biometric", (req, res) => authPost(loginWithBiometric, req, res));
+router.post("/auth/otp/verify", loginRateLimit, (req, res) => authPost(verifyOtp, req, res));
+router.post("/auth/pin", loginRateLimit, (req, res) => authPost(loginWithPin, req, res));
+router.post("/auth/password", loginRateLimit, (req, res) => authPost(loginWithPassword, req, res));
+router.post("/auth/qr/verify", loginRateLimit, (req, res) => authPost(loginWithQr, req, res));
+router.post("/auth/biometric", loginRateLimit, (req, res) => authPost(loginWithBiometric, req, res));
 
 router.post("/auth/logout", requireMobileAuth, (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";

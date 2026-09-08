@@ -17,8 +17,44 @@ import {
   filterPermissionsByEntitlements,
   getEnabledSystemNumbers,
 } from "../feature-modules/entitlements.js";
+import {
+  verifyStaffQrToken,
+  verifyDeviceToken,
+  makeDeviceToken,
+  generateOtp,
+} from "./staff-tokens.js";
+import { isEmailConfigured, sendEmail } from "../email.js";
+import { logger } from "../logger.js";
 
-const otpStore = new Map<string, { otp: string; staffId: number; restaurantId: number; expiresAt: number }>();
+const otpStore = new Map<
+  string,
+  { otp: string; staffId: number; restaurantId: number; expiresAt: number; attempts: number }
+>();
+
+/**
+ * Get the code to the staff member. There is no SMS provider wired up yet, so email is
+ * the only real channel; when neither is available the code is logged server-side so an
+ * administrator can read it from the logs. It is never returned in the HTTP response —
+ * that would put the code in the hands of whoever asked for it.
+ */
+async function deliverStaffOtp(
+  staff: { id: number; name: string | null; email: string | null },
+  otp: string,
+): Promise<void> {
+  if (staff.email && (await isEmailConfigured())) {
+    await sendEmail({
+      to: staff.email,
+      subject: "Your Fastap staff login code",
+      html: `<p>Hi ${staff.name ?? "there"},</p><p>Your login code is <strong>${otp}</strong>. It expires in 5 minutes.</p>`,
+      text: `Your Fastap login code is ${otp} (expires in 5 minutes).`,
+    }).catch(err => logger.error({ err, staffId: staff.id }, "could not email staff OTP"));
+    return;
+  }
+  logger.warn(
+    { staffId: staff.id, otp },
+    "no delivery channel for staff OTP — code written to the server log only",
+  );
+}
 
 export async function findStaffByIdentifier(identifier: string) {
   const raw = identifier.trim();
@@ -133,26 +169,47 @@ export async function loginWithPin(body: Record<string, unknown>) {
   return buildSession(staff, deviceId, "pin", role);
 }
 
+/**
+ * QR login. The scanned value must be a token this server minted for one staff member
+ * (see makeStaffQrToken, issued by the restaurant panel to a signed-in manager).
+ * A bare staff code, email or phone is no longer accepted: those are printed on rosters,
+ * so treating one as proof of identity signed in anyone who could read a name badge.
+ */
 export async function loginWithQr(body: Record<string, unknown>) {
   const qrToken = String(body.qrToken ?? "");
   const deviceId = String(body.deviceId ?? "");
   const role = body.role ? String(body.role) : undefined;
   if (!qrToken || !deviceId) throw new Error("MISSING_FIELDS");
 
-  const staff = await findStaffByIdentifier(qrToken) ?? await findStaffByIdentifier(qrToken.toUpperCase());
+  const staffId = verifyStaffQrToken(qrToken);
+  if (staffId === null) throw new Error("INVALID_CREDENTIALS");
+
+  const [staff] = await db.select().from(staffTable).where(eq(staffTable.id, staffId)).limit(1);
   if (!staff) throw new Error("INVALID_CREDENTIALS");
   await ensureStaffActive(staff);
   return buildSession(staff, deviceId, "qr", role);
 }
 
+/**
+ * Biometric login. The fingerprint or face check happens on the handset and cannot be
+ * verified from here — the previous version simply believed a `deviceVerified: true`
+ * flag in the request body, which anyone could send.
+ *
+ * Instead the app replays the device token it was issued at its last real login. The
+ * biometric prompt guards the app's own storage; this token proves the server already
+ * granted this handset a session for this staff member.
+ */
 export async function loginWithBiometric(body: Record<string, unknown>) {
-  const staffCode = String(body.staffCode ?? "");
+  const deviceToken = String(body.deviceToken ?? "");
   const deviceId = String(body.deviceId ?? "");
   const role = body.role ? String(body.role) : undefined;
-  if (!staffCode || !deviceId) throw new Error("MISSING_FIELDS");
-  if (body.deviceVerified !== true) throw new Error("BIOMETRIC_REQUIRED");
+  if (!deviceId) throw new Error("MISSING_FIELDS");
+  if (!deviceToken) throw new Error("BIOMETRIC_NOT_ENROLLED");
 
-  const staff = await findStaffByIdentifier(staffCode);
+  const staffId = verifyDeviceToken(deviceToken, deviceId);
+  if (staffId === null) throw new Error("BIOMETRIC_NOT_ENROLLED");
+
+  const [staff] = await db.select().from(staffTable).where(eq(staffTable.id, staffId)).limit(1);
   if (!staff) throw new Error("INVALID_CREDENTIALS");
   await ensureStaffActive(staff);
   return buildSession(staff, deviceId, String(body.biometricType ?? "fingerprint"), role);
@@ -161,15 +218,22 @@ export async function loginWithBiometric(body: Record<string, unknown>) {
 export async function requestOtp(phone: string) {
   const normalized = phone.replace(/\D/g, "");
   const staff = await findStaffByIdentifier(phone) ?? await findStaffByIdentifier(normalized);
-  if (!staff?.phone) throw new Error("PHONE_NOT_FOUND");
-  const otp = "123456";
+  // Say the same thing whether or not the number is registered, so this endpoint cannot
+  // be used to discover which phone numbers belong to staff.
+  if (!staff?.phone) return { success: true, message: "If that number is registered, an OTP has been sent." };
+
+  // A fixed "123456" used to be issued here, which made every staff account openable by
+  // anyone who knew a phone number. The code is now random and never leaves the server.
+  const otp = generateOtp();
   otpStore.set(normalized, {
     otp,
     staffId: staff.id,
     restaurantId: staff.restaurantId,
     expiresAt: Date.now() + 5 * 60_000,
+    attempts: 0,
   });
-  return { success: true, message: "OTP sent to registered mobile number" };
+  await deliverStaffOtp(staff, otp);
+  return { success: true, message: "If that number is registered, an OTP has been sent." };
 }
 
 export async function verifyOtp(body: Record<string, unknown>) {
@@ -178,7 +242,17 @@ export async function verifyOtp(body: Record<string, unknown>) {
   const deviceId = String(body.deviceId ?? "");
   const role = body.role ? String(body.role) : undefined;
   const stored = otpStore.get(phone);
-  if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
+  if (!stored || stored.expiresAt < Date.now()) {
+    otpStore.delete(phone);
+    throw new Error("INVALID_OTP");
+  }
+  // Five guesses per code, then it is burned — six digits fall in seconds otherwise.
+  stored.attempts += 1;
+  if (stored.attempts > 5) {
+    otpStore.delete(phone);
+    throw new Error("INVALID_OTP");
+  }
+  if (stored.otp !== otp) {
     throw new Error("INVALID_OTP");
   }
   const [staff] = await db.select().from(staffTable).where(eq(staffTable.id, stored.staffId)).limit(1);

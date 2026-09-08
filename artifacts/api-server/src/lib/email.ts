@@ -78,8 +78,9 @@ export async function isEmailConfigured(): Promise<boolean> {
     const cfg = readEmailConfig(settings.integrations as IntegrationsConfig);
     return Boolean(cfg?.fromEmail);
   } catch (err) {
-    // Settings unreadable (database hiccup) — report "not configured" so the caller
-    // stays permissive rather than locking people out over an unrelated failure.
+    // Settings unreadable (database hiccup). Report "not configured" — the callers that
+    // gate on this now fail closed (no reset issued, verification skipped), so an
+    // unrelated failure can never widen access.
     logger.error({ err }, "could not read email settings");
     return false;
   }

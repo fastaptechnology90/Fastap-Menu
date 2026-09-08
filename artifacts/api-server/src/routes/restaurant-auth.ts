@@ -917,8 +917,14 @@ router.post("/restaurant-auth/forgot-password", async (req, res): Promise<void> 
     }).catch(() => {});
     done();
   } else {
-    logger.info({ staffId: staffMember.id }, "staff password reset requested (demo — token returned)");
-    done({ devToken: token });
+    // Never hand the reset token back to the caller. Without a mail provider there is
+    // no way to prove the requester owns the address, so returning it would let anyone
+    // reset any staff password by typing their email. See routes/auth.ts for the same rule.
+    logger.warn(
+      { staffId: staffMember.id },
+      "staff password reset requested but no email provider is configured — reset not issued",
+    );
+    done();
   }
 });
 

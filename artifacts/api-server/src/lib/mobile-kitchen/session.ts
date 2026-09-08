@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import type { Staff } from "@workspace/db";
+import { makeDeviceToken } from "./staff-tokens.js";
 
 export type MobileSession = {
   token: string;
@@ -21,6 +22,8 @@ export type MobileSession = {
   permissions: string[];
   shiftId: string;
   geoVerified: boolean;
+  /** Long-lived, signed proof this handset was granted a session — enables biometric unlock. */
+  deviceToken: string;
 };
 
 const sessions = new Map<string, MobileSession>();
@@ -58,6 +61,7 @@ export function createMobileSession(
     permissions,
     shiftId: `SHIFT-${new Date().toISOString().slice(0, 13).replace(/[-:T]/g, "")}`,
     geoVerified: true,
+    deviceToken: makeDeviceToken(staff.id, deviceId),
   };
   sessions.set(token, session);
   return session;
@@ -73,6 +77,10 @@ export function sessionPayload(session: MobileSession) {
     permissions: session.permissions,
     loginMethod: session.loginMethod,
     geoVerified: session.geoVerified,
+    // Store this alongside the session. Offering biometric unlock on the next launch
+    // means replaying it — the fingerprint guards the app's storage, this proves the
+    // server already granted this handset a session for this staff member.
+    deviceToken: session.deviceToken,
   };
 }
 

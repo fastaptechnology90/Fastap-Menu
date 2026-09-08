@@ -8,9 +8,13 @@ type Step = "email" | "reset" | "sent" | "done";
 
 /**
  * Self-service password reset, shared by the admin and staff login pages.
- * Step 1 asks for the email. In demo mode (no email provider) the API returns the
- * signed token directly, so we jump straight to the reset step. When a provider is
- * configured the API emails a link and we show a "check your inbox" message instead.
+ * Step 1 asks for the email, the API emails a link, and we show "check your inbox".
+ *
+ * The reset step is reached only by opening that emailed link (/reset-password?token=…),
+ * never from this modal. An earlier version jumped straight to the reset step using a
+ * token the API handed back when no mail provider was configured — which let anyone
+ * reset any account, super admin included, by typing the address in. The API no longer
+ * returns that token and this modal no longer looks for one.
  */
 export function ForgotPasswordModal({ scope, onClose, accent = "amber" }: { scope: Scope; onClose: () => void; accent?: "amber" | "blue" }) {
   const [step, setStep] = useState<Step>("email");
@@ -31,13 +35,13 @@ export function ForgotPasswordModal({ scope, onClose, accent = "amber" }: { scop
       const res = scope === "admin"
         ? await api.auth.forgotPassword(email.trim())
         : await restaurantAuth.forgotPassword(email.trim());
-      if (res.devToken) {
-        setToken(res.devToken);
-        setNotice("Demo mode: no email provider configured, so you can set a new password right here.");
-        setStep("reset");
-      } else {
-        setStep("sent");
+      // The API deliberately reveals nothing about whether the address exists, and never
+      // returns a reset token. If mail is not configured on the platform it says so, so the
+      // person knows to contact their administrator instead of waiting for an email.
+      if (res.emailConfigured === false) {
+        setNotice("Password reset email is not set up on this platform yet. Please contact your administrator.");
       }
+      setStep("sent");
     } catch (e) {
       setError((e as Error).message || "Something went wrong");
     } finally {
@@ -117,7 +121,9 @@ export function ForgotPasswordModal({ scope, onClose, accent = "amber" }: { scop
         {step === "sent" && (
           <div className="space-y-4 text-center py-4">
             <Mail className="h-12 w-12 mx-auto text-emerald-400" />
-            <p className="text-sm text-white/70">If that email is registered, a reset link is on its way. Open it to set a new password (the link expires in 30 minutes).</p>
+            {notice
+              ? <p className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-left">{notice}</p>
+              : <p className="text-sm text-white/70">If that email is registered, a reset link is on its way. Open it to set a new password (the link expires in 30 minutes).</p>}
             <button onClick={onClose} className={`w-full py-3 rounded-xl font-bold text-sm ${accentBtn}`}>Back to login</button>
           </div>
         )}
