@@ -93,7 +93,9 @@ export default function RBACPermissions() {
     if(!restaurantId)return;
     rbacApi.get(restaurantId).then(d=>{
       if(d?.permissions) setRoles(prev=>({...prev,...d.permissions}));
-    }).catch(()=>{});
+      // Falling back to the built-in defaults without saying so would show an
+      // owner permissions their staff do not actually have.
+    }).catch(e => toast({ title: "Showing default permissions", description: e instanceof Error ? e.message : "Your saved roles could not be loaded.", variant: "destructive" }));
   },[restaurantId]);
 
   function toggle(role:string, perm:string) {

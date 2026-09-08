@@ -142,6 +142,7 @@ export default function RoomService() {
   const [detailReq, setDetailReq] = useState<RoomRequest | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
   const [showNew, setShowNew] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState("");
@@ -433,8 +434,27 @@ export default function RoomService() {
     return <div className="p-6 text-center text-white/40 text-sm">Loading room service data…</div>;
   }
 
+  if (loadError && requests.length === 0 && rooms.length === 0) {
+    return (
+      <div className="p-6">
+        <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-5 text-center">
+          <p className="text-sm font-semibold text-red-200">We could not load room service.</p>
+          <p className="mt-1 text-xs text-red-200/70">{loadError}</p>
+          <button onClick={() => loadData()} className="mt-4 px-4 py-2 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 lg:p-6 space-y-5">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 flex items-center justify-between gap-3">
+          <p className="text-xs text-amber-200/90">These figures may be out of date — the last refresh failed.</p>
+          <button onClick={() => loadData()} className="shrink-0 px-3 py-1 rounded-lg bg-amber-500/20 text-amber-100 text-xs font-semibold">Retry</button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold">Room Service</h1>

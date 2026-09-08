@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { restaurantAuth, orders as ordersApi, tables as tablesApi, menu as menuApi, staff as staffApi, rbacApi, featuresApi, type SubscriptionStatus } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { canAccessPath, hasPermission, type RolePermissions } from "@/lib/restaurantRbac";
 import { normalizeOrderStatus, toApiOrderStatus } from "@/lib/orderStatus";
 import { setAppTimezone } from "@/lib/appTimezone";
@@ -154,7 +155,7 @@ interface RestaurantContextValue {
   setCurrentStaff: (s: StaffMember | null) => void;
   setRestaurantId: (id: number) => void;
   setRestaurantInfo: (info: Partial<RestaurantInfo>) => void;
-  updateOrderStatus: (orderId: string, status: LiveOrder["status"]) => void;
+  updateOrderStatus: (orderId: string, status: LiveOrder["status"]) => Promise<void>;
   updateTableStatus: (tableId: string, status: TableInfo["status"]) => void;
   toggleMenuItemAvailability: (itemId: string) => void;
   addOrder: (order: LiveOrder) => void;
@@ -561,11 +562,26 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [restaurantId]);
 
-  function updateOrderStatus(orderId: string, status: LiveOrder["status"]) {
+  async function updateOrderStatus(orderId: string, status: LiveOrder["status"]) {
+    if (!restaurantId) return;
+
+    // Move the card straight away — a chef bumping a ticket should not wait on the
+    // network — but put it back and say so if the write does not land. Swallowing the
+    // error left the board showing an order as ready while the kitchen, the waiter and
+    // the guest were all still looking at the old status, and the next 15s poll would
+    // silently revert it with no explanation.
+    const previous = liveOrders;
     setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    if (restaurantId) {
-      const apiStatus = toApiOrderStatus(status);
-      ordersApi.update(restaurantId, parseInt(orderId), { status: apiStatus }).catch(() => {});
+
+    try {
+      await ordersApi.update(restaurantId, parseInt(orderId), { status: toApiOrderStatus(status) });
+    } catch (e: any) {
+      setLiveOrders(previous);
+      toast({
+        title: "Could not update the order",
+        description: e?.message || "The change was not saved. Please try again.",
+        variant: "destructive",
+      });
     }
   }
 

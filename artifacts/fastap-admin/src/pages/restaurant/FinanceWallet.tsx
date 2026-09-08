@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle, AlertCircle, Download, CreditCard, Banknote, DollarSign, BarChart3, BookOpen } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { finance as financeApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import type { SettlementRow, OnlineTxnRow, CashLedgerRow } from "@/lib/restaurant-types";
@@ -79,7 +80,9 @@ export default function FinanceWallet() {
         const expenseKeys = ["cogs", "costOfGoodsSold", "staffCost", "staff", "utilities", "rent", "marketing", "misc", "miscellaneous"];
         setExpensesTracked(expenseKeys.some(k => p[k] != null) || [cogs, staffCost, utilities, rent, marketing, misc].some(v => v > 0));
       }
-    }).catch(() => {});
+      // Zeroed money figures are indistinguishable from a quiet day, so say when
+      // they are actually missing.
+    }).catch(e => toast({ title: "Could not load your profit and loss figures", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   }, [restaurantId, isRestaurantPublished]);
 
   // Do we actually have finance data? Drives the "unavailable" banner instead of the

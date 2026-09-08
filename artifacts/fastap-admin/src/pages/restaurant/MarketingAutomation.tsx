@@ -4,6 +4,7 @@ import { useRestaurant } from "@/contexts/RestaurantContext";
 import { marketing as marketingApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 type Tab = "campaigns"|"triggers"|"templates"|"analytics";
 
@@ -56,6 +57,7 @@ const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
 };
 
 export default function MarketingAutomation() {
+  const { confirm, confirmDialog } = useConfirm();
   const { restaurantId } = useRestaurant();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("campaigns");
@@ -150,7 +152,13 @@ export default function MarketingAutomation() {
 
   async function handleDeleteCampaign(c: Campaign) {
     if (!restaurantId) return;
-    if (typeof window !== "undefined" && !window.confirm(`Delete campaign “${c.name}”? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete campaign “${c.name}”?`,
+      description: "The campaign and its send history are removed. Messages already delivered cannot be recalled.",
+      destructive: true,
+      confirmLabel: "Delete campaign",
+    });
+    if (!ok) return;
     setBusyId(c.id);
     try {
       await marketingApi.deleteCampaign(restaurantId, Number(c.id));
@@ -563,6 +571,7 @@ export default function MarketingAutomation() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

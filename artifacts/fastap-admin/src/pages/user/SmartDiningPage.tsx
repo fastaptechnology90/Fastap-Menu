@@ -37,6 +37,7 @@ export default function SmartDiningPage() {
   const [apiLines, setApiLines] = useState<RunningBillLine[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [payToast, setPayToast] = useState<string | null>(null);
+  const [payingGroup, setPayingGroup] = useState(false);
   const [apiSplit, setApiSplit] = useState<{ splits?: { person: number; amount: number }[]; seats?: { seat: number; amount: number }[] } | null>(null);
 
   useEffect(() => {
@@ -117,15 +118,21 @@ export default function SmartDiningPage() {
     [orders, activeTable],
   );
 
-  function sendRequest(label: string, type: string) {
-    if (venue.restaurantId) {
-      publicApi.waiterCall({
+  async function sendRequest(label: string, type: string) {
+    if (!venue.restaurantId) return;
+    try {
+      await publicApi.waiterCall({
         restaurantId: venue.restaurantId,
         tableId: venue.tableId,
         tableName: activeTable,
         type,
         message: label,
-      }).catch(() => {});
+      });
+    } catch {
+      // A guest told "waiter notified" who was never notified just sits waiting.
+      setPayToast("We could not reach the staff. Please try again or wave someone over.");
+      setTimeout(() => setPayToast(null), 4000);
+      return;
     }
     setSent(prev => [{ label, time: new Date(), status: "sent" }, ...prev]);
     setToast(label);
@@ -162,26 +169,43 @@ export default function SmartDiningPage() {
     }));
   }
 
-  function payGroup() {
+  async function payGroup() {
+    if (payingGroup) return;
+    const total = summary.total;
+    setPayingGroup(true);
+    try {
+      // Nothing is marked paid until the server has taken the payment — a guest
+      // shown a settled bill that never settled walks out owing money.
+      await publicApi.dining.groupPayment({ total, payments: [{ method: "group", amount: total }] });
+    } catch (e) {
+      setPayToast(e instanceof Error ? e.message : "The payment did not go through. Nothing has been charged.");
+      setTimeout(() => setPayToast(null), 5000);
+      setPayingGroup(false);
+      return;
+    }
     const unpaidIds = allLines.filter(l => !l.paid).map(l => l.id);
     setBillConfig(c => ({ ...c, paidItemIds: [...new Set([...c.paidItemIds, ...unpaidIds])] }));
-    setPayToast(`Group payment of ₹${summary.total} processed${billConfig.groupPayerName ? ` by ${billConfig.groupPayerName}` : ""}`);
+    setPayToast(`Group payment of ₹${total} processed${billConfig.groupPayerName ? ` by ${billConfig.groupPayerName}` : ""}`);
     setTimeout(() => setPayToast(null), 4000);
-    publicApi.dining.groupPayment({ total: summary.total, payments: [{ method: "group", amount: summary.total }] }).catch(() => {});
-    publicApi.waiterCall({
+    setPayingGroup(false);
+    // Telling the floor is best-effort; the payment itself already succeeded.
+    void publicApi.waiterCall({
       restaurantId: venue.restaurantId ?? 0,
       tableId: venue.tableId,
       tableName: activeTable,
       type: "group_payment",
-      message: `Group payment ₹${summary.total}`,
-    }).catch(() => {});
+      message: `Group payment ₹${total}`,
+    }).catch(() => undefined);
   }
 
   function paySelectedItems() {
     const unpaid = allLines.filter(l => !l.paid);
     if (unpaid.length === 0) return;
-    setPayToast(`Item-wise payment: ₹${summary.total} for ${unpaid.length} item(s)`);
-    setTimeout(() => setPayToast(null), 4000);
+    // This used to announce "Item-wise payment: ₹…" and then do nothing at all — no
+    // request, no record, nothing marked paid. A guest could walk out believing their
+    // share was settled. There is no per-item payment endpoint, so say so plainly.
+    setPayToast(`Paying for individual items isn't available yet — please settle ₹${summary.total} at the counter.`);
+    setTimeout(() => setPayToast(null), 5000);
   }
 
   return (

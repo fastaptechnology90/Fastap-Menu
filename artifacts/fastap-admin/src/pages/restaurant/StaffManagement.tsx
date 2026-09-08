@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
 import { staff as staffApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { EmptyState } from "@/components/restaurant/EmptyState";
 
 interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; performance: number; tablesAssigned?: string[]; weeklySchedule?: Record<string, string>; }
 
@@ -52,8 +54,10 @@ const roleCfgOf = (r: StaffRole) => ROLE_CONFIG[r] ?? DEFAULT_ROLE_CFG;
 
 export default function StaffManagement() {
   const { restaurantId, restaurant } = useRestaurant();
+  const { confirm, confirmDialog } = useConfirm();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const mapStaff = (s: any): StaffMember => ({
     ...s,
@@ -71,8 +75,9 @@ export default function StaffManagement() {
     if (!restaurantId) return;
     setLoading(true);
     staffApi.list(restaurantId)
-      .then(data => setStaff(Array.isArray(data) ? data.map(mapStaff) : []))
-      .catch(() => {})
+      // An empty roster and an unreachable server used to look identical.
+      .then(data => { setStaff(Array.isArray(data) ? data.map(mapStaff) : []); setLoadError(null); })
+      .catch(e => setLoadError(e instanceof Error ? e.message : "Could not reach the server."))
       .finally(() => setLoading(false));
   }, [restaurantId]);
 
@@ -131,7 +136,13 @@ export default function StaffManagement() {
 
   async function deleteStaff() {
     if (!restaurantId || !selected) return;
-    if (!window.confirm(`Remove ${selected.name}? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Remove ${selected.name}?`,
+      description: `${selected.name} loses access to the staff app immediately. Their past orders and shifts are kept, but the account cannot be restored.`,
+      destructive: true,
+      confirmLabel: "Remove from team",
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await staffApi.delete(restaurantId, parseInt(selected.id, 10));
@@ -243,6 +254,23 @@ export default function StaffManagement() {
               </button>
             ))}
           </div>
+
+          {loadError && (
+            <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-200">We could not load your team.</p>
+                <p className="text-xs text-red-200/70">{loadError} This is not an empty roster.</p>
+              </div>
+              <button onClick={loadStaff} className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+            </div>
+          )}
+
+          {!loading && !loadError && filtered.length === 0 && (
+            <EmptyState
+              title={staff.length === 0 ? "No staff added yet" : "No one matches this filter"}
+              description={staff.length === 0 ? "Add your first team member so they can sign in to the staff app." : "Try a different role or status."}
+            />
+          )}
 
           {/* Staff Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -518,6 +546,7 @@ export default function StaffManagement() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

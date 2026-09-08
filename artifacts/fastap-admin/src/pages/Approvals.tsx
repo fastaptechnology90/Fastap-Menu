@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 export default function Approvals() {
   const qc = useQueryClient();
-  const { data: items = [], isLoading, refetch, isFetching } = useQuery({ queryKey: ["approvals"], queryFn: api.approvals.list, refetchInterval: 30000 });
+  const { data: items = [], isLoading, isError, refetch, isFetching } = useQuery({ queryKey: ["approvals"], queryFn: api.approvals.list, refetchInterval: 30000 });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => api.approvals.update(id, { status }),
@@ -40,7 +40,14 @@ export default function Approvals() {
       </div>
       <PanelCard title="Approval Queue" description="L1 → L2 → L3 escalation chain for sensitive operations">
         <div className="admin-data-table-wrap">
-          <DataTable data={items} columns={[
+          <DataTable
+            data={items}
+            error={isError}
+            onRetry={() => { void refetch(); }}
+            errorMessage="We could not load the approval queue."
+            emptyMessage="Nothing awaiting sign-off"
+            emptyDescription="Refunds, payouts and other escalated actions land here."
+            columns={[
             { header: "ID", cell: (row: any) => <span className="font-mono text-xs text-primary">{row.id}</span> },
             { header: "Type", cell: (row: any) => <Badge variant="outline" className="capitalize text-xs">{row.type || "general"}</Badge> },
             { header: "Level", cell: (row: any) => <Badge className="text-xs">L{row.level ?? 1}</Badge> },

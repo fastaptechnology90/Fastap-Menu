@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { roomService as roomApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { BedDouble, UserPlus, Users, CalendarDays, Wallet, X, CheckCircle, Loader2, LogOut, Phone } from "lucide-react";
 
 type Folio = {
@@ -24,6 +25,7 @@ function isJustArrived(checkIn: string | null | undefined): boolean {
 function fmt(n: number) { return `₹${Number(n || 0).toLocaleString("en-IN")}`; }
 
 export default function Reception() {
+  const { confirm, confirmDialog } = useConfirm();
   const { restaurantId } = useRestaurant();
   const [rooms, setRooms] = useState<any[]>([]);
   const [folios, setFolios] = useState<Record<string, Folio>>({});
@@ -105,7 +107,12 @@ export default function Reception() {
 
   async function checkout(roomNumber: string, guest: string) {
     if (!restaurantId) return;
-    if (!confirm(`Check out ${guest} from Room ${roomNumber}? This settles the bill and frees the room.`)) return;
+    const ok = await confirm({
+      title: `Check out ${guest} from Room ${roomNumber}?`,
+      description: "The folio is settled and the room is released. Nothing further can be charged to it.",
+      confirmLabel: "Check out",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await roomApi.checkout(restaurantId, roomNumber);
@@ -341,6 +348,7 @@ export default function Reception() {
           </div>
         );
       })()}
+      {confirmDialog}
     </div>
   );
 }

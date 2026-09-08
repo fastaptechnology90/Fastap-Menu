@@ -42,7 +42,7 @@ export default function AIFeatures() {
       setInsights((d.insights ?? []).map((i: any) => ({ ...i, icon: i.type === "warning" ? "⚠️" : i.type === "opportunity" ? "🎯" : "📊" })));
       setPredictions(d.predictions ?? []);
       setMenuOpts(d.menuOptimizations ?? []);
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load insights", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     feedbackApi.list(restaurantId).then(rows => {
       if (Array.isArray(rows) && rows.length > 0) {
         setReviews(rows.map((f: any) => ({
@@ -53,7 +53,7 @@ export default function AIFeatures() {
           date: f.createdAt ? new Date(f.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—",
         })));
       }
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load guest feedback", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   }, [restaurantId, isRestaurantPublished]);
 
   async function generateDish() {

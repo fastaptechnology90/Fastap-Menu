@@ -159,6 +159,7 @@ function DocUploadField({
   onClear: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
@@ -184,6 +185,7 @@ function DocUploadField({
           onChange={e => {
             const file = e.target.files?.[0];
             if (!file) return;
+            setUploadError("");
             setUploading(true);
             void fileToUploadData(file)
               .then(data => {
@@ -195,8 +197,10 @@ function DocUploadField({
                   fileType: data.fileType,
                 });
               })
+              // Shown beside the field rather than in a browser dialog, so the
+              // applicant can see which document failed while they fix it.
               .catch(err => {
-                alert(err instanceof Error ? err.message : "Upload failed");
+                setUploadError(err instanceof Error ? err.message : "Upload failed. Try a smaller file.");
               })
               .finally(() => {
                 setUploading(false);
@@ -205,6 +209,11 @@ function DocUploadField({
           }}
         />
       </label>
+      {uploadError && (
+        <p role="alert" className="text-[11px] text-red-400 flex items-center gap-1">
+          <Icon name="error" size={14} /> {uploadError}
+        </p>
+      )}
       {doc?.fileName && (
         <p className="text-[11px] text-emerald-400 flex items-center gap-1">
           <Icon name="check_circle" size={14} /> {doc.fileName}

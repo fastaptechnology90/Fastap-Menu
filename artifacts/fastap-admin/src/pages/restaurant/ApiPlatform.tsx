@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Key, Copy, RefreshCw, Code, Check, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export default function ApiPlatform() {
   const { restaurantId } = useRestaurant();
@@ -11,7 +12,7 @@ export default function ApiPlatform() {
 
   const load = () => {
     if (!restaurantId) return;
-    platformApi.apiKeys(restaurantId).then(setData).catch(() => {});
+    platformApi.apiKeys(restaurantId).then(setData).catch(e => toast({ title: "Could not load your API keys", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   };
 
   useEffect(load, [restaurantId]);
@@ -27,7 +28,10 @@ export default function ApiPlatform() {
 
   function copyKey() {
     if (!data?.apiKey) return;
-    navigator.clipboard.writeText(data.apiKey).catch(() => {});
+    // Clipboard access is blocked outside a secure context and in some browsers.
+    navigator.clipboard.writeText(data.apiKey).catch(() => {
+      toast({ title: "Could not copy the key", description: "Select it and copy manually.", variant: "destructive" });
+    });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

@@ -220,7 +220,10 @@ export default function EventBanquetPage() {
       setCreatedEventId(res.id);
       setEnquiryToken(res.enquiryToken ?? `EVT-${res.id}`);
       if (res.id && invitations.length > 0) {
-        await publicApi.events.sendInvitations(res.id, invitations.map(i => ({ name: i.name, phone: i.phone, email: i.email }))).catch(() => {});
+        // The enquiry itself is already saved, so a failed invite send is a
+        // partial success, not a reason to discard the whole form.
+        await publicApi.events.sendInvitations(res.id, invitations.map(i => ({ name: i.name, phone: i.phone, email: i.email })))
+          .catch(() => toast({ title: "Enquiry sent, invitations were not", description: "Your event request went through. Send the invitations again from your bookings.", variant: "destructive" }));
       }
       setStep("success");
     } catch {

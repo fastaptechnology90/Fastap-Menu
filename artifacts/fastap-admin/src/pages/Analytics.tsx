@@ -32,7 +32,7 @@ export default function Analytics() {
   const [period, setPeriod] = useState("all");
   const { toast } = useToast();
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading, isError, refetch } = useQuery({
     queryKey: ["superadmin-analytics-summary", period],
     queryFn: () => api.analytics.summary(period),
   });
@@ -134,6 +134,19 @@ export default function Analytics() {
           </button>
         ))}
       </div>
+
+      {isError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+            <p className="text-sm">
+              <span className="font-medium">These figures could not be loaded.</span>{" "}
+              <span className="text-muted-foreground">The dashes below are missing data, not zeroes.</span>
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { void refetch(); }}>Try again</Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>

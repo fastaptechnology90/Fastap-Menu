@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
+import { toast } from "@/hooks/use-toast";
 import { Monitor, Plus, Trash2, Edit2, Save, ToggleLeft, ToggleRight, Tv, Wifi, WifiOff, Settings, GripVertical, ChevronUp, ChevronDown, Check } from "lucide-react";
 
 const API_BASE = "/api";
@@ -77,7 +78,13 @@ export default function DigitalSignage() {
   async function handleSaveSettings() {
     if (!restaurantId) return;
     setSaving(true);
-    await apiFetch(`/restaurants/${restaurantId}/signage/settings`, { method: "PUT", body: JSON.stringify(settings) }).catch(() => {});
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/signage/settings`, { method: "PUT", body: JSON.stringify(settings) });
+    } catch (e) {
+      toast({ title: "Signage settings not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      setSaving(false);
+      return;
+    }
     setSaving(false); setSavedSettings(true); setTimeout(() => setSavedSettings(false), 2000);
   }
 

@@ -22,7 +22,8 @@ export default function FutureAIPage() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    publicApi.aiFuture.catalog().then(r => setFeatures((r.features ?? []) as FutureFeature[])).catch(() => {});
+    publicApi.aiFuture.catalog().then(r => setFeatures((r.features ?? []) as FutureFeature[]))
+      .catch(() => setMsg("Could not load what is coming next. Please try again later."));
   }, []);
 
   async function joinWaitlist(featureId: string) {

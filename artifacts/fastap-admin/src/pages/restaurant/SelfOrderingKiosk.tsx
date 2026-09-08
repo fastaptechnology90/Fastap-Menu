@@ -90,7 +90,7 @@ export default function SelfOrderingKiosk() {
           themeColor: d.themeColor ?? d.theme_color ?? s.themeColor,
         }));
       }
-    }).catch(()=>{});
+    }).catch(e => toast({ title: "Could not load the kiosk settings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     kioskApi.stats(restaurantId).then((d: any) => {
       if (!isRestaurantPublished || d?.isPublished === false) {
         setKioskStats([]);
@@ -110,7 +110,7 @@ export default function SelfOrderingKiosk() {
         if (Array.isArray(d.top_items)) setTopKioskItems(d.top_items);
         else if (Array.isArray(d.topItems)) setTopKioskItems(d.topItems);
       }
-    }).catch(()=>{});
+    }).catch(e => toast({ title: "Could not load the kiosk statistics", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     hardwareApi.get(restaurantId).then((d: any) => {
       const devices = Array.isArray(d?.devices) ? d.devices.filter((x: any) => x.type === "kiosk") : [];
       setKioskUnits(devices.map((k: any) => ({
@@ -126,7 +126,12 @@ export default function SelfOrderingKiosk() {
 
   async function pingKiosk(id: string) {
     if (!restaurantId) return;
-    await hardwareApi.ping(restaurantId, parseInt(id, 10)).catch(() => {});
+    try {
+      await hardwareApi.ping(restaurantId, parseInt(id, 10));
+      toast({ title: "Kiosk responded" });
+    } catch (e) {
+      toast({ title: "Kiosk did not respond", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     const d = await hardwareApi.get(restaurantId).catch(() => null);
     const devices = Array.isArray(d?.devices) ? d.devices.filter((x: any) => x.type === "kiosk") : [];
     setKioskUnits(devices.map((k: any) => ({

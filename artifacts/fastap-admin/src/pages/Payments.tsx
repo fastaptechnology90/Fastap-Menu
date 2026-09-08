@@ -24,7 +24,7 @@ export default function Payments() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [holdReason, setHoldReason] = useState("");
 
-  const { data: payments = [], isLoading, refetch } = useQuery({
+  const { data: payments = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["superadmin-payments"],
     queryFn: () => api.payments.list({ limit: 200 }),
   });
@@ -169,6 +169,11 @@ export default function Payments() {
               data={filtered}
               pageSize={10}
               onRowClick={(row: Payment) => setDetailId(row.id)}
+              error={isError}
+              onRetry={() => { void refetch(); }}
+              errorMessage="We could not load transactions."
+              emptyMessage="No transactions"
+              emptyDescription="Payments taken through the platform appear here."
               columns={[
                 { header: "TXN ID", cell: (row: Payment) => <span className="font-mono text-xs">{row.id}</span> },
                 { header: "Vendor", cell: (row: Payment) => <span className="font-medium">{row.vendorName}</span> },

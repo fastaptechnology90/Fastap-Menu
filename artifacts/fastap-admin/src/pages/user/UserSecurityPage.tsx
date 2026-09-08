@@ -16,6 +16,7 @@ export default function UserSecurityPage() {
   const [alerts, setAlerts] = useState<LoginAlert[]>([]);
   const [security, setSecurity] = useState({ sessionTimeoutMinutes: 30, fraudProtection: true, loginAlertsEnabled: true });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const currentId = getDeviceId();
 
   useEffect(() => {
@@ -28,7 +29,10 @@ export default function UserSecurityPage() {
       setDevices(d.devices ?? []);
       setAlerts(a.alerts ?? []);
       setSecurity(s.security ?? security);
-    }).catch(() => {}).finally(() => setLoading(false));
+      setLoadError("");
+      // An empty device list would otherwise read as "no one else is signed in".
+    }).catch(e => setLoadError(e instanceof Error ? e.message : "Could not reach the server."))
+      .finally(() => setLoading(false));
   }, [user]);
 
   async function removeDevice(id: string) {
@@ -131,7 +135,9 @@ export default function UserSecurityPage() {
 
         <section className="guest-card p-4">
           <h2 className="text-sm font-semibold flex items-center gap-2 mb-3"><Smartphone className="h-4 w-4 text-blue-400" /> Registered Devices</h2>
-          {loading ? <p className="text-xs text-white/40">Loading…</p> : devices.length === 0 ? (
+          {loading ? <p className="text-xs text-white/40">Loading…</p> : loadError ? (
+            <p role="alert" className="text-xs text-red-400">We could not load your devices. {loadError}</p>
+          ) : devices.length === 0 ? (
             <p className="text-xs text-white/40">No devices registered yet</p>
           ) : (
             <div className="space-y-2">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import { CheckSquare, Plus, X, Clock, CheckCircle, Users, FileText, PlayCircle, Download, Eye } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { tasksSop as tasksApi } from "@/lib/api";
@@ -27,7 +28,13 @@ export default function TaskSOP() {
 
   const persistProgress = useCallback(async (type: "opening" | "closing", ids: string[]) => {
     if (!restaurantId) return;
-    await tasksApi.saveChecklistProgress(restaurantId, type, ids).catch(() => {});
+    try {
+      await tasksApi.saveChecklistProgress(restaurantId, type, ids);
+    } catch (e) {
+      // A tick that never reached the server would otherwise look done to the
+      // next shift, who would skip the task.
+      toast({ title: "Checklist not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }, [restaurantId]);
 
   useEffect(() => {
@@ -81,25 +88,37 @@ export default function TaskSOP() {
     tasksApi.checklists(restaurantId).then(data => {
       const prog = data?.progress?.[checklistType] ?? [];
       setChecked(new Set(prog));
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load today's checklist progress", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   }, [restaurantId, checklistType]);
 
   async function toggleTaskStatus(task: TaskRow) {
     if (!restaurantId) return;
     const next = task.status === "completed" ? "pending" : "completed";
-    await tasksApi.updateTask(restaurantId, parseInt(task.id, 10), { status: next }).catch(() => {});
-    setTasks(t => t.map(x => x.id === task.id ? { ...x, status: next } : x));
+    try {
+      await tasksApi.updateTask(restaurantId, parseInt(task.id, 10), { status: next });
+      // Only move the row once the server agrees, so a failed write cannot leave
+      // a task showing as done.
+      setTasks(t => t.map(x => x.id === task.id ? { ...x, status: next } : x));
+    } catch (e) {
+      toast({ title: "Could not update the task", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleAddTask() {
     if (!restaurantId || !newTask.title) return;
-    await tasksApi.createTask(restaurantId, {
-      title: newTask.title,
-      assignedTo: newTask.assignedTo,
-      dueDate: newTask.dueDate || undefined,
-      priority: newTask.priority,
-      description: newTask.notes,
-    }).catch(() => {});
+    try {
+      await tasksApi.createTask(restaurantId, {
+        title: newTask.title,
+        assignedTo: newTask.assignedTo,
+        dueDate: newTask.dueDate || undefined,
+        priority: newTask.priority,
+        description: newTask.notes,
+      });
+    } catch (e) {
+      // Keep the dialog and its contents so the user can correct and retry.
+      toast({ title: "Task not created", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      return;
+    }
     const rows = await tasksApi.tasks(restaurantId).catch(() => []);
     if (Array.isArray(rows)) {
       setTasks(rows.map(t => ({
@@ -114,6 +133,7 @@ export default function TaskSOP() {
     }
     setNewTask({ title: "", assignedTo: "", dueDate: "", priority: "normal", notes: "" });
     setShowAddTask(false);
+    toast({ title: "Task created" });
   }
 
   const template = checklists[checklistType] ?? [];
@@ -141,7 +161,11 @@ export default function TaskSOP() {
 
   async function downloadSop(docId: string) {
     if (!restaurantId) return;
-    await tasksApi.downloadSop(restaurantId, parseInt(docId, 10)).catch(() => {});
+    try {
+      await tasksApi.downloadSop(restaurantId, parseInt(docId, 10));
+    } catch (e) {
+      toast({ title: "Download failed", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function watchVideo(video: TrainingVideo) {

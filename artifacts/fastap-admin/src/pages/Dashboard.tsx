@@ -97,7 +97,7 @@ export default function Dashboard() {
   const [selectedTxn, setSelectedTxn] = useState<any | null>(null);
   const [txnSearch, setTxnSearch] = useState("");
 
-  const { data: stats, isLoading, refetch, isFetching } = useQuery({
+  const { data: stats, isLoading, isError: statsError, refetch, isFetching } = useQuery({
     queryKey: ["superadmin-stats"],
     queryFn: api.dashboard.stats,
     refetchInterval: 60_000,
@@ -209,6 +209,19 @@ export default function Dashboard() {
       </div>
 
       <RevenueByDate />
+
+      {statsError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+            <p className="text-sm">
+              <span className="font-medium">These figures could not be loaded.</span>{" "}
+              <span className="text-muted-foreground">A zero here is a failed request, not a quiet day.</span>
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { void refetch(); }}>Try again</Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>

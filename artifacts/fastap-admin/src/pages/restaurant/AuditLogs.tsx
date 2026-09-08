@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Shield, AlertTriangle, Search, Eye, Clock, User, Download, X, CheckCircle, Ban, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { auditLogs, hardwareApi } from "@/lib/api";
@@ -158,7 +159,10 @@ export default function AuditLogs() {
 
   function blockDevice(id: string) {
     if (!restaurantId) return;
-    hardwareApi.update(restaurantId, parseInt(id, 10), { status: "offline" }).catch(() => {});
+    hardwareApi.update(restaurantId, parseInt(id, 10), { status: "offline" })
+      .then(() => toast({ title: "Device blocked" }))
+      // Silence here meant a device the owner believed blocked was still online.
+      .catch(e => toast({ title: "Device not blocked", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     setDevices(d => d.map(x => x.id === id ? { ...x, status: "blocked" } : x));
   }
 

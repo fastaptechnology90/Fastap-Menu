@@ -90,7 +90,8 @@ export default function Reservation() {
 
   useEffect(() => {
     if (bookingType === "spa" && venue.restaurantId) {
-      publicApi.spaServices(venue.restaurantId).then(list => setSpaServices(list)).catch(() => {});
+      publicApi.spaServices(venue.restaurantId).then(list => setSpaServices(list))
+        .catch(e => toast({ title: "Could not load spa treatments", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     }
   }, [bookingType, venue.restaurantId]);
 
@@ -173,21 +174,35 @@ export default function Reservation() {
   }
 
   async function cancelBooking(id: number) {
-    await publicApi.cancelReservation(id).catch(() => {});
+    try {
+      await publicApi.cancelReservation(id);
+      toast({ title: "Booking cancelled" });
+    } catch (e) {
+      // The guest has to know their table is still held, or they will not turn up.
+      toast({ title: "Could not cancel", description: e instanceof Error ? e.message : "Your booking is still confirmed. Please call the restaurant.", variant: "destructive" });
+      return;
+    }
     loadMyBookings();
   }
 
   async function saveEdit() {
     if (!editBooking) return;
-    await publicApi.updateReservation(editBooking.id, {
-      date: editBooking.date,
-      time: editBooking.time,
-      guestCount: editBooking.guestCount,
-      notes: editBooking.notes,
-      specialRequest: editBooking.specialRequest,
-      zone: editBooking.zone,
-    }).catch(() => {});
+    try {
+      await publicApi.updateReservation(editBooking.id, {
+        date: editBooking.date,
+        time: editBooking.time,
+        guestCount: editBooking.guestCount,
+        notes: editBooking.notes,
+        specialRequest: editBooking.specialRequest,
+        zone: editBooking.zone,
+      });
+    } catch (e) {
+      // The dialog stays open with the edits intact so they can be retried.
+      toast({ title: "Could not update the booking", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      return;
+    }
     setEditBooking(null);
+    toast({ title: "Booking updated" });
     loadMyBookings();
   }
 

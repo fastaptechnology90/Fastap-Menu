@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { analytics as analyticsApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { publicationEmptyMessage, emptyAnalyticsSummaryDisplay } from "@/lib/restaurantPublication";
 import {
@@ -21,6 +22,8 @@ export default function Analytics() {
   const [customerSegments, setCustomerSegments] = useState<any[]>([]);
   const [hourlyOrders, setHourlyOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [exporting, setExporting] = useState(false);
 
   const published = isRestaurantPublished && (summary?.isPublished !== false);
@@ -28,7 +31,11 @@ export default function Analytics() {
   async function handleExport() {
     if (!restaurantId) return;
     setExporting(true);
-    try { await analyticsApi.exportCsv(restaurantId); } catch {} finally { setExporting(false); }
+    try {
+      await analyticsApi.exportCsv(restaurantId);
+    } catch (e) {
+      toast({ title: "Export failed", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setExporting(false); }
   }
 
   useEffect(() => {
@@ -44,12 +51,15 @@ export default function Analytics() {
       return;
     }
     setLoading(true);
+    // The summary carries every KPI on the page, so its failure is the one worth
+    // reporting; the rest degrade into their own empty states.
     Promise.all([
-      analyticsApi.summary(restaurantId, period).catch(() => null),
+      analyticsApi.summary(restaurantId, period).catch(e => { setLoadError(e instanceof Error ? e.message : "Could not reach the server."); return null; }),
       analyticsApi.popularItems(restaurantId).catch(() => []),
       analyticsApi.dailySales(restaurantId, period).catch(() => []),
       analyticsApi.orderStats(restaurantId, period).catch(() => null),
     ]).then(([sum, items, sales, stats]) => {
+      if (sum) setLoadError(null);
       setSummary(sum);
       setTopItems(Array.isArray(items) ? items.map((i: any) => ({
         name: i.name,
@@ -73,7 +83,7 @@ export default function Analytics() {
         setHourlyOrders([]);
       }
     }).finally(() => setLoading(false));
-  }, [restaurantId, period, isRestaurantPublished]);
+  }, [restaurantId, period, isRestaurantPublished, reloadKey]);
 
   const periodLabel = published ? (summary?.periodLabel || "All time") : "—";
   const displaySummary = (published && summary) ? summary : emptyAnalyticsSummaryDisplay(periodLabel);
@@ -87,6 +97,18 @@ export default function Analytics() {
   ];
 
   if (loading) return <div className="p-6 text-center text-white/40 text-sm">Loading analytics…</div>;
+
+  if (loadError) {
+    return (
+      <div className="p-6">
+        <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-5 text-center">
+          <p className="text-sm font-semibold text-red-200">We could not load your analytics.</p>
+          <p className="mt-1 text-xs text-red-200/70">{loadError} Nothing below would be accurate, so it is not shown.</p>
+          <button onClick={() => setReloadKey(k => k + 1)} className="mt-4 px-4 py-2 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
