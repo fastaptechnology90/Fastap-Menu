@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
+import { generateOtp } from "../lib/mobile-kitchen/staff-tokens.js";
 import { eq, and, desc, or, sql, gte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
@@ -24,6 +25,7 @@ import {
   loyaltyTransactionsTable,
   staffTable,
   waiterCallsTable,
+  menuItemsTable,
 } from "@workspace/db";
 import {
   ACCESS_METHODS,
@@ -54,6 +56,7 @@ import {
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPublicIntegrationsConfig } from "../lib/platform-integrations.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
+import { priceMenuItem, taxRateFor } from "../lib/order-pricing.js";
 
 const router: IRouter = Router();
 
@@ -500,7 +503,7 @@ router.post("/public/auth/otp/send", async (req, res): Promise<void> => {
   if (!phone) { res.status(400).json({ error: "phone required" }); return; }
   const isDemoPhone = phone === DEMO_GUEST_PHONE || phone.endsWith(DEMO_GUEST_PHONE);
   const otp = isDemoPhone ? DEMO_GUEST_OTP
-    : process.env.NODE_ENV === "production" ? String(Math.floor(100000 + Math.random() * 900000)) : DEMO_GUEST_OTP;
+    : process.env.NODE_ENV === "production" ? generateOtp() : DEMO_GUEST_OTP;
   otpStore.set(phone, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
   res.json({
     success: true,
@@ -804,22 +807,41 @@ router.post("/public/coupons/validate", async (req, res): Promise<void> => {
     and(eq(promoCodesTable.restaurantId, restaurantId), eq(promoCodesTable.code, code.toUpperCase()), eq(promoCodesTable.isActive, true)),
   );
 
-  let discount = 0;
-  if (promo) {
-    const sub = parseNum(subtotal);
-    const minOrder = parseNum(promo.minOrderAmount);
-    if (sub < minOrder) { res.status(400).json({ error: `Minimum order ₹${minOrder} required` }); return; }
-    if (promo.discountType === "percent") {
-      discount = Math.round(sub * parseNum(promo.discountValue) / 100);
-      if (promo.maxDiscount) discount = Math.min(discount, parseNum(promo.maxDiscount));
-    } else {
-      discount = parseNum(promo.discountValue);
-    }
-    await db.update(promoCodesTable).set({ usedCount: promo.usedCount + 1 }).where(eq(promoCodesTable.id, promo.id));
-  } else {
+  if (!promo) {
     res.status(404).json({ error: "Invalid coupon code" });
     return;
   }
+
+  // The same three conditions the order route applies when it actually prices the
+  // basket. Without them the cart happily showed "₹30 off applied" for a code that
+  // expired years ago or was already spent, and then the order was placed at full
+  // price with nothing on screen to explain the difference.
+  if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+    res.status(400).json({ error: "This coupon has expired" });
+    return;
+  }
+  const usageLimit = Number(promo.usageLimit ?? 0);
+  if (usageLimit > 0 && Number(promo.usedCount ?? 0) >= usageLimit) {
+    res.status(400).json({ error: "This coupon has already been fully used" });
+    return;
+  }
+
+  const sub = parseNum(subtotal);
+  const minOrder = parseNum(promo.minOrderAmount);
+  if (sub < minOrder) { res.status(400).json({ error: `Minimum order ₹${minOrder} required` }); return; }
+
+  let discount = 0;
+  if (promo.discountType === "percent") {
+    discount = Math.round(sub * parseNum(promo.discountValue) / 100);
+    if (promo.maxDiscount) discount = Math.min(discount, parseNum(promo.maxDiscount));
+  } else {
+    discount = parseNum(promo.discountValue);
+  }
+  discount = Math.min(discount, sub);
+
+  // Checking a code is not spending it. This used to increment usedCount, so typing a
+  // coupon into the cart — twice, or then abandoning the basket — burned a redemption
+  // the guest never received.
 
   res.json({ code: code.toUpperCase(), discount, valid: true });
 });
@@ -904,15 +926,59 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   if (!restaurantId || !roomNumber) { res.status(400).json({ error: "restaurantId and roomNumber required" }); return; }
 
   const requestType = type || "food";
+
+  // Food and drink are priced from the menu, exactly as a table order is. The price and
+  // total the room page posted used to be written straight to the folio, so a ₹275 club
+  // sandwich could be charged to the room at ₹1 — and the kitchen still sent it up.
+  // Non-food requests (laundry, amenities) have no menu row and keep the amount they
+  // were sent, which is how the staff-side route treats them too.
+  const requestedLines = Array.isArray(items) ? items as Record<string, unknown>[] : [];
+  let pricedLines = requestedLines;
+  let lineSubtotal = parseNum(total);
+  if ((requestType === "food" || requestType === "bar") && requestedLines.length) {
+    const menuRows = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));
+    const menuMap = new Map(menuRows.map(m => [m.id, m]));
+    const resolved: Record<string, unknown>[] = [];
+    let sum = 0;
+    for (const line of requestedLines) {
+      const mi = menuMap.get(Number(line.menuItemId));
+      if (!mi) {
+        // "Menu item undefined not found" told a guest nothing. Food and drink have to
+        // name a menu row because that is where the price comes from; anything else
+        // belongs under a non-food request type.
+        res.status(400).json({
+          error: line.menuItemId == null
+            ? `"${String(line.name ?? "That item")}" is not on the room-service menu. Choose a dish from the menu to order it.`
+            : `That dish is no longer on this hotel's menu.`,
+        });
+        return;
+      }
+      if (!mi.isAvailable) { res.status(409).json({ error: `${mi.name} is not available right now` }); return; }
+      const quantity = Math.floor(Number(line.qty ?? line.quantity ?? 1));
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+        res.status(400).json({ error: `Invalid quantity for ${mi.name}` });
+        return;
+      }
+      const { unitPrice, addons, variant } = priceMenuItem(mi, line);
+      sum += unitPrice * quantity;
+      resolved.push({ menuItemId: mi.id, name: mi.name, price: unitPrice, quantity, variant, addons, notes: line.notes });
+    }
+    pricedLines = resolved;
+    lineSubtotal = Math.round(sum * 100) / 100;
+  }
+  const taxRate = await taxRateFor(restaurantId);
+  const roomTax = Math.round(lineSubtotal * taxRate * 100) / 100;
+  const roomTotal = Math.round((lineSubtotal + roomTax) * 100) / 100;
+
   const [request] = await db.insert(roomServiceRequestsTable).values({
     restaurantId,
     roomNumber,
     guestName,
     guestPhone,
     type: requestType,
-    items: items || [],
+    items: pricedLines,
     notes,
-    total: String(parseNum(total).toFixed(2)),
+    total: roomTotal.toFixed(2),
     paymentMethod: paymentMethod || "room_bill",
     status: "pending",
   }).returning();
@@ -927,11 +993,10 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   // counting it twice.
   if (requestType === "food" || requestType === "bar") {
     try {
-      const totalNum = parseNum(total);
-      const orderItems = (Array.isArray(items) ? items : []).map((i: any, idx: number) => {
+      const orderItems = pricedLines.map((i: any, idx: number) => {
         const qty = Number(i.qty ?? i.quantity ?? 1) || 1;
         const price = parseNum(i.price);
-        return { id: idx + 1, name: i.name ?? i.description ?? "Item", price, quantity: qty, subtotal: price * qty };
+        return { id: i.menuItemId ?? idx + 1, menuItemId: i.menuItemId, name: i.name ?? i.description ?? "Item", price, quantity: qty, variant: i.variant ?? null, addons: i.addons ?? [], subtotal: Math.round(price * qty * 100) / 100 };
       });
       await db.insert(ordersTable).values({
         restaurantId,
@@ -942,10 +1007,12 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
         status: "pending",
         items: orderItems.length
           ? orderItems
-          : [{ id: 1, name: notes || "Room service", price: totalNum, quantity: 1, subtotal: totalNum }],
-        subtotal: String(totalNum.toFixed(2)),
-        tax: "0.00",
-        total: String(totalNum.toFixed(2)),
+          : [{ id: 1, name: notes || "Room service", price: lineSubtotal, quantity: 1, subtotal: lineSubtotal }],
+        subtotal: lineSubtotal.toFixed(2),
+        // Room food is taxed at the venue's own rate, like every other order. It used to
+        // post 0.00 tax, so the folio and the GST returns were short on every room meal.
+        tax: roomTax.toFixed(2),
+        total: roomTotal.toFixed(2),
         notes: notes ?? null,
         paymentMethod: paymentMethod ?? "room_bill",
         paymentStatus: "pending",

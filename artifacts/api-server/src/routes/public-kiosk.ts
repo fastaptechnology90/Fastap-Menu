@@ -8,6 +8,7 @@ import {
   buildQrPaymentPayload, processNfcTap, tokenStatusLabel, getNfcTags,
   type KioskCartItem,
 } from "../lib/smartKioskLogic.js";
+import { priceMenuItem, clampTip } from "../lib/order-pricing.js";
 
 const router: IRouter = Router();
 
@@ -115,15 +116,34 @@ router.post("/public/kiosk/qr-payment", async (req, res): Promise<void> => {
 
 router.post("/public/kiosk/checkout", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.body.restaurantId ?? 0), 10);
-  const items = Array.isArray(req.body.items) ? req.body.items as KioskCartItem[] : [];
+  const requested = Array.isArray(req.body.items) ? req.body.items as KioskCartItem[] : [];
   const paymentMethod = String(req.body.paymentMethod ?? "upi");
   const tip = parseFloat(String(req.body.tip ?? 0));
-  if (!restaurantId || items.length === 0) {
+  if (!restaurantId || requested.length === 0) {
     res.status(400).json({ error: "restaurantId and items required" });
     return;
   }
 
-  const bill = buildKioskBill(items, tip);
+  // Every price comes from the menu table, never from the kiosk screen. The prices the
+  // client posted used to be taken at face value, so a tampered request bought a ₹275
+  // dish for ₹1 and the kitchen still made it.
+  const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));
+  const menuMap = new Map(menuItems.map(m => [m.id, m]));
+  const items: KioskCartItem[] = [];
+  for (const line of requested) {
+    const mi = menuMap.get(Number(line.menuItemId));
+    if (!mi) { res.status(400).json({ error: `Menu item ${line.menuItemId} not found` }); return; }
+    if (!mi.isAvailable) { res.status(409).json({ error: `${mi.name} is not available right now` }); return; }
+    const quantity = Math.floor(Number(line.quantity));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+      res.status(400).json({ error: `Invalid quantity for ${mi.name}` });
+      return;
+    }
+    const { unitPrice } = priceMenuItem(mi, line as unknown as Record<string, unknown>);
+    items.push({ ...line, menuItemId: mi.id, name: mi.name, quantity, price: unitPrice });
+  }
+
+  const bill = buildKioskBill(items, clampTip(tip, items.reduce((s, i) => s + i.price * i.quantity, 0)));
   const config = getSettings(restaurantId);
   const tokenNumber = generateTokenNumber(String(config.tokenPrefix ?? "K"));
 
@@ -133,6 +153,7 @@ router.post("/public/kiosk/checkout", async (req, res): Promise<void> => {
     quantity: i.quantity,
     price: i.price,
     unitPrice: i.price,
+    subtotal: Math.round(i.price * i.quantity * 100) / 100,
     course: "main",
   }));
 
@@ -142,8 +163,9 @@ router.post("/public/kiosk/checkout", async (req, res): Promise<void> => {
     status: "pending",
     items: orderItems,
     subtotal: String(bill.subtotal),
+    tax: String(bill.gst),
     total: String(bill.grandTotal),
-    tipAmount: String(tip),
+    tipAmount: String(bill.tip),
     paymentMethod,
     notes: `Kiosk self-checkout · Token ${tokenNumber}`,
     metadata: { kiosk: true, tokenNumber, selfCheckout: true },

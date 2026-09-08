@@ -66,7 +66,11 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
     catering: true,
     decor: Boolean(decorationPackageId),
     totalAmount: String(quote.total),
-    advancePaid: String(quote.advance),
+    // An enquiry is not a payment. Writing the quoted advance into `advancePaid` put
+    // tens of thousands of rupees nobody had handed over into the venue's books, and
+    // showed the events team a deposit as already collected. The figure the guest still
+    // owes lives in the quotation.
+    advancePaid: "0",
     metadata: {
       hallId,
       seatingLayout,

@@ -146,7 +146,9 @@ router.post("/public/bar/dj-booking", async (req, res): Promise<void> => {
     notes,
     status: "confirmed",
     totalAmount: String(dj.cover * (guestCount ?? 2)),
-    advancePaid: String(dj.cover),
+    // The cover charge is collected at the door. Recording it as already paid on a
+    // booking made from the guest's phone credited the venue money it never took.
+    advancePaid: "0",
     metadata: { djEventId, genre: dj.genre, coverCharge: dj.cover },
   }).returning();
 

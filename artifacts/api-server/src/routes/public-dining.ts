@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, restaurantsTable, ordersTable } from "@workspace/db";
+import { taxRateFor, round2 } from "../lib/order-pricing.js";
 
 const router: IRouter = Router();
 
@@ -8,7 +9,7 @@ const CLOSED_STATUSES = ["cancelled", "completed", "delivered"];
 
 router.get("/public/dining/running-bill", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.query.restaurantId || "0"), 10);
-  const tableName = req.query.table as string | undefined;
+  const tableName = String(req.query.table ?? req.query.tableName ?? "").trim();
   const slug = req.query.slug as string | undefined;
 
   let rid = restaurantId;
@@ -18,10 +19,18 @@ router.get("/public/dining/running-bill", async (req, res): Promise<void> => {
   }
   if (!rid) { res.status(400).json({ error: "restaurantId or slug required" }); return; }
 
+  // A running bill belongs to one table. Without this the table filter was optional, so
+  // any guest who reached the page without a table — a reload that dropped ?table=, a
+  // bookmark — was handed every open order in the venue: other diners' dishes, their
+  // totals, and a "pay" button over the lot.
+  if (!tableName) {
+    res.status(400).json({ error: "Scan your table's QR code to see its bill." });
+    return;
+  }
+
   const orders = await db.select().from(ordersTable).where(eq(ordersTable.restaurantId, rid));
   const active = orders.filter(o =>
-    !CLOSED_STATUSES.includes(o.status) &&
-    (!tableName || o.tableName === tableName),
+    !CLOSED_STATUSES.includes(o.status) && o.tableName === tableName,
   );
 
   const lines: {
@@ -38,17 +47,20 @@ router.get("/public/dining/running-bill", async (req, res): Promise<void> => {
   for (const order of active) {
     const items = Array.isArray(order.items) ? order.items : [];
     for (const item of items as Record<string, unknown>[]) {
-      const qty = Number(item.quantity ?? 1);
-      const price = parseFloat(String(item.price ?? 0));
-      const addonTotal = Array.isArray(item.addons)
-        ? (item.addons as Record<string, unknown>[]).reduce((s, a) => s + parseFloat(String(a.price ?? 0)), 0)
-        : 0;
+      const qty = Number(item.quantity ?? 1) || 1;
+      // The stored line price already has the chosen portion and every add-on folded in —
+      // that is what the order was priced and charged at. Adding the add-ons a second time
+      // here billed the table more for the same food than the order itself says.
+      const unitPrice = parseFloat(String(item.price ?? 0)) || 0;
+      const lineTotal = item.subtotal != null
+        ? parseFloat(String(item.subtotal)) || 0
+        : Math.round(unitPrice * qty * 100) / 100;
       lines.push({
         id: `order-${order.id}-${item.id ?? item.menuItemId}`,
         name: String(item.name),
-        unitPrice: price + addonTotal,
+        unitPrice,
         quantity: qty,
-        lineTotal: (price + addonTotal) * qty,
+        lineTotal,
         source: "order",
         orderId: String(order.id),
         paid: order.paymentStatus === "paid",
@@ -57,26 +69,33 @@ router.get("/public/dining/running-bill", async (req, res): Promise<void> => {
   }
 
   const subtotal = lines.reduce((s, l) => s + l.lineTotal, 0);
-  const gst = Math.round(subtotal * 0.05);
+  // The live table bill taxed at a flat 5% while the orders on it were taxed at the
+  // venue's own rate, so the running total the guest watched did not match the bill.
+  const gstRate = await taxRateFor(rid);
+  const gst = round2(subtotal * gstRate);
   res.json({
     lines,
     subtotal,
     gst,
-    total: subtotal + gst,
+    gstRatePercent: Math.round(gstRate * 10000) / 100,
+    total: round2(subtotal + gst),
     orderCount: active.length,
     updatedAt: new Date().toISOString(),
   });
 });
 
-router.post("/public/dining/split-bill", (req, res) => {
+router.post("/public/dining/split-bill", async (req, res): Promise<void> => {
   const lines = Array.isArray(req.body.lines) ? req.body.lines as { lineTotal: number; paid?: boolean }[] : [];
   const splitCount = Math.max(2, parseInt(String(req.body.splitCount ?? 2), 10));
   const seatCount = Math.max(1, parseInt(String(req.body.seatCount ?? 1), 10));
   const mode = String(req.body.mode ?? "equal");
   const unpaid = lines.filter(l => !l.paid);
   const subtotal = unpaid.reduce((s, l) => s + parseFloat(String(l.lineTotal ?? 0)), 0);
-  const gst = Math.round(subtotal * 0.05 * 100) / 100;
-  const total = subtotal + gst;
+  // A split bill is the same bill divided up, so it is taxed at the venue's own rate.
+  const rid = parseInt(String(req.body.restaurantId ?? ""), 10);
+  const gstRate = Number.isFinite(rid) ? await taxRateFor(rid) : 0.05;
+  const gst = round2(subtotal * gstRate);
+  const total = round2(subtotal + gst);
 
   if (mode === "seat_wise" && seatCount > 1) {
     const perSeat = Math.round((total / seatCount) * 100) / 100;
@@ -84,7 +103,8 @@ router.post("/public/dining/split-bill", (req, res) => {
       seat: i + 1,
       amount: i === seatCount - 1 ? total - perSeat * (seatCount - 1) : perSeat,
     }));
-    return res.json({ mode, subtotal, gst, total, seats, splitCount: seatCount });
+    res.json({ mode, subtotal, gst, total, seats, splitCount: seatCount });
+    return;
   }
 
   const perPerson = Math.round((total / splitCount) * 100) / 100;

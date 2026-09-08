@@ -100,6 +100,9 @@ router.get("/public/queue/stats/:restaurantId", async (req, res): Promise<void> 
   res.json({
     restaurantId,
     restaurantName: restaurant.name,
+    // A guest waiting for a table needs a way to reach the host desk that is not another
+    // in-app form.
+    restaurantPhone: restaurant.phone ?? null,
     queueLength: waiting.length,
     freeTables,
     freeTablesSoon: prediction.freeTablesSoon,

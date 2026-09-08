@@ -7,7 +7,7 @@ import { initialTrackingMetadata } from "../lib/orderTracking.js";
 import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic.js";
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
-import { priceMenuItem, resolveDiscount, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
+import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 import { canTransition } from "../lib/order-status.js";
 import {
@@ -285,7 +285,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
 
   // A coupon code is honoured only if it really exists, is live and the order qualifies.
   // The raw discountAmount the client used to send is ignored entirely.
-  const { discount, appliedCoupon } = await resolveDiscount(restaurantId, couponCode, subtotal);
+  const { discount, appliedCoupon, promoId, reason: couponReason } = await resolveDiscount(restaurantId, couponCode, subtotal);
   const taxable = Math.max(0, round2(subtotal - discount));
   const tax = round2(taxable * (await taxRateFor(restaurantId)));
   // A tip is the one figure the guest legitimately chooses, but it still cannot be
@@ -443,9 +443,17 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     }).where(and(eq(tablesMapTable.id, resolvedTableId), eq(tablesMapTable.restaurantId, restaurantId)));
   }
 
+  // Count the redemption now the order it discounted exists, not when the code was
+  // merely typed into the box.
+  if (appliedCoupon) await redeemCoupon(promoId);
+
   broadcastEvent("new_order", { id: order.id, restaurantId, tableName, total, status: "pending" });
   broadcastOrderEvent(order.id, "order_status", { id: order.id, status: "pending", tableName });
-  res.status(201).json(parseOrder({ ...order, invoiceNumber: generateInvoiceNumber(order.id, restaurantId) }));
+  res.status(201).json({
+    ...parseOrder({ ...order, invoiceNumber: generateInvoiceNumber(order.id, restaurantId) }),
+    // A code that quietly did nothing leaves the guest staring at the full price. Say so.
+    ...(couponReason ? { couponNotApplied: couponReason } : {}),
+  });
 });
 
 // Live-edit a still-open order from the guest menu: +1 / -1 a plain (un-customized) item.
@@ -485,7 +493,9 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   }
 
   const subtotal = Math.round(items.reduce((s, i) => s + (parseFloat(String(i.subtotal)) || (parseFloat(String(i.price)) || 0) * (i.quantity ?? i.qty ?? 1)), 0) * 100) / 100;
-  const tax = Math.round(subtotal * 0.05 * 100) / 100;
+  // Adjusting a round re-taxed the basket at a flat 5% while the original order was taxed
+  // at the venue's configured rate, so editing an order silently changed the tax on it.
+  const tax = round2(subtotal * (await taxRateFor(order.restaurantId)));
   const total = Math.round((subtotal + tax) * 100) / 100;
   // If the round was already finished, bump it back so the kitchen makes the new/changed items.
   const bumped = ["ready", "served"].includes(String(order.status)) ? "pending" : order.status;
@@ -525,8 +535,9 @@ router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> =
   }
   if (!orderItems.length) { res.status(400).json({ error: "Menu items no longer available" }); return; }
 
-  const tax = parseFloat((subtotal * 0.05).toFixed(2));
-  const total = subtotal + tax;
+  // Same rate as a first order at this venue — a reorder is not taxed differently.
+  const tax = round2(subtotal * (await taxRateFor(original.restaurantId)));
+  const total = round2(subtotal + tax);
   const prepMinutes = Math.min(45, Math.max(15, orderItems.reduce((s, i) => s + (Number(i.quantity) ?? 1) * 5, 10)));
 
   const [order] = await db.insert(ordersTable).values({

@@ -7,6 +7,7 @@ import {
 } from "../lib/paymentLogic.js";
 import { buildInvoicePdfBuffer } from "../lib/invoicePdf.js";
 import { billingFromSettings } from "../lib/restaurant-catalogs.js";
+import { taxRateFor } from "../lib/order-pricing.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPaymentsPublicConfig, isOnlinePaymentMethod, isCashPaymentMethod, processGatewayPayment } from "../lib/payment-gateway.js";
@@ -42,9 +43,16 @@ router.get("/public/payments/catalog", async (_req, res) => {
   });
 });
 
-router.post("/public/payments/quote", (req, res) => {
-  const { subtotal, discount, tip, splitCount, partialPayNow, advanceAmount } = req.body;
+/**
+ * A quote is worked out at the venue's own GST rate when the caller says which venue it
+ * is for. Without that the guest saw 5% on the cart while the order was billed at the
+ * configured rate, and the two disagreed at the moment of payment.
+ */
+router.post("/public/payments/quote", async (req, res): Promise<void> => {
+  const { subtotal, discount, tip, splitCount, partialPayNow, advanceAmount, restaurantId } = req.body;
   if (subtotal == null) { res.status(400).json({ error: "subtotal required" }); return; }
+  const rid = parseInt(String(restaurantId ?? ""), 10);
+  const taxRate = Number.isFinite(rid) ? await taxRateFor(rid) : undefined;
   res.json(computeBillQuote({
     subtotal: parseNum(subtotal),
     discount: parseNum(discount),
@@ -52,6 +60,7 @@ router.post("/public/payments/quote", (req, res) => {
     splitCount: splitCount ? parseInt(String(splitCount), 10) : undefined,
     partialPayNow: partialPayNow != null ? parseNum(partialPayNow) : undefined,
     advanceAmount: advanceAmount != null ? parseNum(advanceAmount) : undefined,
+    taxRate,
   }));
 });
 
@@ -212,12 +221,15 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
 
 router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // An invoice carries the diner's name, phone and everything they ate. It used to be
+  // fetched by id alone, so counting upward printed a GST bill for every table in the
+  // venue.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
-  const billing = billingFromSettings(settings);
+  const billing = billingFromSettings(settings, restaurant);
   const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
 
   if (!order.invoiceNumber) {
@@ -229,12 +241,15 @@ router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> 
 
 router.get("/public/payments/invoice/:orderId/download", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // An invoice carries the diner's name, phone and everything they ate. It used to be
+  // fetched by id alone, so counting upward printed a GST bill for every table in the
+  // venue.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
-  const billing = billingFromSettings(settings);
+  const billing = billingFromSettings(settings, restaurant);
   const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
   const html = buildInvoiceHtml(invoice);
 
@@ -245,12 +260,15 @@ router.get("/public/payments/invoice/:orderId/download", async (req, res): Promi
 
 router.get("/public/payments/invoice/:orderId/pdf", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // An invoice carries the diner's name, phone and everything they ate. It used to be
+  // fetched by id alone, so counting upward printed a GST bill for every table in the
+  // venue.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
-  const billing = billingFromSettings(settings);
+  const billing = billingFromSettings(settings, restaurant);
   const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
   const pdf = buildInvoicePdfBuffer(invoice);
 

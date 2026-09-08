@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, menuItemsTable, promoCodesTable, restaurantsTable } from "@workspace/db";
 import type { MenuItem } from "@workspace/db";
 
@@ -50,13 +50,21 @@ export function priceMenuItem(item: MenuItem, requested: Record<string, unknown>
   let variantName: string | null = null;
   const wantedVariant = typeof requested.variant === "string" ? requested.variant.trim() : "";
   if (wantedVariant) {
-    const variants = Array.isArray(item.variants) ? (item.variants as VariantRow[]) : [];
-    const match = variants.find(v => String(v?.name ?? "").trim() === wantedVariant);
-    if (match) {
-      variantName = String(match.name);
-      // A variant row may hold either the full price of that size or an amount to add.
-      // Treating it as the full price when it is present keeps half/full pricing honest.
-      unitPrice = toNumber(match.price);
+    const variants = Array.isArray(item.variants) ? (item.variants as (VariantRow | string)[]) : [];
+    // A dish's `variants` column holds either priced rows ({name, price}) or, for menus
+    // that never set per-size prices, plain strings like ["Half", "Full"]. Only the
+    // object shape was matched, so a plain-string menu dropped the guest's choice
+    // entirely: the order line said `variant: null` and the kitchen made a full plate
+    // for someone who asked for a half. The name is recorded either way; the price only
+    // moves when the menu actually carries one for that size.
+    const match = variants.find(v =>
+      (typeof v === "string" ? v : String(v?.name ?? "")).trim() === wantedVariant);
+    if (match !== undefined) {
+      variantName = typeof match === "string" ? match : String(match.name);
+      if (typeof match !== "string" && match.price != null && toNumber(match.price) > 0) {
+        // A priced variant row carries the full price of that size, not a surcharge.
+        unitPrice = toNumber(match.price);
+      }
     }
   }
 
@@ -99,12 +107,16 @@ export async function taxRateFor(restaurantId: number): Promise<number> {
  * Resolve a coupon code against the promo table. An unknown, expired, inactive or
  * unmet code yields no discount rather than an error — the guest still gets their
  * order, just at full price, which is what a counter would do.
+ *
+ * It also says *why* it gave nothing. A code that silently comes off the bill leaves a
+ * guest looking at the full price with no idea whether they mistyped it, whether it had
+ * run out, or whether the app is broken; a counter would tell them.
  */
 export async function resolveDiscount(
   restaurantId: number,
   couponCode: unknown,
   subtotal: number,
-): Promise<{ discount: number; appliedCoupon: string | null }> {
+): Promise<{ discount: number; appliedCoupon: string | null; promoId?: number; reason?: string }> {
   const code = typeof couponCode === "string" ? couponCode.trim().toUpperCase() : "";
   if (!code) return { discount: 0, appliedCoupon: null };
 
@@ -114,20 +126,27 @@ export async function resolveDiscount(
     .where(and(eq(promoCodesTable.restaurantId, restaurantId), eq(promoCodesTable.code, code)))
     .limit(1);
 
-  if (!promo || promo.isActive === false) return { discount: 0, appliedCoupon: null };
+  if (!promo) return { discount: 0, appliedCoupon: null, reason: `"${code}" is not a code at this restaurant.` };
+  if (promo.isActive === false) {
+    return { discount: 0, appliedCoupon: null, reason: `"${code}" is no longer being offered.` };
+  }
 
   // Expiry and usage limit were both ignored before, so a spent or long-dead code
   // still took money off the bill.
   if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
-    return { discount: 0, appliedCoupon: null };
+    return { discount: 0, appliedCoupon: null, reason: `"${code}" expired on ${new Date(promo.expiresAt).toLocaleDateString("en-IN")}.` };
   }
 
   const usageLimit = Number(promo.usageLimit ?? 0);
   const usedCount = Number(promo.usedCount ?? 0);
-  if (usageLimit > 0 && usedCount >= usageLimit) return { discount: 0, appliedCoupon: null };
+  if (usageLimit > 0 && usedCount >= usageLimit) {
+    return { discount: 0, appliedCoupon: null, reason: `"${code}" has already been fully used.` };
+  }
 
   const minOrder = toNumber(promo.minOrderAmount);
-  if (minOrder > 0 && subtotal < minOrder) return { discount: 0, appliedCoupon: null };
+  if (minOrder > 0 && subtotal < minOrder) {
+    return { discount: 0, appliedCoupon: null, reason: `"${code}" needs an order of at least ₹${minOrder.toFixed(2)}.` };
+  }
 
   const value = toNumber(promo.discountValue);
   const type = String(promo.discountType).toLowerCase();
@@ -140,7 +159,30 @@ export async function resolveDiscount(
 
   // Never more than the basket itself — a discount can reduce a bill to zero, never below.
   discount = Math.min(Math.max(discount, 0), subtotal);
-  return { discount: round2(discount), appliedCoupon: code };
+  return { discount: round2(discount), appliedCoupon: code, promoId: promo.id };
+}
+
+/**
+ * Count a redemption, once the order it discounted actually exists.
+ *
+ * `usage_limit` was checked against a counter nothing ever advanced, so a code limited
+ * to one use could be used for ever. The increment is conditional on the limit inside
+ * the same statement, so two guests redeeming the last use at the same moment cannot
+ * both get it.
+ */
+export async function redeemCoupon(promoId: number | undefined): Promise<void> {
+  if (!promoId) return;
+  try {
+    await db
+      .update(promoCodesTable)
+      .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+      .where(and(
+        eq(promoCodesTable.id, promoId),
+        sql`(${promoCodesTable.usageLimit} is null or ${promoCodesTable.usageLimit} <= 0 or ${promoCodesTable.usedCount} < ${promoCodesTable.usageLimit})`,
+      ));
+  } catch {
+    // Counting a redemption must never be the thing that fails an order.
+  }
 }
 
 /**
