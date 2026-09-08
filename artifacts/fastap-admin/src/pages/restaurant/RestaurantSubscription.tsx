@@ -91,7 +91,7 @@ export default function RestaurantSubscription() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <PanelLogo size={40} />
+            <PanelLogo panel="restaurant" size="lg" />
             <div>
               <p className="text-xs uppercase tracking-wider text-amber-400/80">Subscription required</p>
               <h1 className="text-2xl font-bold">{restaurant.name || "Your restaurant"}</h1>

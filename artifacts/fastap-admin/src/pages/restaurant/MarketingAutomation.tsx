@@ -37,7 +37,7 @@ function mapCampaign(c: any): Campaign {
   };
 }
 
-type TriggerRow = { id: string; name: string; event: string; channel: string; status: string; condition: string; fires: number; conversions: number; message: string };
+type TriggerRow = { id: string; name: string; event: string; channel: string; status: string; condition: string; fires: number; conversions: number; deliveryTracked?: boolean; audienceSize?: number; message: string };
 type TemplateRow = { id: string; name: string; channel: string; category: string; body: string; usedIn: number };
 type SegmentRow = { label: string; count: number; color: string };
 
@@ -334,6 +334,9 @@ export default function MarketingAutomation() {
           <div className="space-y-3">
             {triggers.length === 0 ? <EmptyState title="No automation triggers" description="Create campaigns with trigger types to see automations." /> : triggers.map(t=>{
               const chcfg = CHANNEL_CFG[t.channel];
+              // Nothing logs a send or a conversion against a campaign yet, so the server
+              // reports deliveryTracked:false rather than a rate. Showing "0% conversion"
+              // would read as a campaign that fired and failed.
               const convRate = t.fires ? Math.round((t.conversions/t.fires)*100) : 0;
               return (
                 <div key={t.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
@@ -347,8 +350,17 @@ export default function MarketingAutomation() {
                       <p className="text-xs text-white/40 mb-2">Trigger: {t.condition}</p>
                       <div className="text-xs bg-white/5 rounded-lg p-2.5 text-white/60 mb-3 font-mono">{t.message}</div>
                       <div className="flex items-center gap-4 text-xs">
-                        <span className="text-white/40">{t.fires} fires</span>
-                        <span className="text-emerald-400 font-semibold">{convRate}% conversion ({t.conversions})</span>
+                        {t.deliveryTracked === false ? (
+                          <>
+                            <span className="text-white/40">{t.audienceSize ?? 0} customers in this segment</span>
+                            <span className="text-white/30">Sends and conversions are not tracked yet</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-white/40">{t.fires} fires</span>
+                            <span className="text-emerald-400 font-semibold">{convRate}% conversion ({t.conversions})</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <button onClick={()=>toggleTrigger(t)} disabled={busyId===t.id} title={t.status==="active"?"Turn trigger off":"Turn trigger on"} className={`h-10 w-16 rounded-xl flex items-center justify-center border transition-all disabled:opacity-40 ${t.status==="active"?"bg-emerald-500/20 border-emerald-500/30 text-emerald-400":"bg-yellow-500/20 border-yellow-500/30 text-yellow-400"}`}>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
+import { fmtINR } from "@/lib/format";
 import { analytics as analyticsApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
@@ -65,7 +66,10 @@ export default function Analytics() {
         name: i.name,
         orders: i.totalOrders || 0,
         revenue: i.totalRevenue || 0,
-        rating: i.avgRating ?? 0,
+        // Null means this dish has no rating of its own — it used to inherit the venue
+        // average, so an unrated dish showed the same stars as a loved one.
+        rating: i.avgRating ?? null,
+        ratingCount: i.ratingCount ?? 0,
         growth: i.growth || "0%",
       })) : []);
       setDailySales(Array.isArray(sales) ? sales.map((s: any) => ({
@@ -88,10 +92,12 @@ export default function Analytics() {
   const periodLabel = published ? (summary?.periodLabel || "All time") : "—";
   const displaySummary = (published && summary) ? summary : emptyAnalyticsSummaryDisplay(periodLabel);
   const kpiMetrics = [
-    { label: "Total Revenue", value: `₹${Math.round((displaySummary.totalRevenue || 0) / 1000)}K`, sub: periodLabel, icon: TrendingUp, color: "text-emerald-400" },
+    // Dividing by 1000 and rounding meant a venue taking ₹123 read "₹0K", and every
+    // figure under half a lakh lost its precision. fmtINR carries the Indian units.
+    { label: "Total Revenue", value: fmtINR(displaySummary.totalRevenue || 0), sub: periodLabel, icon: TrendingUp, color: "text-emerald-400" },
     { label: "Total Orders", value: String(displaySummary.totalOrders || 0), sub: periodLabel, icon: ShoppingBag, color: "text-orange-400" },
-    { label: "Avg Order Value", value: `₹${Math.round(displaySummary.avgOrderValue || 0)}`, sub: "Per order", icon: TrendingUp, color: "text-blue-400" },
-    { label: "Customer Rating", value: displaySummary.feedbackAvgRating ? `${displaySummary.feedbackAvgRating}★` : "0", sub: `${displaySummary.totalCustomers || 0} customers`, icon: Star, color: "text-yellow-400" },
+    { label: "Avg Order Value", value: fmtINR(displaySummary.avgOrderValue || 0), sub: "Per paid order", icon: TrendingUp, color: "text-blue-400" },
+    { label: "Customer Rating", value: displaySummary.feedbackAvgRating ? `${displaySummary.feedbackAvgRating}★` : "No reviews yet", sub: `${displaySummary.totalCustomers || 0} customers`, icon: Star, color: "text-yellow-400" },
     { label: "QR Scans", value: String(displaySummary.qrScans || 0), sub: "Total scans", icon: Users, color: "text-violet-400" },
     { label: "Reviews", value: String(displaySummary.reviews || 0), sub: "Total reviews", icon: Users, color: "text-pink-400" },
   ];
@@ -261,15 +267,16 @@ export default function Analytics() {
                   <td className="px-5 py-3.5 text-white/30 font-bold">#{i + 1}</td>
                   <td className="px-5 py-3.5 font-semibold">{item.name}</td>
                   <td className="px-5 py-3.5 text-white/60">{item.orders}</td>
-                  <td className="px-5 py-3.5 font-bold text-amber-400">₹{item.revenue.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 font-bold text-amber-400">₹{item.revenue.toLocaleString("en-IN")}</td>
                   <td className="px-5 py-3.5">
-                    {item.rating > 0 ? (
+                    {item.rating != null && item.rating > 0 ? (
                       <div className="flex items-center gap-1">
                         <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                         <span className="font-semibold">{item.rating}</span>
+                        <span className="text-white/30 text-xs">({item.ratingCount})</span>
                       </div>
                     ) : (
-                      <span className="text-white/30">0</span>
+                      <span className="text-white/30">Not rated</span>
                     )}
                   </td>
                   <td className={`px-5 py-3.5 font-semibold ${item.growth?.startsWith("-") ? "text-red-400" : item.growth === "0%" ? "text-white/30" : "text-emerald-400"}`}>{item.growth}</td>

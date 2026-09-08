@@ -6,7 +6,8 @@ import { featuresApi } from "@/lib/api";
 export default function FeatureControl() {
   const { restaurant, refreshFeaturePaths } = useRestaurant();
   const qc = useQueryClient();
-  const rid = restaurant?.id;
+  // The context carries the id as a string; the features endpoints take a number.
+  const rid = restaurant?.id ? Number(restaurant.id) : undefined;
 
   const { data, isLoading } = useQuery({
     queryKey: ["restaurant-features", rid],

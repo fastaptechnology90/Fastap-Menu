@@ -34,8 +34,38 @@ export interface StaffMember {
   status: "active" | "on-break" | "offline";
   shift: string;
   joinDate: string;
+  /** The stored performance score. Nothing measures it yet — see hasMeasuredPerformance. */
   performance: number;
+  /** False while performance is a seeded constant, so screens can say so instead of drawing stars. */
+  hasMeasuredPerformance: boolean;
+  /** Measured from this person's paid orders, not derived from their commission. */
+  ordersServed: number;
+  salesTotal: number;
+  avgOrderValue: number;
+  tipsCollected: number;
+  commissionAccrued: number;
+  commissionPaid: number;
+  commissionPending: number;
   tablesAssigned?: string[];
+}
+
+/**
+ * The figures the server measures for one staff member. Login payloads carry none of
+ * them, so an absent field reads as zero rather than as an invented number — the screens
+ * check `hasMeasuredPerformance` before showing a score at all.
+ */
+function measuredStaffFigures(s: Record<string, unknown>) {
+  const n = (v: unknown) => Number(v ?? 0) || 0;
+  return {
+    hasMeasuredPerformance: Boolean(s.hasMeasuredPerformance),
+    ordersServed: n(s.ordersServed),
+    salesTotal: n(s.salesTotal),
+    avgOrderValue: n(s.avgOrderValue),
+    tipsCollected: n(s.tipsCollected),
+    commissionAccrued: n(s.commissionAccrued),
+    commissionPaid: n(s.commissionPaid),
+    commissionPending: n(s.commissionPending),
+  };
 }
 
 export interface RestaurantInfo {
@@ -68,7 +98,10 @@ export interface LiveOrder {
   tabId?: number;
   tableNo: string;
   waiter: string;
-  items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready"; variant?: string; addons?: { name: string; price: number }[]; customizations?: string[]; notes?: string }[];
+  // `voided` / `comped` come from the bill-adjustment routes. A removed line must stay
+  // visible with its reason — a line that silently disappears is how a bill dispute
+  // becomes unanswerable.
+  items: { name: string; qty: number; price: number; subtotal?: number; status: "pending" | "preparing" | "ready"; variant?: string; addons?: { name: string; price: number }[]; customizations?: string[]; notes?: string; voided?: boolean; comped?: boolean; adjustReason?: string; adjustedBy?: string }[];
   status: "new" | "accepted" | "preparing" | "ready" | "served" | "billed" | "cancelled";
   type: "dine-in" | "takeaway" | "room-service" | "delivery";
   placedAt: Date;
@@ -207,6 +240,10 @@ function mapApiOrder(o: any): LiveOrder {
     addons: typeof i === "object" && Array.isArray(i.addons) ? i.addons.map((a: any) => ({ name: String(a?.name ?? a), price: parseFloat(a?.price) || 0 })) : undefined,
     customizations: typeof i === "object" && Array.isArray(i.customizations) ? i.customizations.map((c: any) => String(c)) : undefined,
     notes: typeof i === "object" ? (i.notes || i.specialInstructions || undefined) : undefined,
+    voided: typeof i === "object" ? i.voided === true : false,
+    comped: typeof i === "object" ? i.comped === true : false,
+    adjustReason: typeof i === "object" ? (i.voidReason || i.compReason || undefined) : undefined,
+    adjustedBy: typeof i === "object" ? (i.voidedBy || i.compedBy || undefined) : undefined,
   })) : [];
   const tableName = o.tableName ?? o.table_name;
   const tableId = o.tableId ?? o.table_id;
@@ -346,6 +383,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
           shift: s.shift ? String(s.shift).charAt(0).toUpperCase() + String(s.shift).slice(1) : "—",
           joinDate: s.createdAt ? new Date(s.createdAt).toISOString().split("T")[0] : "",
           performance: s.performanceScore ?? s.performance_score ?? 0,
+          ...measuredStaffFigures(s),
         })));
       }
     } catch {}
@@ -412,6 +450,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         shift: s.shift ? String(s.shift).charAt(0).toUpperCase() + String(s.shift).slice(1) : "—",
         joinDate: new Date().toISOString().split("T")[0],
         performance: s.performanceScore ?? s.performance_score ?? 0,
+        ...measuredStaffFigures(s),
       });
       setAuthBootstrapping(false);
     });
@@ -491,6 +530,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
             shift: s.shift ? String(s.shift).charAt(0).toUpperCase() + String(s.shift).slice(1) : "—",
             joinDate: new Date().toISOString().split("T")[0],
             performance: s.performanceScore ?? s.performance_score ?? 0,
+            ...measuredStaffFigures(s),
           };
           setCurrentStaffState(staffMember);
           localStorage.setItem("fastap_staff", JSON.stringify(staffMember));
