@@ -36,6 +36,20 @@ const ROOM_STATUS_LABEL: Record<string, string> = {
 
 async function bumpQrScan(restaurantId: number, opts: { tableId?: number; tableName?: string; room?: string }) {
   const conditions = [eq(qrCodesTable.restaurantId, restaurantId)];
+
+  // No table and no room means the venue QR — the one on the counter or the door. It
+  // was never counted, so a venue whose only code was that one always read zero scans.
+  if (!opts.tableId && !opts.tableName && !opts.room) {
+    await db.update(qrCodesTable).set({
+      scans: sql`${qrCodesTable.scans} + 1`,
+      updatedAt: new Date(),
+    }).where(and(
+      ...conditions,
+      eq(qrCodesTable.type, "general"),
+    ));
+    return;
+  }
+
   if (opts.tableId) {
     await db.update(qrCodesTable).set({
       scans: sql`${qrCodesTable.scans} + 1`,
@@ -76,11 +90,6 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
   const tableParam = typeof req.query.table === "string" ? req.query.table : undefined;
   const roomParam = typeof req.query.room === "string" ? req.query.room : undefined;
 
-  if (!tableParam && !roomParam) {
-    res.status(400).json({ error: "Scan requires ?table= or ?room= parameter" });
-    return;
-  }
-
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.slug, slug));
   if (!restaurant) {
     res.status(404).json({ error: "Venue not found" });
@@ -92,6 +101,36 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
   }
 
   req.session.restaurantId = restaurant.id;
+
+  // A venue QR — the one on the counter, the door, a flyer or a takeaway bag. The panel
+  // has always offered this as the "Restaurant Menu URL", with Copy and Download beside
+  // it, and scanning it answered "Scan requires ?table= or ?room=". A guest who scanned
+  // the code the restaurant had printed got an error. There is no table to attach, so
+  // this opens the menu to browse and to order takeaway.
+  if (!tableParam && !roomParam) {
+    await bumpQrScan(restaurant.id, {});
+
+    res.json({
+      type: "venue",
+      scannedAt: new Date().toISOString(),
+      restaurant: {
+        id: restaurant.id,
+        name: restaurant.name,
+        slug: restaurant.slug,
+        address: restaurant.address,
+        logoUrl: restaurant.logoUrl,
+        businessType: restaurant.businessType,
+      },
+      table: null,
+      room: null,
+      actions: {
+        menu: `/user/menu?slug=${slug}&entry=qr`,
+        reserve: `/user/reserve?slug=${slug}`,
+        scanUrl: buildScanUrl(slug, { entry: "qr" }),
+      },
+    });
+    return;
+  }
 
   if (tableParam) {
     const tables = await db.select().from(tablesMapTable).where(eq(tablesMapTable.restaurantId, restaurant.id));

@@ -184,7 +184,10 @@ export default function QRManagement() {
   const totalQrCount =
     (tables.length || tableQRs.length) +
     (rooms.length || roomQRs.length) +
-    generalQRs.length;
+    generalQRs.length +
+    // The venue's own menu code, shown at the top of this page — it is a real,
+    // scannable code and was missing from its own count.
+    (venueSlug ? 1 : 0);
 
   const stats = [
     { label: "Total QR Codes", value: totalQrCount, icon: QrCode, color: "text-violet-400" },
@@ -269,14 +272,17 @@ export default function QRManagement() {
                   <div className="bg-white p-2 rounded-lg shadow-lg"><QRCodeSVG value={url} size={100} /></div>
                   <div className="text-center">
                     <div className="font-semibold text-white text-sm">{table.name}</div>
-                    <div className="text-xs text-slate-400">Cap: {table.capacity} • {qr ? `${qr.scans || 0} scans` : "No QR yet"}</div>
+                    {/* The code above is built from the table's scan URL, so it is
+                        printable and scannable right now. "No QR yet" said the opposite
+                        of the truth; what is actually missing is scan counting. */}
+                    <div className="text-xs text-slate-400">Cap: {table.capacity} • {qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
                   </div>
                   <div className="flex gap-2 w-full">
                     <button onClick={() => handleCopy(url, table.id)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
                       {copied === table.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     </button>
                     <button onClick={() => handleGenerate(table.id, table.name)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
-                      <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Create"}
+                      <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Track"}
                     </button>
                     <button title="Download QR" onClick={() => handleDownload(url, `${venueSlug || "restaurant"}-table-${table.name}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
                       <Download className="h-3.5 w-3.5" />
@@ -308,14 +314,14 @@ export default function QRManagement() {
                   <div className="bg-white p-2 rounded-lg shadow-lg"><QRCodeSVG value={qr?.url || url} size={100} /></div>
                   <div className="text-center">
                     <div className="font-semibold text-white text-sm">Room {roomNum}</div>
-                    <div className="text-xs text-slate-400">{qr ? `${qr.scans || 0} scans` : "No QR yet"}</div>
+                    <div className="text-xs text-slate-400">{qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
                   </div>
                   <div className="flex gap-2 w-full">
                     <button onClick={() => handleCopy(qr?.url || url, qr?.id ?? roomNum.charCodeAt(0))} className="flex-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
                       {copied === (qr?.id ?? roomNum.charCodeAt(0)) ? "Copied!" : "Copy"}
                     </button>
                     <button onClick={() => handleGenerate(undefined, undefined, roomNum)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
-                      <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Create"}
+                      <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Track"}
                     </button>
                     <button title="Download QR" onClick={() => handleDownload(qr?.url || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
                       <Download className="h-3.5 w-3.5" />

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 type ScanPayload = {
-  type: "table" | "room";
+  type: "table" | "room" | "venue";
   scannedAt: string;
   restaurant: { id: number; name: string; slug: string; address?: string };
   table?: {
@@ -67,16 +67,18 @@ export default function VenueScanPage() {
   const [error, setError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
 
+  // A link with no table and no room is the venue's own QR — the one printed for the
+  // counter, the door or a takeaway bag. This used to refuse it outright, so the code
+  // the restaurant had printed from its own panel showed the guest an error.
   useEffect(() => {
-    if (!table && !room) {
-      setError("Scan link is missing table or room. Use your camera on the venue QR code.");
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     publicApi.scan(slug, { table, room })
       .then(setData)
-      .catch(() => setError("Could not load table or room details."))
+      .catch(() => setError(
+        table || room
+          ? "Could not load table or room details."
+          : "We could not find that restaurant.",
+      ))
       .finally(() => setLoading(false));
   }, [slug, table, room]);
 
@@ -127,19 +129,22 @@ export default function VenueScanPage() {
   // `isTable?.bookable` failed to compile and the Book / Order buttons were unreachable.
   const isTable = data.type === "table" ? data.table : undefined;
   const isRoom = data.type === "room" ? data.room : undefined;
-  const statusLabel = isTable ? data.table!.statusLabel : isRoom ? data.room!.statusLabel : "—";
+  const isVenue = data.type === "venue";
+  const statusLabel = isTable ? data.table!.statusLabel : isRoom ? data.room!.statusLabel : "Open to browse";
   const statusClass = STATUS_COLOR[statusLabel] ?? STATUS_COLOR[data.table?.status ?? data.room?.status ?? ""] ?? "text-white/60 bg-white/10";
 
   return (
     <div className="guest-page thin-scroll min-h-screen text-white pb-10">
       <div className="guest-header px-4 py-4 text-center">
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/20 border border-orange-500/30 mb-3">
-          {isTable ? <QrCode className="h-7 w-7 text-orange-400" /> : <BedDouble className="h-7 w-7 text-blue-400" />}
+          {isRoom ? <BedDouble className="h-7 w-7 text-blue-400" /> : <QrCode className="h-7 w-7 text-orange-400" />}
         </div>
         <p className="text-xs text-white/40 uppercase tracking-widest">QR Scan detected</p>
         <h1 className="text-2xl font-bold mt-1">{data.restaurant.name}</h1>
         <p className="text-sm text-white/50 mt-1">
-          {isTable ? `Table ${data.table!.name}` : isRoom ? `Room ${data.room!.number}` : "Venue"}
+          {isTable ? `Table ${data.table!.name}`
+            : isRoom ? `Room ${data.room!.number}`
+            : data.restaurant.address || "Browse the menu or order takeaway"}
         </p>
       </div>
 
@@ -150,7 +155,7 @@ export default function VenueScanPage() {
             {isTable?.bookable || isRoom?.bookable ? (
               <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Bookable</span>
             ) : (
-              <span className="text-xs text-white/40">View & order available</span>
+              <span className="text-xs text-white/40">View &amp; order available</span>
             )}
           </div>
 
@@ -179,6 +184,23 @@ export default function VenueScanPage() {
               <Calendar className="h-5 w-5" /> Book {isTable ? "this table" : "this room"}
               <ArrowRight className="h-4 w-4" />
             </button>
+          )}
+          {isVenue && (
+            <>
+              <button onClick={() => go(data.actions.menu)} className="w-full guest-btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2">
+                <UtensilsCrossed className="h-5 w-5" /> See the menu
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              {data.actions.reserve && (
+                <button onClick={() => go(data.actions.reserve)} className="w-full guest-btn-secondary py-3 text-sm flex items-center justify-center gap-2">
+                  <Calendar className="h-4 w-4" /> Book a table
+                </button>
+              )}
+              {/* Said plainly, because ordering to a table needs the table's own code. */}
+              <p className="text-center text-xs text-white/35 pt-1">
+                Sitting at a table? Scan the code on the table itself so your order reaches it.
+              </p>
+            </>
           )}
           {(isTable?.canOrder || isRoom?.canOrder) && (
             <button onClick={() => go(isRoom ? data.actions.hotel : data.actions.menu)} className="w-full py-3.5 rounded-xl bg-blue-500 hover:bg-blue-400 font-bold text-sm flex items-center justify-center gap-2">
