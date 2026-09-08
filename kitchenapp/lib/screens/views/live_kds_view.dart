@@ -1,13 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 // See the note in kitchen_tab.dart — ScrollCacheExtent is not exported by
 // material.dart, and `dart fix` migrated the call without adding this import.
 import 'package:flutter/rendering.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/settings/alert_settings.dart';
 import '../../models/kds/kds_order.dart';
 import '../../models/kds/kds_snapshot.dart';
 import '../../models/kds/kds_view_mode.dart';
-import '../../services/kds_priority_sound_service.dart';
 import '../../state/kitchen_command_controller.dart';
 import '../../widgets/kds/kds_order_tile.dart';
 import '../../widgets/kds/kds_system_capabilities.dart';
@@ -32,36 +34,32 @@ class LiveKdsView extends StatefulWidget {
 }
 
 class _LiveKdsViewState extends State<LiveKdsView> {
-  final KdsPrioritySoundService _soundService = KdsPrioritySoundService();
-  bool _prioritySoundEnabled = true;
-
   @override
   void initState() {
     super.initState();
+    // The board is repainted by the poll, so it has to rebuild when the
+    // controller does; the old listener only played a sound.
     widget.controller.addListener(_onControllerChanged);
+    soundAlertsEnabled.addListener(_onControllerChanged);
   }
 
   @override
   void dispose() {
+    soundAlertsEnabled.removeListener(_onControllerChanged);
     widget.controller.removeListener(_onControllerChanged);
     super.dispose();
   }
 
   void _onControllerChanged() {
-    if (_prioritySoundEnabled) {
-      _soundService.evaluate(widget.controller.kds);
-    }
+    if (mounted) setState(() {});
   }
 
+  // The alarm itself lives on the controller so it outlives this view. The
+  // toolbar switch and the Settings switch are the same setting, so flipping
+  // one here persists and moves the other.
   void _togglePrioritySound(bool enabled) {
-    setState(() {
-      _prioritySoundEnabled = enabled;
-      if (!enabled) {
-        _soundService.reset();
-      } else {
-        _soundService.evaluate(widget.controller.kds);
-      }
-    });
+    unawaited(setSoundAlertsEnabled(enabled));
+    if (mounted) setState(() {});
   }
 
   Future<void> _refresh() => widget.controller.refreshKds();
@@ -90,7 +88,7 @@ class _LiveKdsViewState extends State<LiveKdsView> {
         controller: widget.controller,
         snapshot: snapshot,
         compact: widget.compact,
-        prioritySoundEnabled: _prioritySoundEnabled,
+        prioritySoundEnabled: soundAlertsEnabled.value,
         onPrioritySoundChanged: _togglePrioritySound,
         onRefresh: _refresh,
       );
@@ -102,7 +100,7 @@ class _LiveKdsViewState extends State<LiveKdsView> {
         KdsToolbar(
           controller: widget.controller,
           onRefresh: _refresh,
-          prioritySoundEnabled: _prioritySoundEnabled,
+          prioritySoundEnabled: soundAlertsEnabled.value,
           onPrioritySoundChanged: _togglePrioritySound,
           compact: widget.compact,
         ),

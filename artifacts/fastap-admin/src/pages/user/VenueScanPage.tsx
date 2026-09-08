@@ -78,7 +78,9 @@ export default function VenueScanPage() {
   }, [slug, table, room]);
 
   async function go(path: string) {
-    await loadVenue(slug, { table, room }).catch(() => {});
+    // Navigation must not be blocked by a metadata refresh; the destination
+    // page loads its own data and reports its own failure.
+    await loadVenue(slug, { table, room }).catch(() => undefined);
     navigate(path);
   }
 

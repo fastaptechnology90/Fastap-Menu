@@ -94,7 +94,7 @@ class _KitchenCommunicationViewState extends State<KitchenCommunicationView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System 13 · Kitchen Communication System',
+                      'Kitchen Communication System',
                       style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,

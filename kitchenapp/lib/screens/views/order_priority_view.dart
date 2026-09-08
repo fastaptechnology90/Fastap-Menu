@@ -50,7 +50,7 @@ class OrderPriorityView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 12 · Order Priority Engine',
+                    'Order Priority Engine',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

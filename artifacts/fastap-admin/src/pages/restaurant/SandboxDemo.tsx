@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FlaskConical, Save, Check, CreditCard, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export default function SandboxDemo() {
   const { restaurantId, restaurant } = useRestaurant();
@@ -10,12 +11,18 @@ export default function SandboxDemo() {
 
   useEffect(() => {
     if (!restaurantId) return;
-    platformApi.sandbox(restaurantId).then(setSettings).catch(() => {});
+    platformApi.sandbox(restaurantId).then(setSettings).catch(e => toast({ title: "Could not load the sandbox settings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   }, [restaurantId]);
 
   async function save() {
     if (!restaurantId || !settings) return;
-    await platformApi.updateSandbox(restaurantId, settings).catch(() => {});
+    try {
+      await platformApi.updateSandbox(restaurantId, settings);
+    } catch (e) {
+      // "Saved" must only ever appear after the server has it.
+      toast({ title: "Sandbox settings not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

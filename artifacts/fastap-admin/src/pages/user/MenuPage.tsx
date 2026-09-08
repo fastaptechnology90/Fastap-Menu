@@ -499,6 +499,7 @@ export default function MenuPage() {
   const [selectedItem, setSelectedItem] = useState<MenuDisplayItem | null>(null);
   const [showWaiterPanel, setShowWaiterPanel] = useState(false);
   const [waiterSent, setWaiterSent] = useState<string | null>(null);
+  const [waiterError, setWaiterError] = useState<string | null>(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "price-asc" | "price-desc" | "rating" | "popular">("default");
@@ -541,7 +542,9 @@ export default function MenuPage() {
     const table = venueParams.table;
     setLoading(true);
     setMenuError("");
-    loadVenue(slug, venueParams).catch(() => {});
+    // The menu load below owns the visible error; venue metadata failing on its
+    // own only costs the header, so it must not blank the page.
+    loadVenue(slug, venueParams).catch(() => undefined);
     loadMenuWithCache(slug, table, () => publicApi.menu(slug, table))
       .then(({ data, fromCache }) => {
         setMenuFromCache(fromCache);
@@ -631,15 +634,22 @@ export default function MenuPage() {
     });
   }
 
-  function callWaiter(request: string, type?: string) {
-    if (venue.restaurantId) {
-      publicApi.waiterCall({
+  async function callWaiter(request: string, type?: string) {
+    if (!venue.restaurantId) return;
+    try {
+      await publicApi.waiterCall({
         restaurantId: venue.restaurantId,
         tableId: venue.tableId,
         tableName: activeTable,
         type: type ?? request.toLowerCase().replace(/\s+/g, "_"),
         message: request,
-      }).catch(() => {});
+      });
+    } catch {
+      // "Waiter notified" for a call that never left the phone leaves a guest
+      // waiting for someone who was never told.
+      setWaiterError("We could not reach the staff. Please try again.");
+      setTimeout(() => setWaiterError(null), 4000);
+      return;
     }
     setWaiterSent(request);
     setTimeout(() => setWaiterSent(null), 3000);
@@ -882,6 +892,11 @@ export default function MenuPage() {
       </main>
 
       {/* Waiter notification toast */}
+      {waiterError && (
+        <div role="alert" className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-red-500/90 text-white text-sm font-semibold shadow-lg">
+          {waiterError}
+        </div>
+      )}
       {waiterSent && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-3 rounded-xl shadow-2xl font-semibold text-sm flex items-center gap-2 animate-bounce">
           ✅ {waiterSent} — Waiter notified!

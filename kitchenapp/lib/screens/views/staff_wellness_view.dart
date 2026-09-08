@@ -50,7 +50,7 @@ class StaffWellnessView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 35 · Staff Fatigue & Wellness AI',
+                    'Staff Fatigue & Wellness AI',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

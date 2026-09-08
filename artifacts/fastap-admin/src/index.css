@@ -197,51 +197,130 @@
   --color-guest-surface: hsl(var(--guest-surface));
   --color-guest-elevated: hsl(var(--guest-elevated));
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-success: hsl(var(--success));
+  --color-success-subtle: hsl(var(--success-subtle));
+  --color-success-border: hsl(var(--success-border));
+  --color-warning: hsl(var(--warning));
+  --color-warning-subtle: hsl(var(--warning-subtle));
+  --color-warning-border: hsl(var(--warning-border));
+  --color-danger: hsl(var(--danger));
+  --color-danger-subtle: hsl(var(--danger-subtle));
+  --color-danger-border: hsl(var(--danger-border));
+  --color-info: hsl(var(--info));
+  --color-info-subtle: hsl(var(--info-subtle));
+  --color-info-border: hsl(var(--info-border));
+
+  /* Containers stop at 8px and controls at 4px. The larger Tailwind steps are
+     pinned to the same ceiling so the existing rounded-2xl/3xl markup cannot
+     put pill-shaped panels back on screen. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.5rem;
+  --radius-4xl: 0.5rem;
+
+  /* Tailwind normally bakes its own shadow values into each utility, which left
+     the --shadow-* tokens below unreachable. Pointing the scale at them makes
+     the tokens authoritative and lets the dark panels swap in a heavier ramp. */
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow: var(--shadow);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
 }
 
 /* LIGHT MODE */
 :root {
   /* LIGHT theme (admin panel). Dark theme lives in the .dark block below and is the
      default (html has class="dark"). The guest-* variables further down stay dark in both
-     themes — the guest web is always dark. */
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
-  --sidebar: 210 40% 98%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 214 32% 91%;
-  --sidebar-primary: 221 83% 53%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 210 40% 94%;
-  --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 221 83% 53%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 91%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 40%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 210 40% 98%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
-  --chart-1: 221 83% 53%;
-  --chart-2: 142 71% 45%;
-  --chart-3: 31 97% 55%;
-  --chart-4: 280 87% 65%;
-  --chart-5: 340 82% 52%;
+     themes — the guest web is always dark.
+
+     Roles are expressed against two ramps — one neutral, one brand — so a colour is
+     changed in exactly one place and the whole product follows. Every foreground /
+     background pair below clears 4.5:1. */
+
+  /* Neutral ramp. The 215° cast is deliberate: pure grey reads cheap on an LCD and
+     goes muddy next to a blue accent. */
+  --n-0:   0 0% 100%;
+  --n-25:  210 40% 99%;
+  --n-50:  210 33% 97%;
+  --n-100: 214 30% 94%;
+  --n-200: 214 27% 88%;
+  --n-300: 214 20% 78%;
+  --n-400: 215 16% 58%;
+  --n-500: 215 15% 48%;
+  --n-600: 215 14% 42%;
+  --n-700: 216 20% 28%;
+  --n-800: 217 28% 18%;
+  --n-900: 218 33% 12%;
+
+  /* One brand colour, for the primary button, the active nav item, the focus ring,
+     links and the first chart series. 6.24:1 on white in both directions, so the
+     same value serves as a fill and as text without a second variant. */
+  --brand-50:  211 100% 96%;
+  --brand-100: 211  95% 90%;
+  --brand-200: 211  92% 80%;
+  --brand-500: 211 100% 45%;
+  --brand-600: 211 100% 38%;
+  --brand-700: 213 100% 31%;
+
+  /* Semantics mean state and nothing else. Darker than the 500-weight shades they
+     replace, because these have to survive being read as text on a white card. */
+  --success:        152 60% 30%;
+  --success-subtle: 152 45% 95%;
+  --success-border: 152 40% 80%;
+  --warning:         32 90% 34%;
+  --warning-subtle:  38 92% 95%;
+  --warning-border:  38 80% 78%;
+  --danger:           0 72% 42%;
+  --danger-subtle:    0 80% 96%;
+  --danger-border:    0 70% 85%;
+  --info:           200 85% 32%;
+  --info-subtle:    200 80% 95%;
+  --info-border:    200 70% 80%;
+
+  --background: var(--n-0);
+  --foreground: var(--n-800);
+  --border: var(--n-200);
+  --card: var(--n-0);
+  --card-foreground: var(--n-800);
+  --card-border: var(--n-200);
+  --sidebar: var(--n-25);
+  --sidebar-foreground: var(--n-700);
+  --sidebar-border: var(--n-200);
+  --sidebar-primary: var(--brand-600);
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: var(--n-100);
+  --sidebar-accent-foreground: var(--n-800);
+  --sidebar-ring: var(--brand-600);
+  --popover: var(--n-0);
+  --popover-foreground: var(--n-800);
+  --popover-border: var(--n-200);
+  --primary: var(--brand-600);
+  --primary-foreground: 0 0% 100%;
+  --secondary: var(--n-50);
+  --secondary-foreground: var(--n-700);
+  --muted: var(--n-50);
+  --muted-foreground: var(--n-600);
+  --accent: var(--n-100);
+  --accent-foreground: var(--n-800);
+  --destructive: var(--danger);
+  --destructive-foreground: 0 0% 100%;
+  --input: var(--n-200);
+  --ring: var(--brand-600);
+
+  /* One hue ramp plus two semantics — series are told apart by order, not by hue. */
+  --chart-1: 211 100% 45%;
+  --chart-2: 211  60% 65%;
+  --chart-3: 200  85% 32%;
+  --chart-4: 215  16% 58%;
+  --chart-5: 152  60% 30%;
 
   --app-font-sans: 'Inter', sans-serif;
   --app-font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
@@ -252,15 +331,21 @@
   --guest-elevated: 222 35% 14%;
   --guest-accent: 25 95% 53%;
   --guest-accent-glow: 25 95% 53%;
-  --radius: .25rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); 
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); 
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
+
+  /* 6px containers, 4px controls, 8px sheets — the ceiling is set in @theme above. */
+  --radius: .375rem;
+
+  /* Two layers each: a tight contact shadow plus a wider ambient one. Grey rather
+     than the blue this scale used to carry, so a raised surface reads as depth and
+     not as a tinted panel. Only genuinely floating layers should reach past -md. */
+  --shadow-2xs: 0 1px 1px 0 hsl(215 25% 20% / 0.03);
+  --shadow-xs: 0 1px 2px 0 hsl(215 25% 20% / 0.05);
+  --shadow-sm: 0 1px 3px 0 hsl(215 25% 20% / 0.07), 0 1px 2px -1px hsl(215 25% 20% / 0.05);
+  --shadow: 0 1px 3px 0 hsl(215 25% 20% / 0.07), 0 1px 2px -1px hsl(215 25% 20% / 0.05);
+  --shadow-md: 0 4px 8px -2px hsl(215 25% 20% / 0.08), 0 2px 4px -2px hsl(215 25% 20% / 0.05);
+  --shadow-lg: 0 12px 20px -6px hsl(215 25% 20% / 0.10), 0 4px 8px -4px hsl(215 25% 20% / 0.06);
+  --shadow-xl: 0 20px 32px -10px hsl(215 25% 20% / 0.12), 0 8px 12px -6px hsl(215 25% 20% / 0.07);
+  --shadow-2xl: 0 28px 48px -14px hsl(215 25% 20% / 0.18);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -295,51 +380,73 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* Dark re-points the two ramps; every role above follows automatically, so only the
+   handful of pairings that genuinely invert are restated here. */
 .dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --border: 217 33% 17%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217 33% 17%;
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 217 33% 17%;
-  --sidebar-primary: 221 83% 53%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 217 33% 17%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 224 76% 48%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217 33% 17%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217 33% 17%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --input: 217 33% 17%;
-  --ring: 224 76% 48%;
-  --chart-1: 221 83% 53%;
-  --chart-2: 142 71% 45%;
-  --chart-3: 31 97% 55%;
-  --chart-4: 280 87% 65%;
-  --chart-5: 340 82% 52%;
+  /* A true dark grey-blue rather than near-black. The old 5–11% ground left the
+     white-alpha text ramp nowhere to sit, which is why muted copy failed contrast. */
+  --n-0:   215 28%  9%;
+  --n-25:  215 26% 11%;
+  --n-50:  215 25% 13%;
+  --n-100: 215 22% 17%;
+  --n-200: 215 18% 22%;
+  --n-300: 215 15% 32%;
+  --n-400: 215 14% 48%;
+  --n-500: 215 14% 58%;
+  --n-600: 215 15% 65%;
+  --n-700: 213 20% 82%;
+  --n-800: 210 20% 96%;
+  --n-900:   0  0% 100%;
 
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
+  /* The light-mode blue is unreadable on a 9% ground, so the ramp lifts. */
+  --brand-50:  213 40% 18%;
+  --brand-100: 213 45% 24%;
+  --brand-200: 212 50% 34%;
+  --brand-500: 211 95% 72%;
+  --brand-600: 211 90% 66%;
+  --brand-700: 211 95% 74%;
 
+  --success:        152 55% 55%;
+  --success-subtle: 152 40% 16%;
+  --success-border: 152 35% 28%;
+  --warning:         38 92% 62%;
+  --warning-subtle:  38 60% 16%;
+  --warning-border:  38 50% 30%;
+  --danger:           0 80% 68%;
+  --danger-subtle:    0 55% 18%;
+  --danger-border:    0 50% 32%;
+  --info:           200 85% 65%;
+  --info-subtle:    200 60% 16%;
+  --info-border:    200 50% 30%;
+
+  /* Surfaces lift off the page ground instead of sitting flush with it. */
+  --card: var(--n-50);
+  --popover: var(--n-50);
+  --sidebar: var(--n-25);
+  --secondary: var(--n-100);
+  --muted: var(--n-100);
+  --accent: var(--n-100);
+
+  /* Fills are light here, so their labels have to go dark. */
+  --primary-foreground: var(--n-0);
+  --sidebar-primary-foreground: var(--n-0);
+  --destructive-foreground: var(--n-0);
+
+  --chart-1: 211 90% 66%;
+  --chart-2: 211 55% 50%;
+  --chart-3: 200 85% 65%;
+  --chart-4: 215 14% 58%;
+  --chart-5: 152 55% 55%;
+
+  /* Black at higher alpha: on a dark ground a shadow reads by occlusion, not tint. */
+  --shadow-2xs: 0 1px 1px 0 hsl(0 0% 0% / 0.20);
+  --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.28);
+  --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.36), 0 1px 2px -1px hsl(0 0% 0% / 0.28);
+  --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.36), 0 1px 2px -1px hsl(0 0% 0% / 0.28);
+  --shadow-md: 0 4px 8px -2px hsl(0 0% 0% / 0.42), 0 2px 4px -2px hsl(0 0% 0% / 0.30);
+  --shadow-lg: 0 12px 20px -6px hsl(0 0% 0% / 0.50), 0 4px 8px -4px hsl(0 0% 0% / 0.34);
+  --shadow-xl: 0 20px 32px -10px hsl(0 0% 0% / 0.56), 0 8px 12px -6px hsl(0 0% 0% / 0.38);
+  --shadow-2xl: 0 28px 48px -14px hsl(0 0% 0% / 0.64);
 }
 
 @layer base {

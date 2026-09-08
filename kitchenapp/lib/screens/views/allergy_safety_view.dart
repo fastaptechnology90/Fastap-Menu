@@ -50,7 +50,7 @@ class AllergySafetyView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 9 · Food Allergy & Safety Engine',
+                    'Food Allergy & Safety Engine',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

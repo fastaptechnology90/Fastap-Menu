@@ -55,7 +55,7 @@ class SectionManagementView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 4 · Multi Kitchen Section Management',
+                    'Multi Kitchen Section Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

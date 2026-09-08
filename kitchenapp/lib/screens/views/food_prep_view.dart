@@ -50,7 +50,7 @@ class FoodPrepView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 7 · Food Preparation Management',
+                    'Food Preparation Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

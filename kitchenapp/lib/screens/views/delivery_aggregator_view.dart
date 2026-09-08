@@ -51,7 +51,7 @@ class DeliveryAggregatorView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 23 · Delivery Aggregator System',
+                    'Delivery Aggregator System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

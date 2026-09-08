@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request } from "express";
 import { eq, and, desc, or, sql, gte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
+import { logger } from "../lib/logger.js";
 import {
   db,
   restaurantsTable,
@@ -871,13 +872,21 @@ router.get("/public/me/orders", async (req, res): Promise<void> => {
   const guest = await getGuestUser(req);
   if (!guest) { res.status(401).json({ error: "Not authenticated" }); return; }
   const restaurantId = req.session.restaurantId;
-  const conditions = [];
-  if (restaurantId) conditions.push(eq(ordersTable.restaurantId, restaurantId));
-  if (guest.phone) conditions.push(eq(ordersTable.customerPhone, guest.phone));
-  if (guest.email) conditions.push(eq(ordersTable.customerEmail, guest.email));
-  if (conditions.length === 0) { res.json([]); return; }
 
-  const list = await db.select().from(ordersTable).where(or(...conditions)).orderBy(desc(ordersTable.createdAt)).limit(50);
+  // Identify the guest by phone OR email — either may be missing — but always AND that
+  // with the restaurant. Joining all three with or() meant the restaurant clause alone
+  // matched, so every guest was handed every order in the venue: names, phone numbers,
+  // email addresses and totals belonging to other diners.
+  const identity = [];
+  if (guest.phone) identity.push(eq(ordersTable.customerPhone, guest.phone));
+  if (guest.email) identity.push(eq(ordersTable.customerEmail, guest.email));
+  if (identity.length === 0) { res.json([]); return; }
+
+  const scoped = restaurantId
+    ? and(eq(ordersTable.restaurantId, restaurantId), or(...identity))
+    : or(...identity);
+
+  const list = await db.select().from(ordersTable).where(scoped).orderBy(desc(ordersTable.createdAt)).limit(50);
   res.json(list.map(o => ({
     ...o,
     subtotal: parseNum(o.subtotal),
@@ -893,18 +902,61 @@ router.get("/public/me/orders", async (req, res): Promise<void> => {
 router.post("/public/room-service", async (req, res): Promise<void> => {
   const { restaurantId, roomNumber, guestName, guestPhone, type, items, notes, total, paymentMethod } = req.body;
   if (!restaurantId || !roomNumber) { res.status(400).json({ error: "restaurantId and roomNumber required" }); return; }
+
+  const requestType = type || "food";
   const [request] = await db.insert(roomServiceRequestsTable).values({
     restaurantId,
     roomNumber,
     guestName,
     guestPhone,
-    type: type || "food",
+    type: requestType,
     items: items || [],
     notes,
     total: String(parseNum(total).toFixed(2)),
     paymentMethod: paymentMethod || "room_bill",
     status: "pending",
   }).returning();
+
+  // A guest ordering food from their room has to reach the kitchen. Only the staff-side
+  // route mirrored the request into `orders`; this one stopped at the request table, so
+  // room food never appeared on the kitchen display, in Orders, or in revenue — the
+  // guest waited for a meal nobody was cooking.
+  //
+  // Mirrors the staff route exactly (routes/room-service.ts), including the metadata that
+  // links the two rows so the folio and the kitchen read the same charge without
+  // counting it twice.
+  if (requestType === "food" || requestType === "bar") {
+    try {
+      const totalNum = parseNum(total);
+      const orderItems = (Array.isArray(items) ? items : []).map((i: any, idx: number) => {
+        const qty = Number(i.qty ?? i.quantity ?? 1) || 1;
+        const price = parseNum(i.price);
+        return { id: idx + 1, name: i.name ?? i.description ?? "Item", price, quantity: qty, subtotal: price * qty };
+      });
+      await db.insert(ordersTable).values({
+        restaurantId,
+        tableName: `Room ${roomNumber}`,
+        customerName: guestName ?? "Room Guest",
+        customerPhone: guestPhone ?? null,
+        type: "room_service",
+        status: "pending",
+        items: orderItems.length
+          ? orderItems
+          : [{ id: 1, name: notes || "Room service", price: totalNum, quantity: 1, subtotal: totalNum }],
+        subtotal: String(totalNum.toFixed(2)),
+        tax: "0.00",
+        total: String(totalNum.toFixed(2)),
+        notes: notes ?? null,
+        paymentMethod: paymentMethod ?? "room_bill",
+        paymentStatus: "pending",
+        orderSource: "room_service",
+        metadata: { roomNumber, roomServiceRequestId: request.id, folioMirror: true, source: requestType },
+      });
+    } catch (err) {
+      logger.error({ err, requestId: request.id }, "could not mirror guest room-service order to the kitchen");
+    }
+  }
+
   const assigned = await autoAssignRoomServiceRequest(restaurantId, request.id);
   res.status(201).json(assigned ?? request);
 });

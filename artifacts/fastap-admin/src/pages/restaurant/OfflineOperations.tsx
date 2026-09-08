@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { WifiOff, RefreshCw, CloudOff, Save, Check, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export default function OfflineOperations() {
   const { restaurantId } = useRestaurant();
@@ -12,7 +13,7 @@ export default function OfflineOperations() {
 
   const load = () => {
     if (!restaurantId) return;
-    platformApi.offline(restaurantId).then(setSettings).catch(() => {});
+    platformApi.offline(restaurantId).then(setSettings).catch(e => toast({ title: "Could not load the offline settings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   };
 
   useEffect(load, [restaurantId]);
@@ -20,7 +21,13 @@ export default function OfflineOperations() {
   async function save() {
     if (!restaurantId || !settings) return;
     setSaving(true);
-    await platformApi.updateOffline(restaurantId, settings).catch(() => {});
+    try {
+      await platformApi.updateOffline(restaurantId, settings);
+    } catch (e) {
+      toast({ title: "Offline settings not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

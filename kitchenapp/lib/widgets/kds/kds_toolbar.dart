@@ -55,7 +55,7 @@ class KdsToolbar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System 3 · Live KDS',
+                      'Live KDS',
                       style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,
@@ -64,7 +64,7 @@ class KdsToolbar extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Real-time KOT display · Auto refresh · Live timers',
+                      'Live order board for this section',
                       style: TextStyle(
                         color: AppColors.secondaryText,
                         fontWeight: FontWeight.w600,
@@ -91,9 +91,7 @@ class KdsToolbar extends StatelessWidget {
                               : AppColors.secondaryText,
                         ),
                         label: Text(
-                          prioritySoundEnabled
-                              ? 'Priority alerts on'
-                              : 'Priority alerts off',
+                          prioritySoundEnabled ? 'Alarm on' : 'Alarm off',
                         ),
                         selectedColor: AppColors.warning.withAlpha(28),
                         checkmarkColor: AppColors.warning,
@@ -145,8 +143,8 @@ class KdsToolbar extends StatelessWidget {
                 if (onPrioritySoundChanged != null)
                   IconButton(
                     tooltip: prioritySoundEnabled
-                        ? 'Priority alerts on'
-                        : 'Priority alerts off',
+                        ? 'New-order alarm on'
+                        : 'New-order alarm off',
                     onPressed: () =>
                         onPrioritySoundChanged?.call(!prioritySoundEnabled),
                     icon: Icon(

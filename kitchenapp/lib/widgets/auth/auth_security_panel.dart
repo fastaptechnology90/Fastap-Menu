@@ -43,7 +43,7 @@ class AuthSecurityPanel extends StatelessWidget {
             .clamp(0.0, 1.0);
 
     return PanelCard(
-      title: 'System 1 · Authentication & Security',
+      title: 'Authentication & Security',
       icon: Icons.shield_outlined,
       expandChild: false,
       child: Column(

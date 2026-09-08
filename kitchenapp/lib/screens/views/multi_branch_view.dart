@@ -50,7 +50,7 @@ class MultiBranchView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 43 · Multi Branch & Central Kitchen System',
+                    'Multi Branch & Central Kitchen System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

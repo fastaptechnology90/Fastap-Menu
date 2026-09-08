@@ -51,7 +51,7 @@ class CustomerReturnView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 20 · Customer Return & Re-fire System',
+                    'Customer Return & Re-fire System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

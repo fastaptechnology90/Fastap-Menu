@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:kitchenapp/core/app_lifecycle.dart';
 import 'package:kitchenapp/core/constants/app_constants.dart';
 import 'package:kitchenapp/core/constants/app_spacing.dart';
 import 'package:kitchenapp/core/theme/app_text_styles.dart';
@@ -12,6 +13,7 @@ import 'package:kitchenapp/presentation/screens/main/tabs/operations_tab.dart';
 import 'package:kitchenapp/presentation/screens/main/tabs/profile_tab.dart';
 import 'package:kitchenapp/state/auth_controller.dart';
 import 'package:kitchenapp/state/kitchen_command_controller.dart';
+import 'package:kitchenapp/widgets/kds/kitchen_alarm_banner.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key, required this.auth});
@@ -22,7 +24,8 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class _MainShellScreenState extends State<MainShellScreen>
+    with WidgetsBindingObserver {
   late final KitchenCommandController _controller;
   int _tabIndex = 0;
   List<MainShellTab> _visibleTabs = MainShellTab.values;
@@ -32,15 +35,26 @@ class _MainShellScreenState extends State<MainShellScreen> {
     super.initState();
     _controller = KitchenCommandController(auth: widget.auth);
     _controller.bootstrap();
+    WidgetsBinding.instance.addObserver(this);
     widget.auth.addListener(_syncVisibleTabs);
     _syncVisibleTabs();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.auth.removeListener(_syncVisibleTabs);
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // In a pocket or on a sleeping tablet the poll and the alarm are pure
+    // battery and data cost; they resume with a fresh fetch on the way back.
+    final active = state == AppLifecycleState.resumed;
+    appForeground.value = active;
+    _controller.setAppActive(active);
   }
 
   void _syncVisibleTabs() {
@@ -81,10 +95,19 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ),
         actions: const [SizedBox(width: AppSpacing.sm)],
       ),
-      body: IndexedStack(
-        index: _tabIndex,
+      body: Column(
         children: [
-          for (final tab in _visibleTabs) _tabFor(tab),
+          // Above the tabs, so a new order is impossible to walk past whichever
+          // board happens to be open.
+          KitchenAlarmBanner(controller: _controller),
+          Expanded(
+            child: IndexedStack(
+              index: _tabIndex,
+              children: [
+                for (final tab in _visibleTabs) _tabFor(tab),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

@@ -63,7 +63,7 @@ class LiveAlertView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System 36 · Live Alert Engine',
+                      'Live Alert Engine',
                       style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,

@@ -51,7 +51,7 @@ class SmartwatchSupportView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 42 · Smartwatch Support',
+                    'Smartwatch Support',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

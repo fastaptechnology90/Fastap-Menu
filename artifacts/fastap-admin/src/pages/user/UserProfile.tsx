@@ -47,6 +47,7 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeAmt, setRechargeAmt] = useState("");
+  const [rechargeError, setRechargeError] = useState("");
   const [ordersHistory, setOrdersHistory] = useState<OrderHistoryRow[]>([]);
   const [walletTx, setWalletTx] = useState<WalletTxRow[]>([]);
 
@@ -199,7 +200,9 @@ export default function UserProfile() {
               ))}
             </div>
 
-            <button onClick={async () => { await publicApi.auth.logout().catch(() => {}); setUser(null); navigate("/user/auth"); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all">
+            {/* Sign-out clears this device even if the server call fails — leaving
+                the session on screen would be worse than a stale server session. */}
+            <button onClick={async () => { await publicApi.auth.logout().catch(() => undefined); setUser(null); navigate("/user/auth"); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all">
               <LogOut className="h-4 w-4" />
               Sign Out
             </button>
@@ -259,7 +262,14 @@ export default function UserProfile() {
                   onClick={async () => {
                     const amt = parseFloat(rechargeAmt);
                     if (!amt) return;
-                    await publicApi.rechargeWallet(amt).catch(() => {});
+                    try {
+                      // Clearing the field on a failed top-up reads as success.
+                      await publicApi.rechargeWallet(amt);
+                    } catch (e) {
+                      setRechargeError(e instanceof Error ? e.message : "The top-up did not go through. You have not been charged.");
+                      return;
+                    }
+                    setRechargeError("");
                     await refreshUser();
                     setRechargeAmt("");
                   }}
@@ -268,6 +278,7 @@ export default function UserProfile() {
                   Add Money
                 </button>
               </div>
+              {rechargeError && <p role="alert" className="mt-2 text-xs text-red-400">{rechargeError}</p>}
             </div>
 
             {/* Transactions */}

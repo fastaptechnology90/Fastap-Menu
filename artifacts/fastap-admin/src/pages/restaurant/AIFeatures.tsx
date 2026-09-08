@@ -42,7 +42,7 @@ export default function AIFeatures() {
       setInsights((d.insights ?? []).map((i: any) => ({ ...i, icon: i.type === "warning" ? "⚠️" : i.type === "opportunity" ? "🎯" : "📊" })));
       setPredictions(d.predictions ?? []);
       setMenuOpts(d.menuOptimizations ?? []);
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load insights", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     feedbackApi.list(restaurantId).then(rows => {
       if (Array.isArray(rows) && rows.length > 0) {
         setReviews(rows.map((f: any) => ({
@@ -53,7 +53,7 @@ export default function AIFeatures() {
           date: f.createdAt ? new Date(f.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—",
         })));
       }
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load guest feedback", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   }, [restaurantId, isRestaurantPublished]);
 
   async function generateDish() {
@@ -218,7 +218,7 @@ export default function AIFeatures() {
                 { label: "Menu Card", icon: "📋", desc: "Digital menu card design" },
                 { label: "Festival Offer", icon: "🎉", desc: "Seasonal campaign visual" },
               ].map(a => (
-                <button key={a.label} onClick={() => toast({ title: "Not available yet", description: `${a.label} generation is coming soon (NEEDS API).` })} className="p-3 bg-white/5 hover:bg-white/8 border border-white/5 hover:border-violet-500/30 rounded-xl text-left transition-all group">
+                <button key={a.label} onClick={() => toast({ title: "Not available yet", description: `${a.label} generation is coming soon (Not available yet).` })} className="p-3 bg-white/5 hover:bg-white/8 border border-white/5 hover:border-violet-500/30 rounded-xl text-left transition-all group">
                   <p className="text-xl mb-1">{a.icon}</p>
                   <p className="text-sm font-semibold group-hover:text-violet-300 transition-colors">{a.label}</p>
                   <p className="text-xs text-white/40">{a.desc}</p>
@@ -227,7 +227,7 @@ export default function AIFeatures() {
             </div>
             <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-400 shrink-0" />
-              <p className="text-xs text-amber-300"><strong>NEEDS API</strong> — asset generation is not wired to a backend yet; these buttons are placeholders.</p>
+              <p className="text-xs text-amber-300">asset generation is not wired to a backend yet; these buttons are placeholders.</p>
             </div>
           </div>
         </div>

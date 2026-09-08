@@ -50,7 +50,7 @@ class RecipeCostingView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 15 · Recipe & Food Costing',
+                    'Recipe & Food Costing',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

@@ -75,6 +75,7 @@ export default function OrderTracking() {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   // Payment + table state now arrive with every status poll, so the bill prompt
@@ -199,7 +200,9 @@ export default function OrderTracking() {
       esRef.current = es;
       es.addEventListener("connected", () => setLiveConnected(true));
       es.addEventListener("order_status", () => {
-        publicApi.orderStatus(id).then(applyStatus).catch(() => {});
+        // Background refresh: the last known status stays on screen rather than
+        // interrupting the guest with a toast on every dropped poll.
+        publicApi.orderStatus(id).then(applyStatus).catch(() => undefined);
       });
       es.onerror = () => setLiveConnected(false);
       return () => { es.close(); esRef.current = null; };
@@ -213,7 +216,7 @@ export default function OrderTracking() {
     const id = parseInt(params.id || "", 10);
     if (Number.isNaN(id)) return;
     const interval = setInterval(() => {
-      publicApi.orderStatus(id).then(applyStatus).catch(() => {});
+      publicApi.orderStatus(id).then(applyStatus).catch(() => undefined);
     }, 4000);
     return () => clearInterval(interval);
   }, [params.id, applyStatus]);
@@ -276,7 +279,7 @@ export default function OrderTracking() {
       setMessageText("");
       setShowMessageModal(false);
       showToast("Message sent to your waiter");
-      publicApi.orderStatus(orderId).then(applyStatus).catch(() => {});
+      publicApi.orderStatus(orderId).then(applyStatus).catch(() => undefined);
     } catch {
       try {
         await notifyWaiter("guest_message", `Order #${orderId}: ${text}`);
@@ -649,7 +652,23 @@ export default function OrderTracking() {
             {rating > 0 && (
               <>
                 <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm mb-3 resize-none" rows={2} placeholder="Share feedback..." value={review} onChange={e => setReview(e.target.value)} />
-                <button onClick={() => { if (venue.restaurantId) publicApi.feedback({ restaurantId: venue.restaurantId, orderId: parseInt(String(displayOrder.id), 10) || undefined, rating, comment: review }).catch(() => {}); setReviewSubmitted(true); }} className="w-full py-2.5 rounded-xl bg-orange-500 font-semibold text-sm">Submit Review</button>
+                <button
+                  disabled={submittingReview}
+                  onClick={async () => {
+                    if (!venue.restaurantId || submittingReview) return;
+                    setSubmittingReview(true);
+                    try {
+                      await publicApi.feedback({ restaurantId: venue.restaurantId, orderId: parseInt(String(displayOrder.id), 10) || undefined, rating, comment: review });
+                      // "Thanks for your review" only after the restaurant has it.
+                      setReviewSubmitted(true);
+                    } catch {
+                      showToast("Your review did not send. Please try again.");
+                    } finally {
+                      setSubmittingReview(false);
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-orange-500 font-semibold text-sm disabled:opacity-60"
+                >{submittingReview ? "Sending…" : "Submit Review"}</button>
               </>
             )}
           </div>

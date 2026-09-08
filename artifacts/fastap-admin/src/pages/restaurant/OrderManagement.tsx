@@ -64,7 +64,38 @@ export default function OrderManagement() {
   const [newOrderForm, setNewOrderForm] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
-  const [newOrder, setNewOrder] = useState({ tableName: "", type: "dine_in", customerName: "", menuItemId: "", qty: 1 });
+  // A table of four ordering six dishes used to mean six separate orders, six KOTs and
+  // six bills, because this form took one menu item and one quantity.
+  type NewOrderLine = { menuItemId: string; qty: number };
+  const emptyNewOrder = { tableName: "", type: "dine_in", customerName: "", lines: [] as NewOrderLine[] };
+  const [newOrder, setNewOrder] = useState(emptyNewOrder);
+  const [linePick, setLinePick] = useState("");
+
+  function addLine() {
+    if (!linePick) return;
+    setNewOrder(o => {
+      const existing = o.lines.find(l => l.menuItemId === linePick);
+      return existing
+        ? { ...o, lines: o.lines.map(l => l.menuItemId === linePick ? { ...l, qty: l.qty + 1 } : l) }
+        : { ...o, lines: [...o.lines, { menuItemId: linePick, qty: 1 }] };
+    });
+    setLinePick("");
+  }
+
+  function setLineQty(menuItemId: string, qty: number) {
+    setNewOrder(o => qty < 1
+      ? { ...o, lines: o.lines.filter(l => l.menuItemId !== menuItemId) }
+      : { ...o, lines: o.lines.map(l => l.menuItemId === menuItemId ? { ...l, qty } : l) });
+  }
+
+  function menuItemById(id: string) {
+    return menuItems.find((m: any) => String(m.id) === id);
+  }
+
+  const newOrderTotal = newOrder.lines.reduce((sum, l) => {
+    const mi = menuItemById(l.menuItemId);
+    return sum + (parseFloat(String(mi?.discountedPrice || mi?.price || 0)) * l.qty);
+  }, 0);
 
   useEffect(() => {
     if (!newOrderForm || !restaurantId) return;
@@ -72,7 +103,7 @@ export default function OrderManagement() {
   }, [newOrderForm, restaurantId]);
 
   async function submitNewOrder() {
-    if (!restaurantId || !newOrder.menuItemId) return;
+    if (!restaurantId || newOrder.lines.length === 0) return;
     setCreating(true);
     try {
       await ordersApi.create({
@@ -80,12 +111,13 @@ export default function OrderManagement() {
         tableName: newOrder.tableName || "Counter",
         customerName: newOrder.customerName || "Walk-in",
         type: newOrder.type,
-        items: [{ menuItemId: parseInt(newOrder.menuItemId, 10), quantity: newOrder.qty }],
+        items: newOrder.lines.map(l => ({ menuItemId: parseInt(l.menuItemId, 10), quantity: l.qty })),
         // No method here — the waiter picks how the guest actually pays when collecting.
         metadata: { source: "restaurant_panel", waiter: currentStaff?.name },
       });
       setNewOrderForm(false);
-      setNewOrder({ tableName: "", type: "dine_in", customerName: "", menuItemId: "", qty: 1 });
+      setNewOrder(emptyNewOrder);
+      setLinePick("");
       await refreshOrders();
       toast({ title: "Order created" });
     } catch (e: any) {
@@ -320,7 +352,17 @@ export default function OrderManagement() {
       {selectedOrder && (() => {
         const detailCfg = STATUS_CFG[selectedOrder.status] ?? DEFAULT_STATUS;
         return (
-        <div className="hidden xl:flex w-80 border-l border-white/5 flex-col bg-[#0e1520]">
+        <>
+        {/* Below xl this was `hidden`, so tapping an order on a tablet did nothing at
+            all. It now opens as a sheet over the list, and remains the fixed sidebar on
+            a desktop. */}
+        <button
+          type="button"
+          aria-label="Close order details"
+          onClick={() => setSelectedOrder(null)}
+          className="xl:hidden fixed inset-0 z-30 bg-black/60"
+        />
+        <div className="flex fixed inset-y-0 right-0 z-40 w-full max-w-md xl:static xl:z-auto xl:w-80 xl:max-w-none border-l border-white/5 flex-col bg-[#0e1520]">
           <div className="flex items-center justify-between p-4 border-b border-white/5">
             <h3 className="font-bold">Order Details</h3>
             <button onClick={() => setSelectedOrder(null)} className="text-white/40 hover:text-white">✕</button>
@@ -416,6 +458,7 @@ export default function OrderManagement() {
             </div>
           </div>
         </div>
+        </>
         );
       })()}
 
@@ -429,14 +472,65 @@ export default function OrderManagement() {
             <div className="space-y-3">
               <input className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" placeholder="Table / Counter" value={newOrder.tableName} onChange={e => setNewOrder(o => ({ ...o, tableName: e.target.value }))} />
               <input className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" placeholder="Customer name" value={newOrder.customerName} onChange={e => setNewOrder(o => ({ ...o, customerName: e.target.value }))} />
-              <select className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" value={newOrder.menuItemId} onChange={e => setNewOrder(o => ({ ...o, menuItemId: e.target.value }))}>
-                <option value="">Select menu item</option>
-                {menuItems.map((m: any) => <option key={m.id} value={m.id}>{m.name} — ₹{m.discountedPrice || m.price}</option>)}
+              <select
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
+                value={newOrder.type}
+                onChange={e => setNewOrder(o => ({ ...o, type: e.target.value }))}
+              >
+                <option value="dine_in">Dine-in</option>
+                <option value="takeaway">Takeaway</option>
+                <option value="delivery">Delivery</option>
+                <option value="room_service">Room service</option>
               </select>
-              <input type="number" min={1} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" placeholder="Quantity" value={newOrder.qty} onChange={e => setNewOrder(o => ({ ...o, qty: parseInt(e.target.value, 10) || 1 }))} />
+
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm"
+                  value={linePick}
+                  onChange={e => setLinePick(e.target.value)}
+                >
+                  <option value="">Add a dish…</option>
+                  {menuItems.map((m: any) => (
+                    <option key={m.id} value={m.id}>{m.name} — ₹{m.discountedPrice || m.price}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addLine}
+                  disabled={!linePick}
+                  className="px-4 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-40 text-sm font-semibold"
+                >
+                  Add
+                </button>
+              </div>
+
+              {newOrder.lines.length > 0 && (
+                <div className="rounded-xl border border-white/10 divide-y divide-white/5">
+                  {newOrder.lines.map(line => {
+                    const mi = menuItemById(line.menuItemId);
+                    const unit = parseFloat(String(mi?.discountedPrice || mi?.price || 0));
+                    return (
+                      <div key={line.menuItemId} className="flex items-center gap-2 px-3 py-2">
+                        <span className="flex-1 text-sm truncate">{mi?.name ?? "Item"}</span>
+                        <button type="button" onClick={() => setLineQty(line.menuItemId, line.qty - 1)}
+                          className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 text-sm" aria-label="Reduce quantity">−</button>
+                        <span className="w-6 text-center text-sm tabular-nums">{line.qty}</span>
+                        <button type="button" onClick={() => setLineQty(line.menuItemId, line.qty + 1)}
+                          className="h-7 w-7 rounded-lg bg-white/5 hover:bg-white/10 text-sm" aria-label="Increase quantity">+</button>
+                        <span className="w-16 text-right text-sm tabular-nums text-white/60">₹{(unit * line.qty).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-between px-3 py-2 text-sm font-semibold">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">₹{newOrderTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
             </div>
-            <button disabled={creating || !newOrder.menuItemId} onClick={submitNewOrder} className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-              {creating && <Loader2 className="h-4 w-4 animate-spin" />} Create Order
+            <button disabled={creating || newOrder.lines.length === 0} onClick={submitNewOrder} className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+              {newOrder.lines.length > 0 ? `Create Order · ${newOrder.lines.length} item${newOrder.lines.length > 1 ? "s" : ""}` : "Create Order"}
             </button>
           </div>
         </div>

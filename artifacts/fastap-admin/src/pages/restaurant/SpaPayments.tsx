@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Wallet, X, CheckCircle, Search, Receipt, CreditCard, Smartphone, Banknote, Loader2, Clock, User } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { spa as spaApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 
 type PaymentMeta = { method?: string; amount?: number; upiId?: string; utr?: string; reference?: string; collectedBy?: string; collectedFrom?: string; collectedAt?: string };
@@ -43,7 +44,7 @@ export default function SpaPayments() {
     setLoading(true);
     spaApi.bookings(restaurantId)
       .then(d => setBookings(Array.isArray(d) ? d.map((b: any) => ({ ...b, price: parseFloat(String(b.price || 0)) })) : []))
-      .catch(() => {})
+      .catch(e => toast({ title: "Could not load spa bookings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }))
       .finally(() => setLoading(false));
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [restaurantId]);

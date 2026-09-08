@@ -51,7 +51,7 @@ class FutureAiExpansionView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 48 · Future AI Expansion Features',
+                    'Future AI Expansion Features',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

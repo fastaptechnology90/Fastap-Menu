@@ -1,10 +1,10 @@
 import "./load-env.js";
 import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
-import { db, usersTable, restaurantsTable, categoriesTable, menuItemsTable, branchesTable, tablesMapTable, tableAreasTable, staffTable, customersTable, loyaltyProgramsTable, loyaltyTransactionsTable, campaignsTable, reservationsTable, feedbackTable, ordersTable, hotelRoomsTable, DEFAULT_ROOM_CONTROLS, queueEntriesTable, banquetEventsTable, spaServicesTable, spaBookingsTable, guestUsersTable, walletTransactionsTable, promoCodesTable, auditLogsTable, documentsTable, suppliersTable, purchaseOrdersTable, tasksTable, sopItemsTable, cashShiftsTable, financeTransactionsTable, inventoryItemsTable, housekeepingTasksTable, maintenanceRequestsTable, roomServiceRequestsTable, waiterCallsTable, recipesTable, chatMessagesTable, staffCommissionsTable } from "@workspace/db";
+import { db, usersTable, restaurantsTable, categoriesTable, menuItemsTable, branchesTable, tablesMapTable, tableAreasTable, staffTable, customersTable, loyaltyProgramsTable, loyaltyTransactionsTable, campaignsTable, reservationsTable, feedbackTable, ordersTable, hotelRoomsTable, DEFAULT_ROOM_CONTROLS, queueEntriesTable, banquetEventsTable, spaServicesTable, spaBookingsTable, guestUsersTable, walletTransactionsTable, promoCodesTable, auditLogsTable, documentsTable, suppliersTable, purchaseOrdersTable, tasksTable, sopItemsTable, cashShiftsTable, financeTransactionsTable, inventoryItemsTable, housekeepingTasksTable, maintenanceRequestsTable, roomServiceRequestsTable, waiterCallsTable, recipesTable, recipeIngredientsTable, chatMessagesTable, staffCommissionsTable } from "@workspace/db";
 import { setSettingsSection } from "./lib/restaurant-settings.js";
 import { ensureDemoStaffAccounts, DEMO_STAFF_PASSWORD } from "./lib/demo-staff.js";
-import { allCategorySeeds, MENU_ITEMS_SEED, DEFAULT_CUSTOMIZATION } from "./seed-menu-data.js";
+import { allCategorySeeds, MENU_ITEMS_SEED } from "./seed-menu-data.js";
 
 async function ensureDigitalMenu(restaurantId: number) {
   const catSeeds = allCategorySeeds();
@@ -57,7 +57,10 @@ async function ensureDigitalMenu(restaurantId: number) {
       chefRecommended: item.chefRecommended ?? false,
       variants: item.variants ?? [],
       addons: item.addons ?? [],
-      customizationOptions: { ...DEFAULT_CUSTOMIZATION, ...(item.customizationOptions ?? {}) },
+      // Only what the dish itself defines. Seeding a default set gave every item —
+      // desserts and drinks included — an "Extra Cheese +₹15" and a "Make it a combo
+      // +₹99" option, which the guest app then offered and charged for.
+      customizationOptions: item.customizationOptions ?? {},
     }))
     .filter(i => i.categoryId);
 
@@ -858,11 +861,40 @@ export async function runSeed() {
 
   const existingRecipes = await db.select().from(recipesTable).where(eq(recipesTable.restaurantId, restaurant.id));
   if (existingRecipes.length === 0 && pizza && biryani) {
-    await db.insert(recipesTable).values([
+    const createdRecipes = await db.insert(recipesTable).values([
       { restaurantId: restaurant.id, name: pizza.name, category: "Main", servings: 1, preparationTime: 18, sellingPrice: String(parseFloat(pizza.price)), totalCost: "120", profitMargin: "62" },
       { restaurantId: restaurant.id, name: biryani.name, category: "Main", servings: 1, preparationTime: 25, sellingPrice: String(parseFloat(biryani.price)), totalCost: "95", profitMargin: "58" },
-    ]);
-    console.log("Created demo recipes");
+    ]).returning();
+
+    // Recipes with no ingredient rows cannot move stock, which is why selling a dish
+    // never touched inventory even though the wiring for it existed. Each ingredient
+    // points at a real inventory item so a sale draws that item down.
+    const stock = await db.select().from(inventoryItemsTable).where(eq(inventoryItemsTable.restaurantId, restaurant.id));
+    const stockByName = (needle: string) => stock.find(x => x.name.toLowerCase().includes(needle))?.id;
+    const ingredientRows = [
+      { recipe: pizza.name, ingredient: "Chicken Breast", needle: "chicken", quantity: "0.180", unit: "kg" },
+      { recipe: pizza.name, ingredient: "Tomatoes", needle: "tomato", quantity: "0.120", unit: "kg" },
+      { recipe: biryani.name, ingredient: "Basmati Rice", needle: "basmati", quantity: "0.250", unit: "kg" },
+      { recipe: biryani.name, ingredient: "Ghee", needle: "ghee", quantity: "0.030", unit: "kg" },
+      { recipe: biryani.name, ingredient: "Saffron", needle: "saffron", quantity: "0.200", unit: "g" },
+    ]
+      .map(row => {
+        const recipeId = createdRecipes.find(r => r.name === row.recipe)?.id;
+        const inventoryItemId = stockByName(row.needle);
+        if (!recipeId || !inventoryItemId) return null;
+        return {
+          recipeId,
+          restaurantId: restaurant.id,
+          ingredientName: row.ingredient,
+          quantity: row.quantity,
+          unit: row.unit,
+          inventoryItemId,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (ingredientRows.length) await db.insert(recipeIngredientsTable).values(ingredientRows);
+    console.log("Created demo recipes with ingredient links");
   }
 
   const existingChat = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.restaurantId, restaurant.id));

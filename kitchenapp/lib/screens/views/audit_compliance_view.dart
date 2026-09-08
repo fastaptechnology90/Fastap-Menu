@@ -51,7 +51,7 @@ class AuditComplianceView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 44 · Audit & Compliance System',
+                    'Audit & Compliance System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

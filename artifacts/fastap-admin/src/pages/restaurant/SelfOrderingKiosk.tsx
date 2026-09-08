@@ -90,7 +90,7 @@ export default function SelfOrderingKiosk() {
           themeColor: d.themeColor ?? d.theme_color ?? s.themeColor,
         }));
       }
-    }).catch(()=>{});
+    }).catch(e => toast({ title: "Could not load the kiosk settings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     kioskApi.stats(restaurantId).then((d: any) => {
       if (!isRestaurantPublished || d?.isPublished === false) {
         setKioskStats([]);
@@ -110,7 +110,7 @@ export default function SelfOrderingKiosk() {
         if (Array.isArray(d.top_items)) setTopKioskItems(d.top_items);
         else if (Array.isArray(d.topItems)) setTopKioskItems(d.topItems);
       }
-    }).catch(()=>{});
+    }).catch(e => toast({ title: "Could not load the kiosk statistics", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     hardwareApi.get(restaurantId).then((d: any) => {
       const devices = Array.isArray(d?.devices) ? d.devices.filter((x: any) => x.type === "kiosk") : [];
       setKioskUnits(devices.map((k: any) => ({
@@ -126,7 +126,12 @@ export default function SelfOrderingKiosk() {
 
   async function pingKiosk(id: string) {
     if (!restaurantId) return;
-    await hardwareApi.ping(restaurantId, parseInt(id, 10)).catch(() => {});
+    try {
+      await hardwareApi.ping(restaurantId, parseInt(id, 10));
+      toast({ title: "Kiosk responded" });
+    } catch (e) {
+      toast({ title: "Kiosk did not respond", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
     const d = await hardwareApi.get(restaurantId).catch(() => null);
     const devices = Array.isArray(d?.devices) ? d.devices.filter((x: any) => x.type === "kiosk") : [];
     setKioskUnits(devices.map((k: any) => ({
@@ -161,7 +166,10 @@ export default function SelfOrderingKiosk() {
     }
   }
 
-  const previewItems = [
+  // Illustrative rows for the on-screen kiosk mock-up, so the owner can see the layout
+  // while configuring it. Calories are left unset rather than invented — this used to
+  // render Math.random() figures, which a diner at a real kiosk would have believed.
+  const previewItems: { name: string; price: number; emoji: string; calories?: number }[] = [
     {name:"Butter Chicken",price:380,emoji:"🍛"},
     {name:"Gulab Jamun",price:120,emoji:"🍮"},
     {name:"Cold Coffee",price:110,emoji:"☕"},
@@ -379,7 +387,7 @@ export default function SelfOrderingKiosk() {
                           <span className="text-2xl">{item.emoji}</span>
                           <div className="flex-1">
                             <p className="text-sm font-semibold">{item.name}</p>
-                            {settings.showCalories&&<p className="text-xs text-white/40">~{Math.floor(Math.random()*300+300)} kcal</p>}
+                            {settings.showCalories && item.calories != null && <p className="text-xs text-white/40">{item.calories} kcal</p>}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold" style={{color:settings.themeColor}}>₹{item.price}</span>

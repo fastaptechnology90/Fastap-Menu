@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kitchenapp/core/config/api_config.dart';
 import 'package:kitchenapp/core/constants/app_colors.dart';
 import 'package:kitchenapp/core/constants/app_spacing.dart';
+import 'package:kitchenapp/core/settings/alert_settings.dart';
 import 'package:kitchenapp/core/storage/app_preferences.dart';
 import 'package:kitchenapp/presentation/screens/profile/profile_widgets.dart';
 import 'package:kitchenapp/state/auth_controller.dart';
@@ -18,9 +19,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _prefs = AppPreferences();
-  bool _notifications = true;
-  bool _soundAlerts = true;
-  bool _haptic = true;
   bool _compactMode = false;
   bool _loading = true;
   bool _checkingApi = false;
@@ -32,15 +30,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final notifications = await _prefs.notificationsEnabled();
-    final sound = await _prefs.soundAlertsEnabled();
-    final haptic = await _prefs.hapticEnabled();
     final compact = await _prefs.compactModeEnabled();
     if (!mounted) return;
     setState(() {
-      _notifications = notifications;
-      _soundAlerts = sound;
-      _haptic = haptic;
       _compactMode = compact;
       _loading = false;
     });
@@ -99,37 +91,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const ProfileSectionTitle(
-                  'Notifications',
-                  subtitle: 'Control alerts on this device',
-                ),
-                _SettingsToggleTile(
-                  icon: Icons.notifications_active_outlined,
-                  title: 'Push notifications',
-                  subtitle: 'Order delays, VIP alerts, and broadcasts',
-                  value: _notifications,
-                  onChanged: (value) async {
-                    setState(() => _notifications = value);
-                    await _prefs.setNotificationsEnabled(value);
-                  },
+                  'Alerts',
+                  subtitle: 'How this device tells you an order arrived',
                 ),
                 _SettingsToggleTile(
                   icon: Icons.volume_up_outlined,
-                  title: 'Sound alerts',
-                  subtitle: 'KDS priority chimes and alert tones',
-                  value: _soundAlerts,
+                  title: 'Alarm sound',
+                  subtitle: 'Sound the new-order alarm until it is acknowledged',
+                  value: soundAlertsEnabled.value,
                   onChanged: (value) async {
-                    setState(() => _soundAlerts = value);
-                    await _prefs.setSoundAlertsEnabled(value);
+                    await setSoundAlertsEnabled(value);
+                    if (mounted) setState(() {});
                   },
                 ),
                 _SettingsToggleTile(
                   icon: Icons.vibration_rounded,
-                  title: 'Haptic feedback',
-                  subtitle: 'Vibration on critical kitchen actions',
-                  value: _haptic,
+                  title: 'Vibration',
+                  subtitle: 'Buzz with the alarm and on kitchen actions',
+                  value: hapticFeedbackEnabled.value,
                   onChanged: (value) async {
-                    setState(() => _haptic = value);
-                    await _prefs.setHapticEnabled(value);
+                    await setHapticFeedbackEnabled(value);
+                    if (mounted) setState(() {});
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),

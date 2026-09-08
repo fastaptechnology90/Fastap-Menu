@@ -267,6 +267,11 @@ export default function KitchenDisplay() {
                   <span className={`h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center text-xs font-extrabold ${col.color} bg-white/10`}>{orders.length}</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                  {orders.length === 0 && (
+                    <p className="px-2 py-6 text-center text-xs text-white/25">
+                      {station === "all" ? "Nothing here" : "Nothing for this station"}
+                    </p>
+                  )}
                   {orders.map(order=>{
                     const mins = Math.floor((Date.now()-new Date(order.placedAt).getTime())/60000);
                     const isUrgent = mins >= target;

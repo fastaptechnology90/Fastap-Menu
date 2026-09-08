@@ -73,7 +73,7 @@ export default function StaffCommissionChat() {
       } else {
         setCommissions([]);
       }
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load commissions", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     commissionsApi.chatMessages(restaurantId).then((rows: any[]) => {
       if (Array.isArray(rows) && rows.length > 0) {
         setMessages(rows.map(m => ({
@@ -85,7 +85,7 @@ export default function StaffCommissionChat() {
           type: m.messageType || "message",
         })));
       }
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load messages", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     tasksApi.tasks(restaurantId).then((rows: any[]) => {
       if (Array.isArray(rows) && rows.length > 0) {
         setTasks(rows.map(t => ({
@@ -97,7 +97,7 @@ export default function StaffCommissionChat() {
           dueBy: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
         })));
       }
-    }).catch(() => {});
+    }).catch(e => toast({ title: "Could not load staff tasks", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
   },[restaurantId, period, staffList]);
 
   useEffect(()=>{ msgEndRef.current?.scrollIntoView({behavior:"smooth"}); },[messages]);

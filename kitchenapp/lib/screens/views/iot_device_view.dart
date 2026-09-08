@@ -50,7 +50,7 @@ class IotDeviceView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 32 · IoT Device Integration System',
+                    'IoT Device Integration System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

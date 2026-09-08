@@ -59,7 +59,7 @@ export default function Vendors() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const { data: vendors = [], isLoading, refetch } = useQuery({
+  const { data: vendors = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["superadmin-vendors", showDeleted],
     queryFn: () => api.vendors.list(showDeleted),
   });
@@ -241,6 +241,11 @@ export default function Vendors() {
         <DataTable
           data={filteredVendors}
           pageSize={15}
+          error={isError}
+          onRetry={() => { void refetch(); }}
+          errorMessage="We could not load the vendor list."
+          emptyMessage="No vendors yet"
+          emptyDescription="Restaurants appear here once they register or you add them."
           columns={[
             { header: <input type="checkbox" checked={selected.length === filteredVendors.length && filteredVendors.length > 0} onChange={toggleSelectAll} />, cell: (row) => <input type="checkbox" checked={selected.includes(row.id)} onChange={() => toggleSelect(row.id)} /> },
             { header: "#", cell: (row) => <span className="text-xs text-muted-foreground font-mono">#{row.id}</span> },

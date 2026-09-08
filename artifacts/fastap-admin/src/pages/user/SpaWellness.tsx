@@ -145,7 +145,14 @@ export default function SpaWellness() {
   }
 
   async function cancelBooking(id: number) {
-    await publicApi.spa.cancel(id).catch(() => {});
+    try {
+      await publicApi.spa.cancel(id);
+      toast({ title: "Booking cancelled" });
+    } catch {
+      // A cancellation that never landed still bills the guest for a no-show.
+      toast({ title: "Could not cancel", description: "Your appointment is still booked. Please call the spa.", variant: "destructive" });
+      return;
+    }
     loadBookings();
   }
 

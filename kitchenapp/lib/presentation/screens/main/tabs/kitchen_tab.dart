@@ -265,13 +265,26 @@ class _KitchenTabPanelsState extends State<_KitchenTabPanels>
   }
 }
 
-class _KdsTabPane extends StatelessWidget {
+/// The KDS keeps its state — scroll position, expanded tickets — when the chef
+/// looks at another sub-tab, instead of being rebuilt from scratch on the way
+/// back mid-service.
+class _KdsTabPane extends StatefulWidget {
   const _KdsTabPane({required this.controller});
 
   final KitchenCommandController controller;
 
   @override
+  State<_KdsTabPane> createState() => _KdsTabPaneState();
+}
+
+class _KdsTabPaneState extends State<_KdsTabPane>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xl,
@@ -280,7 +293,7 @@ class _KdsTabPane extends StatelessWidget {
         0,
       ),
       child: LiveKdsView(
-        controller: controller,
+        controller: widget.controller,
         compact: true,
         primaryScroll: true,
       ),

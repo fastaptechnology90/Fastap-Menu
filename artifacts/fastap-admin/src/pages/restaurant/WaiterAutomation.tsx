@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Bell, CheckCircle, Loader, RefreshCw, UtensilsCrossed, Receipt, HelpCircle, Droplets } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { waiterCalls } from "@/lib/api";
@@ -43,7 +44,13 @@ export default function WaiterAutomation() {
 
   async function resolve(id: number) {
     if (!restaurantId) return;
-    await waiterCalls.resolve(restaurantId, id).catch(() => {});
+    try {
+      await waiterCalls.resolve(restaurantId, id);
+    } catch (e) {
+      // A call left unresolved on the server keeps buzzing the floor staff.
+      toast({ title: "Could not close the call", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      return;
+    }
     await load();
   }
 

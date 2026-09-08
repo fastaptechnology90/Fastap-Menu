@@ -361,6 +361,7 @@ export default function TableManagement() {
   const [tableRows, setTableRows] = useState<TableRow[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedZone, setSelectedZone] = useState("All");
   const [statusFilter, setStatusFilter] = useState<TableStatus | "all">("all");
@@ -379,7 +380,12 @@ export default function TableManagement() {
       ]);
       setTableRows(Array.isArray(tData) ? tData.map(mapRow) : []);
       setStaffList(Array.isArray(sData) ? sData : []);
-    } catch { }
+      setLoadError(null);
+    } catch (e) {
+      // "No tables found" during an outage sends staff hunting for a floor plan
+      // that was never deleted.
+      setLoadError(e instanceof Error ? e.message : "Could not reach the server.");
+    }
   }, [restaurantId]);
 
   useEffect(() => {
@@ -579,6 +585,15 @@ export default function TableManagement() {
 
       {loading ? (
         <div className="text-center py-16 text-white/30">Loading tables...</div>
+      ) : loadError ? (
+        <div role="alert" className="text-center py-16">
+          <p className="text-sm font-semibold text-red-300">We could not load your floor plan.</p>
+          <p className="mt-1 text-xs text-red-200/60">{loadError}</p>
+          <button onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}
+            className="mt-4 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-sm font-semibold">
+            Try again
+          </button>
+        </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-16">
           <LayoutGrid className="h-10 w-10 text-white/10 mx-auto mb-3" />

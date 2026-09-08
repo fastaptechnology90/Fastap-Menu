@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:kitchenapp/core/config/app_variant_content.dart';
-import 'package:kitchenapp/core/config/api_config.dart';
 import 'package:kitchenapp/core/constants/app_colors.dart';
 import 'package:kitchenapp/core/constants/app_spacing.dart';
 import 'package:kitchenapp/navigation/module_screen_builder.dart';
@@ -190,7 +189,6 @@ class HomeTab extends StatelessWidget {
                     initials: initials,
                     role: user?.role.label ?? 'Staff',
                     section: user?.section ?? AppVariantContent.defaultSection,
-                    apiMode: ApiConfig.modeLabel,
                     loading: loading,
                     onRefresh: controller.refreshDashboard,
                   ),
@@ -356,7 +354,6 @@ class _HomeHeader extends StatelessWidget {
     required this.initials,
     required this.role,
     required this.section,
-    required this.apiMode,
     required this.loading,
     required this.onRefresh,
   });
@@ -365,7 +362,6 @@ class _HomeHeader extends StatelessWidget {
   final String initials;
   final String role;
   final String section;
-  final String apiMode;
   final bool loading;
   final VoidCallback onRefresh;
 
@@ -433,40 +429,6 @@ class _HomeHeader extends StatelessWidget {
                     color: AppColors.secondaryText,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.chipBackground,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.panelBorder),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        apiMode,
-                        style: TextStyle(
-                          color: AppColors.bodyText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],

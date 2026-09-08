@@ -65,7 +65,7 @@ export default function KYC() {
     } catch { toast.error("Failed to update document"); }
   }
 
-  const { data: kycData = [], isLoading } = useQuery({ queryKey: ["kyc"], queryFn: api.kyc.list, refetchInterval: 30000 });
+  const { data: kycData = [], isLoading, isError, refetch } = useQuery({ queryKey: ["kyc"], queryFn: api.kyc.list, refetchInterval: 30000 });
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.kyc.approve(id),
@@ -110,7 +110,14 @@ export default function KYC() {
         </CardHeader>
         <CardContent>
           {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : (
-            <DataTable data={filtered} columns={[
+            <DataTable
+              data={filtered}
+              error={isError}
+              onRetry={() => { void refetch(); }}
+              errorMessage="We could not load the verification queue."
+              emptyMessage="Nothing to verify"
+              emptyDescription="Vendor documents appear here as they are submitted."
+              columns={[
               { header: "Vendor", cell: (row: KYCRecord) => (
                 <div>
                   <span className="font-medium block">{row.vendorName}</span>

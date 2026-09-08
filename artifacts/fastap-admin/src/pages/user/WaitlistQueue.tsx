@@ -145,7 +145,14 @@ export default function WaitlistQueue() {
 
   async function leaveQueue() {
     if (waitlist?.token && !waitlist.token.startsWith("local")) {
-      await publicApi.leaveQueue(waitlist.token).catch(() => {});
+      try {
+        await publicApi.leaveQueue(waitlist.token);
+      } catch {
+        // Clearing the screen while the host still holds their place would send
+        // the guest away from a table that is about to be called.
+        toast({ title: "Could not leave the queue", description: "You are still in line. Please try again or tell the host.", variant: "destructive" });
+        return;
+      }
     }
     setJoined(false);
     setWaitlist(null);

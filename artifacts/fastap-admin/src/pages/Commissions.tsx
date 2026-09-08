@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,7 @@ function fmtMoney(n: number) {
 
 export default function Commissions() {
   const qc = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(defaultForm);
 
@@ -71,9 +74,22 @@ export default function Commissions() {
               { header: "Applies To", accessorKey: "applyTo" },
               { header: "Status", cell: (row: CommissionRule) => <StatusBadge status={row.status} /> },
               { header: "Actions", cell: (row: CommissionRule) => (
-                <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => { if (confirm(`Delete rule "${row.name}"?`)) deleteMutation.mutate(row.id); }}>
-                  {deleteMutation.isPending && deleteMutation.variables === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                </Button>
+                <AsyncButton
+                  variant="ghost" size="icon" className="text-destructive h-7 w-7" title="Delete rule"
+                  errorMessage="Failed to delete"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: `Delete rule "${row.name}"?`,
+                      description: `Commission on ${row.applyTo} falls back to the platform default from the next order onward.`,
+                      destructive: true,
+                      confirmLabel: "Delete rule",
+                    });
+                    if (!ok) return;
+                    await deleteMutation.mutateAsync(row.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </AsyncButton>
               )},
             ]} />
           )}
@@ -103,6 +119,7 @@ export default function Commissions() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

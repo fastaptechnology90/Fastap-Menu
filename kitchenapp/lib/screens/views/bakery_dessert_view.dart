@@ -51,7 +51,7 @@ class BakeryDessertView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 25 · Bakery & Dessert Management',
+                    'Bakery & Dessert Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

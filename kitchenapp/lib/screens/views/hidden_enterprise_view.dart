@@ -51,7 +51,7 @@ class HiddenEnterpriseView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 47 · Hidden Enterprise Features',
+                    'Hidden Enterprise Features',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

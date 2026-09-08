@@ -51,7 +51,7 @@ class StaffPerformanceView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 33 · Staff Performance System',
+                    'Staff Performance System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

@@ -50,7 +50,7 @@ class ExpeditorManagementView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 21 · Expeditor Management System',
+                    'Expeditor Management System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

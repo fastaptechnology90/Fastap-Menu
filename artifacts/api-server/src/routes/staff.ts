@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
 import { db, staffTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { makeStaffQrToken } from "../lib/mobile-kitchen/staff-tokens.js";
 
 const router: IRouter = Router();
 
@@ -89,5 +90,47 @@ router.delete("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (r
   }
   res.json({ message: "Staff removed" });
 });
+
+/**
+ * Mint the token behind a staff QR login code.
+ *
+ * The app's QR login used to accept a bare staff code, which is printed on rosters —
+ * so anyone who could read a badge could sign in as that person. It now only accepts a
+ * token signed here, which means a manager who is already signed in has to hand it over.
+ * The token is deliberately short-lived: it is meant to be scanned off a screen there
+ * and then, not saved or forwarded.
+ */
+router.post(
+  "/restaurants/:restaurantId/staff/:staffId/login-qr",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const restaurantId = parseInt(req.params.restaurantId, 10);
+    const staffId = parseInt(req.params.staffId, 10);
+    if (!Number.isFinite(restaurantId) || !Number.isFinite(staffId)) {
+      res.status(400).json({ error: "Invalid restaurant or staff id" });
+      return;
+    }
+
+    const [member] = await db
+      .select()
+      .from(staffTable)
+      .where(and(eq(staffTable.id, staffId), eq(staffTable.restaurantId, restaurantId)))
+      .limit(1);
+    if (!member) {
+      res.status(404).json({ error: "Staff member not found" });
+      return;
+    }
+    if (!member.isActive) {
+      res.status(409).json({ error: "This staff member is deactivated." });
+      return;
+    }
+
+    res.json({
+      qrToken: makeStaffQrToken(member.id),
+      expiresInSeconds: 600,
+      staff: { id: member.id, name: member.name, role: member.role },
+    });
+  },
+);
 
 export default router;

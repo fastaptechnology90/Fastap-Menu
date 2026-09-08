@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
+import 'app_text_styles.dart';
 
 /// Light + dark "Modern POS" themes shared by all three apps. The active one is
 /// chosen by `themeMode` in each app root, kept in sync with [appDarkMode] so
@@ -104,13 +105,22 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          textStyle: const TextStyle(fontWeight: AppFontWeights.strong),
         ),
       ),
       textTheme: TextTheme(
-        headlineSmall: TextStyle(fontWeight: FontWeight.w900, color: onSurface),
-        titleMedium: TextStyle(fontWeight: FontWeight.w800, color: onSurface),
-        bodyMedium: TextStyle(color: onSurface),
+        headlineSmall: TextStyle(
+          fontWeight: AppFontWeights.display,
+          color: onSurface,
+        ),
+        titleMedium: TextStyle(
+          fontWeight: AppFontWeights.strong,
+          color: onSurface,
+        ),
+        bodyMedium: TextStyle(
+          fontWeight: AppFontWeights.body,
+          color: onSurface,
+        ),
       ),
     );
   }

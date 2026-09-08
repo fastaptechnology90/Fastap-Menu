@@ -284,7 +284,7 @@ export default function LanguageAccessibilityPage() {
             )}
 
             {/* Per-item playback only renders when the voice-menu endpoint returns items.
-                Today it returns { language, script, itemCount } only — see NEEDS API — so
+                Today it returns { language, script, itemCount } only — see so
                 this section stays hidden rather than showing an empty-state error. */}
             {voiceItems.length > 0 && (
               <div className="space-y-2">
