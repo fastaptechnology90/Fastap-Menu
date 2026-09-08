@@ -50,7 +50,7 @@ class RoomServiceView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 28 · Room Service Kitchen System',
+                    'Room Service Kitchen System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

@@ -51,7 +51,7 @@ class BanquetView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 27 · Event & Banquet Kitchen System',
+                    'Event & Banquet Kitchen System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

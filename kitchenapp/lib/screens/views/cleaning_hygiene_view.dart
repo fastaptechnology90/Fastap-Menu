@@ -50,7 +50,7 @@ class CleaningHygieneView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 29 · Cleaning & Hygiene Management',
+                    'Cleaning & Hygiene Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

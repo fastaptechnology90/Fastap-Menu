@@ -49,7 +49,7 @@ class AiKitchenAssistantView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 11 · AI Kitchen Assistant',
+                    'AI Kitchen Assistant',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

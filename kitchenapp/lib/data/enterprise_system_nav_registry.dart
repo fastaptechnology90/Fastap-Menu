@@ -51,7 +51,9 @@ class EnterpriseSystemNavRegistry {
       return 'Kitchen Command Center';
     }
 
-    return 'System $systemNumber · ${FeatureModuleCatalog.titleFor(systemNumber)}';
+    // A cook does not know what System 29 is. The catalog number is an internal
+    // index, not a name, so it stays out of the title bar.
+    return FeatureModuleCatalog.titleFor(systemNumber);
   }
 
   static bool isNavigable(int systemNumber) {

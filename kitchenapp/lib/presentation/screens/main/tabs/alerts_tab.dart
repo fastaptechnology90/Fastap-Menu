@@ -169,8 +169,7 @@ class AlertsTab extends StatelessWidget {
                       const SizedBox(height: AppSpacing.lg),
                       KitchenOpenModuleButton(
                         title: 'Open full live alerts',
-                        subtitle:
-                            'Manage, acknowledge, and escalate in module 35',
+                        subtitle: 'Manage, acknowledge, and escalate alerts',
                         icon: Icons.open_in_new_rounded,
                         onTap: () => ModuleScreenBuilder.open(
                           context,
@@ -200,7 +199,6 @@ class AlertsTab extends StatelessWidget {
                     subtitle: module.subtitle,
                     icon: module.icon,
                     color: module.color,
-                    badge: '#${module.navIndex}',
                     onTap: () => ModuleScreenBuilder.open(
                       context,
                       navIndex: module.navIndex,

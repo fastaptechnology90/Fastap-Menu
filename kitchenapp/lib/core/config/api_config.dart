@@ -9,7 +9,7 @@ import 'test_environment.dart';
 ///
 /// ```powershell
 /// # Production server
-/// flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://digitalrestuarants.thefingo.com
+/// flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app
 ///
 /// # Local API (Android emulator → host machine)
 /// flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=http://10.0.2.2:8080
@@ -32,8 +32,11 @@ class ApiConfig {
   static const _baseUrlDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
   static const _envDefine = String.fromEnvironment('APP_ENV', defaultValue: '');
 
-  /// Production Fastap API (nginx → Node on VPS).
-  static const defaultExternalBaseUrl = 'https://digitalrestuarants.thefingo.com';
+  /// Production Fastap API. The previous VPS host (digitalrestuarants.thefingo.com)
+  /// was decommissioned; a release build that fell back to it could not reach any
+  /// server at all.
+  static const defaultExternalBaseUrl =
+      'https://fastap-menu-production.up.railway.app';
 
   static ApiRuntimeMode get mode {
     final define = _modeDefine.trim().toLowerCase();

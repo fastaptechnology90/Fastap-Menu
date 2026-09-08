@@ -51,7 +51,7 @@ class BackupRecoveryView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 45 · Backup & Recovery System',
+                    'Backup & Recovery System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

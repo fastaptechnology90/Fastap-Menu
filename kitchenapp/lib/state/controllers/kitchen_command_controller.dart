@@ -24,6 +24,7 @@ import '../../services/modifier_service.dart';
 import '../../services/prep_service.dart';
 import '../../services/dashboard_service.dart';
 import '../../services/kds_service.dart';
+import '../../services/kitchen_alarm_service.dart';
 import '../../services/order_processing_service.dart';
 import '../../models/priority/order_priority_snapshot.dart';
 import '../../models/communication/kitchen_communication_snapshot.dart';
@@ -422,6 +423,15 @@ class KitchenCommandController extends ChangeNotifier {
   String? _waiterAutoAssignmentActionMessage;
   Timer? _pollTimer;
   Timer? _kdsTimer;
+  Timer? _actionMessageTimer;
+  int _actionMessageToken = 0;
+  int _pollTicks = 0;
+  bool _appActive = true;
+
+  /// Rings for new KOTs. It lives here rather than in the KDS view because the
+  /// view is a tab page Flutter disposes the moment another sub-tab is shown —
+  /// the alarm used to die with it.
+  final KitchenAlarmService alarm = KitchenAlarmService();
 
   int get selectedNav => _selectedNav;
   String get selectedSection => _selectedSection;
@@ -713,149 +723,104 @@ class KitchenCommandController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Boards a chef depends on whichever sub-tab happens to be on screen. The
+  /// KDS used to refresh only while it was the selected board, so a KOT that
+  /// arrived while the chef was on Prep was not merely silent — it was never
+  /// fetched at all.
+  static const _alwaysPolledNav = <int>[1, 2, 3, 4, 5, 35];
+
+  /// One dispatch table for "refresh the board behind nav index N", shared by
+  /// the poll and by tab selection so the two can never drift apart.
+  Future<void> refreshNav(int index, {bool silent = false}) {
+    return switch (index) {
+      0 => refreshDashboard(silent: silent),
+      1 => refreshKds(silent: silent),
+      2 => refreshSections(silent: silent),
+      3 => refreshProcessing(silent: silent),
+      4 => refreshFiring(silent: silent),
+      5 => refreshPrep(silent: silent),
+      6 => refreshModifiers(silent: silent),
+      7 => refreshChefTasks(silent: silent),
+      9 => refreshSafety(silent: silent),
+      10 => refreshAiAssistant(silent: silent),
+      11 => refreshOrderPriority(silent: silent),
+      12 => refreshKitchenCommunication(silent: silent),
+      13 => refreshInventory(silent: silent),
+      14 => refreshRecipeCosting(silent: silent),
+      15 => refreshPrepStations(silent: silent),
+      16 => refreshBatchCooking(silent: silent),
+      17 => refreshDelayEscalation(silent: silent),
+      18 => refreshQualityControl(silent: silent),
+      19 => refreshCustomerReturn(silent: silent),
+      20 => refreshExpeditor(silent: silent),
+      21 => refreshPacking(silent: silent),
+      22 => refreshDeliveryAggregator(silent: silent),
+      23 => refreshBarBeverage(silent: silent),
+      24 => refreshBakeryDessert(silent: silent),
+      25 => refreshCloudKitchen(silent: silent),
+      26 => refreshBanquet(silent: silent),
+      27 => refreshRoomService(silent: silent),
+      28 => refreshCleaningHygiene(silent: silent),
+      29 => refreshEquipment(silent: silent),
+      30 => refreshSmartEnergy(silent: silent),
+      31 => refreshIotDevice(silent: silent),
+      32 => refreshStaffPerformance(silent: silent),
+      33 => refreshStaffShift(silent: silent),
+      34 => refreshStaffWellness(silent: silent),
+      35 => refreshLiveAlerts(silent: silent),
+      36 => refreshPanicEmergency(silent: silent),
+      37 => refreshOfflineFailover(silent: silent),
+      38 => refreshAnalyticsReporting(silent: silent),
+      39 => refreshKitchenHeatmap(silent: silent),
+      40 => refreshHardwareIntegration(silent: silent),
+      41 => refreshSmartwatchSupport(silent: silent),
+      42 => refreshMultiBranch(silent: silent),
+      43 => refreshAuditCompliance(silent: silent),
+      44 => refreshBackupRecovery(silent: silent),
+      45 => refreshSandboxTraining(silent: silent),
+      46 => refreshHiddenEnterprise(silent: silent),
+      47 => refreshFutureAiExpansion(silent: silent),
+      48 => refreshWaiterAutoAssignment(silent: silent),
+      _ => Future<void>.value(),
+    };
+  }
+
+  void _pollNav(int index) {
+    if (!_auth.canAccessNav(index)) {
+      return;
+    }
+    unawaited(refreshNav(index, silent: true));
+  }
+
   void _startPolling() {
     _pollTimer?.cancel();
+    _pollTicks = 0;
     _pollTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) {
+        // Nothing on screen, nothing to poll for: a backgrounded phone used to
+        // keep fetching every fifteen seconds for the whole shift.
+        if (!_appActive) {
+          return;
+        }
+        _pollTicks++;
         unawaited(refreshDashboard(silent: true));
-        if (_selectedNav == 1) {
-          unawaited(refreshKds(silent: true));
+        for (final nav in _alwaysPolledNav) {
+          _pollNav(nav);
         }
-        if (_selectedNav == 2) {
-          unawaited(refreshSections(silent: true));
+        if (!_alwaysPolledNav.contains(_selectedNav)) {
+          _pollNav(_selectedNav);
         }
-        if (_selectedNav == 3) {
-          unawaited(refreshProcessing(silent: true));
-        }
-        if (_selectedNav == 4) {
-          unawaited(refreshFiring(silent: true));
-        }
-        if (_selectedNav == 5) {
-          unawaited(refreshPrep(silent: true));
-        }
-        if (_selectedNav == 6) {
-          unawaited(refreshModifiers(silent: true));
-        }
-        if (_selectedNav == 7) {
-          unawaited(refreshChefTasks(silent: true));
-        }
-        if (_selectedNav == 9) {
-          unawaited(refreshSafety(silent: true));
-        }
-        if (_selectedNav == 10) {
-          unawaited(refreshAiAssistant(silent: true));
-        }
-        if (_selectedNav == 11) {
-          unawaited(refreshOrderPriority(silent: true));
-        }
-        if (_selectedNav == 12) {
-          unawaited(refreshKitchenCommunication(silent: true));
-        }
-        if (_selectedNav == 13) {
-          unawaited(refreshInventory(silent: true));
-        }
-        if (_selectedNav == 14) {
-          unawaited(refreshRecipeCosting(silent: true));
-        }
-        if (_selectedNav == 15) {
-          unawaited(refreshPrepStations(silent: true));
-        }
-        if (_selectedNav == 16) {
-          unawaited(refreshBatchCooking(silent: true));
-        }
-        if (_selectedNav == 17) {
-          unawaited(refreshDelayEscalation(silent: true));
-        }
-        if (_selectedNav == 18) {
-          unawaited(refreshQualityControl(silent: true));
-        }
-        if (_selectedNav == 19) {
-          unawaited(refreshCustomerReturn(silent: true));
-        }
-        if (_selectedNav == 20) {
-          unawaited(refreshExpeditor(silent: true));
-        }
-        if (_selectedNav == 21) {
-          unawaited(refreshPacking(silent: true));
-        }
-        if (_selectedNav == 22) {
-          unawaited(refreshDeliveryAggregator(silent: true));
-        }
-        if (_selectedNav == 23) {
-          unawaited(refreshBarBeverage(silent: true));
-        }
-        if (_selectedNav == 24) {
-          unawaited(refreshBakeryDessert(silent: true));
-        }
-        if (_selectedNav == 25) {
-          unawaited(refreshCloudKitchen(silent: true));
-        }
-        if (_selectedNav == 26) {
-          unawaited(refreshBanquet(silent: true));
-        }
-        if (_selectedNav == 27) {
-          unawaited(refreshRoomService(silent: true));
-        }
-        if (_selectedNav == 28) {
-          unawaited(refreshCleaningHygiene(silent: true));
-        }
-        if (_selectedNav == 29) {
-          unawaited(refreshEquipment(silent: true));
-        }
-        if (_selectedNav == 30) {
-          unawaited(refreshSmartEnergy(silent: true));
-        }
-        if (_selectedNav == 31) {
-          unawaited(refreshIotDevice(silent: true));
-        }
-        if (_selectedNav == 32) {
-          unawaited(refreshStaffPerformance(silent: true));
-        }
-        if (_selectedNav == 33) {
-          unawaited(refreshStaffShift(silent: true));
-        }
-        if (_selectedNav == 34) {
-          unawaited(refreshStaffWellness(silent: true));
-        }
-        if (_selectedNav == 35) {
-          unawaited(refreshLiveAlerts(silent: true));
-        }
-        if (_selectedNav == 36) {
-          unawaited(refreshPanicEmergency(silent: true));
-        }
-        if (_selectedNav == 37) {
-          unawaited(refreshOfflineFailover(silent: true));
-        }
-        if (_selectedNav == 38) {
-          unawaited(refreshAnalyticsReporting(silent: true));
-        }
-        if (_selectedNav == 39) {
-          unawaited(refreshKitchenHeatmap(silent: true));
-        }
-        if (_selectedNav == 40) {
-          unawaited(refreshHardwareIntegration(silent: true));
-        }
-        if (_selectedNav == 41) {
-          unawaited(refreshSmartwatchSupport(silent: true));
-        }
-        if (_selectedNav == 42) {
-          unawaited(refreshMultiBranch(silent: true));
-        }
-        if (_selectedNav == 43) {
-          unawaited(refreshAuditCompliance(silent: true));
-        }
-        if (_selectedNav == 44) {
-          unawaited(refreshBackupRecovery(silent: true));
-        }
-        if (_selectedNav == 45) {
-          unawaited(refreshSandboxTraining(silent: true));
-        }
-        if (_selectedNav == 46) {
-          unawaited(refreshHiddenEnterprise(silent: true));
-        }
-        if (_selectedNav == 47) {
-          unawaited(refreshFutureAiExpansion(silent: true));
+        // Every other board the role can open sweeps on a slower cadence, so a
+        // module is current when it is opened without paying for forty-odd
+        // requests every fifteen seconds.
+        if (_pollTicks % 4 == 0) {
+          for (var nav = 1; nav <= 48; nav++) {
+            if (nav == _selectedNav || _alwaysPolledNav.contains(nav)) {
+              continue;
+            }
+            _pollNav(nav);
+          }
         }
       },
     );
@@ -864,6 +829,105 @@ class KitchenCommandController extends ChangeNotifier {
     // so we no longer rebuild the whole KDS board every second (that per-second notifyListeners
     // was the main source of jank / "slow app"). Base values still re-sync on the 15s refresh.
     _kdsTimer?.cancel();
+  }
+
+  /// Called by the shell when the app moves between foreground and background.
+  /// Pauses the poll and the alarm rather than running them against a screen
+  /// nobody is looking at.
+  void setAppActive(bool active) {
+    if (_appActive == active) {
+      return;
+    }
+    _appActive = active;
+    alarm.setPaused(!active);
+    notifyListeners();
+    if (active) {
+      unawaited(refreshDashboard(silent: true));
+      _pollNav(_selectedNav);
+      for (final nav in _alwaysPolledNav) {
+        _pollNav(nav);
+      }
+    }
+  }
+
+  /// The chef's chosen view and filter must not decide what makes a noise: on
+  /// a "VIP only" board a normal KOT never appears, and the alarm would be
+  /// silent again. When the board is filtered the unfiltered queue is pulled
+  /// purely to feed the alarm.
+  Future<void> _syncAlarmFeed() async {
+    if (_kdsFilter == KdsFilter.all) {
+      alarm.evaluate(_kds);
+      return;
+    }
+    try {
+      final full = await _kdsService.fetchKds(
+        section: _selectedSection,
+        view: KdsViewMode.queue,
+        filter: KdsFilter.all,
+      );
+      alarm.evaluate(full);
+    } catch (_) {
+      // A missed poll must not silence a ringing alarm; the next one retries.
+    }
+  }
+
+  /// The message a failed module action left behind, shown once and then
+  /// cleared. Only the KDS used to report failure; every other module's button
+  /// failed in complete silence.
+  String? get actionErrorMessage => _actionErrorMessage;
+  String? _actionErrorMessage;
+
+  void clearActionError() {
+    if (_actionErrorMessage == null) {
+      return;
+    }
+    _actionErrorMessage = null;
+    notifyListeners();
+  }
+
+  /// Runs a module action so a tap that fails is reported instead of leaving
+  /// the previous success banner up, which is exactly what a failed tap reads
+  /// as. [setBanner] writes that module's own banner.
+  Future<void> _runModuleAction(
+    void Function(String?) setBanner,
+    Future<void> Function() action,
+  ) async {
+    setBanner(null);
+    _actionErrorMessage = null;
+    try {
+      await action();
+    } on ApiException catch (error) {
+      setBanner(null);
+      _actionErrorMessage = error.message;
+      notifyListeners();
+      return;
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('module action failed: $error\n$stack');
+      }
+      setBanner(null);
+      _actionErrorMessage =
+          'That did not go through. Check your connection and try again — '
+          'nothing was saved.';
+      notifyListeners();
+      return;
+    }
+    _armActionMessageExpiry(() => setBanner(null));
+  }
+
+  /// A banner that says "completed" is a claim about the last few seconds, not
+  /// about the whole shift. Whichever module set the newest one wins, and it
+  /// wipes itself so a stale green bar cannot stand in for a tap that failed.
+  void _armActionMessageExpiry(void Function() clear) {
+    final token = ++_actionMessageToken;
+    _actionMessageTimer?.cancel();
+    _actionMessageTimer = Timer(const Duration(seconds: 8), () {
+      if (token != _actionMessageToken) {
+        return;
+      }
+      clear();
+      notifyListeners();
+    });
   }
 
   Future<void> refreshDashboard({bool silent = false}) async {
@@ -907,6 +971,7 @@ class KitchenCommandController extends ChangeNotifier {
           ? fresh.mergeLiveTimersFrom(_kds!)
           : fresh;
       _kdsErrorMessage = null;
+      unawaited(_syncAlarmFeed());
     } on ApiException catch (error) {
       _kdsErrorMessage = error.message;
     } catch (_) {
@@ -960,9 +1025,14 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> optimizeProcessingQueue() async {
-    final result = await _processingService.optimizeQueue();
-    _processingActionMessage = result.message;
-    await _syncAfterProcessingChange();
+    await _runModuleAction(
+      (banner) => _processingActionMessage = banner,
+      () async {
+        final result = await _processingService.optimizeQueue();
+        _processingActionMessage = result.message;
+        await _syncAfterProcessingChange();
+      },
+    );
   }
 
   Future<void> performProcessingAction({
@@ -972,20 +1042,25 @@ class KitchenCommandController extends ChangeNotifier {
     String? itemName,
     String? modification,
   }) async {
-    await _processingService.processAction(
-      orderId: orderId,
-      action: action,
-      targetSection: targetSection,
-      itemName: itemName,
-      modification: modification,
+    await _runModuleAction(
+      (banner) => _processingActionMessage = banner,
+      () async {
+        await _processingService.processAction(
+          orderId: orderId,
+          action: action,
+          targetSection: targetSection,
+          itemName: itemName,
+          modification: modification,
+        );
+        _processingActionMessage = _messageForProcessingAction(
+          action,
+          orderId,
+          targetSection: targetSection,
+          itemName: itemName,
+        );
+        await _syncAfterProcessingChange();
+      },
     );
-    _processingActionMessage = _messageForProcessingAction(
-      action,
-      orderId,
-      targetSection: targetSection,
-      itemName: itemName,
-    );
-    await _syncAfterProcessingChange();
   }
 
   String _messageForProcessingAction(
@@ -1042,9 +1117,14 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> syncAllFiringPacing() async {
-    final result = await _firingService.syncPacing();
-    _firingActionMessage = result.message;
-    await _syncAfterFiringChange();
+    await _runModuleAction(
+      (banner) => _firingActionMessage = banner,
+      () async {
+        final result = await _firingService.syncPacing();
+        _firingActionMessage = result.message;
+        await _syncAfterFiringChange();
+      },
+    );
   }
 
   Future<void> performFiringAction({
@@ -1052,17 +1132,22 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? courseType,
   }) async {
-    await _firingService.performAction(
-      sessionId: sessionId,
-      action: action,
-      courseType: courseType,
+    await _runModuleAction(
+      (banner) => _firingActionMessage = banner,
+      () async {
+        await _firingService.performAction(
+          sessionId: sessionId,
+          action: action,
+          courseType: courseType,
+        );
+        _firingActionMessage = _messageForFiringAction(
+          action,
+          sessionId,
+          courseType: courseType,
+        );
+        await _syncAfterFiringChange();
+      },
     );
-    _firingActionMessage = _messageForFiringAction(
-      action,
-      sessionId,
-      courseType: courseType,
-    );
-    await _syncAfterFiringChange();
   }
 
   String _messageForFiringAction(
@@ -1124,26 +1209,31 @@ class KitchenCommandController extends ChangeNotifier {
     required String taskId,
     required String action,
   }) async {
-    var apiAction = action;
-    int? stepIndex;
-    String? ingredient;
+    await _runModuleAction(
+      (banner) => _prepActionMessage = banner,
+      () async {
+        var apiAction = action;
+        int? stepIndex;
+        String? ingredient;
 
-    if (action.startsWith('complete_step:')) {
-      apiAction = 'complete_step';
-      stepIndex = int.tryParse(action.split(':').last);
-    } else if (action.startsWith('check_ingredient:')) {
-      apiAction = 'check_next_ingredient';
-      ingredient = action.substring('check_ingredient:'.length);
-    }
+        if (action.startsWith('complete_step:')) {
+          apiAction = 'complete_step';
+          stepIndex = int.tryParse(action.split(':').last);
+        } else if (action.startsWith('check_ingredient:')) {
+          apiAction = 'check_next_ingredient';
+          ingredient = action.substring('check_ingredient:'.length);
+        }
 
-    await _prepService.performAction(
-      taskId: taskId,
-      action: apiAction,
-      stepIndex: stepIndex,
-      ingredient: ingredient,
+        await _prepService.performAction(
+          taskId: taskId,
+          action: apiAction,
+          stepIndex: stepIndex,
+          ingredient: ingredient,
+        );
+        _prepActionMessage = _messageForPrepAction(apiAction, taskId);
+        await _syncAfterPrepChange();
+      },
     );
-    _prepActionMessage = _messageForPrepAction(apiAction, taskId);
-    await _syncAfterPrepChange();
   }
 
   String _messageForPrepAction(String action, String taskId) {
@@ -1201,19 +1291,24 @@ class KitchenCommandController extends ChangeNotifier {
     String? itemName,
     String? replacement,
   }) async {
-    await _modifierService.performAction(
-      orderId: orderId,
-      action: action,
-      modifierType: modifierType,
-      itemName: itemName,
-      replacement: replacement,
+    await _runModuleAction(
+      (banner) => _modifierActionMessage = banner,
+      () async {
+        await _modifierService.performAction(
+          orderId: orderId,
+          action: action,
+          modifierType: modifierType,
+          itemName: itemName,
+          replacement: replacement,
+        );
+        _modifierActionMessage = _messageForModifierAction(
+          action,
+          orderId,
+          modifierType: modifierType,
+        );
+        await _syncAfterModifierChange();
+      },
     );
-    _modifierActionMessage = _messageForModifierAction(
-      action,
-      orderId,
-      modifierType: modifierType,
-    );
-    await _syncAfterModifierChange();
   }
 
   String _messageForModifierAction(
@@ -1270,9 +1365,14 @@ class KitchenCommandController extends ChangeNotifier {
     required String caseId,
     required String action,
   }) async {
-    await _safetyService.performAction(caseId: caseId, action: action);
-    _safetyActionMessage = _messageForSafetyAction(action, caseId);
-    await _syncAfterSafetyChange();
+    await _runModuleAction(
+      (banner) => _safetyActionMessage = banner,
+      () async {
+        await _safetyService.performAction(caseId: caseId, action: action);
+        _safetyActionMessage = _messageForSafetyAction(action, caseId);
+        await _syncAfterSafetyChange();
+      },
+    );
   }
 
   String _messageForSafetyAction(String action, String caseId) {
@@ -1317,9 +1417,14 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> balanceChefWorkload() async {
-    final result = await _chefTaskService.balanceWorkload();
-    _chefTaskActionMessage = result.message;
-    await _syncAfterChefTaskChange();
+    await _runModuleAction(
+      (banner) => _chefTaskActionMessage = banner,
+      () async {
+        final result = await _chefTaskService.balanceWorkload();
+        _chefTaskActionMessage = result.message;
+        await _syncAfterChefTaskChange();
+      },
+    );
   }
 
   Future<void> performChefTaskAction({
@@ -1327,13 +1432,18 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? targetChefId,
   }) async {
-    await _chefTaskService.performAction(
-      taskId: taskId,
-      action: action,
-      targetChefId: targetChefId,
+    await _runModuleAction(
+      (banner) => _chefTaskActionMessage = banner,
+      () async {
+        await _chefTaskService.performAction(
+          taskId: taskId,
+          action: action,
+          targetChefId: targetChefId,
+        );
+        _chefTaskActionMessage = _messageForChefTaskAction(action, taskId);
+        await _syncAfterChefTaskChange();
+      },
     );
-    _chefTaskActionMessage = _messageForChefTaskAction(action, taskId);
-    await _syncAfterChefTaskChange();
   }
 
   String _messageForChefTaskAction(String action, String taskId) {
@@ -1381,17 +1491,27 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> applyAiSuggestion(String suggestionId) async {
-    final result = await _aiAssistantService.applySuggestion(suggestionId);
-    _aiActionMessage = result.message;
-    await _syncAfterAiAction();
+    await _runModuleAction(
+      (banner) => _aiActionMessage = banner,
+      () async {
+        final result = await _aiAssistantService.applySuggestion(suggestionId);
+        _aiActionMessage = result.message;
+        await _syncAfterAiAction();
+      },
+    );
   }
 
   Future<void> executeAiVoiceCommand(String command) async {
-    final result = await _aiAssistantService.executeVoiceCommand(
-      command: command,
+    await _runModuleAction(
+      (banner) => _aiActionMessage = banner,
+      () async {
+        final result = await _aiAssistantService.executeVoiceCommand(
+          command: command,
+        );
+        _aiActionMessage = result.message;
+        await _syncAfterAiAction();
+      },
     );
-    _aiActionMessage = result.message;
-    await _syncAfterAiAction();
   }
 
   Future<void> _syncAfterAiAction() async {
@@ -1427,21 +1547,31 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> reprioritizeOrderQueue() async {
-    final result = await _orderPriorityService.reprioritizeQueue();
-    _priorityActionMessage = result.message;
-    await _syncAfterPriorityChange();
+    await _runModuleAction(
+      (banner) => _priorityActionMessage = banner,
+      () async {
+        final result = await _orderPriorityService.reprioritizeQueue();
+        _priorityActionMessage = result.message;
+        await _syncAfterPriorityChange();
+      },
+    );
   }
 
   Future<void> performPriorityAction({
     required String orderId,
     required String action,
   }) async {
-    final result = await _orderPriorityService.performAction(
-      orderId: orderId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _priorityActionMessage = banner,
+      () async {
+        final result = await _orderPriorityService.performAction(
+          orderId: orderId,
+          action: action,
+        );
+        _priorityActionMessage = result.message;
+        await _syncAfterPriorityChange();
+      },
     );
-    _priorityActionMessage = result.message;
-    await _syncAfterPriorityChange();
   }
 
   Future<void> _syncAfterPriorityChange() async {
@@ -1483,83 +1613,113 @@ class KitchenCommandController extends ChangeNotifier {
     required String threadId,
     required String message,
   }) async {
-    final result = await _communicationService.sendMessage(
-      threadId: threadId,
-      message: message,
-      sender: _communicationSender,
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        final result = await _communicationService.sendMessage(
+          threadId: threadId,
+          message: message,
+          sender: _communicationSender,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> sendKitchenVoiceNote({required String threadId}) async {
-    final result = await _communicationService.sendVoiceNote(
-      threadId: threadId,
-      sender: _communicationSender,
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        final result = await _communicationService.sendVoiceNote(
+          threadId: threadId,
+          sender: _communicationSender,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> sendKitchenDelayUpdate({
     required String orderId,
     required int minutes,
   }) async {
-    final result = await _communicationService.sendDelayUpdate(
-      orderId: orderId,
-      minutes: minutes,
-      sender: _communicationSender,
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        final result = await _communicationService.sendDelayUpdate(
+          orderId: orderId,
+          minutes: minutes,
+          sender: _communicationSender,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> postChefAnnouncement({
     required String title,
     required String body,
   }) async {
-    if (title.isEmpty || body.isEmpty) {
-      _communicationActionMessage = 'Announcement title and body required';
-      notifyListeners();
-      return;
-    }
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        if (title.isEmpty || body.isEmpty) {
+          _communicationActionMessage = 'Announcement title and body required';
+          notifyListeners();
+          return;
+        }
 
-    final result = await _communicationService.postAnnouncement(
-      title: title,
-      body: body,
-      author: _communicationSender,
-      scope: _selectedSection,
+        final result = await _communicationService.postAnnouncement(
+          title: title,
+          body: body,
+          author: _communicationSender,
+          scope: _selectedSection,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> sendKitchenBroadcast({required String message}) async {
-    if (message.isEmpty) {
-      _communicationActionMessage = 'Broadcast message required';
-      notifyListeners();
-      return;
-    }
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        if (message.isEmpty) {
+          _communicationActionMessage = 'Broadcast message required';
+          notifyListeners();
+          return;
+        }
 
-    final result = await _communicationService.sendBroadcast(
-      message: message,
-      author: _communicationSender,
-      scope: _selectedSection,
+        final result = await _communicationService.sendBroadcast(
+          message: message,
+          author: _communicationSender,
+          scope: _selectedSection,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> performCommunicationAlertAction({
     required String alertId,
     required String action,
   }) async {
-    final result = await _communicationService.performAlertAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _communicationActionMessage = banner,
+      () async {
+        final result = await _communicationService.performAlertAction(
+          alertId: alertId,
+          action: action,
+        );
+        _communicationActionMessage = result.message;
+        await _syncAfterCommunicationChange();
+      },
     );
-    _communicationActionMessage = result.message;
-    await _syncAfterCommunicationChange();
   }
 
   Future<void> _syncAfterCommunicationChange() async {
@@ -1592,51 +1752,76 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> syncInventoryStock() async {
-    final result = await _inventoryService.syncStock();
-    _inventoryActionMessage = result.message;
-    await _syncAfterInventoryChange();
+    await _runModuleAction(
+      (banner) => _inventoryActionMessage = banner,
+      () async {
+        final result = await _inventoryService.syncStock();
+        _inventoryActionMessage = result.message;
+        await _syncAfterInventoryChange();
+      },
+    );
   }
 
   Future<void> deductInventoryItem({
     required String itemId,
     required double quantity,
   }) async {
-    final result = await _inventoryService.deductIngredient(
-      itemId: itemId,
-      quantity: quantity,
+    await _runModuleAction(
+      (banner) => _inventoryActionMessage = banner,
+      () async {
+        final result = await _inventoryService.deductIngredient(
+          itemId: itemId,
+          quantity: quantity,
+        );
+        _inventoryActionMessage = result.message;
+        await _syncAfterInventoryChange();
+      },
     );
-    _inventoryActionMessage = result.message;
-    await _syncAfterInventoryChange();
   }
 
   Future<void> validateInventoryRecipeStock() async {
-    final result = await _inventoryService.validateRecipeStock();
-    _inventoryActionMessage = result.message;
-    await _syncAfterInventoryChange();
+    await _runModuleAction(
+      (banner) => _inventoryActionMessage = banner,
+      () async {
+        final result = await _inventoryService.validateRecipeStock();
+        _inventoryActionMessage = result.message;
+        await _syncAfterInventoryChange();
+      },
+    );
   }
 
   Future<void> applyInventorySubstitution({
     required String itemId,
     required String substituteId,
   }) async {
-    final result = await _inventoryService.applySubstitution(
-      itemId: itemId,
-      substituteId: substituteId,
+    await _runModuleAction(
+      (banner) => _inventoryActionMessage = banner,
+      () async {
+        final result = await _inventoryService.applySubstitution(
+          itemId: itemId,
+          substituteId: substituteId,
+        );
+        _inventoryActionMessage = result.message;
+        await _syncAfterInventoryChange();
+      },
     );
-    _inventoryActionMessage = result.message;
-    await _syncAfterInventoryChange();
   }
 
   Future<void> performInventoryAlertAction({
     required String alertId,
     required String action,
   }) async {
-    final result = await _inventoryService.performAlertAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _inventoryActionMessage = banner,
+      () async {
+        final result = await _inventoryService.performAlertAction(
+          alertId: alertId,
+          action: action,
+        );
+        _inventoryActionMessage = result.message;
+        await _syncAfterInventoryChange();
+      },
     );
-    _inventoryActionMessage = result.message;
-    await _syncAfterInventoryChange();
   }
 
   Future<void> _syncAfterInventoryChange() async {
@@ -1670,33 +1855,48 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> refreshRecipeCosts() async {
-    final result = await _recipeCostingService.refreshCosting();
-    _recipeCostingActionMessage = result.message;
-    await _syncAfterRecipeCostingChange();
+    await _runModuleAction(
+      (banner) => _recipeCostingActionMessage = banner,
+      () async {
+        final result = await _recipeCostingService.refreshCosting();
+        _recipeCostingActionMessage = result.message;
+        await _syncAfterRecipeCostingChange();
+      },
+    );
   }
 
   Future<void> recordRecipeWaste({
     required String recipeId,
     required double plates,
   }) async {
-    final result = await _recipeCostingService.recordWaste(
-      recipeId: recipeId,
-      plates: plates,
+    await _runModuleAction(
+      (banner) => _recipeCostingActionMessage = banner,
+      () async {
+        final result = await _recipeCostingService.recordWaste(
+          recipeId: recipeId,
+          plates: plates,
+        );
+        _recipeCostingActionMessage = result.message;
+        await _syncAfterRecipeCostingChange();
+      },
     );
-    _recipeCostingActionMessage = result.message;
-    await _syncAfterRecipeCostingChange();
   }
 
   Future<void> adjustRecipePortion({
     required String recipeId,
     required String portion,
   }) async {
-    final result = await _recipeCostingService.adjustPortion(
-      recipeId: recipeId,
-      portion: portion,
+    await _runModuleAction(
+      (banner) => _recipeCostingActionMessage = banner,
+      () async {
+        final result = await _recipeCostingService.adjustPortion(
+          recipeId: recipeId,
+          portion: portion,
+        );
+        _recipeCostingActionMessage = result.message;
+        await _syncAfterRecipeCostingChange();
+      },
     );
-    _recipeCostingActionMessage = result.message;
-    await _syncAfterRecipeCostingChange();
   }
 
   Future<void> _syncAfterRecipeCostingChange() async {
@@ -1730,33 +1930,48 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> balancePrepStationQueues() async {
-    final result = await _prepStationService.balanceQueues();
-    _prepStationActionMessage = result.message;
-    await _syncAfterPrepStationChange();
+    await _runModuleAction(
+      (banner) => _prepStationActionMessage = banner,
+      () async {
+        final result = await _prepStationService.balanceQueues();
+        _prepStationActionMessage = result.message;
+        await _syncAfterPrepStationChange();
+      },
+    );
   }
 
   Future<void> assignPrepStationStaff({
     required String stationId,
     required String staffName,
   }) async {
-    final result = await _prepStationService.assignStaff(
-      stationId: stationId,
-      staffName: staffName,
+    await _runModuleAction(
+      (banner) => _prepStationActionMessage = banner,
+      () async {
+        final result = await _prepStationService.assignStaff(
+          stationId: stationId,
+          staffName: staffName,
+        );
+        _prepStationActionMessage = result.message;
+        await _syncAfterPrepStationChange();
+      },
     );
-    _prepStationActionMessage = result.message;
-    await _syncAfterPrepStationChange();
   }
 
   Future<void> performPrepStationAction({
     required String stationId,
     required String action,
   }) async {
-    final result = await _prepStationService.performAction(
-      stationId: stationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _prepStationActionMessage = banner,
+      () async {
+        final result = await _prepStationService.performAction(
+          stationId: stationId,
+          action: action,
+        );
+        _prepStationActionMessage = result.message;
+        await _syncAfterPrepStationChange();
+      },
     );
-    _prepStationActionMessage = result.message;
-    await _syncAfterPrepStationChange();
   }
 
   Future<void> _syncAfterPrepStationChange() async {
@@ -1791,21 +2006,31 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> refreshBatchForecast() async {
-    final result = await _batchCookingService.refreshForecast();
-    _batchCookingActionMessage = result.message;
-    await _syncAfterBatchCookingChange();
+    await _runModuleAction(
+      (banner) => _batchCookingActionMessage = banner,
+      () async {
+        final result = await _batchCookingService.refreshForecast();
+        _batchCookingActionMessage = result.message;
+        await _syncAfterBatchCookingChange();
+      },
+    );
   }
 
   Future<void> performBatchCookingAction({
     required String batchId,
     required String action,
   }) async {
-    final result = await _batchCookingService.performAction(
-      batchId: batchId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _batchCookingActionMessage = banner,
+      () async {
+        final result = await _batchCookingService.performAction(
+          batchId: batchId,
+          action: action,
+        );
+        _batchCookingActionMessage = result.message;
+        await _syncAfterBatchCookingChange();
+      },
     );
-    _batchCookingActionMessage = result.message;
-    await _syncAfterBatchCookingChange();
   }
 
   Future<void> _syncAfterBatchCookingChange() async {
@@ -1844,30 +2069,45 @@ class KitchenCommandController extends ChangeNotifier {
     required String orderId,
     required String reason,
   }) async {
-    final result = await _delayEscalationService.logDelayReason(
-      orderId: orderId,
-      reason: reason,
+    await _runModuleAction(
+      (banner) => _delayEscalationActionMessage = banner,
+      () async {
+        final result = await _delayEscalationService.logDelayReason(
+          orderId: orderId,
+          reason: reason,
+        );
+        _delayEscalationActionMessage = result.message;
+        await _syncAfterDelayEscalationChange();
+      },
     );
-    _delayEscalationActionMessage = result.message;
-    await _syncAfterDelayEscalationChange();
   }
 
   Future<void> autoEscalateAllDelays() async {
-    final result = await _delayEscalationService.autoEscalateAll();
-    _delayEscalationActionMessage = result.message;
-    await _syncAfterDelayEscalationChange();
+    await _runModuleAction(
+      (banner) => _delayEscalationActionMessage = banner,
+      () async {
+        final result = await _delayEscalationService.autoEscalateAll();
+        _delayEscalationActionMessage = result.message;
+        await _syncAfterDelayEscalationChange();
+      },
+    );
   }
 
   Future<void> performDelayEscalationAction({
     required String orderId,
     required String action,
   }) async {
-    final result = await _delayEscalationService.performAction(
-      orderId: orderId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _delayEscalationActionMessage = banner,
+      () async {
+        final result = await _delayEscalationService.performAction(
+          orderId: orderId,
+          action: action,
+        );
+        _delayEscalationActionMessage = result.message;
+        await _syncAfterDelayEscalationChange();
+      },
     );
-    _delayEscalationActionMessage = result.message;
-    await _syncAfterDelayEscalationChange();
   }
 
   Future<void> _syncAfterDelayEscalationChange() async {
@@ -1908,14 +2148,19 @@ class KitchenCommandController extends ChangeNotifier {
     String? itemId,
     bool? passed,
   }) async {
-    final result = await _qualityControlService.performCheckAction(
-      checkId: checkId,
-      action: action,
-      itemId: itemId,
-      passed: passed,
+    await _runModuleAction(
+      (banner) => _qualityControlActionMessage = banner,
+      () async {
+        final result = await _qualityControlService.performCheckAction(
+          checkId: checkId,
+          action: action,
+          itemId: itemId,
+          passed: passed,
+        );
+        _qualityControlActionMessage = result.message;
+        await _syncAfterQualityControlChange();
+      },
     );
-    _qualityControlActionMessage = result.message;
-    await _syncAfterQualityControlChange();
   }
 
   Future<void> performQcOrderAction({
@@ -1923,35 +2168,50 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? reason,
   }) async {
-    final supervisorName = _auth.session?.user.name;
-    final result = await _qualityControlService.performOrderAction(
-      orderId: orderId,
-      action: action,
-      reason: reason,
-      supervisorName: supervisorName,
+    await _runModuleAction(
+      (banner) => _qualityControlActionMessage = banner,
+      () async {
+        final supervisorName = _auth.session?.user.name;
+        final result = await _qualityControlService.performOrderAction(
+          orderId: orderId,
+          action: action,
+          reason: reason,
+          supervisorName: supervisorName,
+        );
+        _qualityControlActionMessage = result.message;
+        await _syncAfterQualityControlChange();
+      },
     );
-    _qualityControlActionMessage = result.message;
-    await _syncAfterQualityControlChange();
   }
 
   Future<void> triggerRandomQcAudit() async {
-    final result = await _qualityControlService.triggerRandomAudit(
-      section: _selectedSection,
+    await _runModuleAction(
+      (banner) => _qualityControlActionMessage = banner,
+      () async {
+        final result = await _qualityControlService.triggerRandomAudit(
+          section: _selectedSection,
+        );
+        _qualityControlActionMessage = result.message;
+        await _syncAfterQualityControlChange();
+      },
     );
-    _qualityControlActionMessage = result.message;
-    await _syncAfterQualityControlChange();
   }
 
   Future<void> logQcComplaint({
     required String orderId,
     required String reason,
   }) async {
-    final result = await _qualityControlService.logComplaint(
-      orderId: orderId,
-      reason: reason,
+    await _runModuleAction(
+      (banner) => _qualityControlActionMessage = banner,
+      () async {
+        final result = await _qualityControlService.logComplaint(
+          orderId: orderId,
+          reason: reason,
+        );
+        _qualityControlActionMessage = result.message;
+        await _syncAfterQualityControlChange();
+      },
     );
-    _qualityControlActionMessage = result.message;
-    await _syncAfterQualityControlChange();
   }
 
   Future<void> _syncAfterQualityControlChange() async {
@@ -1991,14 +2251,19 @@ class KitchenCommandController extends ChangeNotifier {
     String? tag,
     String? severity,
   }) async {
-    final result = await _customerReturnService.performAction(
-      returnId: returnId,
-      action: action,
-      tag: tag,
-      severity: severity,
+    await _runModuleAction(
+      (banner) => _customerReturnActionMessage = banner,
+      () async {
+        final result = await _customerReturnService.performAction(
+          returnId: returnId,
+          action: action,
+          tag: tag,
+          severity: severity,
+        );
+        _customerReturnActionMessage = result.message;
+        await _syncAfterCustomerReturnChange();
+      },
     );
-    _customerReturnActionMessage = result.message;
-    await _syncAfterCustomerReturnChange();
   }
 
   Future<void> createCustomerReturn({
@@ -2006,13 +2271,18 @@ class KitchenCommandController extends ChangeNotifier {
     required String returnType,
     required String reason,
   }) async {
-    final result = await _customerReturnService.createReturn(
-      orderId: orderId,
-      returnType: returnType,
-      reason: reason,
+    await _runModuleAction(
+      (banner) => _customerReturnActionMessage = banner,
+      () async {
+        final result = await _customerReturnService.createReturn(
+          orderId: orderId,
+          returnType: returnType,
+          reason: reason,
+        );
+        _customerReturnActionMessage = result.message;
+        await _syncAfterCustomerReturnChange();
+      },
     );
-    _customerReturnActionMessage = result.message;
-    await _syncAfterCustomerReturnChange();
   }
 
   Future<void> _syncAfterCustomerReturnChange() async {
@@ -2051,30 +2321,50 @@ class KitchenCommandController extends ChangeNotifier {
     required String ticketId,
     required String action,
   }) async {
-    final result = await _expeditorService.performTicketAction(
-      ticketId: ticketId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _expeditorActionMessage = banner,
+      () async {
+        final result = await _expeditorService.performTicketAction(
+          ticketId: ticketId,
+          action: action,
+        );
+        _expeditorActionMessage = result.message;
+        await _syncAfterExpeditorChange();
+      },
     );
-    _expeditorActionMessage = result.message;
-    await _syncAfterExpeditorChange();
   }
 
   Future<void> coordinateExpeditorSections({String? groupId}) async {
-    final result = await _expeditorService.coordinateSections(groupId: groupId);
-    _expeditorActionMessage = result.message;
-    await _syncAfterExpeditorChange();
+    await _runModuleAction(
+      (banner) => _expeditorActionMessage = banner,
+      () async {
+        final result = await _expeditorService.coordinateSections(groupId: groupId);
+        _expeditorActionMessage = result.message;
+        await _syncAfterExpeditorChange();
+      },
+    );
   }
 
   Future<void> syncExpeditorTable(String tableNumber) async {
-    final result = await _expeditorService.syncTables(tableNumber: tableNumber);
-    _expeditorActionMessage = result.message;
-    await _syncAfterExpeditorChange();
+    await _runModuleAction(
+      (banner) => _expeditorActionMessage = banner,
+      () async {
+        final result = await _expeditorService.syncTables(tableNumber: tableNumber);
+        _expeditorActionMessage = result.message;
+        await _syncAfterExpeditorChange();
+      },
+    );
   }
 
   Future<void> syncAllExpeditorTables() async {
-    final result = await _expeditorService.syncTables();
-    _expeditorActionMessage = result.message;
-    await _syncAfterExpeditorChange();
+    await _runModuleAction(
+      (banner) => _expeditorActionMessage = banner,
+      () async {
+        final result = await _expeditorService.syncTables();
+        _expeditorActionMessage = result.message;
+        await _syncAfterExpeditorChange();
+      },
+    );
   }
 
   Future<void> _syncAfterExpeditorChange() async {
@@ -2112,18 +2402,28 @@ class KitchenCommandController extends ChangeNotifier {
     required String jobId,
     required String action,
   }) async {
-    final result = await _packingService.performAction(
-      jobId: jobId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _packingActionMessage = banner,
+      () async {
+        final result = await _packingService.performAction(
+          jobId: jobId,
+          action: action,
+        );
+        _packingActionMessage = result.message;
+        await _syncAfterPackingChange();
+      },
     );
-    _packingActionMessage = result.message;
-    await _syncAfterPackingChange();
   }
 
   Future<void> printAllPackingLabels() async {
-    final result = await _packingService.printLabels();
-    _packingActionMessage = result.message;
-    await _syncAfterPackingChange();
+    await _runModuleAction(
+      (banner) => _packingActionMessage = banner,
+      () async {
+        final result = await _packingService.printLabels();
+        _packingActionMessage = result.message;
+        await _syncAfterPackingChange();
+      },
+    );
   }
 
   Future<void> _syncAfterPackingChange() async {
@@ -2161,18 +2461,28 @@ class KitchenCommandController extends ChangeNotifier {
     required String orderId,
     required String action,
   }) async {
-    final result = await _deliveryAggregatorService.performAction(
-      orderId: orderId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _deliveryAggregatorActionMessage = banner,
+      () async {
+        final result = await _deliveryAggregatorService.performAction(
+          orderId: orderId,
+          action: action,
+        );
+        _deliveryAggregatorActionMessage = result.message;
+        await _syncAfterDeliveryAggregatorChange();
+      },
     );
-    _deliveryAggregatorActionMessage = result.message;
-    await _syncAfterDeliveryAggregatorChange();
   }
 
   Future<void> syncAllAggregatorOrders() async {
-    final result = await _deliveryAggregatorService.syncAllOrders();
-    _deliveryAggregatorActionMessage = result.message;
-    await _syncAfterDeliveryAggregatorChange();
+    await _runModuleAction(
+      (banner) => _deliveryAggregatorActionMessage = banner,
+      () async {
+        final result = await _deliveryAggregatorService.syncAllOrders();
+        _deliveryAggregatorActionMessage = result.message;
+        await _syncAfterDeliveryAggregatorChange();
+      },
+    );
   }
 
   Future<void> _syncAfterDeliveryAggregatorChange() async {
@@ -2213,20 +2523,30 @@ class KitchenCommandController extends ChangeNotifier {
     String? bartenderName,
     String? customization,
   }) async {
-    final result = await _barBeverageService.performAction(
-      drinkId: drinkId,
-      action: action,
-      bartenderName: bartenderName,
-      customization: customization,
+    await _runModuleAction(
+      (banner) => _barBeverageActionMessage = banner,
+      () async {
+        final result = await _barBeverageService.performAction(
+          drinkId: drinkId,
+          action: action,
+          bartenderName: bartenderName,
+          customization: customization,
+        );
+        _barBeverageActionMessage = result.message;
+        await _syncAfterBarBeverageChange();
+      },
     );
-    _barBeverageActionMessage = result.message;
-    await _syncAfterBarBeverageChange();
   }
 
   Future<void> balanceBarQueue() async {
-    final result = await _barBeverageService.balanceQueue();
-    _barBeverageActionMessage = result.message;
-    await _syncAfterBarBeverageChange();
+    await _runModuleAction(
+      (banner) => _barBeverageActionMessage = banner,
+      () async {
+        final result = await _barBeverageService.balanceQueue();
+        _barBeverageActionMessage = result.message;
+        await _syncAfterBarBeverageChange();
+      },
+    );
   }
 
   Future<void> _syncAfterBarBeverageChange() async {
@@ -2265,19 +2585,29 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? customization,
   }) async {
-    final result = await _bakeryDessertService.performAction(
-      jobId: jobId,
-      action: action,
-      customization: customization,
+    await _runModuleAction(
+      (banner) => _bakeryDessertActionMessage = banner,
+      () async {
+        final result = await _bakeryDessertService.performAction(
+          jobId: jobId,
+          action: action,
+          customization: customization,
+        );
+        _bakeryDessertActionMessage = result.message;
+        await _syncAfterBakeryDessertChange();
+      },
     );
-    _bakeryDessertActionMessage = result.message;
-    await _syncAfterBakeryDessertChange();
   }
 
   Future<void> startBakeryProduction({String? itemName}) async {
-    final result = await _bakeryDessertService.startProduction(itemName: itemName);
-    _bakeryDessertActionMessage = result.message;
-    await _syncAfterBakeryDessertChange();
+    await _runModuleAction(
+      (banner) => _bakeryDessertActionMessage = banner,
+      () async {
+        final result = await _bakeryDessertService.startProduction(itemName: itemName);
+        _bakeryDessertActionMessage = result.message;
+        await _syncAfterBakeryDessertChange();
+      },
+    );
   }
 
   Future<void> _syncAfterBakeryDessertChange() async {
@@ -2316,19 +2646,29 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? brandId,
   }) async {
-    final result = await _cloudKitchenService.performAction(
-      orderId: orderId,
-      action: action,
-      brandId: brandId,
+    await _runModuleAction(
+      (banner) => _cloudKitchenActionMessage = banner,
+      () async {
+        final result = await _cloudKitchenService.performAction(
+          orderId: orderId,
+          action: action,
+          brandId: brandId,
+        );
+        _cloudKitchenActionMessage = result.message;
+        await _syncAfterCloudKitchenChange();
+      },
     );
-    _cloudKitchenActionMessage = result.message;
-    await _syncAfterCloudKitchenChange();
   }
 
   Future<void> balanceCloudKitchenLoad() async {
-    final result = await _cloudKitchenService.balanceLoad();
-    _cloudKitchenActionMessage = result.message;
-    await _syncAfterCloudKitchenChange();
+    await _runModuleAction(
+      (banner) => _cloudKitchenActionMessage = banner,
+      () async {
+        final result = await _cloudKitchenService.balanceLoad();
+        _cloudKitchenActionMessage = result.message;
+        await _syncAfterCloudKitchenChange();
+      },
+    );
   }
 
   Future<void> _syncAfterCloudKitchenChange() async {
@@ -2367,20 +2707,30 @@ class KitchenCommandController extends ChangeNotifier {
     int? guestCount,
     String? counterName,
   }) async {
-    final result = await _banquetService.performAction(
-      eventId: eventId,
-      action: action,
-      guestCount: guestCount,
-      counterName: counterName,
+    await _runModuleAction(
+      (banner) => _banquetActionMessage = banner,
+      () async {
+        final result = await _banquetService.performAction(
+          eventId: eventId,
+          action: action,
+          guestCount: guestCount,
+          counterName: counterName,
+        );
+        _banquetActionMessage = result.message;
+        await _syncAfterBanquetChange();
+      },
     );
-    _banquetActionMessage = result.message;
-    await _syncAfterBanquetChange();
   }
 
   Future<void> startBanquetSchedule({String? eventName}) async {
-    final result = await _banquetService.startSchedule(eventName: eventName);
-    _banquetActionMessage = result.message;
-    await _syncAfterBanquetChange();
+    await _runModuleAction(
+      (banner) => _banquetActionMessage = banner,
+      () async {
+        final result = await _banquetService.startSchedule(eventName: eventName);
+        _banquetActionMessage = result.message;
+        await _syncAfterBanquetChange();
+      },
+    );
   }
 
   Future<void> _syncAfterBanquetChange() async {
@@ -2422,20 +2772,30 @@ class KitchenCommandController extends ChangeNotifier {
     String? trayId,
     String? scheduledTime,
   }) async {
-    final result = await _roomServiceService.performAction(
-      orderId: orderId,
-      action: action,
-      trayId: trayId,
-      scheduledTime: scheduledTime,
+    await _runModuleAction(
+      (banner) => _roomServiceActionMessage = banner,
+      () async {
+        final result = await _roomServiceService.performAction(
+          orderId: orderId,
+          action: action,
+          trayId: trayId,
+          scheduledTime: scheduledTime,
+        );
+        _roomServiceActionMessage = result.message;
+        await _syncAfterRoomServiceChange();
+      },
     );
-    _roomServiceActionMessage = result.message;
-    await _syncAfterRoomServiceChange();
   }
 
   Future<void> dispatchRoomServiceTrays({String? orderId}) async {
-    final result = await _roomServiceService.dispatchTray(orderId: orderId);
-    _roomServiceActionMessage = result.message;
-    await _syncAfterRoomServiceChange();
+    await _runModuleAction(
+      (banner) => _roomServiceActionMessage = banner,
+      () async {
+        final result = await _roomServiceService.dispatchTray(orderId: orderId);
+        _roomServiceActionMessage = result.message;
+        await _syncAfterRoomServiceChange();
+      },
+    );
   }
 
   Future<void> _syncAfterRoomServiceChange() async {
@@ -2475,19 +2835,29 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? staffName,
   }) async {
-    final result = await _cleaningHygieneService.performAction(
-      taskId: taskId,
-      action: action,
-      staffName: staffName,
+    await _runModuleAction(
+      (banner) => _cleaningHygieneActionMessage = banner,
+      () async {
+        final result = await _cleaningHygieneService.performAction(
+          taskId: taskId,
+          action: action,
+          staffName: staffName,
+        );
+        _cleaningHygieneActionMessage = result.message;
+        await _syncAfterCleaningHygieneChange();
+      },
     );
-    _cleaningHygieneActionMessage = result.message;
-    await _syncAfterCleaningHygieneChange();
   }
 
   Future<void> startCleaningHygieneAudit({String? auditType}) async {
-    final result = await _cleaningHygieneService.startAudit(auditType: auditType);
-    _cleaningHygieneActionMessage = result.message;
-    await _syncAfterCleaningHygieneChange();
+    await _runModuleAction(
+      (banner) => _cleaningHygieneActionMessage = banner,
+      () async {
+        final result = await _cleaningHygieneService.startAudit(auditType: auditType);
+        _cleaningHygieneActionMessage = result.message;
+        await _syncAfterCleaningHygieneChange();
+      },
+    );
   }
 
   Future<void> _syncAfterCleaningHygieneChange() async {
@@ -2523,25 +2893,35 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? issueSummary,
   }) async {
-    final result = await _equipmentService.performAction(
-      assetId: assetId,
-      action: action,
-      issueSummary: issueSummary,
+    await _runModuleAction(
+      (banner) => _equipmentActionMessage = banner,
+      () async {
+        final result = await _equipmentService.performAction(
+          assetId: assetId,
+          action: action,
+          issueSummary: issueSummary,
+        );
+        _equipmentActionMessage = result.message;
+        await _syncAfterEquipmentChange();
+      },
     );
-    _equipmentActionMessage = result.message;
-    await _syncAfterEquipmentChange();
   }
 
   Future<void> raiseEquipmentMaintenance({
     String? assetId,
     String? issueSummary,
   }) async {
-    final result = await _equipmentService.raiseMaintenance(
-      assetId: assetId,
-      issueSummary: issueSummary,
+    await _runModuleAction(
+      (banner) => _equipmentActionMessage = banner,
+      () async {
+        final result = await _equipmentService.raiseMaintenance(
+          assetId: assetId,
+          issueSummary: issueSummary,
+        );
+        _equipmentActionMessage = result.message;
+        await _syncAfterEquipmentChange();
+      },
     );
-    _equipmentActionMessage = result.message;
-    await _syncAfterEquipmentChange();
   }
 
   Future<void> _syncAfterEquipmentChange() async {
@@ -2580,20 +2960,30 @@ class KitchenCommandController extends ChangeNotifier {
     required String alertId,
     required String action,
   }) async {
-    final result = await _smartEnergyService.performAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _smartEnergyActionMessage = banner,
+      () async {
+        final result = await _smartEnergyService.performAction(
+          alertId: alertId,
+          action: action,
+        );
+        _smartEnergyActionMessage = result.message;
+        await _syncAfterSmartEnergyChange();
+      },
     );
-    _smartEnergyActionMessage = result.message;
-    await _syncAfterSmartEnergyChange();
   }
 
   Future<void> triggerSmartEnergyShutdown({String? equipmentName}) async {
-    final result = await _smartEnergyService.triggerShutdown(
-      equipmentName: equipmentName,
+    await _runModuleAction(
+      (banner) => _smartEnergyActionMessage = banner,
+      () async {
+        final result = await _smartEnergyService.triggerShutdown(
+          equipmentName: equipmentName,
+        );
+        _smartEnergyActionMessage = result.message;
+        await _syncAfterSmartEnergyChange();
+      },
     );
-    _smartEnergyActionMessage = result.message;
-    await _syncAfterSmartEnergyChange();
   }
 
   Future<void> _syncAfterSmartEnergyChange() async {
@@ -2631,18 +3021,28 @@ class KitchenCommandController extends ChangeNotifier {
     required String deviceId,
     required String action,
   }) async {
-    final result = await _iotDeviceService.performAction(
-      deviceId: deviceId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _iotDeviceActionMessage = banner,
+      () async {
+        final result = await _iotDeviceService.performAction(
+          deviceId: deviceId,
+          action: action,
+        );
+        _iotDeviceActionMessage = result.message;
+        await _syncAfterIotDeviceChange();
+      },
     );
-    _iotDeviceActionMessage = result.message;
-    await _syncAfterIotDeviceChange();
   }
 
   Future<void> syncAllIotDevices() async {
-    final result = await _iotDeviceService.syncAll();
-    _iotDeviceActionMessage = result.message;
-    await _syncAfterIotDeviceChange();
+    await _runModuleAction(
+      (banner) => _iotDeviceActionMessage = banner,
+      () async {
+        final result = await _iotDeviceService.syncAll();
+        _iotDeviceActionMessage = result.message;
+        await _syncAfterIotDeviceChange();
+      },
+    );
   }
 
   Future<void> _syncAfterIotDeviceChange() async {
@@ -2681,30 +3081,45 @@ class KitchenCommandController extends ChangeNotifier {
     required String staffId,
     required String action,
   }) async {
-    final result = await _staffPerformanceService.performStaffAction(
-      staffId: staffId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffPerformanceActionMessage = banner,
+      () async {
+        final result = await _staffPerformanceService.performStaffAction(
+          staffId: staffId,
+          action: action,
+        );
+        _staffPerformanceActionMessage = result.message;
+        await _syncAfterStaffPerformanceChange();
+      },
     );
-    _staffPerformanceActionMessage = result.message;
-    await _syncAfterStaffPerformanceChange();
   }
 
   Future<void> performStaffIncentiveAction({
     required String incentiveId,
     required String action,
   }) async {
-    final result = await _staffPerformanceService.performIncentiveAction(
-      incentiveId: incentiveId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffPerformanceActionMessage = banner,
+      () async {
+        final result = await _staffPerformanceService.performIncentiveAction(
+          incentiveId: incentiveId,
+          action: action,
+        );
+        _staffPerformanceActionMessage = result.message;
+        await _syncAfterStaffPerformanceChange();
+      },
     );
-    _staffPerformanceActionMessage = result.message;
-    await _syncAfterStaffPerformanceChange();
   }
 
   Future<void> recalculateStaffPerformance() async {
-    final result = await _staffPerformanceService.recalculate();
-    _staffPerformanceActionMessage = result.message;
-    await _syncAfterStaffPerformanceChange();
+    await _runModuleAction(
+      (banner) => _staffPerformanceActionMessage = banner,
+      () async {
+        final result = await _staffPerformanceService.recalculate();
+        _staffPerformanceActionMessage = result.message;
+        await _syncAfterStaffPerformanceChange();
+      },
+    );
   }
 
   Future<void> _syncAfterStaffPerformanceChange() async {
@@ -2744,24 +3159,34 @@ class KitchenCommandController extends ChangeNotifier {
     required String staffId,
     required String action,
   }) async {
-    final result = await _staffShiftService.performStaffAction(
-      staffId: staffId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffShiftActionMessage = banner,
+      () async {
+        final result = await _staffShiftService.performStaffAction(
+          staffId: staffId,
+          action: action,
+        );
+        _staffShiftActionMessage = result.message;
+        await _syncAfterStaffShiftChange();
+      },
     );
-    _staffShiftActionMessage = result.message;
-    await _syncAfterStaffShiftChange();
   }
 
   Future<void> performShiftSwapAction({
     required String swapId,
     required String action,
   }) async {
-    final result = await _staffShiftService.performSwapAction(
-      swapId: swapId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffShiftActionMessage = banner,
+      () async {
+        final result = await _staffShiftService.performSwapAction(
+          swapId: swapId,
+          action: action,
+        );
+        _staffShiftActionMessage = result.message;
+        await _syncAfterStaffShiftChange();
+      },
     );
-    _staffShiftActionMessage = result.message;
-    await _syncAfterStaffShiftChange();
   }
 
   Future<void> performShiftHandoverAction({
@@ -2769,19 +3194,29 @@ class KitchenCommandController extends ChangeNotifier {
     required String action,
     String? note,
   }) async {
-    final result = await _staffShiftService.performHandoverAction(
-      handoverId: handoverId,
-      action: action,
-      note: note,
+    await _runModuleAction(
+      (banner) => _staffShiftActionMessage = banner,
+      () async {
+        final result = await _staffShiftService.performHandoverAction(
+          handoverId: handoverId,
+          action: action,
+          note: note,
+        );
+        _staffShiftActionMessage = result.message;
+        await _syncAfterStaffShiftChange();
+      },
     );
-    _staffShiftActionMessage = result.message;
-    await _syncAfterStaffShiftChange();
   }
 
   Future<void> syncAllStaffShifts() async {
-    final result = await _staffShiftService.syncAll();
-    _staffShiftActionMessage = result.message;
-    await _syncAfterStaffShiftChange();
+    await _runModuleAction(
+      (banner) => _staffShiftActionMessage = banner,
+      () async {
+        final result = await _staffShiftService.syncAll();
+        _staffShiftActionMessage = result.message;
+        await _syncAfterStaffShiftChange();
+      },
+    );
   }
 
   Future<void> _syncAfterStaffShiftChange() async {
@@ -2819,30 +3254,45 @@ class KitchenCommandController extends ChangeNotifier {
     required String alertId,
     required String action,
   }) async {
-    final result = await _staffWellnessService.performAlertAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffWellnessActionMessage = banner,
+      () async {
+        final result = await _staffWellnessService.performAlertAction(
+          alertId: alertId,
+          action: action,
+        );
+        _staffWellnessActionMessage = result.message;
+        await _syncAfterStaffWellnessChange();
+      },
     );
-    _staffWellnessActionMessage = result.message;
-    await _syncAfterStaffWellnessChange();
   }
 
   Future<void> performStaffWellnessRecommendationAction({
     required String recommendationId,
     required String action,
   }) async {
-    final result = await _staffWellnessService.performRecommendationAction(
-      recommendationId: recommendationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _staffWellnessActionMessage = banner,
+      () async {
+        final result = await _staffWellnessService.performRecommendationAction(
+          recommendationId: recommendationId,
+          action: action,
+        );
+        _staffWellnessActionMessage = result.message;
+        await _syncAfterStaffWellnessChange();
+      },
     );
-    _staffWellnessActionMessage = result.message;
-    await _syncAfterStaffWellnessChange();
   }
 
   Future<void> runStaffWellnessScan() async {
-    final result = await _staffWellnessService.runScan();
-    _staffWellnessActionMessage = result.message;
-    await _syncAfterStaffWellnessChange();
+    await _runModuleAction(
+      (banner) => _staffWellnessActionMessage = banner,
+      () async {
+        final result = await _staffWellnessService.runScan();
+        _staffWellnessActionMessage = result.message;
+        await _syncAfterStaffWellnessChange();
+      },
+    );
   }
 
   Future<void> _syncAfterStaffWellnessChange() async {
@@ -2882,18 +3332,28 @@ class KitchenCommandController extends ChangeNotifier {
     required String alertId,
     required String action,
   }) async {
-    final result = await _liveAlertService.performAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _liveAlertActionMessage = banner,
+      () async {
+        final result = await _liveAlertService.performAction(
+          alertId: alertId,
+          action: action,
+        );
+        _liveAlertActionMessage = result.message;
+        await _syncAfterLiveAlertChange();
+      },
     );
-    _liveAlertActionMessage = result.message;
-    await _syncAfterLiveAlertChange();
   }
 
   Future<void> syncAllLiveAlerts() async {
-    final result = await _liveAlertService.syncAll();
-    _liveAlertActionMessage = result.message;
-    await _syncAfterLiveAlertChange();
+    await _runModuleAction(
+      (banner) => _liveAlertActionMessage = banner,
+      () async {
+        final result = await _liveAlertService.syncAll();
+        _liveAlertActionMessage = result.message;
+        await _syncAfterLiveAlertChange();
+      },
+    );
   }
 
   Future<void> _syncAfterLiveAlertChange() async {
@@ -2932,42 +3392,62 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> triggerPanicButton({required String emergencyType}) async {
-    final result = await _panicEmergencyService.triggerPanic(
-      emergencyType: emergencyType,
-      section: _selectedSection,
+    await _runModuleAction(
+      (banner) => _panicEmergencyActionMessage = banner,
+      () async {
+        final result = await _panicEmergencyService.triggerPanic(
+          emergencyType: emergencyType,
+          section: _selectedSection,
+        );
+        _panicEmergencyActionMessage = result.message;
+        await _syncAfterPanicEmergencyChange();
+      },
     );
-    _panicEmergencyActionMessage = result.message;
-    await _syncAfterPanicEmergencyChange();
   }
 
   Future<void> performPanicIncidentAction({
     required String incidentId,
     required String action,
   }) async {
-    final result = await _panicEmergencyService.performIncidentAction(
-      incidentId: incidentId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _panicEmergencyActionMessage = banner,
+      () async {
+        final result = await _panicEmergencyService.performIncidentAction(
+          incidentId: incidentId,
+          action: action,
+        );
+        _panicEmergencyActionMessage = result.message;
+        await _syncAfterPanicEmergencyChange();
+      },
     );
-    _panicEmergencyActionMessage = result.message;
-    await _syncAfterPanicEmergencyChange();
   }
 
   Future<void> performEvacuationAction({
     required String evacuationId,
     required String action,
   }) async {
-    final result = await _panicEmergencyService.performEvacuationAction(
-      evacuationId: evacuationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _panicEmergencyActionMessage = banner,
+      () async {
+        final result = await _panicEmergencyService.performEvacuationAction(
+          evacuationId: evacuationId,
+          action: action,
+        );
+        _panicEmergencyActionMessage = result.message;
+        await _syncAfterPanicEmergencyChange();
+      },
     );
-    _panicEmergencyActionMessage = result.message;
-    await _syncAfterPanicEmergencyChange();
   }
 
   Future<void> syncAllPanicEmergency() async {
-    final result = await _panicEmergencyService.syncAll();
-    _panicEmergencyActionMessage = result.message;
-    await _syncAfterPanicEmergencyChange();
+    await _runModuleAction(
+      (banner) => _panicEmergencyActionMessage = banner,
+      () async {
+        final result = await _panicEmergencyService.syncAll();
+        _panicEmergencyActionMessage = result.message;
+        await _syncAfterPanicEmergencyChange();
+      },
+    );
   }
 
   Future<void> _syncAfterPanicEmergencyChange() async {
@@ -3010,48 +3490,73 @@ class KitchenCommandController extends ChangeNotifier {
     required String moduleId,
     required String action,
   }) async {
-    final result = await _offlineFailoverService.performModuleAction(
-      moduleId: moduleId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _offlineFailoverActionMessage = banner,
+      () async {
+        final result = await _offlineFailoverService.performModuleAction(
+          moduleId: moduleId,
+          action: action,
+        );
+        _offlineFailoverActionMessage = result.message;
+        await _syncAfterOfflineFailoverChange();
+      },
     );
-    _offlineFailoverActionMessage = result.message;
-    await _syncAfterOfflineFailoverChange();
   }
 
   Future<void> performFailoverQueueAction({
     required String queueId,
     required String action,
   }) async {
-    final result = await _offlineFailoverService.performQueueAction(
-      queueId: queueId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _offlineFailoverActionMessage = banner,
+      () async {
+        final result = await _offlineFailoverService.performQueueAction(
+          queueId: queueId,
+          action: action,
+        );
+        _offlineFailoverActionMessage = result.message;
+        await _syncAfterOfflineFailoverChange();
+      },
     );
-    _offlineFailoverActionMessage = result.message;
-    await _syncAfterOfflineFailoverChange();
   }
 
   Future<void> performQueueRecoveryAction({
     required String recoveryId,
     required String action,
   }) async {
-    final result = await _offlineFailoverService.performRecoveryAction(
-      recoveryId: recoveryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _offlineFailoverActionMessage = banner,
+      () async {
+        final result = await _offlineFailoverService.performRecoveryAction(
+          recoveryId: recoveryId,
+          action: action,
+        );
+        _offlineFailoverActionMessage = result.message;
+        await _syncAfterOfflineFailoverChange();
+      },
     );
-    _offlineFailoverActionMessage = result.message;
-    await _syncAfterOfflineFailoverChange();
   }
 
   Future<void> restoreOfflineSync() async {
-    final result = await _offlineFailoverService.restoreSync();
-    _offlineFailoverActionMessage = result.message;
-    await _syncAfterOfflineFailoverChange();
+    await _runModuleAction(
+      (banner) => _offlineFailoverActionMessage = banner,
+      () async {
+        final result = await _offlineFailoverService.restoreSync();
+        _offlineFailoverActionMessage = result.message;
+        await _syncAfterOfflineFailoverChange();
+      },
+    );
   }
 
   Future<void> syncAllOfflineFailover() async {
-    final result = await _offlineFailoverService.syncAll();
-    _offlineFailoverActionMessage = result.message;
-    await _syncAfterOfflineFailoverChange();
+    await _runModuleAction(
+      (banner) => _offlineFailoverActionMessage = banner,
+      () async {
+        final result = await _offlineFailoverService.syncAll();
+        _offlineFailoverActionMessage = result.message;
+        await _syncAfterOfflineFailoverChange();
+      },
+    );
   }
 
   Future<void> _syncAfterOfflineFailoverChange() async {
@@ -3092,30 +3597,45 @@ class KitchenCommandController extends ChangeNotifier {
     required String reportId,
     required String action,
   }) async {
-    final result = await _analyticsReportingService.performReportAction(
-      reportId: reportId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _analyticsReportingActionMessage = banner,
+      () async {
+        final result = await _analyticsReportingService.performReportAction(
+          reportId: reportId,
+          action: action,
+        );
+        _analyticsReportingActionMessage = result.message;
+        await _syncAfterAnalyticsReportingChange();
+      },
     );
-    _analyticsReportingActionMessage = result.message;
-    await _syncAfterAnalyticsReportingChange();
   }
 
   Future<void> performAnalyticsInsightAction({
     required String insightId,
     required String action,
   }) async {
-    final result = await _analyticsReportingService.performInsightAction(
-      insightId: insightId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _analyticsReportingActionMessage = banner,
+      () async {
+        final result = await _analyticsReportingService.performInsightAction(
+          insightId: insightId,
+          action: action,
+        );
+        _analyticsReportingActionMessage = result.message;
+        await _syncAfterAnalyticsReportingChange();
+      },
     );
-    _analyticsReportingActionMessage = result.message;
-    await _syncAfterAnalyticsReportingChange();
   }
 
   Future<void> generateAllAnalyticsReports() async {
-    final result = await _analyticsReportingService.generateAll();
-    _analyticsReportingActionMessage = result.message;
-    await _syncAfterAnalyticsReportingChange();
+    await _runModuleAction(
+      (banner) => _analyticsReportingActionMessage = banner,
+      () async {
+        final result = await _analyticsReportingService.generateAll();
+        _analyticsReportingActionMessage = result.message;
+        await _syncAfterAnalyticsReportingChange();
+      },
+    );
   }
 
   Future<void> _syncAfterAnalyticsReportingChange() async {
@@ -3156,54 +3676,79 @@ class KitchenCommandController extends ChangeNotifier {
     required String stationId,
     required String action,
   }) async {
-    final result = await _kitchenHeatmapService.performStationAction(
-      stationId: stationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _kitchenHeatmapActionMessage = banner,
+      () async {
+        final result = await _kitchenHeatmapService.performStationAction(
+          stationId: stationId,
+          action: action,
+        );
+        _kitchenHeatmapActionMessage = result.message;
+        await _syncAfterKitchenHeatmapChange();
+      },
     );
-    _kitchenHeatmapActionMessage = result.message;
-    await _syncAfterKitchenHeatmapChange();
   }
 
   Future<void> performDelayHotspotAction({
     required String hotspotId,
     required String action,
   }) async {
-    final result = await _kitchenHeatmapService.performHotspotAction(
-      hotspotId: hotspotId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _kitchenHeatmapActionMessage = banner,
+      () async {
+        final result = await _kitchenHeatmapService.performHotspotAction(
+          hotspotId: hotspotId,
+          action: action,
+        );
+        _kitchenHeatmapActionMessage = result.message;
+        await _syncAfterKitchenHeatmapChange();
+      },
     );
-    _kitchenHeatmapActionMessage = result.message;
-    await _syncAfterKitchenHeatmapChange();
   }
 
   Future<void> performStaffDensityAction({
     required String densityId,
     required String action,
   }) async {
-    final result = await _kitchenHeatmapService.performDensityAction(
-      densityId: densityId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _kitchenHeatmapActionMessage = banner,
+      () async {
+        final result = await _kitchenHeatmapService.performDensityAction(
+          densityId: densityId,
+          action: action,
+        );
+        _kitchenHeatmapActionMessage = result.message;
+        await _syncAfterKitchenHeatmapChange();
+      },
     );
-    _kitchenHeatmapActionMessage = result.message;
-    await _syncAfterKitchenHeatmapChange();
   }
 
   Future<void> performRushZoneAction({
     required String rushId,
     required String action,
   }) async {
-    final result = await _kitchenHeatmapService.performRushAction(
-      rushId: rushId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _kitchenHeatmapActionMessage = banner,
+      () async {
+        final result = await _kitchenHeatmapService.performRushAction(
+          rushId: rushId,
+          action: action,
+        );
+        _kitchenHeatmapActionMessage = result.message;
+        await _syncAfterKitchenHeatmapChange();
+      },
     );
-    _kitchenHeatmapActionMessage = result.message;
-    await _syncAfterKitchenHeatmapChange();
   }
 
   Future<void> refreshAllKitchenHeatmap() async {
-    final result = await _kitchenHeatmapService.refreshAll();
-    _kitchenHeatmapActionMessage = result.message;
-    await _syncAfterKitchenHeatmapChange();
+    await _runModuleAction(
+      (banner) => _kitchenHeatmapActionMessage = banner,
+      () async {
+        final result = await _kitchenHeatmapService.refreshAll();
+        _kitchenHeatmapActionMessage = result.message;
+        await _syncAfterKitchenHeatmapChange();
+      },
+    );
   }
 
   Future<void> _syncAfterKitchenHeatmapChange() async {
@@ -3245,78 +3790,113 @@ class KitchenCommandController extends ChangeNotifier {
     required String displayId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performDisplayAction(
-      displayId: displayId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performDisplayAction(
+          displayId: displayId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> performTabletAction({
     required String tabletId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performTabletAction(
-      tabletId: tabletId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performTabletAction(
+          tabletId: tabletId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> performPrinterAction({
     required String printerId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performPrinterAction(
-      printerId: printerId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performPrinterAction(
+          printerId: printerId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> performSmartwatchAction({
     required String watchId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performSmartwatchAction(
-      watchId: watchId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performSmartwatchAction(
+          watchId: watchId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> performNfcAction({
     required String nfcId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performNfcAction(
-      nfcId: nfcId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performNfcAction(
+          nfcId: nfcId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> performScannerAction({
     required String scannerId,
     required String action,
   }) async {
-    final result = await _hardwareIntegrationService.performScannerAction(
-      scannerId: scannerId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.performScannerAction(
+          scannerId: scannerId,
+          action: action,
+        );
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
     );
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
   }
 
   Future<void> syncAllHardwareIntegration() async {
-    final result = await _hardwareIntegrationService.syncAll();
-    _hardwareIntegrationActionMessage = result.message;
-    await _syncAfterHardwareIntegrationChange();
+    await _runModuleAction(
+      (banner) => _hardwareIntegrationActionMessage = banner,
+      () async {
+        final result = await _hardwareIntegrationService.syncAll();
+        _hardwareIntegrationActionMessage = result.message;
+        await _syncAfterHardwareIntegrationChange();
+      },
+    );
   }
 
   Future<void> _syncAfterHardwareIntegrationChange() async {
@@ -3357,54 +3937,79 @@ class KitchenCommandController extends ChangeNotifier {
     required String alertId,
     required String action,
   }) async {
-    final result = await _smartwatchSupportService.performOrderAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _smartwatchSupportActionMessage = banner,
+      () async {
+        final result = await _smartwatchSupportService.performOrderAction(
+          alertId: alertId,
+          action: action,
+        );
+        _smartwatchSupportActionMessage = result.message;
+        await _syncAfterSmartwatchSupportChange();
+      },
     );
-    _smartwatchSupportActionMessage = result.message;
-    await _syncAfterSmartwatchSupportChange();
   }
 
   Future<void> performWatchDelayAction({
     required String alertId,
     required String action,
   }) async {
-    final result = await _smartwatchSupportService.performDelayAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _smartwatchSupportActionMessage = banner,
+      () async {
+        final result = await _smartwatchSupportService.performDelayAction(
+          alertId: alertId,
+          action: action,
+        );
+        _smartwatchSupportActionMessage = result.message;
+        await _syncAfterSmartwatchSupportChange();
+      },
     );
-    _smartwatchSupportActionMessage = result.message;
-    await _syncAfterSmartwatchSupportChange();
   }
 
   Future<void> performWatchEmergencyAction({
     required String alertId,
     required String action,
   }) async {
-    final result = await _smartwatchSupportService.performEmergencyAction(
-      alertId: alertId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _smartwatchSupportActionMessage = banner,
+      () async {
+        final result = await _smartwatchSupportService.performEmergencyAction(
+          alertId: alertId,
+          action: action,
+        );
+        _smartwatchSupportActionMessage = result.message;
+        await _syncAfterSmartwatchSupportChange();
+      },
     );
-    _smartwatchSupportActionMessage = result.message;
-    await _syncAfterSmartwatchSupportChange();
   }
 
   Future<void> performWatchTaskAction({
     required String taskId,
     required String action,
   }) async {
-    final result = await _smartwatchSupportService.performTaskAction(
-      taskId: taskId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _smartwatchSupportActionMessage = banner,
+      () async {
+        final result = await _smartwatchSupportService.performTaskAction(
+          taskId: taskId,
+          action: action,
+        );
+        _smartwatchSupportActionMessage = result.message;
+        await _syncAfterSmartwatchSupportChange();
+      },
     );
-    _smartwatchSupportActionMessage = result.message;
-    await _syncAfterSmartwatchSupportChange();
   }
 
   Future<void> pushAllSmartwatchAlerts() async {
-    final result = await _smartwatchSupportService.pushAll();
-    _smartwatchSupportActionMessage = result.message;
-    await _syncAfterSmartwatchSupportChange();
+    await _runModuleAction(
+      (banner) => _smartwatchSupportActionMessage = banner,
+      () async {
+        final result = await _smartwatchSupportService.pushAll();
+        _smartwatchSupportActionMessage = result.message;
+        await _syncAfterSmartwatchSupportChange();
+      },
+    );
   }
 
   Future<void> _syncAfterSmartwatchSupportChange() async {
@@ -3445,66 +4050,96 @@ class KitchenCommandController extends ChangeNotifier {
     required String kitchenId,
     required String action,
   }) async {
-    final result = await _multiBranchService.performCentralAction(
-      kitchenId: kitchenId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.performCentralAction(
+          kitchenId: kitchenId,
+          action: action,
+        );
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
     );
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
   }
 
   Future<void> performRecipeSyncAction({
     required String syncId,
     required String action,
   }) async {
-    final result = await _multiBranchService.performRecipeAction(
-      syncId: syncId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.performRecipeAction(
+          syncId: syncId,
+          action: action,
+        );
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
     );
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
   }
 
   Future<void> performBranchKitchenAction({
     required String branchId,
     required String action,
   }) async {
-    final result = await _multiBranchService.performBranchAction(
-      branchId: branchId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.performBranchAction(
+          branchId: branchId,
+          action: action,
+        );
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
     );
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
   }
 
   Future<void> performSharedInventoryAction({
     required String inventoryId,
     required String action,
   }) async {
-    final result = await _multiBranchService.performInventoryAction(
-      inventoryId: inventoryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.performInventoryAction(
+          inventoryId: inventoryId,
+          action: action,
+        );
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
     );
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
   }
 
   Future<void> performDemandForecastAction({
     required String forecastId,
     required String action,
   }) async {
-    final result = await _multiBranchService.performForecastAction(
-      forecastId: forecastId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.performForecastAction(
+          forecastId: forecastId,
+          action: action,
+        );
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
     );
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
   }
 
   Future<void> syncAllMultiBranch() async {
-    final result = await _multiBranchService.syncAll();
-    _multiBranchActionMessage = result.message;
-    await _syncAfterMultiBranchChange();
+    await _runModuleAction(
+      (banner) => _multiBranchActionMessage = banner,
+      () async {
+        final result = await _multiBranchService.syncAll();
+        _multiBranchActionMessage = result.message;
+        await _syncAfterMultiBranchChange();
+      },
+    );
   }
 
   Future<void> _syncAfterMultiBranchChange() async {
@@ -3546,66 +4181,96 @@ class KitchenCommandController extends ChangeNotifier {
     required String logId,
     required String action,
   }) async {
-    final result = await _auditComplianceService.performActionLogAction(
-      logId: logId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.performActionLogAction(
+          logId: logId,
+          action: action,
+        );
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
     );
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
   }
 
   Future<void> performFoodSafetyLogAction({
     required String logId,
     required String action,
   }) async {
-    final result = await _auditComplianceService.performFoodSafetyAction(
-      logId: logId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.performFoodSafetyAction(
+          logId: logId,
+          action: action,
+        );
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
     );
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
   }
 
   Future<void> performHygieneLogAction({
     required String logId,
     required String action,
   }) async {
-    final result = await _auditComplianceService.performHygieneAction(
-      logId: logId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.performHygieneAction(
+          logId: logId,
+          action: action,
+        );
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
     );
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
   }
 
   Future<void> performStaffActivityLogAction({
     required String logId,
     required String action,
   }) async {
-    final result = await _auditComplianceService.performStaffActivityAction(
-      logId: logId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.performStaffActivityAction(
+          logId: logId,
+          action: action,
+        );
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
     );
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
   }
 
   Future<void> performIncidentLogAction({
     required String incidentId,
     required String action,
   }) async {
-    final result = await _auditComplianceService.performIncidentAction(
-      incidentId: incidentId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.performIncidentAction(
+          incidentId: incidentId,
+          action: action,
+        );
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
     );
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
   }
 
   Future<void> exportAllAuditCompliance() async {
-    final result = await _auditComplianceService.exportAll();
-    _auditComplianceActionMessage = result.message;
-    await _syncAfterAuditComplianceChange();
+    await _runModuleAction(
+      (banner) => _auditComplianceActionMessage = banner,
+      () async {
+        final result = await _auditComplianceService.exportAll();
+        _auditComplianceActionMessage = result.message;
+        await _syncAfterAuditComplianceChange();
+      },
+    );
   }
 
   Future<void> _syncAfterAuditComplianceChange() async {
@@ -3647,66 +4312,96 @@ class KitchenCommandController extends ChangeNotifier {
     required String backupId,
     required String action,
   }) async {
-    final result = await _backupRecoveryService.performAutoBackupAction(
-      backupId: backupId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.performAutoBackupAction(
+          backupId: backupId,
+          action: action,
+        );
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
     );
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
   }
 
   Future<void> performManualBackupAction({
     required String backupId,
     required String action,
   }) async {
-    final result = await _backupRecoveryService.performManualBackupAction(
-      backupId: backupId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.performManualBackupAction(
+          backupId: backupId,
+          action: action,
+        );
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
     );
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
   }
 
   Future<void> performCloudSyncAction({
     required String syncId,
     required String action,
   }) async {
-    final result = await _backupRecoveryService.performCloudSyncAction(
-      syncId: syncId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.performCloudSyncAction(
+          syncId: syncId,
+          action: action,
+        );
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
     );
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
   }
 
   Future<void> performRestoreAction({
     required String restoreId,
     required String action,
   }) async {
-    final result = await _backupRecoveryService.performRestoreAction(
-      restoreId: restoreId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.performRestoreAction(
+          restoreId: restoreId,
+          action: action,
+        );
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
     );
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
   }
 
   Future<void> performDataRecoveryAction({
     required String recoveryId,
     required String action,
   }) async {
-    final result = await _backupRecoveryService.performDataRecoveryAction(
-      recoveryId: recoveryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.performDataRecoveryAction(
+          recoveryId: recoveryId,
+          action: action,
+        );
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
     );
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
   }
 
   Future<void> runAllBackupRecovery() async {
-    final result = await _backupRecoveryService.runAll();
-    _backupRecoveryActionMessage = result.message;
-    await _syncAfterBackupRecoveryChange();
+    await _runModuleAction(
+      (banner) => _backupRecoveryActionMessage = banner,
+      () async {
+        final result = await _backupRecoveryService.runAll();
+        _backupRecoveryActionMessage = result.message;
+        await _syncAfterBackupRecoveryChange();
+      },
+    );
   }
 
   Future<void> _syncAfterBackupRecoveryChange() async {
@@ -3747,54 +4442,79 @@ class KitchenCommandController extends ChangeNotifier {
     required String demoId,
     required String action,
   }) async {
-    final result = await _sandboxTrainingService.performDemoAction(
-      demoId: demoId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _sandboxTrainingActionMessage = banner,
+      () async {
+        final result = await _sandboxTrainingService.performDemoAction(
+          demoId: demoId,
+          action: action,
+        );
+        _sandboxTrainingActionMessage = result.message;
+        await _syncAfterSandboxTrainingChange();
+      },
     );
-    _sandboxTrainingActionMessage = result.message;
-    await _syncAfterSandboxTrainingChange();
   }
 
   Future<void> performPracticeSessionAction({
     required String sessionId,
     required String action,
   }) async {
-    final result = await _sandboxTrainingService.performPracticeAction(
-      sessionId: sessionId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _sandboxTrainingActionMessage = banner,
+      () async {
+        final result = await _sandboxTrainingService.performPracticeAction(
+          sessionId: sessionId,
+          action: action,
+        );
+        _sandboxTrainingActionMessage = result.message;
+        await _syncAfterSandboxTrainingChange();
+      },
     );
-    _sandboxTrainingActionMessage = result.message;
-    await _syncAfterSandboxTrainingChange();
   }
 
   Future<void> performSopTrainingAction({
     required String sopId,
     required String action,
   }) async {
-    final result = await _sandboxTrainingService.performSopAction(
-      sopId: sopId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _sandboxTrainingActionMessage = banner,
+      () async {
+        final result = await _sandboxTrainingService.performSopAction(
+          sopId: sopId,
+          action: action,
+        );
+        _sandboxTrainingActionMessage = result.message;
+        await _syncAfterSandboxTrainingChange();
+      },
     );
-    _sandboxTrainingActionMessage = result.message;
-    await _syncAfterSandboxTrainingChange();
   }
 
   Future<void> performSimulationAction({
     required String simulationId,
     required String action,
   }) async {
-    final result = await _sandboxTrainingService.performSimulationAction(
-      simulationId: simulationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _sandboxTrainingActionMessage = banner,
+      () async {
+        final result = await _sandboxTrainingService.performSimulationAction(
+          simulationId: simulationId,
+          action: action,
+        );
+        _sandboxTrainingActionMessage = result.message;
+        await _syncAfterSandboxTrainingChange();
+      },
     );
-    _sandboxTrainingActionMessage = result.message;
-    await _syncAfterSandboxTrainingChange();
   }
 
   Future<void> launchAllSandboxTraining() async {
-    final result = await _sandboxTrainingService.launchAll();
-    _sandboxTrainingActionMessage = result.message;
-    await _syncAfterSandboxTrainingChange();
+    await _runModuleAction(
+      (banner) => _sandboxTrainingActionMessage = banner,
+      () async {
+        final result = await _sandboxTrainingService.launchAll();
+        _sandboxTrainingActionMessage = result.message;
+        await _syncAfterSandboxTrainingChange();
+      },
+    );
   }
 
   Future<void> _syncAfterSandboxTrainingChange() async {
@@ -3832,87 +4552,132 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> performSoftDeleteAction(String itemId, String action) async {
-    final result = await _hiddenEnterpriseService.performSoftDeleteAction(
-      itemId: itemId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performSoftDeleteAction(
+          itemId: itemId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performDeletedOrderAction(String orderId, String action) async {
-    final result = await _hiddenEnterpriseService.performDeletedOrderAction(
-      orderId: orderId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performDeletedOrderAction(
+          orderId: orderId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performActionReplayAction(String replayId, String action) async {
-    final result = await _hiddenEnterpriseService.performActionReplayAction(
-      replayId: replayId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performActionReplayAction(
+          replayId: replayId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performVersionLogAction(String versionId, String action) async {
-    final result = await _hiddenEnterpriseService.performVersionLogAction(
-      versionId: versionId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performVersionLogAction(
+          versionId: versionId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performDeviceTrackingAction(
     String deviceId,
     String action,
   ) async {
-    final result = await _hiddenEnterpriseService.performDeviceTrackingAction(
-      deviceId: deviceId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performDeviceTrackingAction(
+          deviceId: deviceId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performSessionLogAction(String sessionId, String action) async {
-    final result = await _hiddenEnterpriseService.performSessionLogAction(
-      sessionId: sessionId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performSessionLogAction(
+          sessionId: sessionId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performLockdownAction(String lockdownId, String action) async {
-    final result = await _hiddenEnterpriseService.performLockdownAction(
-      lockdownId: lockdownId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performLockdownAction(
+          lockdownId: lockdownId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> performHiddenQueueRecoveryAction(
     String queueId,
     String action,
   ) async {
-    final result = await _hiddenEnterpriseService.performQueueRecoveryAction(
-      queueId: queueId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.performQueueRecoveryAction(
+          queueId: queueId,
+          action: action,
+        );
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
     );
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
   }
 
   Future<void> activateAllHiddenEnterprise() async {
-    final result = await _hiddenEnterpriseService.activateAll();
-    _hiddenEnterpriseActionMessage = result.message;
-    await _syncAfterHiddenEnterpriseChange();
+    await _runModuleAction(
+      (banner) => _hiddenEnterpriseActionMessage = banner,
+      () async {
+        final result = await _hiddenEnterpriseService.activateAll();
+        _hiddenEnterpriseActionMessage = result.message;
+        await _syncAfterHiddenEnterpriseChange();
+      },
+    );
   }
 
   Future<void> _syncAfterHiddenEnterpriseChange() async {
@@ -3954,67 +4719,97 @@ class KitchenCommandController extends ChangeNotifier {
     String entryId,
     String action,
   ) async {
-    final result = await _futureAiExpansionService.performCookingAssistantAction(
-      entryId: entryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result = await _futureAiExpansionService.performCookingAssistantAction(
+          entryId: entryId,
+          action: action,
+        );
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
     );
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
   }
 
   Future<void> performFutureRoboticKitchenAction(
     String entryId,
     String action,
   ) async {
-    final result = await _futureAiExpansionService.performRoboticKitchenAction(
-      entryId: entryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result = await _futureAiExpansionService.performRoboticKitchenAction(
+          entryId: entryId,
+          action: action,
+        );
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
     );
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
   }
 
   Future<void> performFuturePlatingSuggestionAction(
     String entryId,
     String action,
   ) async {
-    final result =
-        await _futureAiExpansionService.performPlatingSuggestionAction(
-      entryId: entryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result =
+            await _futureAiExpansionService.performPlatingSuggestionAction(
+          entryId: entryId,
+          action: action,
+        );
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
     );
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
   }
 
   Future<void> performFutureWasteReductionAction(
     String entryId,
     String action,
   ) async {
-    final result = await _futureAiExpansionService.performWasteReductionAction(
-      entryId: entryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result = await _futureAiExpansionService.performWasteReductionAction(
+          entryId: entryId,
+          action: action,
+        );
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
     );
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
   }
 
   Future<void> performFuturePrepAutomationAction(
     String entryId,
     String action,
   ) async {
-    final result = await _futureAiExpansionService.performPrepAutomationAction(
-      entryId: entryId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result = await _futureAiExpansionService.performPrepAutomationAction(
+          entryId: entryId,
+          action: action,
+        );
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
     );
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
   }
 
   Future<void> activateAllFutureAiExpansion() async {
-    final result = await _futureAiExpansionService.activateAll();
-    _futureAiExpansionActionMessage = result.message;
-    await _syncAfterFutureAiExpansionChange();
+    await _runModuleAction(
+      (banner) => _futureAiExpansionActionMessage = banner,
+      () async {
+        final result = await _futureAiExpansionService.activateAll();
+        _futureAiExpansionActionMessage = result.message;
+        await _syncAfterFutureAiExpansionChange();
+      },
+    );
   }
 
   Future<void> _syncAfterFutureAiExpansionChange() async {
@@ -4053,36 +4848,56 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> autoAllocateWaiterTasks() async {
-    final result = await _waiterAutoAssignmentService.autoAllocate();
-    _waiterAutoAssignmentActionMessage = result.message;
-    await _syncAfterWaiterAutoAssignmentChange();
+    await _runModuleAction(
+      (banner) => _waiterAutoAssignmentActionMessage = banner,
+      () async {
+        final result = await _waiterAutoAssignmentService.autoAllocate();
+        _waiterAutoAssignmentActionMessage = result.message;
+        await _syncAfterWaiterAutoAssignmentChange();
+      },
+    );
   }
 
   Future<void> balanceWaiterWorkload() async {
-    final result = await _waiterAutoAssignmentService.balanceWorkload();
-    _waiterAutoAssignmentActionMessage = result.message;
-    await _syncAfterWaiterAutoAssignmentChange();
+    await _runModuleAction(
+      (banner) => _waiterAutoAssignmentActionMessage = banner,
+      () async {
+        final result = await _waiterAutoAssignmentService.balanceWorkload();
+        _waiterAutoAssignmentActionMessage = result.message;
+        await _syncAfterWaiterAutoAssignmentChange();
+      },
+    );
   }
 
   Future<void> performWaiterTaskAction(String taskId, String action) async {
-    final result = await _waiterAutoAssignmentService.performTaskAction(
-      taskId: taskId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _waiterAutoAssignmentActionMessage = banner,
+      () async {
+        final result = await _waiterAutoAssignmentService.performTaskAction(
+          taskId: taskId,
+          action: action,
+        );
+        _waiterAutoAssignmentActionMessage = result.message;
+        await _syncAfterWaiterAutoAssignmentChange();
+      },
     );
-    _waiterAutoAssignmentActionMessage = result.message;
-    await _syncAfterWaiterAutoAssignmentChange();
   }
 
   Future<void> performWaiterNotificationAction(
     String notificationId,
     String action,
   ) async {
-    final result = await _waiterAutoAssignmentService.performNotificationAction(
-      notificationId: notificationId,
-      action: action,
+    await _runModuleAction(
+      (banner) => _waiterAutoAssignmentActionMessage = banner,
+      () async {
+        final result = await _waiterAutoAssignmentService.performNotificationAction(
+          notificationId: notificationId,
+          action: action,
+        );
+        _waiterAutoAssignmentActionMessage = result.message;
+        await _syncAfterWaiterAutoAssignmentChange();
+      },
     );
-    _waiterAutoAssignmentActionMessage = result.message;
-    await _syncAfterWaiterAutoAssignmentChange();
   }
 
   Future<void> _syncAfterWaiterAutoAssignmentChange() async {
@@ -4097,62 +4912,82 @@ class KitchenCommandController extends ChangeNotifier {
   }
 
   Future<void> optimizeSectionQueue() async {
-    final result = await _sectionService.optimizeQueue();
-    _sectionsActionMessage = result.message;
-    await Future.wait([
-      refreshSections(silent: true),
-      refreshDashboard(silent: true),
-      refreshKds(silent: true),
-    ]);
-    notifyListeners();
+    await _runModuleAction(
+      (banner) => _sectionsActionMessage = banner,
+      () async {
+        final result = await _sectionService.optimizeQueue();
+        _sectionsActionMessage = result.message;
+        await Future.wait([
+          refreshSections(silent: true),
+          refreshDashboard(silent: true),
+          refreshKds(silent: true),
+        ]);
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> rerouteOrderToSection({
     required String orderId,
     required String section,
   }) async {
-    await _sectionService.rerouteOrder(orderId: orderId, section: section);
-    _sectionsActionMessage = 'Rerouted $orderId to $section section';
-    await Future.wait([
-      refreshSections(silent: true),
-      refreshDashboard(silent: true),
-      refreshKds(silent: true),
-    ]);
-    notifyListeners();
+    await _runModuleAction(
+      (banner) => _sectionsActionMessage = banner,
+      () async {
+        await _sectionService.rerouteOrder(orderId: orderId, section: section);
+        _sectionsActionMessage = 'Rerouted $orderId to $section section';
+        await Future.wait([
+          refreshSections(silent: true),
+          refreshDashboard(silent: true),
+          refreshKds(silent: true),
+        ]);
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> assignSectionChef({
     required String sectionName,
     required String chefName,
   }) async {
-    await _sectionService.assignChef(
-      sectionName: sectionName,
-      chefName: chefName,
+    await _runModuleAction(
+      (banner) => _sectionsActionMessage = banner,
+      () async {
+        await _sectionService.assignChef(
+          sectionName: sectionName,
+          chefName: chefName,
+        );
+        _sectionsActionMessage = 'Assigned $chefName to $sectionName section';
+        await refreshSections(silent: true);
+        notifyListeners();
+      },
     );
-    _sectionsActionMessage = 'Assigned $chefName to $sectionName section';
-    await refreshSections(silent: true);
-    notifyListeners();
   }
 
   Future<void> applyRoutingRecommendation(
     RoutingRecommendation recommendation,
   ) async {
-    switch (recommendation.action) {
-      case 'balance_load':
-        await optimizeSectionQueue();
-      case 'assign_chef':
-        final headChef = headChefForSection(recommendation.targetSection);
-        final chef = headChef == null ? 'Relief chef' : 'Relief · $headChef';
-        await assignSectionChef(
-          sectionName: recommendation.targetSection,
-          chefName: chef,
-        );
-      case 'none':
-        _sectionsActionMessage = recommendation.message;
-        notifyListeners();
-      default:
-        await optimizeSectionQueue();
-    }
+    await _runModuleAction(
+      (banner) => _sectionsActionMessage = banner,
+      () async {
+        switch (recommendation.action) {
+          case 'balance_load':
+            await optimizeSectionQueue();
+          case 'assign_chef':
+            final headChef = headChefForSection(recommendation.targetSection);
+            final chef = headChef == null ? 'Relief chef' : 'Relief · $headChef';
+            await assignSectionChef(
+              sectionName: recommendation.targetSection,
+              chefName: chef,
+            );
+          case 'none':
+            _sectionsActionMessage = recommendation.message;
+            notifyListeners();
+          default:
+            await optimizeSectionQueue();
+        }
+      },
+    );
   }
 
   Future<void> performKdsAction(String orderId, String action) async {
@@ -4212,100 +5047,65 @@ class KitchenCommandController extends ChangeNotifier {
       return;
     }
     _selectedNav = index;
+    clearActionMessages();
     notifyListeners();
-    if (index == 1) {
-      unawaited(refreshKds());
-    } else if (index == 2) {
-      unawaited(refreshSections());
-    } else if (index == 3) {
-      unawaited(refreshProcessing());
-    } else if (index == 4) {
-      unawaited(refreshFiring());
-    } else if (index == 5) {
-      unawaited(refreshPrep());
-    } else if (index == 6) {
-      unawaited(refreshModifiers());
-    } else if (index == 7) {
-      unawaited(refreshChefTasks());
-    } else if (index == 9) {
-      unawaited(refreshSafety());
-    } else if (index == 10) {
-      unawaited(refreshAiAssistant());
-    } else if (index == 11) {
-      unawaited(refreshOrderPriority());
-    } else if (index == 12) {
-      unawaited(refreshKitchenCommunication());
-    } else if (index == 13) {
-      unawaited(refreshInventory());
-    } else if (index == 14) {
-      unawaited(refreshRecipeCosting());
-    } else if (index == 15) {
-      unawaited(refreshPrepStations());
-    } else if (index == 16) {
-      unawaited(refreshBatchCooking());
-    } else if (index == 17) {
-      unawaited(refreshDelayEscalation());
-    } else if (index == 18) {
-      unawaited(refreshQualityControl());
-    } else if (index == 19) {
-      unawaited(refreshCustomerReturn());
-    } else if (index == 20) {
-      unawaited(refreshExpeditor());
-    } else if (index == 21) {
-      unawaited(refreshPacking());
-    } else if (index == 22) {
-      unawaited(refreshDeliveryAggregator());
-    } else if (index == 23) {
-      unawaited(refreshBarBeverage());
-    } else if (index == 24) {
-      unawaited(refreshBakeryDessert());
-    } else if (index == 25) {
-      unawaited(refreshCloudKitchen());
-    } else if (index == 26) {
-      unawaited(refreshBanquet());
-    } else if (index == 27) {
-      unawaited(refreshRoomService());
-    } else if (index == 28) {
-      unawaited(refreshCleaningHygiene());
-    } else if (index == 29) {
-      unawaited(refreshEquipment());
-    } else if (index == 30) {
-      unawaited(refreshSmartEnergy());
-    } else if (index == 31) {
-      unawaited(refreshIotDevice());
-    } else if (index == 32) {
-      unawaited(refreshStaffPerformance());
-    } else if (index == 33) {
-      unawaited(refreshStaffShift());
-    } else if (index == 34) {
-      unawaited(refreshStaffWellness());
-    } else if (index == 35) {
-      unawaited(refreshLiveAlerts());
-    } else if (index == 36) {
-      unawaited(refreshPanicEmergency());
-    } else if (index == 37) {
-      unawaited(refreshOfflineFailover());
-    } else if (index == 38) {
-      unawaited(refreshAnalyticsReporting());
-    } else if (index == 39) {
-      unawaited(refreshKitchenHeatmap());
-    } else if (index == 40) {
-      unawaited(refreshHardwareIntegration());
-    } else if (index == 41) {
-      unawaited(refreshSmartwatchSupport());
-    } else if (index == 42) {
-      unawaited(refreshMultiBranch());
-    } else if (index == 43) {
-      unawaited(refreshAuditCompliance());
-    } else if (index == 44) {
-      unawaited(refreshBackupRecovery());
-    } else if (index == 45) {
-      unawaited(refreshSandboxTraining());
-    } else if (index == 46) {
-      unawaited(refreshHiddenEnterprise());
-    } else if (index == 47) {
-      unawaited(refreshFutureAiExpansion());
-    }
+    unawaited(refreshNav(index));
+  }
+
+  /// Wipes every module's success banner. A "completed" bar left over from
+  /// half an hour ago is exactly what a chef or housekeeper reads as
+  /// confirmation of the tap that just failed, so it does not survive moving
+  /// to another board.
+  void clearActionMessages() {
+    _actionMessageTimer?.cancel();
+    _actionMessageToken++;
+    _actionErrorMessage = null;
+    _aiActionMessage = null;
+    _analyticsReportingActionMessage = null;
+    _auditComplianceActionMessage = null;
+    _backupRecoveryActionMessage = null;
+    _bakeryDessertActionMessage = null;
+    _banquetActionMessage = null;
+    _barBeverageActionMessage = null;
+    _batchCookingActionMessage = null;
+    _chefTaskActionMessage = null;
+    _cleaningHygieneActionMessage = null;
+    _cloudKitchenActionMessage = null;
+    _communicationActionMessage = null;
+    _customerReturnActionMessage = null;
+    _delayEscalationActionMessage = null;
+    _deliveryAggregatorActionMessage = null;
+    _equipmentActionMessage = null;
+    _expeditorActionMessage = null;
+    _firingActionMessage = null;
+    _futureAiExpansionActionMessage = null;
+    _hardwareIntegrationActionMessage = null;
+    _hiddenEnterpriseActionMessage = null;
+    _inventoryActionMessage = null;
+    _iotDeviceActionMessage = null;
+    _kitchenHeatmapActionMessage = null;
+    _liveAlertActionMessage = null;
+    _modifierActionMessage = null;
+    _multiBranchActionMessage = null;
+    _offlineFailoverActionMessage = null;
+    _packingActionMessage = null;
+    _panicEmergencyActionMessage = null;
+    _prepActionMessage = null;
+    _prepStationActionMessage = null;
+    _priorityActionMessage = null;
+    _processingActionMessage = null;
+    _qualityControlActionMessage = null;
+    _recipeCostingActionMessage = null;
+    _roomServiceActionMessage = null;
+    _safetyActionMessage = null;
+    _sandboxTrainingActionMessage = null;
+    _sectionsActionMessage = null;
+    _smartEnergyActionMessage = null;
+    _smartwatchSupportActionMessage = null;
+    _staffPerformanceActionMessage = null;
+    _staffShiftActionMessage = null;
+    _staffWellnessActionMessage = null;
+    _waiterAutoAssignmentActionMessage = null;
   }
 
   void selectSection(String section) {
@@ -4396,6 +5196,8 @@ class KitchenCommandController extends ChangeNotifier {
   void dispose() {
     _pollTimer?.cancel();
     _kdsTimer?.cancel();
+    _actionMessageTimer?.cancel();
+    alarm.dispose();
     super.dispose();
   }
 }

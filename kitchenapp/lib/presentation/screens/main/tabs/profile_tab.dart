@@ -109,7 +109,7 @@ class ProfileTab extends StatelessWidget {
                       icon: Icons.shield_outlined,
                       title: 'Authentication & Security',
                       subtitle:
-                          'System 1 · login methods, roles, and security status',
+                          'Login methods, roles, and security status',
                       color: AppColors.primary,
                       onTap: () => ModuleScreenBuilder.open(
                         context,

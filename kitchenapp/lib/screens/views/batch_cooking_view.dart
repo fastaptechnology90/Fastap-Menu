@@ -50,7 +50,7 @@ class BatchCookingView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 17 · Advanced Batch Cooking',
+                    'Advanced Batch Cooking',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

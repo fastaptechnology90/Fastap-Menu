@@ -96,7 +96,7 @@ class _WaiterBoard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 49 · Waiter Auto Assignment',
+                    'Waiter Auto Assignment',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

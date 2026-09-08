@@ -56,7 +56,7 @@ class OfflineFailoverView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 38 · Offline Mode & Failover System',
+                    'Offline Mode & Failover System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

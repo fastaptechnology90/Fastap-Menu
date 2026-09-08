@@ -50,7 +50,7 @@ class CloudKitchenView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 26 · Cloud Kitchen Management',
+                    'Cloud Kitchen Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

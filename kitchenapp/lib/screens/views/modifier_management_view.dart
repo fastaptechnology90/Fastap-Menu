@@ -51,7 +51,7 @@ class ModifierManagementView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 8 · Modifier & Customization Management',
+                    'Modifier & Customization Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

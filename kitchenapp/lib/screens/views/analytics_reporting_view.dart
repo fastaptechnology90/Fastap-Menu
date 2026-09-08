@@ -51,7 +51,7 @@ class AnalyticsReportingView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 39 · Analytics & Reporting System',
+                    'Analytics & Reporting System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

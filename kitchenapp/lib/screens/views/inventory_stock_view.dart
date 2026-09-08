@@ -50,7 +50,7 @@ class InventoryStockView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 14 · Inventory & Stock Integration',
+                    'Inventory & Stock Integration',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

@@ -50,7 +50,7 @@ class CourseFiringView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 6 · Food Firing & Course Management',
+                    'Food Firing & Course Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

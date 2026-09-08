@@ -50,7 +50,7 @@ class PackingDeliveryView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 22 · Packing & Delivery Preparation',
+                    'Packing & Delivery Preparation',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

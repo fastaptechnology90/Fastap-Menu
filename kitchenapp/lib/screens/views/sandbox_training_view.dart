@@ -51,7 +51,7 @@ class SandboxTrainingView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 46 · Sandbox & Training Mode',
+                    'Sandbox & Training Mode',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

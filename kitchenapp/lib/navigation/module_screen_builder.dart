@@ -52,6 +52,7 @@ import '../screens/views/staff_shift_view.dart';
 import '../screens/views/staff_wellness_view.dart';
 import '../screens/views/waiter_auto_assignment_view.dart';
 import '../data/enterprise_system_nav_registry.dart';
+import '../core/constants/app_colors.dart';
 import '../presentation/widgets/common/role_access_denied.dart';
 import '../presentation/widgets/module/module_detail_header.dart';
 import '../state/kitchen_command_controller.dart';
@@ -180,6 +181,8 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
   @override
   void initState() {
     super.initState();
+    // Whatever the last module said about the last tap does not apply here.
+    widget.controller.clearActionMessages();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       refreshModule(widget.controller, widget.navIndex);
     });
@@ -240,6 +243,13 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                         onRefresh: () =>
                             refreshModule(widget.controller, widget.navIndex),
                       ),
+                      if (widget.controller.actionErrorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        _ActionFailureBanner(
+                          message: widget.controller.actionErrorMessage!,
+                          onDismiss: widget.controller.clearActionError,
+                        ),
+                      ],
                       if (systemNumber != null) ...[
                         const SizedBox(height: 12),
                         EnterpriseSystemCapabilitiesExpandable(
@@ -258,6 +268,50 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                 );
               },
             ),
+    );
+  }
+}
+
+
+/// Shown when a module button did not reach the server. Without it a failed tap
+/// on any board outside the KDS produced nothing at all on screen — while the
+/// previous action's success banner stayed pinned above it.
+class _ActionFailureBanner extends StatelessWidget {
+  const _ActionFailureBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: AppColors.danger),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: AppColors.danger,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
+            icon: Icon(Icons.close_rounded, color: AppColors.danger),
+          ),
+        ],
+      ),
     );
   }
 }

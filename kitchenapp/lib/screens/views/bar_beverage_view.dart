@@ -51,7 +51,7 @@ class BarBeverageView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 24 · Bar & Beverage Kitchen System',
+                    'Bar & Beverage Kitchen System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

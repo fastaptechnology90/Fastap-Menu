@@ -51,7 +51,7 @@ class HardwareIntegrationView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 41 · Hardware Integration System',
+                    'Hardware Integration System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

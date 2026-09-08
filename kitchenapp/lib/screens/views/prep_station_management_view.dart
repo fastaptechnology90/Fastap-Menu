@@ -50,7 +50,7 @@ class PrepStationManagementView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 16 · Prep Station Management',
+                    'Prep Station Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

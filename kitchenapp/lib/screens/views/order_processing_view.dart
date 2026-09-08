@@ -51,7 +51,7 @@ class OrderProcessingView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 5 · Advanced Order Processing',
+                    'Advanced Order Processing',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

@@ -50,7 +50,7 @@ class SmartEnergyView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 31 · Smart Energy & Gas Monitoring',
+                    'Smart Energy & Gas Monitoring',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

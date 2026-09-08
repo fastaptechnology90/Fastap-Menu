@@ -50,7 +50,7 @@ class KitchenHeatmapView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 40 · Live Kitchen Heatmap System',
+                    'Live Kitchen Heatmap System',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,

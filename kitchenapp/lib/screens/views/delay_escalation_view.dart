@@ -57,7 +57,7 @@ class DelayEscalationView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System 18 · Delay & Escalation System',
+                      'Delay & Escalation System',
                       style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,

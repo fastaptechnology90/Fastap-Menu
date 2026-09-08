@@ -56,7 +56,7 @@ class PanicEmergencyView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System 37 · Panic & Emergency System',
+                      'Panic & Emergency System',
                       style: TextStyle(
                         color: AppColors.primaryText,
                         fontWeight: FontWeight.w900,

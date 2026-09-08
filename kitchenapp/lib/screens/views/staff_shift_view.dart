@@ -50,7 +50,7 @@ class StaffShiftView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'System 34 · Staff Shift Management',
+                    'Staff Shift Management',
                     style: TextStyle(
                       color: AppColors.primaryText,
                       fontWeight: FontWeight.w900,
