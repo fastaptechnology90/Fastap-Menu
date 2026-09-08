@@ -15,6 +15,18 @@ import { saveActiveOrder } from "@/lib/activeOrder";
 
 export type DietaryFilter = "all" | "veg" | "non-veg" | "vegan" | "jain" | "gluten-free" | "keto" | "sugar-free" | "organic" | "nut-free" | "dairy-free";
 
+/**
+ * What the basket comes to.
+ *
+ * `CartItem.price` is the FULL unit price the guest was shown — portion and add-ons
+ * already folded in by whoever built the line. Adding the add-on prices again here (which
+ * both the cart footer and the offline queue used to do) charged every extra twice on
+ * screen, so the guest saw one figure in the cart and was billed a smaller one.
+ */
+function cartValue(items: CartItem[]): number {
+  return items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+}
+
 export interface CartItem {
   id: string;
   menuItemId: string;
@@ -24,6 +36,11 @@ export interface CartItem {
   image?: string;
   customizations: string[];
   addons: { name: string; price: number }[];
+  // The half/full (or regular/large) the guest picked. It is the dish's own variant NAME,
+  // because that is the only thing the server will match against the menu when it prices
+  // the line — a portion recorded only as a "Portion: Half" customization string is not
+  // priced at all and the guest silently pays the full rate.
+  variant?: string;
   specialInstructions?: string;
   course: "starter" | "main" | "dessert" | "beverage";
 }
@@ -408,9 +425,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((item: Omit<CartItem, "id">) => {
     setCart(prev => {
+      // Variant is part of the identity of a line: a half plate and a full plate of the same
+      // dish are two different things at two different prices, not one line of quantity two.
       const existing = prev.find(c =>
         c.menuItemId === item.menuItemId &&
-        JSON.stringify(c.customizations) === JSON.stringify(item.customizations),
+        (c.variant ?? "") === (item.variant ?? "") &&
+        JSON.stringify(c.customizations) === JSON.stringify(item.customizations) &&
+        JSON.stringify(c.addons?.map(a => a.name)) === JSON.stringify(item.addons?.map(a => a.name)),
       );
       if (existing) {
         return prev.map(c => c.id === existing.id ? { ...c, quantity: c.quantity + item.quantity } : c);
@@ -443,6 +464,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         menuItemId: parseInt(c.menuItemId, 10),
         quantity: c.quantity,
         unitPrice: c.price,
+        // `variant` is the field the server prices from; without it a half portion was
+        // charged at the full rate. `unitPrice` above is ignored server-side by design.
+        variant: c.variant,
         addons: c.addons,
         customizations: c.customizations,
         notes: c.specialInstructions,
@@ -486,7 +510,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       return order;
     } catch (err) {
       const pendingId = `pending-${Date.now()}`;
-      const total = cart.reduce((sum, i) => sum + (i.price + i.addons.reduce((a, b) => a + b.price, 0)) * i.quantity, 0);
+      const total = cartValue(cart);
       queueOfflineOrder({
         id: pendingId,
         body: body as Record<string, unknown>,
@@ -546,7 +570,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     });
   }, [venue.restaurantId]);
 
-  const cartTotal = cart.reduce((sum, i) => sum + (i.price + i.addons.reduce((a, b) => a + b.price, 0)) * i.quantity, 0);
+  const cartTotal = cartValue(cart);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   const setWaitlistPersist = useCallback((w: WaitlistEntry | null) => {

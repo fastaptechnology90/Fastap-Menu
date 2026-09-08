@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageShell, PanelCard } from "@/components/shared/PageShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/apiClient";
 import { CreditCard, Save } from "lucide-react";
@@ -43,7 +44,14 @@ export default function BillingEngine() {
             {m.rate != null && (
               <div className="mt-3 flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs">Rate</Badge>
-                <span className="font-semibold">{m.rate} {m.unit}</span>
+                {/* The rate was read-only, so the only thing this page could change was the
+                    on/off switch — the number the platform actually bills on was unreachable. */}
+                <Input
+                  type="number" step="0.01" className="h-8 w-28"
+                  value={m.rate}
+                  onChange={e => setModels(prev => prev.map((x, j) => j === i ? { ...x, rate: e.target.value === "" ? 0 : parseFloat(e.target.value) } : x))}
+                />
+                <span className="text-sm text-muted-foreground">{m.unit}</span>
               </div>
             )}
           </PanelCard>

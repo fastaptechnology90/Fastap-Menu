@@ -25,7 +25,7 @@ export default function Escrow() {
   const [freezeVendorId, setFreezeVendorId] = useState("");
 
   const { data, isLoading } = useQuery({ queryKey: ["escrow"], queryFn: api.escrow.get, refetchInterval: 30000 });
-  const { data: vendors = [] } = useQuery({ queryKey: ["superadmin-vendors"], queryFn: api.vendors.list });
+  const { data: vendors = [] } = useQuery({ queryKey: ["superadmin-vendors"], queryFn: () => api.vendors.list() });
 
   const metrics = data?.metrics;
   const ledger = data?.ledger ?? [];
@@ -38,7 +38,14 @@ export default function Escrow() {
 
   const freezeMutation = useMutation({
     mutationFn: (vendorId: string) => api.escrow.freeze(vendorId),
-    onSuccess: (_, v) => { toast.success(`Vendor ${v} payouts frozen`); setFreezeDialog(false); setFreezeVendorId(""); qc.invalidateQueries({ queryKey: ["escrow"] }); },
+    onSuccess: (_, v) => {
+      const name = (vendors as any[]).find((x: any) => String(x.id) === v)?.name ?? `#${v}`;
+      toast.success(`${name} payouts frozen`);
+      setFreezeDialog(false); setFreezeVendorId("");
+      qc.invalidateQueries({ queryKey: ["escrow"] });
+      // The freeze lives on the vendor record, so the vendor list is stale after this.
+      qc.invalidateQueries({ queryKey: ["superadmin-vendors"] });
+    },
     onError: () => toast.error("Failed to freeze"),
   });
 
@@ -62,7 +69,9 @@ export default function Escrow() {
             <KpiCard title="Total Escrow" value={fmt(metrics?.totalEscrow ?? 0)} icon={<Wallet className="h-4 w-4 text-primary" />} />
             <KpiCard title="Active Holds" value={fmt(metrics?.activeHolds ?? 0)} icon={<Lock className="h-4 w-4 text-yellow-500" />} />
             <KpiCard title="Pending Releases" value={fmt(metrics?.pendingReleases ?? 0)} icon={<ArrowRightLeft className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="Locked Disputes" value={fmt(metrics?.lockedDisputes ?? 0)} icon={<ShieldAlert className="h-4 w-4 text-red-500" />} />
+            {/* Surfaces what "Add Reserve" actually writes — it used to land in settings and
+                show up on no screen at all. */}
+            <KpiCard title="Reserve Balance" value={fmt((metrics as any)?.reserveBalance ?? 0)} icon={<ShieldAlert className="h-4 w-4 text-red-500" />} />
           </div>
           <Card>
             <CardHeader><CardTitle>Escrow Ledger</CardTitle></CardHeader>
@@ -72,7 +81,7 @@ export default function Escrow() {
                 { header: "Vendor", accessorKey: "vendorName" },
                 { header: "Type", cell: (row: any) => <span className={`text-xs font-medium ${row.type === "Release" ? "text-green-500" : row.type === "Dispute Lock" ? "text-red-500" : "text-muted-foreground"}`}>{row.type}</span> },
                 { header: "Amount", cell: (row: any) => <span className="font-medium">{fmt(row.amount)}</span> },
-                { header: "Balance After", cell: (row: any) => <span className="font-bold">{fmt(row.balance)}</span> },
+                { header: "Gross Sales", cell: (row: any) => <span className="font-bold">{fmt(row.balance)}</span> },
                 { header: "Date", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.date}</span> },
                 { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
               ]} />

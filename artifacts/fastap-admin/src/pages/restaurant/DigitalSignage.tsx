@@ -15,7 +15,21 @@ const SLIDE_TYPES = [
   { value: "promo", label: "Promotion" },
   { value: "menu", label: "Menu Highlight" },
   { value: "social", label: "Social Media" },
+  { value: "video", label: "Video (YouTube)" },
 ];
+
+/**
+ * Screens embed the player, so a watch/share link has to become an embed link — pasting
+ * a plain youtube.com/watch URL into an iframe is refused by YouTube and shows a blank
+ * screen in the dining room.
+ */
+function youtubeEmbedUrl(raw: string): string | null {
+  const url = String(raw || "").trim();
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return null;
+  return `https://www.youtube.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}`;
+}
 
 const BG_PRESETS = ["#7c3aed", "#f97316", "#0f172a", "#1e293b", "#dc2626", "#16a34a", "#0891b2", "#c2410c"];
 
@@ -26,7 +40,7 @@ export default function DigitalSignage() {
   const [tab, setTab] = useState<"slides" | "screens" | "settings">("slides");
   const [editSlide, setEditSlide] = useState<any | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [newSlide, setNewSlide] = useState({ type: "banner", title: "", subtitle: "", bg_color: "#7c3aed", text_color: "#ffffff", active: true });
+  const [newSlide, setNewSlide] = useState<any>({ type: "banner", title: "", subtitle: "", bg_color: "#7c3aed", text_color: "#ffffff", active: true, url: "", duration: 10 });
   const [saving, setSaving] = useState(false);
   const [savedSettings, setSavedSettings] = useState(false);
   const [settings, setSettings] = useState<any>({});
@@ -49,30 +63,66 @@ export default function DigitalSignage() {
       .finally(() => setLoading(false));
   }, [restaurantId]);
 
+  // Every one of these used to run without a catch, so a rejected write threw into the
+  // console and the screen list simply stayed as it was — silently out of step with what
+  // the TVs were showing.
   async function handleToggleSlide(id: number, active: boolean) {
     if (!restaurantId) return;
-    await apiFetch(`/restaurants/${restaurantId}/signage/slides/${id}`, { method: "PUT", body: JSON.stringify({ active }) });
-    setData((prev: any) => ({ ...prev, slides: prev.slides.map((s: any) => s.id === id ? { ...s, active } : s) }));
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/signage/slides/${id}`, { method: "PUT", body: JSON.stringify({ active }) });
+      setData((prev: any) => ({ ...prev, slides: prev.slides.map((s: any) => s.id === id ? { ...s, active } : s) }));
+    } catch (e) {
+      toast({ title: "Could not change the slide", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleDeleteSlide(id: number) {
     if (!restaurantId) return;
-    await apiFetch(`/restaurants/${restaurantId}/signage/slides/${id}`, { method: "DELETE" });
-    setData((prev: any) => ({ ...prev, slides: prev.slides.filter((s: any) => s.id !== id) }));
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/signage/slides/${id}`, { method: "DELETE" });
+      setData((prev: any) => ({ ...prev, slides: prev.slides.filter((s: any) => s.id !== id) }));
+      toast({ title: "Slide removed" });
+    } catch (e) {
+      toast({ title: "Could not remove the slide", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
+  }
+
+  /** Shared checks for both add and edit — a video slide is useless without a playable link. */
+  function slideProblem(slide: any): string | null {
+    if (!String(slide.title || "").trim()) return "Give the slide a title";
+    if (slide.type === "video" && !youtubeEmbedUrl(slide.url)) {
+      return "Paste a YouTube link — a full youtube.com/watch or youtu.be address";
+    }
+    return null;
   }
 
   async function handleAddSlide() {
-    if (!restaurantId || !newSlide.title) return;
-    const slide = await apiFetch(`/restaurants/${restaurantId}/signage/slides`, { method: "POST", body: JSON.stringify(newSlide) });
-    setData((prev: any) => ({ ...prev, slides: [...prev.slides, slide] }));
-    setShowAdd(false); setNewSlide({ type: "banner", title: "", subtitle: "", bg_color: "#7c3aed", text_color: "#ffffff", active: true });
+    if (!restaurantId) return;
+    const problem = slideProblem(newSlide);
+    if (problem) { toast({ title: problem, variant: "destructive" }); return; }
+    try {
+      const slide = await apiFetch(`/restaurants/${restaurantId}/signage/slides`, { method: "POST", body: JSON.stringify(newSlide) });
+      setData((prev: any) => ({ ...prev, slides: [...prev.slides, slide] }));
+      setShowAdd(false);
+      setNewSlide({ type: "banner", title: "", subtitle: "", bg_color: "#7c3aed", text_color: "#ffffff", active: true, url: "", duration: 10 });
+      toast({ title: "Slide added" });
+    } catch (e) {
+      toast({ title: "Could not add the slide", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleSaveSlide() {
     if (!restaurantId || !editSlide) return;
-    await apiFetch(`/restaurants/${restaurantId}/signage/slides/${editSlide.id}`, { method: "PUT", body: JSON.stringify(editSlide) });
-    setData((prev: any) => ({ ...prev, slides: prev.slides.map((s: any) => s.id === editSlide.id ? editSlide : s) }));
-    setEditSlide(null);
+    const problem = slideProblem(editSlide);
+    if (problem) { toast({ title: problem, variant: "destructive" }); return; }
+    try {
+      await apiFetch(`/restaurants/${restaurantId}/signage/slides/${editSlide.id}`, { method: "PUT", body: JSON.stringify(editSlide) });
+      setData((prev: any) => ({ ...prev, slides: prev.slides.map((s: any) => s.id === editSlide.id ? editSlide : s) }));
+      setEditSlide(null);
+      toast({ title: "Slide saved" });
+    } catch (e) {
+      toast({ title: "Could not save the slide", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function handleSaveSettings() {
@@ -232,18 +282,51 @@ export default function DigitalSignage() {
                 <div key={f.field}>
                   <label className="text-xs text-slate-400 mb-1 block">{f.label}</label>
                   {f.type === "select" ? (
-                    <select value={(editSlide || newSlide)[f.field]} onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, [f.field]: e.target.value })) : setNewSlide(p => ({ ...p, [f.field]: e.target.value }))} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none">
+                    <select value={(editSlide || newSlide)[f.field]} onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, [f.field]: e.target.value })) : setNewSlide((p: any) => ({ ...p, [f.field]: e.target.value }))} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none">
                       {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   ) : (
-                    <input value={(editSlide || newSlide)[f.field] || ""} onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, [f.field]: e.target.value })) : setNewSlide(p => ({ ...p, [f.field]: e.target.value }))} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none" />
+                    <input value={(editSlide || newSlide)[f.field] || ""} onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, [f.field]: e.target.value })) : setNewSlide((p: any) => ({ ...p, [f.field]: e.target.value }))} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none" />
                   )}
                 </div>
               ))}
+              {/* A video screen had no field to hold its link, so the only slides that
+                  could be built were static colour cards. */}
+              {(editSlide || newSlide).type === "video" && (
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">YouTube link</label>
+                  <input
+                    value={(editSlide || newSlide).url || ""}
+                    onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, url: e.target.value })) : setNewSlide((p: any) => ({ ...p, url: e.target.value }))}
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none"
+                  />
+                  {youtubeEmbedUrl((editSlide || newSlide).url) ? (
+                    <iframe
+                      title="Slide preview"
+                      src={youtubeEmbedUrl((editSlide || newSlide).url) as string}
+                      className="mt-2 w-full aspect-video rounded-lg border border-slate-600"
+                      allow="autoplay; encrypted-media"
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-1">Plays muted and on loop on the screen.</p>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Seconds on screen</label>
+                <input
+                  type="number"
+                  min={3}
+                  value={(editSlide || newSlide).duration ?? 10}
+                  onChange={e => editSlide ? setEditSlide((p: any) => ({ ...p, duration: Number(e.target.value) })) : setNewSlide((p: any) => ({ ...p, duration: Number(e.target.value) }))}
+                  className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none"
+                />
+              </div>
               <div>
                 <label className="text-xs text-slate-400 mb-2 block">Background Color</label>
                 <div className="flex gap-2 flex-wrap">
-                  {BG_PRESETS.map(c => <button key={c} onClick={() => editSlide ? setEditSlide((p: any) => ({ ...p, bg_color: c })) : setNewSlide(p => ({ ...p, bg_color: c }))} className="w-8 h-8 rounded-lg border-2 transition-all" style={{ background: c, borderColor: (editSlide || newSlide).bg_color === c ? "#fff" : "transparent" }} />)}
+                  {BG_PRESETS.map(c => <button key={c} onClick={() => editSlide ? setEditSlide((p: any) => ({ ...p, bg_color: c })) : setNewSlide((p: any) => ({ ...p, bg_color: c }))} className="w-8 h-8 rounded-lg border-2 transition-all" style={{ background: c, borderColor: (editSlide || newSlide).bg_color === c ? "#fff" : "transparent" }} />)}
                 </div>
               </div>
             </div>

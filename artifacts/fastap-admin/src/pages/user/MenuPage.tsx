@@ -5,11 +5,10 @@ import { useLocaleAccessibility } from "@/contexts/LocaleAccessibilityContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePwa } from "@/contexts/PwaContext";
 import { publicApi } from "@/lib/api";
-import { DEFAULT_CUSTOMIZATION } from "@/lib/digitalMenuCatalog";
 import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestEmpty } from "@/components/user/GuestApiState";
-import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
+import { resolveGuestSlug } from "@/lib/guestDemo";
 import { loadActiveOrders, removeActiveOrder, clearActiveOrder } from "@/lib/activeOrder";
 import { MenuGridCard } from "@/components/user/MenuGridCard";
 import { ServiceHubSheet } from "@/components/user/ServiceHubSheet";
@@ -67,6 +66,9 @@ interface MenuDisplayItem {
   videoUrl?: string;
   preview360Url?: string;
   addons: { name: string; price: number }[];
+  // Portions the kitchen actually offers, each with the full price of that portion (a
+  // "Half" at ₹210 is ₹210, not ₹210 on top of the full price).
+  variants: { name: string; price: number }[];
   customizations: string[];
   customizationOptions: CustomizationOpts;
 }
@@ -90,10 +92,19 @@ function matchesDietaryFilter(tags: string[], filter: DietaryFilter): boolean {
   }
 }
 
+/**
+ * Only what this dish itself declares.
+ *
+ * A shared default set used to be merged in here, so every item — coffee and kulfi
+ * included — offered "Extra Cheese +₹15", "Large +₹25" and "Make it a combo meal +₹99".
+ * The server prices strictly from the dish's own `addons`, so none of those were ever
+ * actually charged: the guest picked an option, watched the total go up on screen, and
+ * then got a different bill. The server stopped merging the defaults; this is the other
+ * half of that fix.
+ */
 function parseCustomization(raw: unknown): CustomizationOpts {
-  const base = DEFAULT_CUSTOMIZATION as CustomizationOpts;
-  if (typeof raw !== "object" || raw === null) return base;
-  return { ...base, ...(raw as CustomizationOpts) };
+  if (typeof raw !== "object" || raw === null) return {};
+  return { ...(raw as CustomizationOpts) };
 }
 
 function mapApiItem(i: Record<string, unknown>, categorySlug: string, categoryGroup = "food", restaurantRating = 0): MenuDisplayItem {
@@ -106,16 +117,26 @@ function mapApiItem(i: Record<string, unknown>, categorySlug: string, categoryGr
   const addons = Array.isArray(i.addons)
     ? (i.addons as Record<string, unknown>[]).map(a => ({ name: String(a.name ?? a), price: parseFloat(String(a.price ?? 0)) }))
     : [];
-  const customizations = Array.isArray(i.variants)
-    ? (i.variants as unknown[]).map(v => (typeof v === "object" && v !== null ? String((v as Record<string, unknown>).name ?? v) : String(v)))
+  // A variant row is {name, price} where price is the full price of that portion. Older
+  // rows are bare strings with no price; those are shown but priced at the base rate,
+  // which is exactly what the server will do with them.
+  const basePrice = (i.discountedPrice as number) ?? parseFloat(String(i.price ?? 0));
+  const variants = Array.isArray(i.variants)
+    ? (i.variants as unknown[]).map(v =>
+        typeof v === "object" && v !== null
+          ? { name: String((v as Record<string, unknown>).name ?? ""), price: parseFloat(String((v as Record<string, unknown>).price ?? basePrice)) || basePrice }
+          : { name: String(v), price: basePrice },
+      ).filter(v => v.name)
     : [];
+  const customizations = variants.map(v => v.name);
   const custOpts = parseCustomization(i.customizationOptions);
   return {
     id: String(i.id),
     name: String(i.name),
     category: categorySlug,
     categoryGroup,
-    price: (i.discountedPrice as number) ?? parseFloat(String(i.price ?? 0)),
+    price: basePrice,
+    variants,
     dietaryTags: tags,
     rating: restaurantRating > 0 ? restaurantRating : 0,
     reviews: (i.orderCount as number) || 0,
@@ -153,7 +174,7 @@ function categoryIcon(name: string, slug?: string): string {
 interface ItemDetailProps {
   item: MenuDisplayItem;
   onClose: () => void;
-  onAdd: (customizations: string[], addons: MenuDisplayItem["addons"], instructions?: string, unitPrice?: number) => void;
+  onAdd: (customizations: string[], addons: MenuDisplayItem["addons"], instructions?: string, unitPrice?: number, variant?: string) => void;
   readOnly?: boolean;
 }
 
@@ -168,9 +189,10 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
   const [extraSpicy, setExtraSpicy] = useState(false);
   const opts = item.customizationOptions;
 
-  const portionSizes = opts.portionSizes?.length
-    ? opts.portionSizes
-    : item.customizations.map(name => ({ name, price: name.toLowerCase().includes("large") ? 25 : 0 }));
+  // The dish's own portions, at the dish's own prices. This used to fall back to inventing
+  // a flat ₹25 surcharge for anything named "large", which matched nothing the kitchen or
+  // the server knew about.
+  const portionSizes = item.variants;
 
   const removeOptions = opts.removeIngredients ?? ["No onion", "No garlic", "No dairy", "No nuts"];
   const toppings = opts.toppings ?? [];
@@ -183,14 +205,15 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
     setSelectedAddons(p => p.find(x => x.name === a.name) ? p.filter(x => x.name !== a.name) : [...p, a]);
   }
 
-  const portionPrice = portionSizes.find(p => p.name === portion)?.price ?? 0;
-  const extrasPrice = (extraCheese ? (opts.extraCheese?.price ?? 15) : 0) + (extraSpicy ? (opts.extraSpicy?.price ?? 0) : 0);
-  const unitPrice = item.price + portionPrice + extrasPrice + selectedAddons.reduce((s, a) => s + a.price, 0);
+  // A chosen portion REPLACES the base price — that is how the server reads a variant, and
+  // the two have to agree or the guest is shown one figure and billed another.
+  const portionPrice = portionSizes.find(p => p.name === portion)?.price;
+  const extrasPrice = (extraCheese ? (opts.extraCheese?.price ?? 0) : 0) + (extraSpicy ? (opts.extraSpicy?.price ?? 0) : 0);
+  const unitPrice = (portionPrice ?? item.price) + extrasPrice + selectedAddons.reduce((s, a) => s + a.price, 0);
   const total = unitPrice * qty;
 
   const allCustomizations = [
     ...selectedCustom,
-    ...(portion ? [`Portion: ${portion}`] : []),
     ...(extraCheese ? [opts.extraCheese?.label ?? "Extra Cheese"] : []),
     ...(extraSpicy ? [opts.extraSpicy?.label ?? "Extra Spicy"] : []),
   ];
@@ -324,7 +347,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
                     onClick={() => setPortion(portion === p.name ? "" : p.name)}
                     className={`px-3 py-1.5 rounded-full text-xs border transition-all ${portion === p.name ? "bg-orange-500/20 border-orange-500/50 text-orange-300" : "bg-white/5 border-white/10 text-white/60"}`}
                   >
-                    {p.name}{p.price > 0 ? ` +₹${p.price}` : ""}
+                    {p.name} ₹{p.price}
                   </button>
                 ))}
               </div>
@@ -433,7 +456,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
                   </button>
                 </div>
                 <button
-                  onClick={() => { onAdd(allCustomizations, selectedAddons, instructions, unitPrice); onClose(); }}
+                  onClick={() => { onAdd(allCustomizations, selectedAddons, instructions, unitPrice, portion || undefined); onClose(); }}
                   className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
                 >
                   <ShoppingCart className="h-4 w-4" />
@@ -451,10 +474,16 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
 export default function MenuPage() {
   const [, navigate] = useAppLocation();
   const { addToCart, cart, updateQuantity, cartCount, cartTotal, activeRestaurant, activeTable, activeSection, dietaryFilter, setDietaryFilter, setActiveRestaurant, setActiveTable, loadVenue, venue, user, favorites } = useUser();
-  // Demo menu (the marketing "spice-garden" venue) is VIEW-ONLY: no login, no ordering —
-  // visitors can browse the menu but cannot add to cart or check out.
-  const urlSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("slug") : null;
-  const isDemo = (urlSlug ?? (venue as { restaurantSlug?: string })?.restaurantSlug) === DEMO_SLUG;
+  // The marketing preview menu is VIEW-ONLY: a visitor who arrived from the landing page
+  // with no venue of their own can browse but not order.
+  //
+  // "No venue of their own" is the whole test, and it has to consider the context saved
+  // when the guest scanned — not just the current URL. Comparing the raw ?slug (which is
+  // absent on a reload or a link that dropped its query) against the demo alias put real
+  // diners into the read-only preview and told them ordering was disabled while they were
+  // sitting at a table. resolveGuestSlug returns null only when neither the URL nor the
+  // saved scan knows a real venue.
+  const isDemo = resolveGuestSlug((venue as { restaurantSlug?: string })?.restaurantSlug || undefined) === null;
   const { t, speakMenuItem, accessibility, announce } = useLocaleAccessibility();
   const { loadMenuWithCache, isOnline, connectionStatus, settings, pendingOrders } = useOffline();
   const { canInstall, isStandalone, installApp } = usePwa();
@@ -614,14 +643,16 @@ export default function MenuPage() {
       return 0;
     });
 
-  async function handleAdd(item: MenuDisplayItem, customizations: string[], addons: { name: string; price: number }[], instructions?: string, unitPrice?: number) {
+  async function handleAdd(item: MenuDisplayItem, customizations: string[], addons: { name: string; price: number }[], instructions?: string, unitPrice?: number, variant?: string) {
     if (isDemo) return; // demo menu is view-only — ordering disabled
     const beverageSlugs = ["soft-drinks", "coffee", "tea", "mocktails", "cocktails", "premium-liquor", "wine-menu", "beer-menu"];
     const course = item.category === "starters" ? "starter" : item.category === "desserts" ? "dessert" : beverageSlugs.includes(item.category) ? "beverage" : "main";
     // Everything the guest taps + on goes into the CART (even when they already have an order
     // running). Nothing is sent to the kitchen until they tap Place Order — which submits a new
     // order for the table. This is what stops a tap from silently placing an order on its own.
-    const linePrice = unitPrice ?? item.price + addons.reduce((s, a) => s + a.price, 0);
+    // A chosen portion replaces the base price, matching how the server prices the line.
+    const portionPrice = variant ? item.variants.find(v => v.name === variant)?.price : undefined;
+    const linePrice = unitPrice ?? (portionPrice ?? item.price) + addons.reduce((s, a) => s + a.price, 0);
     addToCart({
       menuItemId: item.id,
       name: item.name,
@@ -629,6 +660,7 @@ export default function MenuPage() {
       quantity: 1,
       customizations,
       addons,
+      variant,
       specialInstructions: instructions,
       course,
     });
@@ -988,7 +1020,7 @@ export default function MenuPage() {
         <ItemDetail
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
-          onAdd={(c, a, instr, unitPrice) => { handleAdd(selectedItem, c, a, instr, unitPrice); setSelectedItem(null); }}
+          onAdd={(c, a, instr, unitPrice, variant) => { handleAdd(selectedItem, c, a, instr, unitPrice, variant); setSelectedItem(null); }}
           readOnly={isDemo}
         />
       )}

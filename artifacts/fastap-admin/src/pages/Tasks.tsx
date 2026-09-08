@@ -14,6 +14,14 @@ import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { CheckSquare, Clock, Plus, RefreshCw, Loader2, Search, CheckCircle, AlertTriangle, PlayCircle } from "lucide-react";
 
+// The API stores task status lowercase ("pending", "in progress"); a few older rows and
+// the create response use title case. Every comparison goes through this so both match.
+const norm = (s?: string) => String(s ?? "").toLowerCase().replace(/_/g, " ").trim();
+const statusLabel = (s?: string) => {
+  const n = norm(s);
+  return n ? n.replace(/\b\w/g, c => c.toUpperCase()) : "Pending";
+};
+
 export default function Tasks() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -36,17 +44,18 @@ export default function Tasks() {
   const updateMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => api.tasks.updateStatus(id, status),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tasks"] }); toast({ title: "Task updated" }); },
+    onError: (e: any) => toast({ title: "Could not update task", description: e.message, variant: "destructive" }),
   });
 
   const filtered = tasks.filter((t: any) => {
     const matchSearch = t.title?.toLowerCase().includes(search.toLowerCase()) || t.assignedTo?.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || t.status?.toLowerCase() === filter;
+    const matchFilter = filter === "all" || norm(t.status) === filter;
     return matchSearch && matchFilter;
   });
 
-  const pending = tasks.filter((t: any) => t.status === "Pending").length;
-  const inProgress = tasks.filter((t: any) => t.status === "In Progress").length;
-  const completed = tasks.filter((t: any) => t.status === "Completed").length;
+  const pending = tasks.filter((t: any) => norm(t.status) === "pending").length;
+  const inProgress = tasks.filter((t: any) => norm(t.status) === "in progress").length;
+  const completed = tasks.filter((t: any) => norm(t.status) === "completed").length;
 
   const priorityColor: Record<string, string> = {
     critical: "text-red-400 bg-red-500/10",
@@ -162,15 +171,16 @@ export default function Tasks() {
               )},
               { header: "Assigned To", cell: (row: any) => <span className="text-sm">{row.assignedTo || "Unassigned"}</span> },
               { header: "Due Date", cell: (row: any) => (
-                <span className={`text-xs ${row.dueDate && new Date(row.dueDate) < new Date() && row.status !== "Completed" ? "text-red-400 font-medium" : "text-muted-foreground"}`}>{row.dueDate || "No deadline"}</span>
+                <span className={`text-xs ${row.dueDate && new Date(row.dueDate) < new Date() && norm(row.status) !== "completed" ? "text-red-400 font-medium" : "text-muted-foreground"}`}>{row.dueDate || "No deadline"}</span>
               )},
               { header: "Status", cell: (row: any) => (
-                <Badge variant={row.status === "Completed" ? "default" : row.status === "In Progress" ? "secondary" : "outline"} className="text-xs">{row.status}</Badge>
+                <Badge variant={norm(row.status) === "completed" ? "default" : norm(row.status) === "in progress" ? "secondary" : "outline"} className="text-xs">{statusLabel(row.status)}</Badge>
               )},
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1">
-                  {row.status === "Pending" && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateMutation.mutate({ id: row.id, status: "In Progress" })}>Start</Button>}
-                  {row.status === "In Progress" && <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" onClick={() => updateMutation.mutate({ id: row.id, status: "Completed" })}>Done</Button>}
+                  {norm(row.status) === "pending" && <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: row.id, status: "in progress" })}>Start</Button>}
+                  {norm(row.status) === "in progress" && <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: row.id, status: "completed" })}>Done</Button>}
+                  {norm(row.status) === "completed" && <span className="text-xs text-muted-foreground">Done</span>}
                 </div>
               )},
             ]} />

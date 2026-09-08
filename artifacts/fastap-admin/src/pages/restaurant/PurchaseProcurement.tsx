@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter, Eye } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { procurement as procurementApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 
@@ -80,7 +81,11 @@ export default function PurchaseProcurement() {
       }, ...prev]);
       setShowAdd(false);
       setPoForm({ supplierName: "", itemName: "", qty: 1, unitPrice: 0 });
-    } catch { /* create failed */ }
+      toast({ title: "Purchase order created" });
+    } catch (e: any) {
+      // Keep the form open with what was typed rather than closing on a failure.
+      toast({ title: "Purchase order not created", description: e?.message, variant: "destructive" });
+    }
     finally { setCreatingPo(false); }
   }
 
@@ -156,27 +161,33 @@ export default function PurchaseProcurement() {
   async function updatePO(id:string, status:string) {
     if (!restaurantId) return;
     const apiStatus = status === "delivered" ? "received" : status;
-    try {
-      const numericId = orders.find(o => o.id === id);
-      if (numericId) {
-        const raw = await procurementApi.purchaseOrders(restaurantId);
-        const match = (raw as any[]).find((r:any) => (r.poNumber || String(r.id)) === id);
-        if (match?.id) await procurementApi.updatePO(restaurantId, match.id, { status: apiStatus });
-      }
-    } catch {}
-    setOrders(o=>o.map(x=>x.id===id?{...x,status}:x));
-  }
-
-  // Mark an invoice paid. Invoices derive from delivered POs (status = paymentStatus),
-  // so update the underlying PO's paymentStatus (optimistic + best-effort persist).
-  async function payInvoice(inv: { po: string }) {
-    if (!restaurantId) return;
-    setOrders(o => o.map(x => x.id === inv.po ? { ...x, paymentStatus: "paid" } : x));
+    // The row used to move to its new status whether or not the server accepted it, and
+    // the failure was swallowed — so an order could read "Approved" to everyone while the
+    // supplier's copy was still awaiting approval. Only advance it once the write lands.
     try {
       const raw = await procurementApi.purchaseOrders(restaurantId);
-      const match = (raw as any[]).find((r:any) => (r.poNumber || String(r.id)) === inv.po);
-      if (match?.id) await procurementApi.updatePO(restaurantId, match.id, { paymentStatus: "paid" });
-    } catch {}
+      const match = (raw as any[]).find((r: any) => (r.poNumber || String(r.id)) === id);
+      if (!match?.id) throw new Error("This purchase order is no longer on the server.");
+      await procurementApi.updatePO(restaurantId, match.id, { status: apiStatus });
+      setOrders(o => o.map(x => x.id === id ? { ...x, status } : x));
+      toast({ title: `${id} marked ${status}` });
+    } catch (e: any) {
+      toast({ title: `Could not update ${id}`, description: e?.message, variant: "destructive" });
+    }
+  }
+
+  /**
+   * Settling a supplier invoice has nowhere to be recorded: purchase_orders carries no
+   * payment column and the update endpoint accepts only status and notes. This used to
+   * flip the row to "paid" locally and swallow the rejection, so the list showed invoices
+   * as settled that no one had paid. Say so instead of inventing a payment.
+   */
+  function payInvoice(_inv: { po: string }) {
+    toast({
+      title: "Supplier payments are not recorded yet",
+      description: "Mark the order delivered to close it off; settle the invoice in your accounts until payment tracking is added.",
+      variant: "destructive",
+    });
   }
 
   return (

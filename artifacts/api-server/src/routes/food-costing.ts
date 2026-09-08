@@ -73,14 +73,26 @@ router.put("/restaurants/:restaurantId/recipes/:recipeId", requireAuth, async (r
   }).where(and(eq(recipesTable.id, recipeId), eq(recipesTable.restaurantId, restaurantId))).returning();
   if (!recipe) { res.status(404).json({ error: "Recipe not found" }); return; }
   if (Array.isArray(ingredients)) {
+    // The rows are replaced wholesale, and the replacements used to carry no
+    // inventoryItemId — so saving a recipe cut every ingredient loose from the stock item
+    // it draws down, and the dish silently stopped consuming anything. Fall back to the
+    // link the ingredient already had when the caller does not send one.
+    const existing = await db.select().from(recipeIngredientsTable).where(eq(recipeIngredientsTable.recipeId, recipeId));
+    const linkByName = new Map(
+      existing.map(e => [String(e.ingredientName ?? "").trim().toLowerCase(), e.inventoryItemId]),
+    );
     await db.delete(recipeIngredientsTable).where(eq(recipeIngredientsTable.recipeId, recipeId));
     for (const ing of ingredients) {
       const ingCost = (parseFloat(ing.quantity) || 0) * (parseFloat(ing.costPerUnit) || 0);
+      const inventoryItemId = ing.inventoryItemId !== undefined
+        ? (ing.inventoryItemId ?? null)
+        : linkByName.get(String(ing.name ?? "").trim().toLowerCase()) ?? null;
       await db.insert(recipeIngredientsTable).values({
         recipeId: recipe.id, restaurantId,
         ingredientName: ing.name, quantity: String(ing.quantity),
         unit: ing.unit, costPerUnit: String(ing.costPerUnit),
         totalCost: String(ingCost.toFixed(2)),
+        inventoryItemId,
       });
     }
   }

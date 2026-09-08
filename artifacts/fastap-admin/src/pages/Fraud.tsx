@@ -10,6 +10,14 @@ import { ShieldAlert, ShieldBan, FileSearch, ShieldCheck, Search, Loader2 } from
 import { api, type FraudAlert } from "@/lib/apiClient";
 import { fmtINRFull } from "@/lib/format";
 import { toast } from "sonner";
+import { statusIs, statusLabel } from "@/pages/statusValue";
+
+/**
+ * The list route returns the stored status verbatim for everything except `active`,
+ * so a settled alert arrives as `resolved` / `dismissed`. Comparing against
+ * `"Resolved"` never matched, leaving Block Vendor live on an alert already closed.
+ */
+const isSettled = (alert: FraudAlert) => statusIs(alert.status, "resolved", "dismissed", "blocked");
 
 export default function Fraud() {
   const qc = useQueryClient();
@@ -34,7 +42,7 @@ export default function Fraud() {
   });
 
   const filtered = alerts.filter(a => a.vendorName.toLowerCase().includes(search.toLowerCase()) || a.type.toLowerCase().includes(search.toLowerCase()));
-  const active = alerts.filter(a => a.status === "Active");
+  const active = alerts.filter(a => statusIs(a.status, "active"));
   const highRisk = alerts.filter(a => a.riskScore >= 75);
 
   return (
@@ -62,12 +70,12 @@ export default function Fraud() {
                 return <span className={`font-bold ${color}`}>{row.riskScore}/100</span>;
               }},
               { header: "Amount", cell: (row: FraudAlert) => <span className="font-medium text-destructive">{fmtINRFull(row.amount)}</span> },
-              { header: "Status", cell: (row: FraudAlert) => <StatusBadge status={row.status} /> },
+              { header: "Status", cell: (row: FraudAlert) => <StatusBadge status={statusLabel(row.status)} /> },
               { header: "Actions", cell: (row: FraudAlert) => (
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="outline" className="h-7 text-xs text-green-500" disabled={row.status === "Resolved"} onClick={() => resolveMutation.mutate(row.id)}>Resolve</Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs text-red-500" disabled={row.status === "Resolved"} onClick={() => blockMutation.mutate(row.id)}>Block Vendor</Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={row.status === "Dismissed" || row.status === "Resolved"} onClick={() => dismissMutation.mutate(row.id)}>Dismiss</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-green-500" disabled={isSettled(row)} onClick={() => resolveMutation.mutate(row.id)}>Resolve</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-red-500" disabled={isSettled(row)} onClick={() => blockMutation.mutate(row.id)}>Block Vendor</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={isSettled(row)} onClick={() => dismissMutation.mutate(row.id)}>Dismiss</Button>
                 </div>
               )},
             ]} />

@@ -20,16 +20,34 @@ export default function VendorCRM() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ vendorName: "", type: "Meeting Log", notes: "", followUpDate: "", outcome: "Positive", upsellPlan: "" });
+  const [form, setForm] = useState({ vendorId: "", vendorName: "", type: "Meeting Log", notes: "", followUpDate: "", outcome: "Positive", upsellPlan: "none" });
 
   const { data: crm, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["vendor-crm"],
     queryFn: api.vendorCrm.get,
   });
 
+  const { data: vendorList = [] } = useQuery({
+    queryKey: ["superadmin-vendors", false],
+    queryFn: () => api.vendors.list(),
+  });
+
+  const submitLog = () => {
+    createLog.mutate({
+      ...form,
+      vendorId: form.vendorId ? Number(form.vendorId) : undefined,
+      upsellPlan: form.upsellPlan === "none" ? "" : form.upsellPlan,
+    });
+  };
+
   const createLog = useMutation({
     mutationFn: api.vendorCrm.createLog,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor-crm"] }); setOpen(false); toast({ title: "CRM log added" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendor-crm"] });
+      setOpen(false);
+      setForm({ vendorId: "", vendorName: "", type: "Meeting Log", notes: "", followUpDate: "", outcome: "Positive", upsellPlan: "none" });
+      toast({ title: "CRM log added" });
+    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -102,10 +120,21 @@ export default function VendorCRM() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader><DialogTitle>Log Vendor Interaction</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createLog.mutate(form); }} className="space-y-4 pt-2">
+              <form onSubmit={e => { e.preventDefault(); submitLog(); }} className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <Label>Vendor Name</Label>
-                  <Input placeholder="Vendor business name" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} required />
+                  <Label>Vendor</Label>
+                  <Select
+                    value={form.vendorId}
+                    onValueChange={v => {
+                      const picked = vendorList.find(x => String(x.id) === v);
+                      setForm(f => ({ ...f, vendorId: v, vendorName: picked?.name ?? f.vendorName }));
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select vendor…" /></SelectTrigger>
+                    <SelectContent>
+                      {vendorList.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -146,7 +175,7 @@ export default function VendorCRM() {
                     <Select value={form.upsellPlan} onValueChange={v => setForm(f => ({ ...f, upsellPlan: v }))}>
                       <SelectTrigger><SelectValue placeholder="Select plan..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         <SelectItem value="starter">→ Starter</SelectItem>
                         <SelectItem value="pro">→ Pro</SelectItem>
                         <SelectItem value="enterprise">→ Enterprise</SelectItem>
@@ -154,7 +183,7 @@ export default function VendorCRM() {
                     </Select>
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={createLog.isPending}>
+                <Button type="submit" className="w-full" disabled={createLog.isPending || !form.vendorId || !form.notes.trim()}>
                   {createLog.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Log Interaction
                 </Button>
               </form>

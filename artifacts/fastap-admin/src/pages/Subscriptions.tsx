@@ -47,8 +47,9 @@ export default function Subscriptions() {
       if (ctx?.prev) qc.setQueryData(["subscriptions"], ctx.prev);
       toast({ title: "Action failed", description: e?.message, variant: "destructive" });
     },
+    // The vendors list carries the same plan/active flags this writes.
+    onSettled: () => { qc.invalidateQueries({ queryKey: ["subscriptions"] }); qc.invalidateQueries({ queryKey: ["superadmin-vendors"] }); },
     onSuccess: () => toast({ title: "Subscription updated" }),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["subscriptions"] }),
   });
 
   const planCounts = plans.map((p: any) => ({
@@ -77,9 +78,16 @@ export default function Subscriptions() {
     if (type === "upgrade" || type === "downgrade") setSelectedPlan(vendor.plan);
   };
 
+  const isPlanChange = actionType === "upgrade" || actionType === "downgrade";
+  const planUnchanged = isPlanChange && (!selectedPlan || selectedPlan === actionVendor?.plan);
+
   const confirmAction = () => {
     if (!actionVendor) return;
-    const plan = (actionType === "upgrade" || actionType === "downgrade") ? selectedPlan : undefined;
+    if (planUnchanged) {
+      toast({ title: "Pick a different plan", description: `${actionVendor.vendorName} is already on ${actionVendor.plan}.` });
+      return;
+    }
+    const plan = isPlanChange ? selectedPlan : undefined;
     actionMutation.mutate({ vendorId: actionVendor.vendorId, action: actionType, plan });
   };
 
@@ -158,7 +166,7 @@ export default function Subscriptions() {
               { header: "Amount", cell: (row: any) => <span className="font-medium">{row.amount > 0 ? `₹${row.amount}/mo` : "Free"}</span> },
               { header: "Renewal", cell: (row: any) => <span className="text-sm text-muted-foreground">{row.renewal}</span> },
               { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
-              { header: "Auto-Renew", cell: (row: any) => <Switch checked={row.autoRenew} disabled /> },
+              { header: "Auto-Renew", cell: (row: any) => <Switch checked={row.autoRenew} disabled title="Follows the subscription status — pause or resume to change it" /> },
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1 flex-wrap">
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleAction(row, "upgrade")} title="Change plan"><ArrowUp className="h-3 w-3" /></Button>
@@ -186,14 +194,14 @@ export default function Subscriptions() {
               <Select value={selectedPlan} onValueChange={setSelectedPlan}>
                 <SelectTrigger><SelectValue placeholder="Select new plan" /></SelectTrigger>
                 <SelectContent>
-                  {plans.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — ₹{p.price}/mo</SelectItem>)}
+                  {plans.filter((p: any) => p.isPublished !== false).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — ₹{p.price}/mo</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionVendor(null)}>Cancel</Button>
-            <Button onClick={confirmAction} disabled={actionMutation.isPending}>
+            <Button onClick={confirmAction} disabled={actionMutation.isPending || planUnchanged}>
               {actionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirm
             </Button>

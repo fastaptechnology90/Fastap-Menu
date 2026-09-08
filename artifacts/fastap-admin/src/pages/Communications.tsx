@@ -13,7 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, MessageSquare, Phone, Send, RefreshCw, Loader2, Megaphone, Users, Radio, PhoneCall } from "lucide-react";
+import { Mail, MessageSquare, Phone, Send, RefreshCw, Loader2, Megaphone, Radio, PhoneCall, AlertTriangle } from "lucide-react";
+
+// The log returns status lowercase ("delivered"); the send response uses title case.
+const norm = (s?: string) => String(s ?? "").toLowerCase().trim();
+const pretty = (s?: string) => {
+  const n = norm(s);
+  return n ? n.replace(/\b\w/g, c => c.toUpperCase()) : "—";
+};
 
 export default function Communications() {
   const { toast } = useToast();
@@ -31,15 +38,15 @@ export default function Communications() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["communications"] });
       setOpen(false);
-      toast({ title: "Communication sent successfully" });
+      toast({ title: "Communication recorded", description: "Saved to the log. No message has been dispatched — see the notice on this page." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const emailsSent = comms.filter((c: any) => c.channel === "email").length;
-  const smsSent = comms.filter((c: any) => c.channel === "sms").length;
-  const whatsappSent = comms.filter((c: any) => c.channel === "whatsapp").length;
-  const callLogs = comms.filter((c: any) => c.channel === "call").length;
+  const emailsSent = comms.filter((c: any) => norm(c.channel) === "email").length;
+  const smsSent = comms.filter((c: any) => norm(c.channel) === "sms").length;
+  const whatsappSent = comms.filter((c: any) => norm(c.channel) === "whatsapp").length;
+  const callLogs = comms.filter((c: any) => norm(c.channel) === "call").length;
 
   const typeColor: Record<string, string> = {
     Broadcast: "bg-blue-500/10 text-blue-400",
@@ -54,7 +61,7 @@ export default function Communications() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Vendor Communication Center</h2>
-          <p className="text-muted-foreground">Broadcast messages, renewal reminders, and marketing campaigns.</p>
+          <p className="text-muted-foreground">Draft and record broadcasts, renewal reminders, and marketing campaigns.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
@@ -114,9 +121,12 @@ export default function Communications() {
                   <Label>Message</Label>
                   <Textarea placeholder="Write your message..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} required />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  This saves the message against the chosen audience. It is not dispatched — no provider is connected yet.
+                </p>
                 <Button type="submit" className="w-full" disabled={sendMutation.isPending}>
                   {sendMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  Send to {form.target === "all" ? "All Vendors" : form.target}
+                  Record for {form.target === "all" ? "all vendors" : form.target}
                 </Button>
               </form>
             </DialogContent>
@@ -124,10 +134,23 @@ export default function Communications() {
         </div>
       </div>
 
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="flex items-start gap-3 py-4">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Messages are recorded here, not delivered.</p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              No email, SMS or WhatsApp provider is connected to this screen yet, so nothing reaches a vendor inbox.
+              Each entry below is a draft kept on record with the audience it was aimed at.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Emails Sent" value={emailsSent} icon={<Mail className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="SMS Sent" value={smsSent} icon={<Phone className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="WhatsApp Sent" value={whatsappSent} icon={<MessageSquare className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Email Drafts" value={emailsSent} icon={<Mail className="h-4 w-4 text-blue-500" />} />
+        <KpiCard title="SMS Drafts" value={smsSent} icon={<Phone className="h-4 w-4 text-orange-500" />} />
+        <KpiCard title="WhatsApp Drafts" value={whatsappSent} icon={<MessageSquare className="h-4 w-4 text-green-500" />} />
         <KpiCard title="Call Logs" value={callLogs} icon={<PhoneCall className="h-4 w-4 text-purple-500" />} />
       </div>
 
@@ -159,13 +182,10 @@ export default function Communications() {
                     </div>
                   )},
                   { header: "Target", cell: (row: any) => <Badge variant="outline" className="text-xs capitalize">{row.target}</Badge> },
-                  { header: "Recipients", cell: (row: any) => <span className="font-medium">{row.recipients?.toLocaleString() || "—"}</span> },
-                  { header: "Delivered", cell: (row: any) => (
-                    <span className={`font-medium ${(row.deliveryRate || 0) > 90 ? "text-green-400" : "text-yellow-400"}`}>{row.deliveryRate || 0}%</span>
-                  )},
-                  { header: "Sent At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.sentAt).toLocaleString()}</span> },
+                  { header: "Est. audience", cell: (row: any) => <span className="font-medium">{row.recipients?.toLocaleString() || "—"}</span> },
+                  { header: "Created", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.sentAt).toLocaleString()}</span> },
                   { header: "Status", cell: (row: any) => (
-                    <Badge variant={row.status === "Delivered" ? "default" : row.status === "Failed" ? "destructive" : "secondary"} className="text-xs">{row.status}</Badge>
+                    <Badge variant="secondary" className="text-xs" title="Recorded on the platform. Not dispatched to any provider.">Recorded</Badge>
                   )},
                 ]} />
               )}
@@ -192,9 +212,9 @@ export default function Communications() {
                     columns={[
                       { header: "Subject", cell: (row: any) => <span className="font-medium">{row.subject}</span> },
                       { header: "Channel", accessorKey: "channel" },
-                      { header: "Recipients", cell: (row: any) => <span>{row.recipients?.toLocaleString()}</span> },
-                      { header: "Status", cell: (row: any) => <Badge variant="secondary" className="text-xs">{row.status}</Badge> },
-                      { header: "Sent", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.sentAt).toLocaleDateString()}</span> },
+                      { header: "Est. audience", cell: (row: any) => <span>{row.recipients?.toLocaleString()}</span> },
+                      { header: "Status", cell: (row: any) => <Badge variant="secondary" className="text-xs">{pretty(row.status)}</Badge> },
+                      { header: "Created", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.sentAt).toLocaleDateString()}</span> },
                     ]}
                   />
                 )}

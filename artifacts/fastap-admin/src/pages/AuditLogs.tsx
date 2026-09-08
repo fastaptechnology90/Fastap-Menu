@@ -10,6 +10,7 @@ import { Search, Loader2, RefreshCcw, Download, Shield, AlertTriangle, Activity,
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
+import { downloadCsv } from "@/lib/download";
 
 const severityVariant: Record<string, "destructive" | "outline" | "secondary"> = {
   critical: "destructive",
@@ -48,14 +49,19 @@ export default function AuditLogs() {
   const todayCount = logs.filter(l => new Date(l.dateTime).toDateString() === new Date().toDateString()).length;
 
   const handleExport = () => {
-    const headers = ["Timestamp", "User", "Action", "Module", "Target", "IP Address", "Severity"];
-    const rows = filtered.map(l => [new Date(l.dateTime).toLocaleString(), l.user, l.action, l.module, l.target, l.ipAddress, l.severity]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "audit-logs.csv"; a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Audit log exported" });
+    if (!filtered.length) { toast({ title: "Nothing to export", description: "No audit entries match the current filters." }); return; }
+    // downloadCsv quotes and escapes each field; the previous plain join broke the file
+    // apart whenever an action or target contained a comma.
+    downloadCsv(filtered.map(l => ({
+      Timestamp: new Date(l.dateTime).toLocaleString(),
+      User: l.user ?? "",
+      Action: l.action ?? "",
+      Module: l.module ?? "",
+      Target: l.target ?? "",
+      "IP Address": l.ipAddress ?? "",
+      Severity: l.severity ?? "",
+    })), `audit-logs-${new Date().toISOString().split("T")[0]}.csv`);
+    toast({ title: `Exported ${filtered.length} audit entries` });
   };
 
   return (

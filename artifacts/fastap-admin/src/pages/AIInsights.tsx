@@ -9,8 +9,13 @@ import { fmtINR } from "@/lib/format";
 
 export default function AIInsights() {
   const { data, isLoading, refetch, isFetching } = useQuery({ queryKey: ["ai-insights"], queryFn: api.aiInsights.get, refetchInterval: 120000 });
+  // `ai-insights` returns forecast as a summary object; the month-by-month series it is
+  // drawn from is only exposed on the extended analytics endpoint.
+  const { data: extended } = useQuery({ queryKey: ["analytics-extended"], queryFn: api.analytics.extended, refetchInterval: 120000 });
 
   const insights = data?.insights ?? [];
+  const forecastSummary = data?.forecast;
+  const forecastSeries = extended?.forecastData ?? [];
   const priorityColor = (p: string) => p === "high" ? "destructive" : p === "medium" ? "secondary" : "outline";
 
   return (
@@ -27,25 +32,25 @@ export default function AIInsights() {
       <div className="admin-stat-grid">
         <KpiCard title="Active Insights" value={insights.length} accent="violet" icon={<Sparkles className="h-4 w-4 text-violet-500" />} />
         <KpiCard title="Churn Risk" value={data?.churnRisk?.length ?? 0} accent="amber" icon={<AlertTriangle className="h-4 w-4 text-amber-500" />} subtitle="Vendors at risk" />
-        <KpiCard title="Forecast Periods" value={data?.forecast?.length ?? 0} accent="emerald" icon={<TrendingUp className="h-4 w-4 text-emerald-500" />} />
+        <KpiCard title="Projected Revenue" value={forecastSummary ? fmtINR(forecastSummary.projectedRevenue) : "—"} accent="emerald" icon={<TrendingUp className="h-4 w-4 text-emerald-500" />} subtitle="End of forecast horizon" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
         <PanelCard title="Revenue Forecast" description="Projected platform revenue" className="lg:col-span-2">
           <div className="h-[200px]">
-            {(data?.forecast ?? []).length > 0 ? (
+            {forecastSeries.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.forecast}>
+                <AreaChart data={forecastSeries}>
                   <defs>
                     <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => fmtINR(v)} />
-                  <Tooltip formatter={(v: number) => [fmtINR(v), "Revenue"]} />
-                  <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#forecastGrad)" />
+                  <Tooltip formatter={(v: number) => [fmtINR(v), "Forecast"]} />
+                  <Area type="monotone" dataKey="forecast" stroke="hsl(var(--primary))" fill="url(#forecastGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (

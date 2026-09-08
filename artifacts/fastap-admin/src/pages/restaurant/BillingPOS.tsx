@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, restaurantApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { downloadText } from "@/lib/download";
 import type { RecentBill } from "@/lib/restaurant-types";
 import { emptyPosStatsDisplay } from "@/lib/restaurantPublication";
@@ -181,6 +182,15 @@ export default function BillingPOS() {
       }, ...prev].slice(0, 20));
       setReference("");
       setPaid(true);
+    } catch (e: any) {
+      // There was no catch here at all: when the write was rejected the rest of this
+      // function never ran, so the cashier saw the button do nothing — no confirmation,
+      // no error, and a guest walking away from a bill the system had not recorded.
+      toast({
+        title: "Payment not recorded",
+        description: `${e?.message ?? "The server rejected it."} Do not let the guest leave — try again.`,
+        variant: "destructive",
+      });
     } finally {
       setPaying(false);
     }

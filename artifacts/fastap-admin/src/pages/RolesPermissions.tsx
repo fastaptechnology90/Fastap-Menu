@@ -8,7 +8,7 @@ import { Icon } from "@/components/shared/Icon";
 import { api, type RolePermissionsConfig } from "@/lib/apiClient";
 import { adminNavGroups } from "@/config/adminNav";
 import { MANAGEABLE_ADMIN_ROLES, ADMIN_ROLE_LABELS, defaultRolePages, setAdminPageOverrides } from "@/lib/adminRbac";
-import { ShieldCheck, Save, Loader2, Plus, X, UserPlus, FilePlus } from "lucide-react";
+import { ShieldCheck, Save, Loader2, Plus, X, UserPlus, FilePlus, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Team = { key: string; label: string };
@@ -148,6 +148,21 @@ export default function RolesPermissions() {
         </CardContent>
       </Card>
 
+      {(teams.length > 0 || pages.length > 0) && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex items-start gap-3 py-4">
+            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium">Custom teams and pages are saved, but not yet wired up.</p>
+              <ul className="text-xs text-muted-foreground mt-1 space-y-0.5 list-disc pl-4">
+                {teams.length > 0 && <li>An admin account cannot be put on a custom team yet — Admin Users only accepts the six built-in roles.</li>}
+                {pages.length > 0 && <li>A custom page has no screen behind it, so opening its path lands back on the dashboard.</li>}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Role selector */}
       <div className="flex flex-wrap gap-2">
         {allRoles.map(role => (
@@ -217,6 +232,7 @@ export default function RolesPermissions() {
             <CardContent className="space-y-3">
               <input autoFocus value={newTeamName} onChange={e => setNewTeamName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addTeam(); }} placeholder="Team name (e.g. Digital Marketing)" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <p className="text-xs text-muted-foreground">A new team starts with no page access — toggle the pages it should see, then Save changes.</p>
+              <p className="text-xs text-amber-500">Heads up: the team is saved, but no admin account can be assigned to it yet — Admin Users only accepts the six built-in roles.</p>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" size="sm" onClick={() => setShowAddTeam(false)}>Cancel</Button>
                 <Button size="sm" onClick={addTeam}><Plus className="h-4 w-4 mr-1" /> Add team</Button>
@@ -235,6 +251,7 @@ export default function RolesPermissions() {
               <input autoFocus value={newPageTitle} onChange={e => setNewPageTitle(e.target.value)} placeholder="Page name (e.g. Blog)" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <input value={newPagePath} onChange={e => setNewPagePath(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addPage(); }} placeholder="Path (optional, e.g. /blog)" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
               <p className="text-xs text-muted-foreground">The page appears under "Custom Pages" and can be toggled on/off per team.</p>
+              <p className="text-xs text-amber-500">Heads up: this records the path only. There is no screen behind it yet, so opening it lands back on the dashboard.</p>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" size="sm" onClick={() => setShowAddPage(false)}>Cancel</Button>
                 <Button size="sm" onClick={addPage}><Plus className="h-4 w-4 mr-1" /> Add page</Button>

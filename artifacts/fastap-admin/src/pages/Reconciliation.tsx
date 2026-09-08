@@ -18,6 +18,7 @@ export default function Reconciliation() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [discSearch, setDiscSearch] = useState("");
   const [investigate, setInvestigate] = useState<any | null>(null);
 
   const { data: recon, isLoading, refetch, isFetching } = useQuery({
@@ -33,13 +34,13 @@ export default function Reconciliation() {
 
   const adjustMutation = useMutation({
     mutationFn: (id: string) => api.reconciliation.adjust(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reconciliation"] }); toast({ title: "Manual adjustment applied" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reconciliation"] }); toast({ title: "Discrepancy written off" }); },
+    onError: (e: any) => toast({ title: "Could not adjust", description: e.message, variant: "destructive" }),
   });
 
   const summary = recon?.summary || { matched: 0, mismatched: 0, missing: 0, duplicates: 0, totalAmount: 0 };
   const discrepancies = (recon?.discrepancies || []).filter((d: any) =>
-    d.id?.toLowerCase().includes(search.toLowerCase()) || d.vendorName?.toLowerCase().includes(search.toLowerCase())
+    d.id?.toLowerCase().includes(discSearch.toLowerCase()) || d.vendorName?.toLowerCase().includes(discSearch.toLowerCase())
   );
   const matched = (recon?.matched || []).filter((m: any) =>
     m.id?.toLowerCase().includes(search.toLowerCase()) ||
@@ -137,8 +138,8 @@ export default function Reconciliation() {
                 <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alert.severity === "high" ? "border-red-500/30 bg-red-500/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
                   <AlertTriangle className={`h-4 w-4 mt-0.5 ${alert.severity === "high" ? "text-red-400" : "text-yellow-400"}`} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{alert.type}</p>
-                    <p className="text-xs text-muted-foreground">{alert.description}</p>
+                    <p className="text-sm font-medium">{alert.type || alert.vendorName || "Revenue leakage"}</p>
+                    <p className="text-xs text-muted-foreground">{alert.description || alert.message}</p>
                     <p className="text-xs font-bold text-red-400 mt-1">Potential loss: {fmtINRFull(alert.amount ?? 0)}</p>
                   </div>
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setInvestigate(alert)}>Investigate</Button>
@@ -194,7 +195,7 @@ export default function Reconciliation() {
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search by ID or vendor…" className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+                  <Input placeholder="Search by ID or vendor…" className="pl-8" value={discSearch} onChange={e => setDiscSearch(e.target.value)} />
                 </div>
               </div>
             </CardHeader>
@@ -215,7 +216,7 @@ export default function Reconciliation() {
                   { header: "Type", cell: (row: any) => <span className={`font-medium ${statusColor[row.discrepancyType] || "text-muted-foreground"}`}>{row.discrepancyType}</span> },
                   { header: "Date", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.date}</span> },
                   { header: "Action", cell: (row: any) => (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => adjustMutation.mutate(row.id)}>Adjust</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={adjustMutation.isPending} onClick={() => adjustMutation.mutate(row.id)}>Adjust</Button>
                   )},
                 ]} />
               )}
@@ -231,13 +232,11 @@ export default function Reconciliation() {
               ) : (
                 <DataTable data={recon?.history || []} pageSize={10} columns={[
                   { header: "Run ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
-                  { header: "Triggered By", cell: (row: any) => <span className="font-medium">{row.triggeredBy}</span> },
-                  { header: "Records", cell: (row: any) => <span>{row.totalRecords}</span> },
-                  { header: "Matched", cell: (row: any) => <span className="text-green-400 font-medium">{row.matched}</span> },
-                  { header: "Issues", cell: (row: any) => <span className={row.issues > 0 ? "text-red-400 font-bold" : "text-muted-foreground"}>{row.issues}</span> },
-                  { header: "Duration", cell: (row: any) => <span className="text-muted-foreground text-sm">{row.duration}</span> },
+                  { header: "Triggered By", cell: (row: any) => <span className="font-medium">{row.by || "—"}</span> },
+                  { header: "Matched", cell: (row: any) => <span className="text-green-400 font-medium">{row.matched ?? 0}</span> },
+                  { header: "Issues", cell: (row: any) => <span className={row.issues > 0 ? "text-red-400 font-bold" : "text-muted-foreground"}>{row.issues ?? 0}</span> },
                   { header: "Run At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.runAt).toLocaleString()}</span> },
-                  { header: "Status", cell: (row: any) => <Badge variant={row.status === "Completed" ? "default" : "destructive"} className="text-xs">{row.status}</Badge> },
+                  { header: "Status", cell: () => <Badge className="text-xs">Completed</Badge> },
                 ]} />
               )}
             </CardContent>

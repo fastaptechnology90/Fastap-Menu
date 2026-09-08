@@ -40,14 +40,18 @@ export default function Agreements() {
 
   const filtered = agreements.filter((a: any) => {
     const matchSearch = a.vendorName?.toLowerCase().includes(search.toLowerCase()) || a.id?.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || a.status?.toLowerCase() === filter;
+    const matchFilter = filter === "all" || String(a.status ?? "").toLowerCase() === filter;
     return matchSearch && matchFilter;
   });
 
-  const active = agreements.filter((a: any) => a.status === "Active").length;
-  const expired = agreements.filter((a: any) => a.status === "Expired").length;
+  // The API stores whatever casing it is handed ("Active" on create, "active" after a
+  // renew), so every status test here is case-insensitive — otherwise renewing an
+  // agreement dropped it out of the Active count and greyed out its badge.
+  const statusOf = (a: any) => String(a?.status ?? "").toLowerCase();
+  const active = agreements.filter((a: any) => statusOf(a) === "active").length;
+  const expired = agreements.filter((a: any) => statusOf(a) === "expired").length;
   const expiringDocs = agreements.filter((a: any) => {
-    if (!a.expiryDate || a.status === "Expired") return false;
+    if (!a.expiryDate || statusOf(a) === "expired") return false;
     return Math.ceil((new Date(a.expiryDate).getTime() - Date.now()) / 86400000) <= 30;
   });
 
@@ -159,16 +163,24 @@ export default function Agreements() {
                 return <span className={`text-xs font-medium ${!daysLeft ? "text-muted-foreground" : daysLeft < 0 ? "text-red-400" : daysLeft <= 30 ? "text-yellow-400" : "text-muted-foreground"}`}>{row.expiryDate || "No expiry"}</span>;
               }},
               { header: "Status", cell: (row: any) => (
-                <Badge variant={row.status === "Active" ? "default" : row.status === "Expired" ? "destructive" : "secondary"} className="text-xs">{row.status}</Badge>
+                <Badge variant={statusOf(row) === "active" ? "default" : statusOf(row) === "expired" ? "destructive" : "secondary"} className="text-xs capitalize">{row.status}</Badge>
               )},
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1">
                   {/* No agreement PDF download endpoint exists — disabled until an API is added. */}
                   <Button variant="ghost" size="icon" className="h-7 w-7" title="PDF download API not available" disabled><Download className="h-3.5 w-3.5" /></Button>
-                  {row.status !== "Expired" && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={renewMutation.isPending} onClick={() => renewMutation.mutate(row.id)}>Renew</Button>
+                  {statusOf(row) !== "expired" && (
+                    // Renew only extends an existing expiry date; on an open-ended
+                    // agreement the API returns success and changes nothing, which
+                    // showed a "renewal initiated" toast for a no-op.
+                    <Button
+                      variant="ghost" size="sm" className="h-7 text-xs"
+                      disabled={renewMutation.isPending || !row.expiryDate}
+                      title={row.expiryDate ? "Extend expiry by one year" : "No expiry date on this agreement — nothing to renew"}
+                      onClick={() => renewMutation.mutate(row.id)}
+                    >Renew</Button>
                   )}
-                  {row.status === "Expired" && (
+                  {statusOf(row) === "expired" && (
                     // No agreement status-update endpoint exists to mark expired — disabled until an API is added.
                     <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" title="Mark-expired API not available" disabled>Mark Expired</Button>
                   )}

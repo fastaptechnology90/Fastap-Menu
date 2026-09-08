@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChefHat, Plus, X, TrendingUp, Package, Percent, Edit2, Search, Trash2 } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { foodCosting as foodCostingApi } from "@/lib/api";
+import { foodCosting as foodCostingApi, inventory as inventoryApi, menu as menuApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-type Ingredient = { name: string; qty: number; unit: string; costPer: string; cost: number; costPerUnit: number };
+type Ingredient = { name: string; qty: number; unit: string; costPer: string; cost: number; costPerUnit: number; inventoryItemId: number | null };
 type Recipe = {
   id: string;
   name: string;
@@ -16,7 +16,7 @@ type Recipe = {
   ingredients: Ingredient[];
 };
 
-type EditIngredient = { name: string; quantity: string; unit: string; costPerUnit: string };
+type EditIngredient = { name: string; quantity: string; unit: string; costPerUnit: string; inventoryItemId: number | null };
 
 function mapRecipe(r: any): Recipe {
   const ingredients: Ingredient[] = (Array.isArray(r.ingredients) ? r.ingredients : []).map((ing: any) => ({
@@ -26,6 +26,7 @@ function mapRecipe(r: any): Recipe {
     costPer: `₹${ing.costPerUnit ?? 0}/${ing.unit || "unit"}`,
     cost: parseFloat(String(ing.totalCost ?? ing.cost)) || 0,
     costPerUnit: parseFloat(String(ing.costPerUnit ?? 0)) || 0,
+    inventoryItemId: ing.inventoryItemId ?? null,
   }));
   return {
     id: String(r.id),
@@ -55,6 +56,23 @@ export default function FoodCosting() {
   const [editForm, setEditForm] = useState({ name: "", category: "", servings: "1", sellingPrice: "" });
   const [editIngredients, setEditIngredients] = useState<EditIngredient[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [stock, setStock] = useState<{ id: number; name: string; unit: string; costPerUnit: number }[]>([]);
+  const [dishNames, setDishNames] = useState<string[]>([]);
+
+  // A recipe is tied to a dish by name and an ingredient to a stock line by id. Both lists
+  // are loaded so the owner can pick from them rather than retype and hope they match.
+  useEffect(() => {
+    if (!restaurantId) return;
+    Promise.all([
+      inventoryApi.list(restaurantId).catch(() => []),
+      menuApi.items(restaurantId).catch(() => []),
+    ]).then(([inv, items]) => {
+      setStock((Array.isArray(inv) ? inv : []).map((i: any) => ({
+        id: i.id, name: i.name, unit: i.unit || "", costPerUnit: Number(i.costPerUnit) || 0,
+      })));
+      setDishNames((Array.isArray(items) ? items : []).map((i: any) => String(i.name)).filter(Boolean).sort());
+    });
+  }, [restaurantId]);
 
   const loadRecipes = useCallback(async () => {
     if (!restaurantId) return;
@@ -84,14 +102,23 @@ export default function FoodCosting() {
       quantity: String(i.qty || ""),
       unit: i.unit || "",
       costPerUnit: String(i.costPerUnit || ""),
+      inventoryItemId: i.inventoryItemId,
     })));
+  }
+
+  /** Picking a stock line fills in its name, unit and current cost, and records the link. */
+  function linkIngredient(idx: number, stockId: string) {
+    const item = stock.find(s => String(s.id) === stockId);
+    setEditIngredients(prev => prev.map((ing, i) => i !== idx ? ing : item
+      ? { ...ing, inventoryItemId: item.id, name: item.name, unit: item.unit, costPerUnit: String(item.costPerUnit) }
+      : { ...ing, inventoryItemId: null }));
   }
 
   function updateIngredient(idx: number, field: keyof EditIngredient, value: string) {
     setEditIngredients(prev => prev.map((ing, i) => i === idx ? { ...ing, [field]: value } : ing));
   }
   function addIngredientRow() {
-    setEditIngredients(prev => [...prev, { name: "", quantity: "", unit: "", costPerUnit: "" }]);
+    setEditIngredients(prev => [...prev, { name: "", quantity: "", unit: "", costPerUnit: "", inventoryItemId: null }]);
   }
   function removeIngredientRow(idx: number) {
     setEditIngredients(prev => prev.filter((_, i) => i !== idx));
@@ -115,6 +142,9 @@ export default function FoodCosting() {
             quantity: parseFloat(ing.quantity) || 0,
             unit: ing.unit.trim(),
             costPerUnit: parseFloat(ing.costPerUnit) || 0,
+            // Without this the save wiped the stock link and the dish stopped
+            // consuming anything the next time it sold.
+            inventoryItemId: ing.inventoryItemId,
           })),
       });
       setEditRecipe(null);
@@ -139,7 +169,11 @@ export default function FoodCosting() {
   const avgMargin = recipes.length ? Math.round(recipes.reduce((s, r) => s + r.margin, 0) / recipes.length) : 0;
 
   async function handleCreateRecipe() {
-    if (!newRecipe.name || !restaurantId) return;
+    if (!restaurantId) return;
+    if (!newRecipe.name.trim()) {
+      toast({ title: "Name the recipe after the dish it costs", description: "The name is what ties it to the menu item.", variant: "destructive" });
+      return;
+    }
     try {
       await foodCostingApi.create(restaurantId, {
         name: newRecipe.name,
@@ -299,7 +333,28 @@ export default function FoodCosting() {
           <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-5"><h2 className="text-base font-bold">Add Recipe</h2><button onClick={() => setShowAdd(false)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><X className="h-4 w-4" /></button></div>
             <div className="space-y-4">
-              <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Dish Name</label><input value={newRecipe.name} onChange={e => setNewRecipe(p => ({ ...p, name: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="e.g. Paneer Tikka" /></div>
+              {/* The recipe reaches the menu — margin, and the stock a sale draws down —
+                  only when its name matches a dish exactly. Typing it by hand meant one
+                  stray word left the recipe costing nothing that anyone sells, so offer
+                  the menu itself. */}
+              <div>
+                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Dish Name</label>
+                <input
+                  list="menu-dish-names"
+                  value={newRecipe.name}
+                  onChange={e => setNewRecipe(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"
+                  placeholder="Start typing a dish from your menu"
+                />
+                <datalist id="menu-dish-names">
+                  {dishNames.map(n => <option key={n} value={n} />)}
+                </datalist>
+                {newRecipe.name.trim() && !dishNames.some(n => n.toLowerCase() === newRecipe.name.trim().toLowerCase()) && (
+                  <p className="text-[11px] text-yellow-400/80 mt-1">
+                    No menu item is called this. The recipe will still save, but it will not show a margin on the menu or move stock when the dish sells.
+                  </p>
+                )}
+              </div>
               <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Category</label><input value={newRecipe.category} onChange={e => setNewRecipe(p => ({ ...p, category: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="Main Course, Starter, Dessert..." /></div>
               <div><label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Selling Price (₹)</label><input value={newRecipe.sellingPrice} onChange={e => setNewRecipe(p => ({ ...p, sellingPrice: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" placeholder="e.g. 320" /></div>
               <p className="text-xs text-white/40">You can add ingredients after creating the recipe.</p>
@@ -345,7 +400,17 @@ export default function FoodCosting() {
                     const rowCost = (parseFloat(ing.quantity) || 0) * (parseFloat(ing.costPerUnit) || 0);
                     return (
                       <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                        <input value={ing.name} onChange={e => updateIngredient(idx, "name", e.target.value)} placeholder="Ingredient" className="col-span-4 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
+                        {/* Selecting a stock line is what makes selling this dish draw the
+                            ingredient down. Free text costs the plate but moves no stock. */}
+                        <select
+                          value={ing.inventoryItemId == null ? "" : String(ing.inventoryItemId)}
+                          onChange={e => linkIngredient(idx, e.target.value)}
+                          aria-label="Stock item"
+                          className={`col-span-4 bg-white/5 border rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500/50 ${ing.inventoryItemId == null ? "border-yellow-500/40" : "border-white/10"}`}
+                        >
+                          <option value="">{ing.name || "Not linked to stock"}</option>
+                          {stock.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                        </select>
                         <input type="number" min={0} value={ing.quantity} onChange={e => updateIngredient(idx, "quantity", e.target.value)} placeholder="Qty" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
                         <input value={ing.unit} onChange={e => updateIngredient(idx, "unit", e.target.value)} placeholder="Unit" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />
                         <input type="number" min={0} value={ing.costPerUnit} onChange={e => updateIngredient(idx, "costPerUnit", e.target.value)} placeholder="₹/unit" className="col-span-2 bg-white/5 border border-white/10 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50" />

@@ -2,39 +2,40 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { DataTable } from "@/components/shared/DataTable";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
-import { Download, FileText, Table, File, RefreshCw, Loader2, CheckCircle, Clock, Shield } from "lucide-react";
+import { Download, Table, File, Loader2, CheckCircle, Clock, Shield } from "lucide-react";
 
+// `supported` mirrors what generateExportCsv on the API actually builds a file for.
+// Every other module falls through to a generic vendor-name list on the server, so
+// offering it here would hand the operator a file that does not hold the data its
+// label promises. Those stay listed but disabled until the API grows a real exporter.
 const EXPORT_MODULES = [
-  { id: "vendors", label: "Vendors", icon: "👥", description: "All vendor records with status, plan, and KYC details" },
-  { id: "payments", label: "Payments", icon: "💳", description: "Transaction history with amounts, gateway, and status" },
-  { id: "refunds", label: "Refunds", icon: "↩️", description: "All refund requests and their resolution status" },
-  { id: "settlements", label: "Settlements", icon: "💰", description: "Settlement batches with gross, deductions, and net payout" },
-  { id: "subscriptions", label: "Subscriptions", icon: "📦", description: "Vendor subscription records and renewal dates" },
-  { id: "invoices", label: "Invoices", icon: "🧾", description: "All generated invoices with payment status" },
-  { id: "taxes", label: "Taxes", icon: "📊", description: "GST, TDS/TCS records and tax summaries" },
-  { id: "audit-logs", label: "Audit Logs", icon: "🔍", description: "Complete audit trail of admin actions" },
-  { id: "kyc", label: "KYC Records", icon: "🪪", description: "Vendor verification documents and status" },
-  { id: "fraud", label: "Fraud Alerts", icon: "🚨", description: "Fraud detection alerts and risk scores" },
-  { id: "support", label: "Support Tickets", icon: "🎫", description: "All support tickets with resolution data" },
-  { id: "analytics", label: "Analytics Report", icon: "📈", description: "Revenue, vendor growth, and performance data" },
+  { id: "vendors", label: "Vendors", icon: "👥", supported: true, description: "Vendor records with plan, status, and signup date" },
+  { id: "payments", label: "Payments", icon: "💳", supported: true, description: "Order-level transaction history with amount, method, and status" },
+  { id: "audit-logs", label: "Audit Logs", icon: "🔍", supported: true, description: "Complete audit trail of admin actions" },
+  { id: "analytics", label: "Analytics Report", icon: "📈", supported: true, description: "Order-level data behind the revenue and growth reports" },
+  { id: "refunds", label: "Refunds", icon: "↩️", supported: false, description: "All refund requests and their resolution status" },
+  { id: "settlements", label: "Settlements", icon: "💰", supported: false, description: "Settlement batches with gross, deductions, and net payout" },
+  { id: "subscriptions", label: "Subscriptions", icon: "📦", supported: false, description: "Vendor subscription records and renewal dates" },
+  { id: "invoices", label: "Invoices", icon: "🧾", supported: false, description: "All generated invoices with payment status" },
+  { id: "taxes", label: "Taxes", icon: "📊", supported: false, description: "GST, TDS/TCS records and tax summaries" },
+  { id: "kyc", label: "KYC Records", icon: "🪪", supported: false, description: "Vendor verification documents and status" },
+  { id: "fraud", label: "Fraud Alerts", icon: "🚨", supported: false, description: "Fraud detection alerts and risk scores" },
+  { id: "support", label: "Support Tickets", icon: "🎫", supported: false, description: "All support tickets with resolution data" },
 ];
 
 export default function ExportCenter() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [format, setFormat] = useState("csv");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  // The export API emits CSV only and ignores any date range, so no format or date
+  // control is offered here — one that changed nothing would just mislead.
+  const format = "csv";
 
   const { data: exportHistory = [], isLoading } = useQuery({
     queryKey: ["export-history"],
@@ -44,7 +45,7 @@ export default function ExportCenter() {
   const handleExport = async (moduleId: string, moduleLabel: string) => {
     setExporting(moduleId);
     try {
-      const result = await api.exportCenter.create({ module: moduleId, format, dateFrom, dateTo });
+      const result = await api.exportCenter.create({ module: moduleId, format });
       qc.invalidateQueries({ queryKey: ["export-history"] });
       toast({
         title: `${moduleLabel} export completed`,
@@ -67,7 +68,7 @@ export default function ExportCenter() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Export Center</h2>
-          <p className="text-muted-foreground">Export platform data in PDF, Excel, and CSV formats with governance controls.</p>
+          <p className="text-muted-foreground">Export platform data as CSV, with an audited request history.</p>
         </div>
       </div>
 
@@ -87,49 +88,46 @@ export default function ExportCenter() {
 
         <TabsContent value="export" className="mt-4 space-y-4">
           <Card>
-            <CardHeader><CardTitle className="text-base">Export Settings</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Export Settings</CardTitle>
+              <CardDescription>
+                Exports are generated as CSV covering the full table. Excel, PDF, and date-range
+                filtering are not implemented on the export API yet.
+              </CardDescription>
+            </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Export Format</Label>
-                  <Select value={format} onValueChange={setFormat}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="csv"><div className="flex items-center gap-2"><Table className="h-4 w-4" /> CSV</div></SelectItem>
-                      <SelectItem value="xlsx"><div className="flex items-center gap-2"><Table className="h-4 w-4" /> Excel (XLSX)</div></SelectItem>
-                      <SelectItem value="pdf"><div className="flex items-center gap-2"><FileText className="h-4 w-4" /> PDF</div></SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>From Date</Label>
-                  <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>To Date</Label>
-                  <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Table className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">CSV</span>
+                <Badge variant="secondary" className="text-xs">Only available format</Badge>
               </div>
             </CardContent>
           </Card>
 
           <div className="grid gap-4 md:grid-cols-3">
             {EXPORT_MODULES.map(mod => (
-              <Card key={mod.id} className="hover:border-primary/50 transition-colors">
+              <Card key={mod.id} className={mod.supported ? "hover:border-primary/50 transition-colors" : "opacity-60"}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{mod.icon}</span>
                       <CardTitle className="text-base">{mod.label}</CardTitle>
                     </div>
-                    <Badge variant="outline" className="text-xs uppercase">{format}</Badge>
+                    <Badge variant={mod.supported ? "outline" : "secondary"} className="text-xs uppercase">
+                      {mod.supported ? format : "N/A"}
+                    </Badge>
                   </div>
                   <CardDescription className="text-xs">{mod.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full" variant="outline" size="sm" disabled={exporting === mod.id} onClick={() => handleExport(mod.id, mod.label)}>
+                  <Button
+                    className="w-full" variant="outline" size="sm"
+                    disabled={!mod.supported || exporting === mod.id}
+                    title={mod.supported ? undefined : "No exporter for this module on the API yet"}
+                    onClick={() => handleExport(mod.id, mod.label)}
+                  >
                     {exporting === mod.id ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-2 h-3.5 w-3.5" />}
-                    Export {mod.label}
+                    {mod.supported ? `Export ${mod.label}` : "Not available yet"}
                   </Button>
                 </CardContent>
               </Card>

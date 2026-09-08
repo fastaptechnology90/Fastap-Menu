@@ -12,6 +12,7 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { QrCode, Nfc, Download, RefreshCw, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
+import { downloadCsv } from "@/lib/download";
 
 export default function QRNFC() {
   const qc = useQueryClient();
@@ -24,9 +25,11 @@ export default function QRNFC() {
     queryFn: api.qr.list,
   });
 
+  // Wrapped rather than passed by reference: react-query hands the query context in as the
+  // first argument, which list() would otherwise read as its includeDeleted flag.
   const { data: vendors = [] } = useQuery({
     queryKey: ["superadmin-vendors"],
-    queryFn: api.vendors.list,
+    queryFn: () => api.vendors.list(),
   });
 
   const bulkMutation = useMutation({
@@ -53,13 +56,18 @@ export default function QRNFC() {
   const nfcCount = codes.filter((c: any) => c.type === "nfc").length;
 
   const exportList = () => {
-    const header = "vendor,label,type,url,scans,status\n";
-    const rows = filtered.map((c: any) => [c.vendorName, c.label, c.type, c.url, c.scans, c.status].join(","));
-    const blob = new Blob([header + rows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "qr-codes.csv"; a.click();
-    URL.revokeObjectURL(url);
-    toast.success("QR list exported");
+    if (!filtered.length) { toast.error("No QR codes to export"); return; }
+    // downloadCsv quotes each field. Vendor names and table labels routinely contain
+    // commas, which the previous plain join spilled into extra columns.
+    downloadCsv(filtered.map((c: any) => ({
+      Vendor: c.vendorName ?? "",
+      Label: c.label ?? "",
+      Type: c.type ?? "",
+      URL: c.url ?? "",
+      Scans: c.scans ?? 0,
+      Status: c.status ?? "",
+    })), `qr-codes-${new Date().toISOString().split("T")[0]}.csv`);
+    toast.success(`Exported ${filtered.length} QR codes`);
   };
 
   return (

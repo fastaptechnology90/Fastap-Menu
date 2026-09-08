@@ -79,7 +79,7 @@ export const api = {
       const qs = q.toString();
       return request<{ from: string | null; to: string | null; revenue: number; totalOrders: number }>(`/superadmin/revenue${qs ? `?${qs}` : ""}`);
     },
-    restaurantRevenues: () => request<{ restaurants: { id: number; name: string; isActive: boolean; orderRevenue: number; spaRevenue: number; totalRevenue: number; paidOrders: number }[]; grandTotal: number; count: number }>("/superadmin/restaurant-revenues"),
+    restaurantRevenues: () => request<{ restaurants: { id: number; name: string; isActive: boolean; orderRevenue: number; spaRevenue: number; banquetRevenue: number; totalRevenue: number; paidOrders: number }[]; grandTotal: number; count: number }>("/superadmin/restaurant-revenues"),
   },
   vendors: {
     list: (includeDeleted = false) =>

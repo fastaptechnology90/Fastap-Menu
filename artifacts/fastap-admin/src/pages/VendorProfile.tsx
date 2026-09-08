@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function VendorProfile() {
   const { confirm, confirmDialog } = useConfirm();
   const params = useParams();
+  const [, setLocation] = useLocation();
   const id = parseInt(params.id || "0", 10);
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -39,6 +40,8 @@ export default function VendorProfile() {
   const [editBranch, setEditBranch] = useState({ id: "", name: "", address: "" });
   const [staffForm, setStaffForm] = useState({ name: "", email: "", role: "waiter", phone: "", password: "" });
   const [qrLabel, setQrLabel] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({ name: "", phone: "", address: "", businessType: "", email: "", website: "", gstNumber: "", fssaiNumber: "" });
 
   const { data: vendor, isLoading } = useQuery({
     queryKey: ["vendor", id],
@@ -167,6 +170,7 @@ export default function VendorProfile() {
       setNote("");
       toast({ title: `${noteType} saved` });
     },
+    onError: (e: any) => toast({ title: "Could not save note", description: e.message, variant: "destructive" }),
   });
 
   const kycApproveMutation = useMutation({
@@ -202,7 +206,8 @@ export default function VendorProfile() {
 
   const kycRequestMutation = useMutation({
     mutationFn: () => api.kyc.requestMore(String(vendorKyc?.id || vendor!.id)),
-    onSuccess: () => toast({ title: "Re-upload request sent" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["kyc"] }); qc.invalidateQueries({ queryKey: ["vendor", id] }); toast({ title: "Re-upload request sent" }); },
+    onError: (e: any) => toast({ title: "Request failed", description: e.message, variant: "destructive" }),
   });
 
   // Approve a single document.
@@ -251,6 +256,7 @@ export default function VendorProfile() {
   const disableBranchMutation = useMutation({
     mutationFn: (branchId: string) => api.vendors.updateBranch(id, branchId, { isActive: false }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor-branches", id] }); toast({ title: "Branch disabled" }); },
+    onError: (e: any) => toast({ title: "Could not disable branch", description: e.message, variant: "destructive" }),
   });
 
   const editBranchMutation = useMutation({
@@ -268,6 +274,7 @@ export default function VendorProfile() {
   const deleteStaffMutation = useMutation({
     mutationFn: (staffId: string) => api.vendors.deleteStaff(id, staffId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor-staff", id] }); toast({ title: "Staff removed" }); },
+    onError: (e: any) => toast({ title: "Could not remove staff", description: e.message, variant: "destructive" }),
   });
 
   const createQrMutation = useMutation({
@@ -279,6 +286,7 @@ export default function VendorProfile() {
   const deleteQrMutation = useMutation({
     mutationFn: (qrId: string) => api.vendors.deleteQr(id, qrId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-qr"] }); toast({ title: "QR disabled" }); },
+    onError: (e: any) => toast({ title: "Could not disable QR", description: e.message, variant: "destructive" }),
   });
 
   const controlsMutation = useMutation({
@@ -302,11 +310,23 @@ export default function VendorProfile() {
   const forceLogoutMutation = useMutation({
     mutationFn: () => api.vendors.forceLogout(id),
     onSuccess: () => toast({ title: "All vendor sessions invalidated" }),
+    onError: (e: any) => toast({ title: "Force logout failed", description: e.message, variant: "destructive" }),
+  });
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: () => api.vendors.update(id, detailsForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendor", id] });
+      qc.invalidateQueries({ queryKey: ["superadmin-vendors"] });
+      setDetailsOpen(false);
+      toast({ title: "Business details updated" });
+    },
+    onError: (e: any) => toast({ title: "Could not save details", description: e.message, variant: "destructive" }),
   });
 
   const deleteVendorMutation = useMutation({
     mutationFn: () => api.vendors.delete(id),
-    onSuccess: () => { toast({ title: "Vendor deleted" }); window.location.href = "/vendors"; },
+    onSuccess: () => { toast({ title: "Vendor deleted" }); setLocation("/vendors"); },
     onError: () => toast({ title: "Failed to delete vendor", variant: "destructive" }),
   });
 
@@ -327,7 +347,8 @@ export default function VendorProfile() {
   const vendorTickets = supportTickets.filter(t => t.vendorName === vendor.name);
   const vendorKyc = kyc.find((k: any) => k.vendorId === String(vendor.id));
   const vendorRefunds = refunds.filter((r: any) => r.vendorName === vendor.name);
-  const vendorLogs = auditLogs.filter((l: any) => l.target?.includes(String(vendor.id)));
+  const vendorLogs = auditLogs.filter((l: any) =>
+    String(l.target ?? "").split(",").map(t => t.trim()).includes(String(vendor.id)));
 
   const planPriceMap = Object.fromEntries((plans as any[]).map(p => [p.id, p.price]));
   const mrr = planPriceMap[vendor.plan] ?? 0;
@@ -344,14 +365,19 @@ export default function VendorProfile() {
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
   const platformControls = vendor.platformControls ?? {};
 
-  const BRANCHES = vendorBranches.length ? vendorBranches : (vendor.address ? [{
-    id: "B-main", name: `${vendor.name} — Main`, location: vendor.address, tables: 0, rooms: 0, status: vendor.isActive ? "Active" : "Inactive",
+  // When a vendor has no branch records we still show their registered address as a
+  // stand-in row. It has no branch id behind it, so it is flagged and its row actions
+  // are disabled — previously Edit/Disable on this row hit the API with "B-main" and
+  // failed with no message at all.
+  const BRANCHES: any[] = vendorBranches.length ? vendorBranches : (vendor.address ? [{
+    id: "B-main", name: `${vendor.name} — Main`, location: vendor.address, tables: 0, rooms: 0,
+    status: vendor.isActive ? "Active" : "Inactive", isPlaceholder: true,
   }] : []);
 
   const STAFF = vendorStaff;
   const QR_CODES = allQrCodes.filter((q: any) => String(q.vendorId) === String(vendor.id)).map((q: any) => ({
     id: q.id, tableNo: q.label || q.type, type: q.type, scans: q.scans ?? 0,
-    lastScan: q.lastScan || null, status: q.status || "Active", url: q.url,
+    lastScan: q.lastScan || null, status: q.status ? String(q.status).replace(/^./, c => c.toUpperCase()) : "Active", url: q.url,
   }));
   const DOCUMENTS = vendorDocuments.length ? vendorDocuments : (vendorKyc ? [
     { type: "KYC Status", number: vendorKyc.status || "pending", status: vendorKyc.status || "Pending", uploaded: "—", expires: null },
@@ -465,7 +491,18 @@ export default function VendorProfile() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Business Details</CardTitle></CardHeader>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>Business Details</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => {
+                setDetailsForm({
+                  name: vendor.name ?? "", phone: vendor.phone ?? "", address: vendor.address ?? "",
+                  businessType: vendor.businessType ?? "", email: (vendor as any).email ?? "",
+                  website: (vendor as any).website ?? "", gstNumber: (vendor as any).gstNumber ?? "",
+                  fssaiNumber: (vendor as any).fssaiNumber ?? "",
+                });
+                setDetailsOpen(true);
+              }}><Edit2 className="mr-2 h-3.5 w-3.5" /> Edit details</Button>
+            </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
@@ -600,7 +637,8 @@ export default function VendorProfile() {
             <Button size="sm" disabled={featuresMutation.isPending || featuresLoading} onClick={() => {
               const all: Record<string, boolean> = {};
               for (const m of ((vendorFeatures?.modules ?? []) as any[])) all[m.key] = true;
-              if (Object.keys(all).length) featuresMutation.mutate(all);
+              if (!Object.keys(all).length) { toast({ title: "Module list not loaded yet", description: "Wait for the feature list to finish loading and try again.", variant: "destructive" }); return; }
+              featuresMutation.mutate(all, { onSuccess: () => toast({ title: "All modules granted to this vendor" }) });
             }}>
               Grant Full Control
             </Button>
@@ -638,8 +676,12 @@ export default function VendorProfile() {
                 { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
                 { header: "Actions", cell: (row: any) => (
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditBranch({ id: row.id, name: row.name, address: row.location || "" }); setEditBranchOpen(true); }}>Edit</Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" onClick={() => disableBranchMutation.mutate(row.id)}>Disable</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={row.isPlaceholder}
+                      title={row.isPlaceholder ? "This is the vendor's registered address, not a saved branch — add it as a branch first" : "Edit branch"}
+                      onClick={() => { setEditBranch({ id: row.id, name: row.name, address: row.location || "" }); setEditBranchOpen(true); }}>Edit</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" disabled={row.isPlaceholder || disableBranchMutation.isPending}
+                      title={row.isPlaceholder ? "This is the vendor's registered address, not a saved branch" : "Disable branch"}
+                      onClick={() => disableBranchMutation.mutate(row.id)}>Disable</Button>
                   </div>
                 )},
               ]} />
@@ -704,7 +746,7 @@ export default function VendorProfile() {
                 { header: "Name", cell: (row: any) => <span className="font-medium">{row.name}</span> },
                 { header: "Role", cell: (row: any) => <Badge variant="outline" className="text-xs">{row.role}</Badge> },
                 { header: "Branch", accessorKey: "branch" },
-                { header: "Last Login", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.lastLogin).toLocaleString()}</span> },
+                { header: "Last Login", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.lastLogin ? new Date(row.lastLogin).toLocaleString() : "Never"}</span> },
                 { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
                 { header: "Actions", cell: (row: any) => (
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" onClick={() => deleteStaffMutation.mutate(row.id)}>Remove</Button>
@@ -730,11 +772,11 @@ export default function VendorProfile() {
                 { header: "Location", accessorKey: "tableNo" },
                 { header: "Type", cell: (row: any) => <Badge variant="outline" className="text-xs">{row.type}</Badge> },
                 { header: "Total Scans", cell: (row: any) => <span className="font-bold">{row.scans}</span> },
-                { header: "Last Scan", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.lastScan).toLocaleString()}</span> },
+                { header: "Last Scan", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.lastScan ? new Date(row.lastScan).toLocaleString() : "Never scanned"}</span> },
                 { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
                 { header: "Actions", cell: (row: any) => (
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => row.url && window.open(row.url, "_blank")}><Download className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={!row.url} title={row.url ? "Open menu link" : "This code has no menu URL"} onClick={() => row.url && window.open(row.url, "_blank")}><Download className="h-3 w-3" /></Button>
                     <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" onClick={() => deleteQrMutation.mutate(row.id)}>Disable</Button>
                   </div>
                 )},
@@ -812,13 +854,12 @@ export default function VendorProfile() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader><CardTitle className="text-sm">Refund Rate</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Payment & Refund Rates</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { label: "Payment Success Rate", value: 96.4, color: "text-green-500" },
-                    { label: "Refund Rate", value: vendorRefunds.length > 0 ? Math.round((vendorRefunds.length / Math.max(vendorTx.length, 1)) * 100) : 3.2, color: "text-yellow-500" },
-                    { label: "Chargeback Rate", value: 0.8, color: "text-red-500" },
+                    { label: "Paid Transactions", value: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0, color: "text-green-500" },
+                    { label: "Refund Rate", value: vendorTx.length ? Math.round((vendorRefunds.length / vendorTx.length) * 100) : 0, color: "text-yellow-500" },
                   ].map((item, i) => (
                     <div key={i}>
                       <div className="flex justify-between text-sm mb-1"><span className="text-muted-foreground">{item.label}</span><span className={`font-bold ${item.color}`}>{item.value}%</span></div>
@@ -834,8 +875,8 @@ export default function VendorProfile() {
                 <div className="space-y-3">
                   {[
                     { label: "Order Volume", score: Math.min(100, vendor.totalOrders > 500 ? 100 : vendor.totalOrders > 100 ? 80 : 50) },
-                    { label: "Payment Health", score: 95 },
-                    { label: "KYC Compliance", score: 90 },
+                    { label: "Payment Health", score: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0 },
+                    { label: "KYC Compliance", score: String(vendorKyc?.status ?? "").toLowerCase() === "approved" ? 100 : 0 },
                     { label: "Support Quality", score: Math.max(40, 100 - vendorTickets.length * 5) },
                     { label: "Refund Control", score: Math.max(60, 100 - vendorRefunds.length * 3) },
                   ].map((item, i) => (
@@ -869,11 +910,8 @@ export default function VendorProfile() {
             <CardContent>
               <div className="space-y-3">
                 {[
+                  ...vendorLogs.slice(0, 20).map(l => ({ action: l.action, by: l.user, date: new Date(l.dateTime).toLocaleString(), icon: "🔧" })),
                   { action: "Vendor registered", by: "System", date: new Date(vendor.createdAt).toLocaleString(), icon: "🚀" },
-                  { action: `Plan set to ${vendor.plan}`, by: "Admin", date: new Date(vendor.createdAt).toLocaleString(), icon: "📦" },
-                  { action: "KYC documents submitted", by: "Vendor", date: new Date(Date.now() - 86400000 * 5).toLocaleString(), icon: "📄" },
-                  { action: "KYC verification pending", by: "System", date: new Date(Date.now() - 86400000 * 4).toLocaleString(), icon: "⏳" },
-                  ...vendorLogs.slice(0, 5).map(l => ({ action: l.action, by: l.user, date: new Date(l.dateTime).toLocaleString(), icon: "🔧" })),
                 ].map((event, i) => (
                   <div key={i} className="flex items-start gap-3">
                     <span className="text-lg">{event.icon}</span>
@@ -944,6 +982,35 @@ export default function VendorProfile() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit Business Details</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {([
+              ["name", "Business Name"], ["businessType", "Business Type"],
+              ["email", "Business Email"], ["phone", "Phone"],
+              ["website", "Website"], ["gstNumber", "GST Number"],
+              ["fssaiNumber", "FSSAI Number"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="space-y-2">
+                <Label>{label}</Label>
+                <Input value={(detailsForm as any)[key]} onChange={e => setDetailsForm(f => ({ ...f, [key]: e.target.value }))} />
+              </div>
+            ))}
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Address</Label>
+              <Input value={detailsForm.address} onChange={e => setDetailsForm(f => ({ ...f, address: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailsOpen(false)}>Cancel</Button>
+            <Button disabled={!detailsForm.name.trim() || updateDetailsMutation.isPending} onClick={() => updateDetailsMutation.mutate()}>
+              {updateDetailsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

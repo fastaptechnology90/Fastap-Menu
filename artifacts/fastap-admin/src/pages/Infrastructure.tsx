@@ -50,13 +50,15 @@ export default function Infrastructure() {
     onError: () => toast({ title: "Failed to update maintenance mode", variant: "destructive" }),
   });
 
+  // The endpoint writes a CSV of the vendor table into export history. It is not a
+  // database backup, so it is not described as one.
   const backupMutation = useMutation({
     mutationFn: api.infrastructure.triggerBackup,
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["infrastructure-overview"] });
-      toast({ title: "Backup completed", description: `${data.id} — ${data.sizeMb} MB` });
+      toast({ title: "Vendor snapshot created", description: `${data.id} — ${data.sizeMb} MB` });
     },
-    onError: () => toast({ title: "Backup failed", variant: "destructive" }),
+    onError: () => toast({ title: "Snapshot failed", variant: "destructive" }),
   });
 
   const retryMutation = useMutation({
@@ -88,7 +90,7 @@ export default function Infrastructure() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Infrastructure & Monitoring</h2><p className="text-muted-foreground">Real-time cluster health, job queues, and backup management.</p></div>
+        <div><h2 className="text-2xl font-bold tracking-tight">Infrastructure & Monitoring</h2><p className="text-muted-foreground">Job queues, system alerts, and vendor snapshots.</p></div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 border rounded-md p-2 bg-card">
             <span className="text-sm font-medium">Maintenance Mode</span>
@@ -106,18 +108,31 @@ export default function Infrastructure() {
 
       {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : metrics && (
         <>
+          {/* The API sets `estimated` because these numbers are derived from row counts and
+              queue depth, not read off the host. Showing them as live telemetry would invite
+              capacity decisions based on figures nothing measured. */}
+          {(metrics as any).estimated && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                <span className="font-semibold">Estimated, not measured.</span> These figures are
+                derived from database row counts and queue depth — the platform has no host-metrics
+                agent. Disk is a fixed placeholder. Do not use them for capacity planning.
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-4">
             <KpiCard title="Uptime" value={metrics.uptime} icon={<Activity className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="API Req/min" value={metrics.apiRpm.toLocaleString()} icon={<Network className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Cache Hit Rate" value={`${metrics.cacheHitRate}%`} icon={<Server className="h-4 w-4 text-blue-500" />} />
+            <KpiCard title="API Req/min (est.)" value={metrics.apiRpm.toLocaleString()} icon={<Network className="h-4 w-4 text-primary" />} />
+            <KpiCard title="Cache Hit Rate (est.)" value={`${metrics.cacheHitRate}%`} icon={<Server className="h-4 w-4 text-blue-500" />} />
             <KpiCard title="Queue Depth" value={metrics.queueDepth} icon={<Activity className="h-4 w-4 text-yellow-500" />} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <MetricCard icon={<Cpu className="h-4 w-4" />} title="CPU Usage" value={metrics.cpu} max={100} unit="%" />
-            <MetricCard icon={<Server className="h-4 w-4" />} title="Memory" value={metrics.memory} max={100} unit="%" />
-            <MetricCard icon={<HardDrive className="h-4 w-4" />} title="Disk" value={metrics.disk} max={100} unit="%" />
-            <MetricCard icon={<Database className="h-4 w-4" />} title="DB Connections" value={metrics.dbConnections} unit="" />
+            <MetricCard icon={<Cpu className="h-4 w-4" />} title="CPU Usage (est.)" value={metrics.cpu} max={100} unit="%" />
+            <MetricCard icon={<Server className="h-4 w-4" />} title="Memory (est.)" value={metrics.memory} max={100} unit="%" />
+            <MetricCard icon={<HardDrive className="h-4 w-4" />} title="Disk (placeholder)" value={metrics.disk} max={100} unit="%" />
+            <MetricCard icon={<Database className="h-4 w-4" />} title="DB Connections (est.)" value={metrics.dbConnections} unit="" />
           </div>
         </>
       )}
@@ -126,7 +141,7 @@ export default function Infrastructure() {
         <TabsList>
           <TabsTrigger value="queues">Job Queues</TabsTrigger>
           <TabsTrigger value="alerts">System Alerts</TabsTrigger>
-          <TabsTrigger value="backup">Backup & Recovery</TabsTrigger>
+          <TabsTrigger value="backup">Vendor Snapshots</TabsTrigger>
           <TabsTrigger value="logs">System Logs</TabsTrigger>
         </TabsList>
 
@@ -194,21 +209,25 @@ export default function Infrastructure() {
 
         <TabsContent value="backup" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <KpiCard title="Last Backup" value={backupStats.lastBackup ? formatTime(backupStats.lastBackup) : "—"} icon={<Archive className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="Total Backups" value={backupStats.total} icon={<CheckCircle className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Backup Size" value={`${backupStats.totalSizeMb.toFixed(1)} MB`} icon={<HardDrive className="h-4 w-4 text-blue-500" />} />
+            <KpiCard title="Last Snapshot" value={backupStats.lastBackup ? formatTime(backupStats.lastBackup) : "—"} icon={<Archive className="h-4 w-4 text-green-500" />} />
+            <KpiCard title="Total Snapshots" value={backupStats.total} icon={<CheckCircle className="h-4 w-4 text-primary" />} />
+            <KpiCard title="Snapshot Size" value={`${backupStats.totalSizeMb.toFixed(1)} MB`} icon={<HardDrive className="h-4 w-4 text-blue-500" />} />
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <Button disabled={backupMutation.isPending} onClick={() => backupMutation.mutate()}>
               {backupMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
-              Trigger Backup Now
+              Export Vendor Snapshot
             </Button>
+            <p className="text-xs text-muted-foreground max-w-md">
+              Writes a CSV of the vendor table to export history. This is not a database backup —
+              no full-database restore point is produced.
+            </p>
           </div>
           <Card>
-            <CardHeader><CardTitle>Backup History</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Snapshot History</CardTitle></CardHeader>
             <CardContent>
               {backupHistory.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No backups yet. Trigger a backup to get started.</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No snapshots yet. Export one to get started.</p>
               ) : (
                 <DataTable
                   data={backupHistory}

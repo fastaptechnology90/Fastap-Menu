@@ -40,6 +40,11 @@ function getHealthColor(score: number) {
   return "text-red-400";
 }
 
+// Type labels are free text on the way in, so compare them case- and accent-insensitively.
+function normalizeType(v: string) {
+  return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
 function getVendorTag(vendor: any) {
   if (!vendor.isActive) return "dormant";
   if (vendor.plan === "enterprise") return "enterprise";
@@ -114,7 +119,10 @@ export default function Vendors() {
   const handleExportCSV = () => {
     const headers = ["ID", "Business Name", "Owner", "Email", "Type", "Plan", "Status", "Orders", "Health Score", "Joined"];
     const rows = filteredVendors.map(v => [v.id, v.name, v.ownerName, v.ownerEmail, v.businessType || "Restaurant", v.plan, v.isActive ? "Active" : "Suspended", v.totalOrders, getHealthScore(v), new Date(v.createdAt).toLocaleDateString()]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+    // Business names routinely contain commas ("Bistro, Inc"), which silently shifted
+    // every later column in the exported file. Quote every cell instead.
+    const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map(r => r.map(cell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "vendors.csv"; a.click();
@@ -125,7 +133,10 @@ export default function Vendors() {
   const filteredVendors = vendors.filter(v => {
     const matchSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) || (v.ownerEmail ?? "").toLowerCase().includes(searchTerm.toLowerCase()) || String(v.id).includes(searchTerm);
     const matchStatus = statusFilter === "all" || (statusFilter === "active" ? v.isActive : !v.isActive);
-    const matchType = typeFilter === "all" || (v.businessType || "Restaurant") === typeFilter;
+    // Business type is stored however it was entered — "restaurant", "Restaurant",
+    // "Cafe" and "Cafe" with an accent all occur — so an exact compare against the
+    // dropdown label hid most real rows.
+    const matchType = typeFilter === "all" || normalizeType(v.businessType || "Restaurant") === normalizeType(typeFilter);
     const matchPlan = planFilter === "all" || v.plan === planFilter;
     return matchSearch && matchStatus && matchType && matchPlan;
   });
@@ -133,16 +144,19 @@ export default function Vendors() {
   const toggleSelect = (id: number) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleSelectAll = () => setSelected(selected.length === filteredVendors.length ? [] : filteredVendors.map(v => v.id));
 
-  const activeCount = vendors.filter(v => v.isActive).length;
-  const suspendedCount = vendors.filter(v => !v.isActive).length;
-  const enterpriseCount = vendors.filter(v => v.plan === "enterprise").length;
+  // Archived vendors are only in the list when "Show archived" is on; counting them as
+  // "Suspended" made the headline numbers jump every time that button was pressed.
+  const liveVendors = vendors.filter(v => !(v as any).platformControls?.deletedAt);
+  const activeCount = liveVendors.filter(v => v.isActive).length;
+  const suspendedCount = liveVendors.filter(v => !v.isActive).length;
+  const enterpriseCount = liveVendors.filter(v => v.plan === "enterprise").length;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Vendor Management</h2>
-          <p className="text-muted-foreground">{isLoading ? "Loading…" : `${vendors.length} vendors on platform`}</p>
+          <p className="text-muted-foreground">{isLoading ? "Loading…" : `${liveVendors.length} vendors on platform`}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
@@ -186,7 +200,7 @@ export default function Vendors() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Total Vendors" value={vendors.length} icon={<Building2 className="h-4 w-4 text-primary" />} />
+        <KpiCard title="Total Vendors" value={liveVendors.length} icon={<Building2 className="h-4 w-4 text-primary" />} />
         <KpiCard title="Active" value={activeCount} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
         <KpiCard title="Suspended" value={suspendedCount} icon={<XCircle className="h-4 w-4 text-red-500" />} />
         <KpiCard title="Enterprise" value={enterpriseCount} icon={<TrendingUp className="h-4 w-4 text-purple-500" />} />
@@ -289,7 +303,11 @@ export default function Vendors() {
                       <Link href={`/vendors/${row.id}`} className="cursor-pointer flex items-center"><Eye className="mr-2 h-4 w-4" /> View Profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => freezeMutation.mutate(row.id)}>Freeze Payout</DropdownMenuItem>
+                    {/* Freezing is one-way on the API side, so re-clicking it on an already
+                        frozen vendor did nothing but pop a success toast. */}
+                    <DropdownMenuItem disabled={Boolean((row as any).payoutsFrozen)} onClick={() => freezeMutation.mutate(row.id)}>
+                      {(row as any).payoutsFrozen ? "Payouts already frozen" : "Freeze Payout"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => resetPasswordMutation.mutate(row.id)}>Reset Password</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {(row as any).platformControls?.deletedAt ? (

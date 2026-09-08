@@ -27,10 +27,12 @@ export default function WhiteLabel() {
   }, [settings]);
 
   const saveMutation = useMutation({
+    // whiteLabel is stored on platform settings but is not declared on PlatformSettings,
+    // so the payload is widened here rather than changing the shared type.
     mutationFn: (data: any) => api.settings.update({
       platformName: data.appName,
       whiteLabel: { domain: data.domain, primaryColor: data.primaryColor, appName: data.appName, domainVerified },
-    }),
+    } as Parameters<typeof api.settings.update>[0]),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["platform-settings"] });
       toast.success("White label configuration saved");
@@ -97,8 +99,14 @@ export default function WhiteLabel() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5" /> Branding</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Platform Name</Label><Input value={appName} onChange={e => setAppName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Primary Color</Label><Input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-10 w-20" /></div>
+            <div className="space-y-2"><Label>Platform Name</Label><Input value={appName} onChange={e => setAppName(e.target.value)} /><p className="text-xs text-muted-foreground">Saved as the platform name used across the admin panel.</p></div>
+            <div className="space-y-2">
+              <Label>Primary Color</Label>
+              <Input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-10 w-20" />
+              {/* Stored under whiteLabel in platform settings, but no panel reads it back to
+                  build a theme, so it must not look like it restyles anything. */}
+              <p className="text-xs text-muted-foreground">Stored for future theming — no panel applies this colour yet.</p>
+            </div>
           </CardContent>
         </Card>
       </div>

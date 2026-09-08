@@ -119,8 +119,11 @@ export default function VenueScanPage() {
     );
   }
 
-  const isTable = data.type === "table" && data.table;
-  const isRoom = data.type === "room" && data.room;
+  // undefined rather than false when absent: the scanned table/room is read through `?.`
+  // further down, and optional chaining does not narrow a `false` out of the union — so
+  // `isTable?.bookable` failed to compile and the Book / Order buttons were unreachable.
+  const isTable = data.type === "table" ? data.table : undefined;
+  const isRoom = data.type === "room" ? data.room : undefined;
   const statusLabel = isTable ? data.table!.statusLabel : isRoom ? data.room!.statusLabel : "—";
   const statusClass = STATUS_COLOR[statusLabel] ?? STATUS_COLOR[data.table?.status ?? data.room?.status ?? ""] ?? "text-white/60 bg-white/10";
 

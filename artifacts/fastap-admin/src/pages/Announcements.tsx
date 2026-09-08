@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
-import { Megaphone, Plus, RefreshCw, Loader2, Trash2, AlertTriangle, Wrench, Zap, Radio } from "lucide-react";
+import { Megaphone, RefreshCw, Loader2, Trash2, AlertTriangle, Wrench, Zap, Radio } from "lucide-react";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 export default function Announcements() {
   const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", message: "", type: "Feature Release", severity: "info", scheduledAt: "", targetAudience: "all", active: true });
@@ -27,13 +29,14 @@ export default function Announcements() {
 
   const createMutation = useMutation({
     mutationFn: api.announcements.create,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["announcements"] }); setOpen(false); toast({ title: "Announcement published" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["announcements"] }); setOpen(false); toast({ title: "Announcement saved" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: api.announcements.delete,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["announcements"] }); toast({ title: "Announcement removed" }); },
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const toggleMutation = useMutation({
@@ -65,7 +68,7 @@ export default function Announcements() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Announcement & Maintenance Broadcast</h2>
-          <p className="text-muted-foreground">Publish maintenance alerts, feature releases, downtime notices, and emergency alerts.</p>
+          <p className="text-muted-foreground">Keep a record of maintenance alerts, feature releases, downtime notices, and emergency alerts.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
@@ -131,8 +134,11 @@ export default function Announcements() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
-                  <Label>Publish immediately</Label>
+                  <Label>Mark as live</Label>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  A scheduled time is stored for reference only — nothing flips this to live automatically.
+                </p>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending}>
                   {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Megaphone className="mr-2 h-4 w-4" />}
                   Publish Announcement
@@ -142,6 +148,19 @@ export default function Announcements() {
           </Dialog>
         </div>
       </div>
+
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="flex items-start gap-3 py-4">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium">Announcements are recorded here only.</p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Nothing yet pushes them to restaurant owner panels or the staff apps, and no message is emailed.
+              "Live" and "Scheduled" describe this record, not a delivery.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total" value={announcements.length} icon={<Megaphone className="h-4 w-4 text-primary" />} />
@@ -177,7 +196,17 @@ export default function Announcements() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch checked={ann.active} onCheckedChange={() => toggleMutation.mutate(ann.id)} disabled={toggleMutation.isPending} />
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteMutation.mutate(ann.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" disabled={deleteMutation.isPending}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `Delete "${ann.title}"?`,
+                          description: "This removes the announcement from the platform record for good.",
+                          destructive: true,
+                          confirmLabel: "Delete",
+                        });
+                        if (!ok) return;
+                        deleteMutation.mutate(ann.id);
+                      }}>
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>
@@ -186,10 +215,11 @@ export default function Announcements() {
             </Card>
           ))}
           {announcements.length === 0 && (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No announcements published yet.</CardContent></Card>
+            <Card><CardContent className="py-12 text-center text-muted-foreground">No announcements recorded yet.</CardContent></Card>
           )}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

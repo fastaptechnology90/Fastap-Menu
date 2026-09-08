@@ -15,9 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Search, Download, CheckCircle, XCircle, RefreshCcw, Loader2, Eye, PauseCircle, RotateCcw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 export default function Payments() {
   const qc = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all"); // all | 7 | 15 | 30 (days)
@@ -43,14 +45,27 @@ export default function Payments() {
 
   const retryMutation = useMutation({
     mutationFn: () => api.payments.retry(detailId!),
-    onSuccess: () => { toast.success("Payment retry queued"); qc.invalidateQueries({ queryKey: ["payment-detail", detailId] }); },
-    onError: () => toast.error("Retry failed"),
+    // A retry can flip the transaction to paid, which changes the row in the table behind the
+    // dialog and every downstream payout figure — refreshing only the dialog looked like a no-op.
+    onSuccess: (r: any) => {
+      toast.success(r?.paymentStatus === "paid" ? "Payment captured" : "Retry attempted — still unpaid");
+      qc.invalidateQueries({ queryKey: ["payment-detail", detailId] });
+      qc.invalidateQueries({ queryKey: ["superadmin-payments"] });
+      qc.invalidateQueries({ queryKey: ["superadmin-settlements"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Retry failed"),
   });
 
   const refundMutation = useMutation({
     mutationFn: () => api.payments.refund(detailId!, { reason: "Admin initiated from payments" }),
-    onSuccess: () => { toast.success("Refund initiated"); qc.invalidateQueries({ queryKey: ["refunds"] }); },
-    onError: () => toast.error("Refund failed"),
+    onSuccess: () => {
+      toast.success("Refund initiated");
+      qc.invalidateQueries({ queryKey: ["refunds"] });
+      qc.invalidateQueries({ queryKey: ["superadmin-payments"] });
+      qc.invalidateQueries({ queryKey: ["payment-detail", detailId] });
+      qc.invalidateQueries({ queryKey: ["superadmin-settlements"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Refund failed"),
   });
 
   const nowMs = Date.now();
@@ -152,7 +167,6 @@ export default function Payments() {
                 <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="success">Success</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
@@ -225,10 +239,24 @@ export default function Payments() {
           <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" size="sm" disabled={retryMutation.isPending} onClick={() => retryMutation.mutate()}><RotateCcw className="h-3.5 w-3.5 mr-1" /> Retry</Button>
             <Button variant="outline" size="sm" disabled={holdMutation.isPending || detail?.held} onClick={() => holdMutation.mutate()}><PauseCircle className="h-3.5 w-3.5 mr-1" /> Hold</Button>
-            <Button variant="outline" size="sm" disabled={refundMutation.isPending} onClick={() => refundMutation.mutate()}><Undo2 className="h-3.5 w-3.5 mr-1" /> Refund</Button>
+            <Button
+              variant="outline" size="sm" disabled={refundMutation.isPending}
+              onClick={async () => {
+                // A full refund is irreversible and was firing on a single click with no prompt.
+                const ok = await confirm({
+                  title: `Refund ${detail ? fmtINRFull(detail.grossAmount) : "this transaction"}?`,
+                  description: `A full refund is raised against ${detail?.orderId ?? "this order"} and the payment is marked refunded. This cannot be undone here.`,
+                  destructive: true,
+                  confirmLabel: "Refund in full",
+                });
+                if (!ok) return;
+                refundMutation.mutate();
+              }}
+            ><Undo2 className="h-3.5 w-3.5 mr-1" /> Refund</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

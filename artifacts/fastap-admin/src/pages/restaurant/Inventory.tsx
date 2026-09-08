@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { inventory as inventoryApi } from "@/lib/api";
-import { Plus, Search, AlertTriangle, TrendingDown, RefreshCw, ShoppingCart, X, Save, Package } from "lucide-react";
+import { Plus, Search, AlertTriangle, TrendingDown, RefreshCw, ShoppingCart, X, Save, Package, Edit2, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 interface InventoryItem {
   id: string | number;
@@ -10,7 +12,7 @@ interface InventoryItem {
   currentStock: number;
   minStock: number;
   maxStock: number;
-  unitCost?: number;
+  unitCost: number;
   costPerUnit?: number;
   supplier?: string;
   lastRestocked?: string;
@@ -19,17 +21,28 @@ interface InventoryItem {
   isLow?: boolean;
 }
 
-const CATEGORIES = ["All", "Grains", "Protein", "Dairy", "Vegetables", "Oils & Fats", "Spices", "Beverages", "raw_material", "beverage", "cleaning", "packaging"];
+// Stock is filed under lower-case keys ("grains", "dairy"), so offer those rather than
+// prettified names that match nothing in the table.
+const CATEGORY_OPTIONS = ["raw_material", "grains", "vegetables", "dairy", "poultry", "meat", "seafood", "spices", "oils", "beverage", "packaging", "cleaning"];
 
 export default function Inventory() {
   const { restaurantId } = useRestaurant();
+  const { confirm, confirmDialog } = useConfirm();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  async function reload() {
+    if (!restaurantId) return;
+    const data = await inventoryApi.list(restaurantId);
+    setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), unitCost: Number(i.costPerUnit) || 0, currentStock: Number(i.currentStock) || 0, minStock: Number(i.minStock) || 0, maxStock: Number(i.maxStock) || 0 })) : []);
+  }
 
   useEffect(() => {
     if (!restaurantId) return;
     setLoading(true);
-    inventoryApi.list(restaurantId).then(data => setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), unitCost: i.costPerUnit ?? 0 })) : [])).catch(() => {}).finally(() => setLoading(false));
+    reload()
+      .catch(e => toast({ title: "Could not load stock", description: e?.message, variant: "destructive" }))
+      .finally(() => setLoading(false));
   }, [restaurantId]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -38,7 +51,10 @@ export default function Inventory() {
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [restockItem, setRestockItem] = useState<InventoryItem | null>(null);
   const [restockQty, setRestockQty] = useState("");
-  const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ category: "Grains", unit: "kg" });
+  const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ category: "raw_material", unit: "kg" });
+
+  // Derived from the stock on hand, so a filter button can never point at an empty set.
+  const categoryNames = ["All", ...Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort()];
 
   const filtered = items.filter(i => {
     const catMatch = category === "All" || i.category === category;
@@ -59,25 +75,81 @@ export default function Inventory() {
   }
 
   async function handleRestock() {
-    if (!restockItem || !restockQty || !restaurantId) return;
+    if (!restockItem || !restaurantId) return;
+    if (!(Number(restockQty) > 0)) {
+      toast({ title: "Enter a quantity to add", description: "How much stock came in?", variant: "destructive" });
+      return;
+    }
     try {
       await inventoryApi.addTransaction(restaurantId, Number(restockItem.id), { type: "in", quantity: Number(restockQty), reason: "restock", performedBy: "Staff" });
-      const data = await inventoryApi.list(restaurantId);
-      setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), unitCost: i.costPerUnit ?? 0 })) : []);
-    } catch (e) { console.error(e); }
-    setRestockItem(null);
-    setRestockQty("");
+      await reload();
+      // The modal used to close whether the call succeeded or threw, so a failed delivery
+      // looked identical to a booked one and the stock figure quietly stayed wrong.
+      toast({ title: `Added ${restockQty} ${restockItem.unit} of ${restockItem.name}` });
+      setRestockItem(null);
+      setRestockQty("");
+    } catch (e: any) {
+      toast({ title: "Could not record the restock", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function handleAddItem() {
-    if (!newItem.name || !restaurantId) return;
+    if (!restaurantId) return;
+    if (!String(newItem.name ?? "").trim()) {
+      toast({ title: "Item Name is required", variant: "destructive" });
+      return;
+    }
     try {
-      await inventoryApi.create(restaurantId, { name: newItem.name, category: newItem.category || "Grains", unit: newItem.unit || "kg", currentStock: newItem.currentStock || 0, minStock: newItem.minStock || 10, maxStock: newItem.maxStock || 50, costPerUnit: newItem.unitCost || 0, supplier: newItem.supplier || "" });
-      const data = await inventoryApi.list(restaurantId);
-      setItems(Array.isArray(data) ? data.map(i => ({ ...i, id: String(i.id), unitCost: i.costPerUnit ?? 0 })) : []);
-    } catch (e) { console.error(e); }
-    setAddMode(false);
-    setNewItem({ category: "Grains", unit: "kg" });
+      await inventoryApi.create(restaurantId, { name: newItem.name, category: newItem.category || "raw_material", unit: newItem.unit || "kg", currentStock: newItem.currentStock || 0, minStock: newItem.minStock || 10, maxStock: newItem.maxStock || 50, costPerUnit: newItem.unitCost || 0, supplier: newItem.supplier || "" });
+      await reload();
+      toast({ title: `${newItem.name} added to stock` });
+      setAddMode(false);
+      setNewItem({ category: "raw_material", unit: "kg" });
+    } catch (e: any) {
+      // Keep the form open so nothing typed has to be entered again.
+      toast({ title: "Could not add the item", description: e?.message, variant: "destructive" });
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editItem || !restaurantId) return;
+    if (!String(editItem.name ?? "").trim()) {
+      toast({ title: "Item Name cannot be blank", variant: "destructive" });
+      return;
+    }
+    try {
+      await inventoryApi.update(restaurantId, Number(editItem.id), {
+        name: editItem.name, category: editItem.category, unit: editItem.unit,
+        currentStock: Number(editItem.currentStock) || 0,
+        minStock: Number(editItem.minStock) || 0,
+        maxStock: Number(editItem.maxStock) || 0,
+        costPerUnit: Number(editItem.unitCost) || 0,
+        supplier: editItem.supplier || "",
+      });
+      await reload();
+      toast({ title: "Item updated" });
+      setEditItem(null);
+    } catch (e: any) {
+      toast({ title: "Could not save the item", description: e?.message, variant: "destructive" });
+    }
+  }
+
+  async function handleDelete(item: InventoryItem) {
+    if (!restaurantId) return;
+    const ok = await confirm({
+      title: `Remove ${item.name} from stock?`,
+      description: "Its stock history goes with it. Recipes that use it will stop drawing it down.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await inventoryApi.delete(restaurantId, Number(item.id));
+      await reload();
+      toast({ title: `${item.name} removed` });
+    } catch (e: any) {
+      toast({ title: "Could not remove the item", description: e?.message, variant: "destructive" });
+    }
   }
 
   return (
@@ -128,7 +200,7 @@ export default function Inventory() {
           <input className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder="Search items, suppliers..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-2 flex-wrap">
-          {CATEGORIES.map(cat => (
+          {categoryNames.map(cat => (
             <button key={cat} onClick={() => setCategory(cat)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${category === cat ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
               {cat}
             </button>
@@ -184,9 +256,19 @@ export default function Inventory() {
                     <td className="px-4 py-3 text-xs text-white/50 max-w-28 truncate">{item.supplier}</td>
                     <td className="px-4 py-3 text-xs text-white/40">{item.lastRestocked}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => setRestockItem(item)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 border border-emerald-500/30 transition-all whitespace-nowrap">
-                        <RefreshCw className="h-3 w-3" /> Restock
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setRestockItem(item)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 border border-emerald-500/30 transition-all whitespace-nowrap">
+                          <RefreshCw className="h-3 w-3" /> Restock
+                        </button>
+                        {/* Correcting a wrong unit cost or supplier, and retiring a line
+                            entirely, both existed on the server and had no button. */}
+                        <button onClick={() => setEditItem({ ...item })} aria-label={`Edit ${item.name}`} className="h-7 w-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center hover:bg-blue-500/30 transition-all">
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                        <button onClick={() => handleDelete(item)} aria-label={`Remove ${item.name}`} className="h-7 w-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -226,46 +308,54 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Add Item Modal */}
-      {addMode && (
+      {/* One form for both adding and correcting a line — the fields are identical. */}
+      {(addMode || editItem) && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 p-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold">Add Inventory Item</h3>
-              <button onClick={() => setAddMode(false)}><X className="h-5 w-5 text-white/40" /></button>
+              <h3 className="font-bold">{editItem ? `Edit ${editItem.name}` : "Add Inventory Item"}</h3>
+              <button onClick={() => { setAddMode(false); setEditItem(null); }} aria-label="Close"><X className="h-5 w-5 text-white/40" /></button>
             </div>
             <div className="space-y-3">
               {[
                 { label: "Item Name", field: "name", type: "text", placeholder: "e.g. Basmati Rice" },
-                { label: "Category", field: "category", type: "select", options: CATEGORIES.filter(c => c !== "All") },
+                { label: "Category", field: "category", type: "select", options: Array.from(new Set([...items.map(i => i.category).filter(Boolean), ...CATEGORY_OPTIONS])) },
                 { label: "Unit", field: "unit", type: "select", options: ["kg", "g", "L", "ml", "pcs", "dozen", "box"] },
                 { label: "Current Stock", field: "currentStock", type: "number" },
                 { label: "Minimum Stock", field: "minStock", type: "number" },
                 { label: "Maximum Stock", field: "maxStock", type: "number" },
                 { label: "Unit Cost (₹)", field: "unitCost", type: "number" },
                 { label: "Supplier", field: "supplier", type: "text", placeholder: "Supplier name" },
-              ].map(({ label, field, type, placeholder, options }) => (
-                <div key={field}>
-                  <label className="block text-xs text-white/40 mb-1">{label}</label>
-                  {type === "select" ? (
-                    <select className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white" value={(newItem as any)[field] || ""} onChange={e => setNewItem({ ...newItem, [field]: e.target.value })}>
-                      {options?.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : (
-                    <input type={type} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder={placeholder} value={(newItem as any)[field] || ""} onChange={e => setNewItem({ ...newItem, [field]: type === "number" ? Number(e.target.value) : e.target.value })} />
-                  )}
-                </div>
-              ))}
+              ].map(({ label, field, type, placeholder, options }) => {
+                const source: any = editItem ?? newItem;
+                const set = (value: any) => editItem
+                  ? setEditItem({ ...editItem, [field]: value })
+                  : setNewItem({ ...newItem, [field]: value });
+                return (
+                  <div key={field}>
+                    <label className="block text-xs text-white/40 mb-1">{label}</label>
+                    {type === "select" ? (
+                      <select className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white" value={source[field] || ""} onChange={e => set(e.target.value)}>
+                        <option value="">Select…</option>
+                        {options?.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input type={type} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder={placeholder} value={source[field] ?? ""} onChange={e => set(type === "number" ? Number(e.target.value) : e.target.value)} />
+                    )}
+                  </div>
+                );
+              })}
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setAddMode(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
-                <button onClick={handleAddItem} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold flex items-center justify-center gap-2">
-                  <Save className="h-4 w-4" /> Add Item
+                <button onClick={() => { setAddMode(false); setEditItem(null); }} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
+                <button onClick={editItem ? handleSaveEdit : handleAddItem} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold flex items-center justify-center gap-2">
+                  <Save className="h-4 w-4" /> {editItem ? "Save Changes" : "Add Item"}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

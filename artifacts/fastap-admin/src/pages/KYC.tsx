@@ -65,7 +65,18 @@ export default function KYC() {
     } catch { toast.error("Failed to update document"); }
   }
 
-  const { data: kycData = [], isLoading, isError, refetch } = useQuery({ queryKey: ["kyc"], queryFn: api.kyc.list, refetchInterval: 30000 });
+  const { data: rawKyc = [], isLoading, isError, refetch } = useQuery({ queryKey: ["kyc"], queryFn: api.kyc.list, refetchInterval: 30000 });
+
+  // The list endpoint only maps the raw "approved"/"rejected" KYC states to a label and
+  // lets everything else fall through to "Pending Review" — so a vendor put into
+  // "action_required" (by Request Re-upload, or by rejecting one of their documents)
+  // was displayed as if nobody had looked at it yet, and the Action Required counter
+  // was permanently zero. Re-derive the label from the raw state the payload carries.
+  const kycData = rawKyc.map(k => {
+    const raw = String((k as any).kycData?.status ?? "").toLowerCase();
+    if (raw === "action_required") return { ...k, status: "Action Required" };
+    return k;
+  });
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.kyc.approve(id),

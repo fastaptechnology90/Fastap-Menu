@@ -14,6 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api, type SupportTicket } from "@/lib/apiClient";
 import { toast } from "sonner";
 
+// Ticket status/priority come from the API lowercase ("open", "in_progress",
+// "critical"). Compare through this rather than against title-case literals.
+const norm = (s?: string) => String(s ?? "").toLowerCase().replace(/_/g, " ").trim();
+const pretty = (s?: string) => {
+  const n = norm(s);
+  return n ? n.replace(/\b\w/g, c => c.toUpperCase()) : "—";
+};
+
 export default function Support() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -54,7 +62,7 @@ export default function Support() {
     onError: () => toast.error("Merge failed"),
   });
 
-  const getPriorityColor = (p: string) => p === "Critical" ? "bg-red-500/10 text-red-500" : p === "High" ? "bg-orange-500/10 text-orange-500" : p === "Medium" ? "bg-yellow-500/10 text-yellow-500" : "bg-blue-500/10 text-blue-500";
+  const getPriorityColor = (p: string) => { const n = norm(p); return n === "critical" ? "bg-red-500/10 text-red-500" : n === "high" ? "bg-orange-500/10 text-orange-500" : n === "medium" ? "bg-yellow-500/10 text-yellow-500" : "bg-blue-500/10 text-blue-500"; };
 
   const filtered = tickets.filter(t => t.vendorName.toLowerCase().includes(search.toLowerCase()) || t.subject.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()));
 
@@ -62,10 +70,10 @@ export default function Support() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div><h2 className="text-2xl font-bold tracking-tight">Support & Tickets</h2><p className="text-muted-foreground">Vendor support requests and SLA monitoring.</p></div>
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Open Tickets" value={tickets.filter(t => t.status === "Open").length} icon={<MessageSquare className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Critical" value={tickets.filter(t => t.priority === "Critical").length} icon={<Clock className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Escalated" value={tickets.filter(t => t.status === "Escalated").length} icon={<ArrowUpRight className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="Resolved" value={tickets.filter(t => t.status === "Resolved").length} icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Open Tickets" value={tickets.filter(t => norm(t.status) === "open").length} icon={<MessageSquare className="h-4 w-4 text-primary" />} />
+        <KpiCard title="Critical" value={tickets.filter(t => norm(t.priority) === "critical").length} icon={<Clock className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Escalated" value={tickets.filter(t => norm(t.status) === "escalated").length} icon={<ArrowUpRight className="h-4 w-4 text-orange-500" />} />
+        <KpiCard title="Resolved" value={tickets.filter(t => norm(t.status) === "resolved").length} icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} />
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -77,8 +85,8 @@ export default function Support() {
               { header: "Ticket ID", cell: (row: SupportTicket) => <span className="font-mono text-xs">{row.id}</span> },
               { header: "Vendor", accessorKey: "vendorName" },
               { header: "Subject", cell: (row: SupportTicket) => <span className="text-sm">{row.subject}</span> },
-              { header: "Priority", cell: (row: SupportTicket) => <Badge className={`text-xs ${getPriorityColor(row.priority)}`} variant="outline">{row.priority}</Badge> },
-              { header: "Status", cell: (row: SupportTicket) => <StatusBadge status={row.status} /> },
+              { header: "Priority", cell: (row: SupportTicket) => <Badge className={`text-xs ${getPriorityColor(row.priority)}`} variant="outline">{pretty(row.priority)}</Badge> },
+              { header: "Status", cell: (row: SupportTicket) => <StatusBadge status={pretty(row.status)} /> },
               { header: "SLA Deadline", cell: (row: SupportTicket) => { const d = new Date(row.slaDeadline); const overdue = d < new Date(); return <span className={`text-xs ${overdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{d.toLocaleDateString()}</span>; } },
               { header: "Actions", cell: (row: SupportTicket) => (
                 <div className="flex items-center gap-1 flex-wrap">
@@ -88,9 +96,9 @@ export default function Support() {
                       {["Agent A", "Agent B", "Finance Team", "Tech Lead"].map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Button size="sm" variant="outline" className="h-7 text-xs text-green-500" disabled={row.status === "Resolved" || row.status === "Closed"} onClick={() => { setResolveDialog({ open: true, id: row.id, subject: row.subject }); setResolution(""); }}>Resolve</Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs text-orange-500" disabled={row.status === "Escalated"} onClick={() => escalateMutation.mutate(row.id)}>Escalate</Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={row.status === "Closed"} onClick={() => closeMutation.mutate(row.id)}>Close</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-green-500" disabled={norm(row.status) === "resolved" || norm(row.status) === "closed"} onClick={() => { setResolveDialog({ open: true, id: row.id, subject: row.subject }); setResolution(""); }}>Resolve</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-orange-500" disabled={norm(row.status) === "escalated" || norm(row.status) === "closed"} onClick={() => escalateMutation.mutate(row.id)}>Escalate</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={norm(row.status) === "closed"} onClick={() => closeMutation.mutate(row.id)}>Close</Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setMergeDialog({ open: true, primaryId: row.id }); setMergeSecondaryId(""); }}><GitMerge className="h-3 w-3 mr-1" /> Merge</Button>
                 </div>
               )},
