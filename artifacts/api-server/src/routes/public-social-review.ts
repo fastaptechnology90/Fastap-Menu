@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { getPublicBaseUrl } from "../lib/scan-urls.js";
 import { eq, desc } from "drizzle-orm";
 import { db, restaurantsTable, feedbackTable, guestUsersTable } from "@workspace/db";
 import {
@@ -136,7 +137,9 @@ router.post("/public/social/food-photos/:photoId/like", async (req, res): Promis
 router.post("/public/social/share", async (req, res): Promise<void> => {
   const slug = String(req.body.slug ?? "spice-garden");
   const restaurant = await loadRestaurant(slug);
-  const baseUrl = String(req.body.baseUrl ?? "https://digitalrestuarants.thefingo.com");
+  // This defaulted to a domain that no longer resolves, so a share link a guest posted
+  // to Instagram led nowhere. Use the deployment's own address.
+  const baseUrl = String(req.body.baseUrl ?? getPublicBaseUrl());
   const shareUrl = `${baseUrl}/user/menu?slug=${slug}${req.body.table ? `&table=${req.body.table}` : ""}`;
   const payload = buildSharePayload({
     platform: String(req.body.platform ?? "whatsapp"),

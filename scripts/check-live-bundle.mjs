@@ -1,4 +1,4 @@
-const base = process.argv[2] || "https://digitalrestuarants.thefingo.com";
+const base = process.argv[2] || "https://fastap-menu-production.up.railway.app";
 const html = await (await fetch(base + "/")).text();
 const m = html.match(/index-[^"']+\.js/);
 console.log("site:", base);

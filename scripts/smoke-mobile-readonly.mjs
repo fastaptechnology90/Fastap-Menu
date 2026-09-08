@@ -6,7 +6,7 @@ import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-const BASE = process.env.API_BASE || "https://digitalrestuarants.thefingo.com";
+const BASE = process.env.API_BASE || "https://fastap-menu-production.up.railway.app";
 
 console.log(`\n=== Read-only mobile smoke (production-safe) ===\n${BASE}\n`);
 

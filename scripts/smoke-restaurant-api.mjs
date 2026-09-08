@@ -28,6 +28,11 @@ async function main() {
   const smokeEmail = `smoke-${stamp}@fastap.test`;
 
   const register = await req("POST", "/restaurant-auth/register", {
+    // Registration asks for the role being registered and the legal name that goes on
+    // the venue's tax invoices. This script predates both, so every run failed at the
+    // first step and the 60 checks after it failed on a missing session.
+    staffRole: "owner",
+    legalBusinessName: `Smoke Venue ${stamp} Pvt Ltd`,
     ownerName: "Smoke Owner",
     ownerEmail: smokeEmail,
     ownerPassword: "SmokeTest1!",
@@ -155,7 +160,7 @@ async function main() {
     "/restaurant/menu", "/restaurant/audit", "/restaurant/notifications", "/restaurant/documents",
     "/restaurant/offline", "/restaurant/aggregators", "/restaurant/waiter",
   ];
-  const WEB = process.env.WEB_BASE || "https://digitalrestuarants.thefingo.com";
+  const WEB = process.env.WEB_BASE || "https://fastap-menu-production.up.railway.app";
   for (const route of webRoutes) {
     try {
       const r = await fetch(`${WEB}${route}`);

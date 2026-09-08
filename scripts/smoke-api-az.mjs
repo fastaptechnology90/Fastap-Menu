@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * A–Z API smoke test: guest public APIs, restaurant panel, super admin, all staff roles.
- * Usage: API_BASE=https://digitalrestuarants.thefingo.com/api node scripts/smoke-api-az.mjs
+ * Usage: API_BASE=https://fastap-menu-production.up.railway.app/api node scripts/smoke-api-az.mjs
  */
 const BASE = process.env.API_BASE || "http://localhost:8080/api";
 const SLUG = "spice-garden";

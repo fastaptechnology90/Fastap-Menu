@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Integration smoke test: User web panel ↔ Restaurant panel ↔ Super Admin panel
- * Usage: API_BASE=https://digitalrestuarants.thefingo.com/api node scripts/smoke-all-panels.mjs
+ * Usage: API_BASE=https://fastap-menu-production.up.railway.app/api node scripts/smoke-all-panels.mjs
  */
 const BASE = process.env.API_BASE || "http://localhost:8080/api";
-const WEB = process.env.WEB_BASE || "https://digitalrestuarants.thefingo.com";
+const WEB = process.env.WEB_BASE || "https://fastap-menu-production.up.railway.app";
 const SLUG = "spice-garden";
 const today = new Date().toISOString().split("T")[0];
 
