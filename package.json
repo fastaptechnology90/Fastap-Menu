@@ -25,6 +25,7 @@
     "smoke:mobile-real": "node scripts/smoke-mobile-real-data.mjs",
     "smoke:mobile-readonly": "node scripts/smoke-mobile-readonly.mjs",
     "smoke:full": "node scripts/smoke-full-stack.mjs",
+    "e2e:demo": "node scripts/e2e-demo-path.mjs",
     "build:apk:kitchen": "cd kitchenapp && flutter build apk --release --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app --dart-define=APP_ENV=production",
     "build:apk:waiter": "cd waiterapp && flutter build apk --release --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app --dart-define=APP_ENV=production --dart-define=APP_VARIANT=waiter",
     "build:apk:housekeeping": "cd housekeepingapp && flutter build apk --release --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app --dart-define=APP_ENV=production --dart-define=APP_VARIANT=housekeeping",
