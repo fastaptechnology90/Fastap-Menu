@@ -8,6 +8,7 @@ import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { priceMenuItem, resolveDiscount, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
+import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 
 const router: IRouter = Router();
 
@@ -180,6 +181,11 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
   // otherwise Finance keeps money that was handed back.
   if (String(order.status ?? "").toLowerCase() === "cancelled") {
     await reverseOrderPaymentInLedger({ restaurantId, order, reason: req.body?.cancelReason });
+    // Ingredients taken out when the order was placed go back on the shelf, otherwise
+    // every cancellation would permanently understate stock.
+    if (String(existing.status ?? "").toLowerCase() !== "cancelled") {
+      await restoreStockForOrder(restaurantId, orderId);
+    }
   }
 
   if (status === "ready" && !order.waiterName) {
@@ -365,6 +371,15 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     const mi = menuMap.get(item.menuItemId);
     if (mi) await db.update(menuItemsTable).set({ orderCount: mi.orderCount + item.quantity }).where(eq(menuItemsTable.id, mi.id));
   }
+
+  // Selling a dish takes its ingredients out of stock. This is the only place the sale
+  // touches inventory — before it, the count above was the entire effect of an order on
+  // stock, so the Inventory page only ever moved when someone typed a restock in by hand.
+  await consumeStockForOrder(
+    restaurantId,
+    order.id,
+    orderItems.map(i => ({ name: i.name, quantity: i.quantity })),
+  );
 
   if (customerPhone || customerEmail) {
     const existing = await db.select().from(customersTable).where(eq(customersTable.restaurantId, restaurantId));

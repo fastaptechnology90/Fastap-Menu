@@ -4,6 +4,8 @@ import { menu as menuApi } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 type MenuItem = any;
 import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, Filter } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 const CATEGORIES = ["All", "Starters", "Main Course", "Desserts", "Beverages", "Breads", "Special"];
 
@@ -31,7 +33,62 @@ function mapItem(i: any, nameOf: (id: any) => string): any {
   };
 }
 
+/**
+ * Name + price rows, used for both sizes and add-ons. Kept deliberately plain: the
+ * server prices an order from these rows, so what the owner types here is what a guest
+ * is charged.
+ */
+function VariantEditor({ label, hint, rows, onChange }: {
+  label: string;
+  hint: string;
+  rows: { name: string; price: number }[];
+  onChange: (rows: { name: string; price: number }[]) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs text-white/40 mb-1.5">{label}</label>
+      <div className="space-y-2">
+        {rows.map((row, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm placeholder:text-white/30"
+              placeholder="Name"
+              value={row.name}
+              onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
+            />
+            <input
+              type="number"
+              min={0}
+              className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm placeholder:text-white/30"
+              placeholder="₹"
+              value={row.price}
+              onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, price: Number(e.target.value) || 0 } : r))}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, i) => i !== idx))}
+              className="px-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/40"
+              aria-label={`Remove ${label.toLowerCase()} row`}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([...rows, { name: "", price: 0 }])}
+          className="text-xs text-amber-400 hover:text-amber-300"
+        >
+          + Add {label.toLowerCase().replace(/s$/, "")}
+        </button>
+        <p className="text-[11px] text-white/30">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function MenuManagement() {
+  const { confirm, confirmDialog } = useConfirm();
   const { restaurantId } = useRestaurant();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
@@ -83,44 +140,86 @@ export default function MenuManagement() {
   async function handleToggle(id: string) {
     const item = items.find(i => i.id === id);
     if (!item || !restaurantId) return;
-    setItems(prev => prev.map(i => i.id === id ? { ...i, available: !i.available } : i));
-    await menuApi.updateItem(restaurantId, parseInt(id), { isAvailable: !item.available }).catch(() => {});
+    // Marking a dish finished for the day is the most common action in a kitchen, and it
+    // hides the item from the guest menu immediately — so a failure has to be visible,
+    // not swallowed, or staff keep taking orders for something that has run out.
+    const next = !item.available;
+    setItems(prev => prev.map(i => i.id === id ? { ...i, available: next } : i));
+    try {
+      await menuApi.updateItem(restaurantId, parseInt(id), { isAvailable: next });
+      toast({ title: next ? `${item.name} is back on the menu` : `${item.name} marked unavailable` });
+    } catch (e: any) {
+      setItems(prev => prev.map(i => i.id === id ? { ...i, available: item.available } : i));
+      toast({ title: "Could not update availability", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function handleSaveEdit() {
     if (!editItem || !restaurantId) return;
     const categoryId = await resolveCategoryId(editItem.category);
-    await menuApi.updateItem(restaurantId, parseInt(editItem.id), {
-      name: editItem.name, price: String(editItem.price), description: editItem.description,
-      categoryId, dietaryTags: [editItem.dietary || "veg"],
-      spiceLevel: editItem.spiceLevel ?? 0, prepTime: editItem.prepTime ?? 15,
-      calories: editItem.calories ?? 0, isFeatured: editItem.featured ?? false,
-      isAvailable: editItem.available,
-    }).catch(() => {});
-    setItems(prev => prev.map(i => i.id === editItem.id ? editItem : i));
-    setEditItem(null);
+    try {
+      await menuApi.updateItem(restaurantId, parseInt(editItem.id), {
+        name: editItem.name, price: String(editItem.price), description: editItem.description,
+        categoryId, dietaryTags: [editItem.dietary || "veg"],
+        spiceLevel: editItem.spiceLevel ?? 0, prepTime: editItem.prepTime ?? 15,
+        calories: editItem.calories ?? 0, isFeatured: editItem.featured ?? false,
+        isAvailable: editItem.available,
+        imageUrl: editItem.imageUrl || null,
+        variants: editItem.variants ?? [],
+        addons: editItem.addons ?? [],
+      });
+      // Only reflect the change once the server has accepted it. Updating the list first
+      // and swallowing the error showed the owner a new price that was never saved.
+      setItems(prev => prev.map(i => i.id === editItem.id ? editItem : i));
+      setEditItem(null);
+      toast({ title: "Item updated" });
+    } catch (e: any) {
+      toast({ title: "Could not save item", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function handleAddItem() {
     if (!newItem.name || !newItem.price || !restaurantId) return;
     const categoryId = await resolveCategoryId(newItem.category || "Main Course");
-    await menuApi.createItem(restaurantId, {
-      name: newItem.name, price: String(newItem.price), description: newItem.description || "",
-      categoryId, dietaryTags: [newItem.dietary || "veg"],
-      spiceLevel: newItem.spiceLevel ?? 0, prepTime: newItem.prepTime ?? 15,
-      calories: newItem.calories ?? 0, isFeatured: newItem.featured ?? false,
-      isAvailable: newItem.available ?? true,
-    }).catch(() => {});
-    await reload();
-    setAddMode(false);
-    setNewItem({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
+    try {
+      await menuApi.createItem(restaurantId, {
+        name: newItem.name, price: String(newItem.price), description: newItem.description || "",
+        categoryId, dietaryTags: [newItem.dietary || "veg"],
+        spiceLevel: newItem.spiceLevel ?? 0, prepTime: newItem.prepTime ?? 15,
+        calories: newItem.calories ?? 0, isFeatured: newItem.featured ?? false,
+        isAvailable: newItem.available ?? true,
+        imageUrl: newItem.imageUrl || null,
+        variants: newItem.variants ?? [],
+        addons: newItem.addons ?? [],
+      });
+      await reload();
+      setAddMode(false);
+      setNewItem({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
+      toast({ title: "Item added" });
+    } catch (e: any) {
+      // Keep the form open with what was typed so nothing has to be re-entered.
+      toast({ title: "Could not add item", description: e?.message, variant: "destructive" });
+    }
   }
 
   async function handleDelete(id: string) {
     if (!restaurantId) return;
-    if (!confirm("Delete this menu item?")) return;
+    const ok = await confirm({
+      title: "Delete this item?",
+      description: "It will be removed from the menu. Guests will no longer see it.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    const previous = items;
     setItems(prev => prev.filter(i => i.id !== id));
-    await menuApi.deleteItem(restaurantId, parseInt(id)).catch(() => {});
+    try {
+      await menuApi.deleteItem(restaurantId, parseInt(id));
+      toast({ title: "Item deleted" });
+    } catch (e: any) {
+      setItems(previous);
+      toast({ title: "Could not delete item", description: e?.message, variant: "destructive" });
+    }
   }
 
   return (
@@ -295,6 +394,43 @@ export default function MenuManagement() {
                 </div>
               ))}
 
+              {/* Photo. The database has carried imageUrl all along and the guest menu
+                  renders it — there was simply no way to set one, so every dish showed a
+                  placeholder icon. A guest choosing food needs to see the food. */}
+              <div>
+                <label className="block text-xs text-white/40 mb-1.5">Photo URL</label>
+                <input
+                  type="url"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                  placeholder="https://…"
+                  value={(editItem || newItem).imageUrl || ""}
+                  onChange={e => editItem ? setEditItem({ ...editItem, imageUrl: e.target.value }) : setNewItem({ ...newItem, imageUrl: e.target.value })}
+                />
+                {(editItem || newItem).imageUrl && (
+                  <img
+                    src={(editItem || newItem).imageUrl}
+                    alt=""
+                    className="mt-2 h-24 w-24 rounded-lg object-cover border border-white/10"
+                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                )}
+              </div>
+
+              {/* Half / full and add-ons: both columns exist on the item and both were
+                  unreachable, so the server fell back to inventing a set for every dish. */}
+              <VariantEditor
+                label="Sizes"
+                hint="Half / Full, Regular / Large — leave empty for a single price"
+                rows={(editItem || newItem).variants ?? []}
+                onChange={rows => editItem ? setEditItem({ ...editItem, variants: rows }) : setNewItem({ ...newItem, variants: rows })}
+              />
+              <VariantEditor
+                label="Add-ons"
+                hint="Extra cheese, extra gravy — priced on top of the item"
+                rows={(editItem || newItem).addons ?? []}
+                onChange={rows => editItem ? setEditItem({ ...editItem, addons: rows }) : setNewItem({ ...newItem, addons: rows })}
+              />
+
               {/* Spice Level */}
               <div>
                 <label className="block text-xs text-white/40 mb-2">Spice Level</label>
@@ -328,6 +464,7 @@ export default function MenuManagement() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

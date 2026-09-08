@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, restaurantsTable, categoriesTable, menuItemsTable, menuViewsTable, campaignsTable, feedbackTable } from "@workspace/db";
-import { MENU_CATEGORY_CATALOG, DIETARY_FILTERS, DEFAULT_CUSTOMIZATION } from "../seed-menu-data.js";
+import { MENU_CATEGORY_CATALOG, DIETARY_FILTERS } from "../seed-menu-data.js";
 import { buildUpsellSuggestions } from "../lib/ordering.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
 import { resolveVenueSlug } from "../lib/demo-venue.js";
@@ -9,10 +9,14 @@ import { resolveVenueSlug } from "../lib/demo-venue.js";
 const router: IRouter = Router();
 
 function formatMenuItem(i: typeof menuItemsTable.$inferSelect) {
-  const customizationOptions = {
-    ...DEFAULT_CUSTOMIZATION,
-    ...(typeof i.customizationOptions === "object" && i.customizationOptions !== null ? i.customizationOptions as Record<string, unknown> : {}),
-  };
+  // Only what this dish actually offers. A default set used to be merged in here, so
+  // every item — desserts and drinks included — came back offering "Extra Cheese +₹15",
+  // "Large +₹25" and "Make it a combo +₹99", and the guest was charged for them. It also
+  // buried the real half/full variants an owner had configured.
+  const customizationOptions =
+    typeof i.customizationOptions === "object" && i.customizationOptions !== null
+      ? i.customizationOptions as Record<string, unknown>
+      : {};
   return {
     ...i,
     price: parseFloat(i.price),

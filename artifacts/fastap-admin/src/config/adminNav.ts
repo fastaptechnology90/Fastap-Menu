@@ -80,7 +80,6 @@ export const adminNavGroups: AdminNavGroup[] = [
       { title: "Infrastructure", href: "/infrastructure", icon: "dns" },
       { title: "Disaster Recovery", href: "/disaster-recovery", icon: "backup" },
       { title: "API Control", href: "/api-control", icon: "api" },
-      { title: "Sandbox", href: "/sandbox", icon: "science" },
       { title: "Data Archival", href: "/data-archival", icon: "archive" },
       { title: "Feature Releases", href: "/feature-releases", icon: "new_releases" },
       { title: "Staff App Releases", href: "/app-releases", icon: "smartphone" },
