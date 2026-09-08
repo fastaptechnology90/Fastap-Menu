@@ -13,6 +13,19 @@ import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, Smartphone, Monitor, Loader2, RefreshCw, XCircle, Plus, Trash2, Globe, AlertTriangle, Key, Eye } from "lucide-react";
 
+// These switches persist to platform settings, but nothing in the API reads them back:
+// login does not check the IP list, issue a second factor, expire idle sessions, or age
+// passwords. They are recorded intent, not active controls, and are labelled as such so
+// nobody assumes the admin panel is protected by a control that is not actually running.
+const SECURITY_SETTINGS = [
+  { label: "Two-Factor Authentication", desc: "Require 2FA for admin login", key: "twoFactor" },
+  { label: "OTP Verification", desc: "OTP on sensitive actions", key: "otp" },
+  { label: "Session Timeout (30min)", desc: "Auto logout after inactivity", key: "sessionTimeout" },
+  { label: "Device Tracking", desc: "Track all logged-in devices", key: "deviceTracking" },
+  { label: "IP Whitelist Enforced", desc: "Restrict login to whitelisted IPs", key: "ipWhitelistEnforced" },
+  { label: "Forced Password Reset", desc: "Require password change every 90 days", key: "forcePasswordReset" },
+];
+
 export default function Security() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -26,16 +39,19 @@ export default function Security() {
   const revokeSession = useMutation({
     mutationFn: api.security.revokeSession,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); toast({ title: "Session revoked" }); },
+    onError: () => toast({ title: "Failed to revoke session", variant: "destructive" }),
   });
 
   const addIpWhitelist = useMutation({
     mutationFn: (ip: string) => api.security.addIpWhitelist(ip),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); toast({ title: "IP whitelisted" }); setIpInput(""); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); toast({ title: "IP added to the list" }); setIpInput(""); },
+    onError: () => toast({ title: "Failed to add IP", variant: "destructive" }),
   });
 
   const removeIpWhitelist = useMutation({
     mutationFn: api.security.removeIpWhitelist,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); toast({ title: "IP removed from whitelist" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); toast({ title: "IP removed from the list" }); },
+    onError: () => toast({ title: "Failed to remove IP", variant: "destructive" }),
   });
 
   const securitySettings = security?.securitySettings ?? {};
@@ -46,7 +62,12 @@ export default function Security() {
 
   const updateSecuritySetting = useMutation({
     mutationFn: (patch: Record<string, boolean>) => api.security.updateSettings(patch),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["security"] }); },
+    onSuccess: (_d, patch) => {
+      qc.invalidateQueries({ queryKey: ["security"] });
+      const [key, value] = Object.entries(patch)[0] ?? [];
+      const label = SECURITY_SETTINGS.find(s => s.key === key)?.label ?? "Setting";
+      toast({ title: `${label} ${value ? "enabled" : "disabled"}` });
+    },
     onError: () => toast({ title: "Failed to update setting", variant: "destructive" }),
   });
 
@@ -71,27 +92,27 @@ export default function Security() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
-          <CardHeader><CardTitle className="text-base">Security Settings</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Security Settings</CardTitle>
+            <CardDescription className="text-amber-600 dark:text-amber-400">
+              Saved as policy only — none of these are enforced at login yet. Do not rely on
+              them to restrict access.
+            </CardDescription>
+          </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { label: "Two-Factor Authentication", desc: "Require 2FA for admin login", key: "twoFactor" },
-              { label: "OTP Verification", desc: "OTP on sensitive actions", key: "otp" },
-              { label: "Session Timeout (30min)", desc: "Auto logout after inactivity", key: "sessionTimeout" },
-              { label: "Device Tracking", desc: "Track all logged-in devices", key: "deviceTracking" },
-              { label: "IP Whitelist Enforced", desc: "Restrict login to whitelisted IPs", key: "ipWhitelistEnforced" },
-              { label: "Forced Password Reset", desc: "Require password change every 90 days", key: "forcePasswordReset" },
-            ].map(setting => (
+            {SECURITY_SETTINGS.map(setting => (
               <div key={setting.key} className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-medium">{setting.label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium">{setting.label}</p>
+                    <Badge variant="secondary" className="text-[10px]">Not enforced</Badge>
+                  </div>
                   <p className="text-xs text-muted-foreground">{setting.desc}</p>
                 </div>
                 <Switch
                   checked={securitySettings[setting.key] ?? ["twoFactor", "deviceTracking", "sessionTimeout"].includes(setting.key)}
-                  onCheckedChange={v => {
-                    updateSecuritySetting.mutate({ [setting.key]: v });
-                    toast({ title: `${setting.label} ${v ? "enabled" : "disabled"}` });
-                  }}
+                  disabled={updateSecuritySetting.isPending}
+                  onCheckedChange={v => updateSecuritySetting.mutate({ [setting.key]: v })}
                 />
               </div>
             ))}
@@ -99,7 +120,13 @@ export default function Security() {
         </Card>
 
         <Card className="md:col-span-2">
-          <CardHeader><CardTitle className="text-base">IP Whitelist</CardTitle><CardDescription>Only whitelisted IPs can access the admin panel</CardDescription></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">IP Whitelist</CardTitle>
+            <CardDescription>
+              Addresses are stored, but login does not check this list — it does not currently
+              restrict who can reach the admin panel.
+            </CardDescription>
+          </CardHeader>
           <CardContent>
             <div className="flex gap-2 mb-4">
               <Input placeholder="Enter IP address (e.g. 192.168.1.1)" value={ipInput} onChange={e => setIpInput(e.target.value)} />
@@ -171,6 +198,12 @@ export default function Security() {
             <CardContent className="pt-4">
               {isLoading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+              ) : devices.length === 0 ? (
+                // The API returns an empty device list unconditionally — there is no device
+                // registry behind it, so say that rather than showing a hopeful empty table.
+                <p className="text-center text-sm text-muted-foreground py-12">
+                  Device tracking is not implemented on the API — no devices are recorded.
+                </p>
               ) : (
                 <DataTable data={devices} pageSize={10} columns={[
                   { header: "Device", cell: (row: any) => (

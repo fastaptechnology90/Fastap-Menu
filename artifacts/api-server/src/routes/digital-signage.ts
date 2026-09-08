@@ -7,18 +7,23 @@ const router: IRouter = Router();
 const DEFAULT_SIGNAGE = {
   settings: { enabled: true, rotation_speed: 10, theme: "dark", show_prices: true, show_images: true, show_promotions: true, font_size: "medium", display_mode: "auto" },
   slides: [
-    { id: 1, type: "banner", title: "Welcome to Our Restaurant", subtitle: "Scan QR Code to Order", bg_color: "#7c3aed", text_color: "#ffffff", active: true, order: 1 },
-    { id: 2, type: "promo", title: "Happy Hour", subtitle: "20% Off on All Beverages — 4PM to 7PM", bg_color: "#f97316", text_color: "#ffffff", active: true, order: 2 },
+    { id: 1, type: "banner", title: "Welcome to Our Restaurant", subtitle: "Scan QR Code to Order", bg_color: "#7c3aed", text_color: "#ffffff", active: true, order: 1, url: "", duration: 10 },
+    { id: 2, type: "promo", title: "Happy Hour", subtitle: "20% Off on All Beverages — 4PM to 7PM", bg_color: "#f97316", text_color: "#ffffff", active: true, order: 2, url: "", duration: 10 },
   ],
   screens: [
     { id: 1, name: "Main Entrance", location: "Entrance", status: "online", last_ping: new Date().toISOString(), resolution: "1920x1080" },
   ],
 };
 
+/**
+ * Rebuild each slide from a known set of fields so a malformed store cannot break a
+ * screen. `url` belongs in that set: a slide could be saved with a video link and the
+ * link was dropped on the very next read, which is why a video screen never played.
+ */
 function normalizeSignage(raw: unknown): typeof DEFAULT_SIGNAGE {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<typeof DEFAULT_SIGNAGE>;
   const slides = Array.isArray(r.slides)
-    ? r.slides.map((slide, i) => ({
+    ? r.slides.map((slide: any, i) => ({
         id: slide.id ?? i + 1,
         type: slide.type ?? "promo",
         title: slide.title ?? "Untitled",
@@ -27,6 +32,8 @@ function normalizeSignage(raw: unknown): typeof DEFAULT_SIGNAGE {
         text_color: slide.text_color ?? "#ffffff",
         active: slide.active !== false,
         order: slide.order ?? i + 1,
+        url: slide.url ?? "",
+        duration: Number(slide.duration) > 0 ? Number(slide.duration) : 10,
       }))
     : DEFAULT_SIGNAGE.slides;
   return {

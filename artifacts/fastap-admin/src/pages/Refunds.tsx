@@ -21,6 +21,15 @@ const isPending = (refund: Refund) => statusIs(refund.status, "pending");
 /** A settled refund must not be re-opened by a partial adjustment. */
 const isAdjustable = (refund: Refund) => statusIs(refund.status, "pending", "processing");
 
+/**
+ * The queue mixes two kinds of row: real refund records (`REF-12`) and read-only
+ * history synthesised from already-refunded orders (`REF-ORD-12`). Only the first
+ * kind is addressable — the action routes strip the prefix and look the number up
+ * in the refunds table, so acting on `REF-ORD-12` writes to refund #12, an
+ * unrelated customer's record. Actions stay off for the synthetic rows.
+ */
+const isActionable = (refund: Refund) => !/^REF-ORD-/i.test(refund.id);
+
 export default function Refunds() {
   const qc = useQueryClient();
   const { confirm, confirmDialog } = useConfirm();
@@ -106,7 +115,7 @@ export default function Refunds() {
                 <div className="flex items-center gap-1 flex-wrap">
                   <AsyncButton
                     size="sm" variant="outline" className="text-green-500 border-green-500/30 h-7 text-xs"
-                    disabled={!isPending(row)}
+                    disabled={!isPending(row) || !isActionable(row)}
                     errorMessage="Failed to approve refund"
                     onClick={async () => {
                       const ok = await confirm({
@@ -118,11 +127,12 @@ export default function Refunds() {
                       await approveMutation.mutateAsync(row.id);
                     }}
                   >Approve</AsyncButton>
-                  <Button size="sm" variant="outline" className="text-red-500 border-red-500/30 h-7 text-xs" disabled={!isPending(row)} onClick={() => { setRejectDialog({ open: true, id: row.id, amount: row.amount }); setRejectReason(""); }}>Reject</Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!isAdjustable(row)} onClick={() => { setPartialDialog({ open: true, id: row.id, max: row.amount }); setPartialAmount(String(row.amount)); }}>Partial</Button>
-                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs" title="Retry" errorMessage="Retry failed" onClick={() => retryMutation.mutateAsync(row.id)}><RotateCcw className="h-3 w-3" /></AsyncButton>
+                  <Button size="sm" variant="outline" className="text-red-500 border-red-500/30 h-7 text-xs" disabled={!isPending(row) || !isActionable(row)} onClick={() => { setRejectDialog({ open: true, id: row.id, amount: row.amount }); setRejectReason(""); }}>Reject</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!isAdjustable(row) || !isActionable(row)} onClick={() => { setPartialDialog({ open: true, id: row.id, max: row.amount }); setPartialAmount(String(row.amount)); }}>Partial</Button>
+                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs" title="Retry" disabled={!isActionable(row)} errorMessage="Retry failed" onClick={() => retryMutation.mutateAsync(row.id)}><RotateCcw className="h-3 w-3" /></AsyncButton>
                   <AsyncButton
                     size="sm" variant="ghost" className="h-7 text-xs text-red-400" title="Cancel"
+                    disabled={!isActionable(row)}
                     errorMessage="Cancel failed"
                     onClick={async () => {
                       const ok = await confirm({
@@ -136,7 +146,7 @@ export default function Refunds() {
                       await cancelMutation.mutateAsync(row.id);
                     }}
                   ><Ban className="h-3 w-3" /></AsyncButton>
-                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs text-orange-500" title="Escalate" errorMessage="Escalation failed" onClick={() => escalateMutation.mutateAsync(row.id)}><ArrowUpRight className="h-3 w-3" /></AsyncButton>
+                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs text-orange-500" title="Escalate" disabled={!isActionable(row)} errorMessage="Escalation failed" onClick={() => escalateMutation.mutateAsync(row.id)}><ArrowUpRight className="h-3 w-3" /></AsyncButton>
                 </div>
               )},
             ]}

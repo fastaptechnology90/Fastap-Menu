@@ -11,11 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Copy, Trash2, Key, Loader2, Webhook, BarChart3, RotateCcw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Copy, Trash2, Key, Loader2, Webhook, BarChart3, RotateCcw, AlertTriangle } from "lucide-react";
 import { api, type ApiKey } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const defaultForm = { name: "", environment: "Production" };
 
@@ -47,16 +47,21 @@ export default function ApiControl() {
   const createWebhookMutation = useMutation({
     mutationFn: () => api.webhooks.create({ url: webhookUrl }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["webhooks"] }); setWebhookDialog(false); setWebhookUrl(""); toast.success("Webhook added"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to add webhook"),
   });
 
   const deleteWebhookMutation = useMutation({
     mutationFn: (id: string) => api.webhooks.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["webhooks"] }); toast.success("Webhook removed"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to remove webhook"),
   });
 
+  // The endpoint clears the failure counter and stamps a delivery time; it does not
+  // re-send the payload, so the toast does not claim a redelivery.
   const retryWebhookMutation = useMutation({
     mutationFn: (id: string) => api.webhooks.retry(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["webhooks"] }); toast.success("Webhook retry sent"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["webhooks"] }); toast.success("Webhook failure count reset"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to reset webhook"),
   });
 
   const formatTime = (s: string | null) => {
@@ -69,7 +74,7 @@ export default function ApiControl() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">API & Integration Control</h2><p className="text-muted-foreground">API keys, webhooks, and usage analytics.</p></div>
+        <div><h2 className="text-2xl font-bold tracking-tight">API & Integration Control</h2><p className="text-muted-foreground">API key issuing and webhook registration.</p></div>
       </div>
 
       <Tabs defaultValue="keys">
@@ -148,29 +153,33 @@ export default function ApiControl() {
         </TabsContent>
 
         <TabsContent value="usage" className="mt-4 space-y-4">
+          {/* Nothing counts HTTP requests on this platform. The API derives "calls" from
+              order and audit row counts, fixes the average latency by formula, and splits a
+              per-endpoint table off those same numbers by fixed percentages. Charting that as
+              traffic would be inventing telemetry, so only the figures that are real counts
+              are shown, and the rest is described rather than drawn. */}
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              <span className="font-semibold">No request metering yet.</span> The platform does not
+              record API traffic, so call volume, latency, per-hour breakdown, and top endpoints
+              cannot be reported. The counts below are real; traffic analytics needs a metrics
+              collector on the API.
+            </p>
+          </div>
           <div className="grid gap-4 md:grid-cols-4">
-            <KpiCard title="Total API Calls" value={usage?.totalCalls?.toLocaleString() ?? "—"} icon={<BarChart3 className="h-4 w-4" />} />
-            <KpiCard title="Success Rate" value={`${usage?.successRate ?? 0}%`} icon={<BarChart3 className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="Avg Response" value={`${usage?.avgResponseMs ?? 0}ms`} icon={<BarChart3 className="h-4 w-4" />} />
-            <KpiCard title="Failed Calls" value={String(usage?.failedCalls ?? 0)} icon={<BarChart3 className="h-4 w-4 text-red-500" />} />
+            <KpiCard title="Total Keys" value={String(usage?.totalKeys ?? keys.length)} icon={<Key className="h-4 w-4" />} />
+            <KpiCard title="Active Keys" value={String(usage?.activeKeys ?? 0)} icon={<Key className="h-4 w-4 text-green-500" />} />
+            <KpiCard title="Active Webhooks" value={String(usage?.activeWebhooks ?? 0)} icon={<Webhook className="h-4 w-4 text-blue-500" />} />
+            <KpiCard title="Logged Errors" value={String(usage?.failedCalls ?? 0)} icon={<BarChart3 className="h-4 w-4 text-red-500" />} />
           </div>
           <Card>
-            <CardHeader><CardTitle className="text-sm">Calls by Hour (24h)</CardTitle></CardHeader>
-            <CardContent className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={usage?.hourly ?? []}><XAxis dataKey="hour" fontSize={10} /><YAxis fontSize={10} /><Tooltip /><Bar dataKey="calls" fill="hsl(var(--primary))" radius={2} /></BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Top Endpoints</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm">Traffic Analytics</CardTitle></CardHeader>
             <CardContent>
-              <DataTable data={usage?.endpoints ?? []} columns={[
-                { header: "Endpoint", accessorKey: "path" },
-                { header: "Calls", accessorKey: "calls" },
-                { header: "Errors", accessorKey: "errors" },
-                { header: "Avg ms", accessorKey: "avgMs" },
-              ]} />
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                Per-endpoint call volume, error rate, and response times are not collected.
+                They will appear here once the API records request metrics.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -182,6 +191,18 @@ export default function ApiControl() {
           {!newKey ? (
             <div className="space-y-3 py-2">
               <div className="space-y-1"><Label>Name</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div className="space-y-1">
+                <Label>Environment</Label>
+                {/* The API accepts and stores this, and the KPI row counts by it — without a
+                    control here a Sandbox key could never be created. */}
+                <Select value={form.environment} onValueChange={v => setForm(f => ({ ...f, environment: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Production">Production</SelectItem>
+                    <SelectItem value="Sandbox">Sandbox</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button className="w-full" disabled={!form.name || createMutation.isPending} onClick={() => createMutation.mutate(form)}>Generate</Button>
             </div>
           ) : (

@@ -47,7 +47,7 @@ export default function LegalCompliance() {
       </PanelCard>
       <PanelCard title="Active Legal Holds">
         {(data?.holds ?? []).length === 0 ? (
-          <EmptyState icon={<Scale className="h-6 w-6" />} title="No active holds" description="Legal holds freeze vendor payouts and enable investigation mode." />
+          <EmptyState icon={<Scale className="h-6 w-6" />} title="No active holds" description="A hold flags the vendor record for investigation. It does not stop payouts on its own — settlements are still processed." />
         ) : (
           <div className="admin-data-table-wrap">
             <DataTable data={data.holds} columns={[
@@ -62,11 +62,23 @@ export default function LegalCompliance() {
       <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
         <DialogContent className="rounded-2xl">
           <DialogHeader><DialogTitle>Apply Legal Hold</DialogTitle></DialogHeader>
+          {/* There is no release endpoint — POST /superadmin/legal/hold is the only route —
+              so this is one-way from the panel and the operator is told before committing. */}
+          <p className="text-xs text-amber-600 dark:text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
+            This cannot be undone from the admin panel: there is no release-hold action yet, and
+            the flag stays on the vendor record until it is cleared directly in the database.
+          </p>
           <Input placeholder="Vendor ID" value={holdForm.vendorId} onChange={e => setHoldForm(f => ({ ...f, vendorId: e.target.value }))} />
           <Textarea placeholder="Reason for hold" value={holdForm.reason} onChange={e => setHoldForm(f => ({ ...f, reason: e.target.value }))} rows={3} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setHoldOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => holdMutation.mutate()} disabled={!holdForm.vendorId || holdMutation.isPending}>Apply Hold</Button>
+            <Button
+              variant="destructive"
+              onClick={() => holdMutation.mutate()}
+              disabled={!holdForm.vendorId || !holdForm.reason.trim() || holdMutation.isPending}
+            >
+              Apply Hold
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

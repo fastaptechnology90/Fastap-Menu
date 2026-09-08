@@ -423,6 +423,7 @@ export const tasksSop = {
   sopList: (rid: number) => get<any[]>(`/restaurants/${rid}/sop`),
   createSop: (rid: number, body: any) => post<any>(`/restaurants/${rid}/sop`, body),
   updateSop: (rid: number, id: number, body: any) => put<any>(`/restaurants/${rid}/sop/${id}`, body),
+  deleteSop: (rid: number, id: number) => del<any>(`/restaurants/${rid}/sop/${id}`),
   downloadSop: (rid: number, sopId: number) => downloadFromApi(`/restaurants/${rid}/sop/${sopId}/download`, `sop-${sopId}.txt`),
   trainingVideos: (rid: number) => get<any[]>(`/restaurants/${rid}/training-videos`),
   recordVideoView: (rid: number, videoId: string) => post<any>(`/restaurants/${rid}/training-videos/${videoId}/view`, {}),

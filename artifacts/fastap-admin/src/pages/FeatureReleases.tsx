@@ -24,7 +24,7 @@ export default function FeatureReleases() {
   return (
     <PageShell
       title="Feature Release Management"
-      description="Gradual rollouts, beta access, and vendor plan targeting."
+      description="Rollout plan of record. Saved to platform settings — no API route gates a feature on these values yet, so editing them does not change who sees what."
       icon={<Rocket className="h-6 w-6" />}
       accent="violet"
       loading={isLoading}

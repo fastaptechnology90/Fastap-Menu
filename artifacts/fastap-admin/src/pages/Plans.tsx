@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { api, type Plan } from "@/lib/apiClient";
 import { fmtINRFull } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { Plus, Copy, Trash2, Loader2, Package, Pencil } from "lucide-react";
 
 const DEFAULT_TOGGLES: Record<string, string> = {
@@ -46,6 +47,7 @@ const emptyPlan = (): Partial<Plan> & { id: string } => ({
 export default function Plans() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<(Partial<Plan> & { id: string }) | null>(null);
   const [featureInput, setFeatureInput] = useState("");
@@ -60,6 +62,7 @@ export default function Plans() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plans"] });
+      qc.invalidateQueries({ queryKey: ["subscriptions"] });
       setDialog(false);
       setEditing(null);
       toast({ title: "Plan saved" });
@@ -69,12 +72,20 @@ export default function Plans() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.plans.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan deleted" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plans"] });
+      // Subscriptions prices every vendor from this list, so it goes stale the moment a plan does.
+      qc.invalidateQueries({ queryKey: ["subscriptions"] });
+      toast({ title: "Plan deleted" });
+    },
+    // Without this a rejected delete left the card sitting there with no explanation.
+    onError: (e: Error) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (id: string) => api.plans.duplicate(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan duplicated" }); },
+    onError: (e: Error) => toast({ title: "Duplicate failed", description: e.message, variant: "destructive" }),
   });
 
   const openEdit = (plan?: Plan) => {
@@ -132,7 +143,19 @@ export default function Plans() {
                 <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => openEdit(plan)}><Pencil className="h-3 w-3 mr-1" /> Edit</Button>
                 <Button size="sm" variant="ghost" className="h-8" onClick={() => duplicateMutation.mutate(plan.id)}><Copy className="h-3 w-3" /></Button>
                 {!["free", "starter", "pro", "enterprise"].includes(plan.id) && (
-                  <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => deleteMutation.mutate(plan.id)}><Trash2 className="h-3 w-3" /></Button>
+                  <Button
+                    size="sm" variant="ghost" className="h-8 text-destructive" title="Delete plan"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Delete plan "${plan.name}"?`,
+                        description: "Vendors still on this plan keep the plan id but lose its price and limits.",
+                        destructive: true,
+                        confirmLabel: "Delete plan",
+                      });
+                      if (!ok) return;
+                      deleteMutation.mutate(plan.id);
+                    }}
+                  ><Trash2 className="h-3 w-3" /></Button>
                 )}
               </div>
             </CardContent>
@@ -193,6 +216,7 @@ export default function Plans() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

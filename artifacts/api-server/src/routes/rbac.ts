@@ -31,10 +31,25 @@ const PERMISSION_GROUPS = [
   { group: "Advanced", perms: ["time_based_access", "device_based_access", "branch_wise_access", "approval_workflows", "activity_tracking"] },
 ];
 
+/** A fresh copy every time — see loadPermissions. */
+function cloneDefaults(): Record<string, Record<string, boolean>> {
+  return Object.fromEntries(Object.entries(DEFAULT_PERMISSIONS).map(([role, perms]) => [role, { ...perms }]));
+}
+
+/**
+ * The handlers below assign into the object this returns. It used to hand back the
+ * module-level DEFAULT_PERMISSIONS itself whenever a venue had saved nothing yet, so the
+ * first permission change rewrote the defaults for the whole process: every other venue
+ * on the server inherited that edit, and "Reset to default" restored the edited version
+ * rather than the real one. Always return a copy.
+ */
 async function loadPermissions(rid: number): Promise<Record<string, Record<string, boolean>>> {
+  const base = cloneDefaults();
   const stored = await getSettingsSection<Record<string, Record<string, boolean>> | null>(rid, "rbac", null);
-  if (stored && Object.keys(stored).length > 0) return { ...DEFAULT_PERMISSIONS, ...stored };
-  return DEFAULT_PERMISSIONS;
+  if (stored && Object.keys(stored).length > 0) {
+    for (const [role, perms] of Object.entries(stored)) base[role] = { ...perms };
+  }
+  return base;
 }
 
 router.get("/restaurants/:restaurantId/rbac", requireAuth, async (req, res): Promise<void> => {

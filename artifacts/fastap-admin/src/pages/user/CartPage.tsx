@@ -360,6 +360,7 @@ export default function CartPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold">{item.name}</p>
+                      {item.variant && <p className="text-xs text-white/50 mt-0.5">{item.variant}</p>}
                       {item.customizations.length > 0 && <p className="text-xs text-white/40 mt-0.5">{item.customizations.join(", ")}</p>}
                       {item.addons.length > 0 && <p className="text-xs text-orange-400/70 mt-0.5">+ {item.addons.map(a => a.name).join(", ")}</p>}
                       {item.specialInstructions && <p className="text-xs text-yellow-400/70 mt-0.5">Note: {item.specialInstructions}</p>}
@@ -369,7 +370,8 @@ export default function CartPage() {
                     </button>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm font-bold text-orange-400">₹{(item.price + item.addons.reduce((s, a) => s + a.price, 0)) * item.quantity}</span>
+                    {/* item.price already includes the portion and every add-on. */}
+                    <span className="text-sm font-bold text-orange-400">₹{item.price * item.quantity}</span>
                     <div className="flex items-center gap-2 bg-white/5 rounded-lg p-0.5">
                       <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="h-7 w-7 rounded-md bg-white/10 flex items-center justify-center"><Minus className="h-3 w-3" /></button>
                       <span className="w-5 text-center text-sm font-bold">{item.quantity}</span>

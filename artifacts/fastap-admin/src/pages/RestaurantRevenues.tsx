@@ -70,6 +70,7 @@ export default function RestaurantRevenues() {
                     <th className="py-2 pr-4 font-medium">Restaurant</th>
                     <th className="py-2 pr-4 font-medium text-right">Orders revenue</th>
                     <th className="py-2 pr-4 font-medium text-right">Spa revenue</th>
+                    <th className="py-2 pr-4 font-medium text-right">Banquet revenue</th>
                     <th className="py-2 pr-4 font-medium text-right">Total revenue</th>
                     <th className="py-2 pr-4 font-medium text-right">Paid orders</th>
                     <th className="py-2 font-medium">Status</th>
@@ -82,6 +83,7 @@ export default function RestaurantRevenues() {
                       <td className="py-3 pr-4 font-semibold">{r.name}</td>
                       <td className="py-3 pr-4 text-right text-muted-foreground">{fmtINRFull(r.orderRevenue)}</td>
                       <td className="py-3 pr-4 text-right text-muted-foreground">{fmtINRFull(r.spaRevenue)}</td>
+                      <td className="py-3 pr-4 text-right text-muted-foreground">{fmtINRFull(r.banquetRevenue ?? 0)}</td>
                       <td className="py-3 pr-4 text-right font-bold text-emerald-500">{fmtINRFull(r.totalRevenue)}</td>
                       <td className="py-3 pr-4 text-right">{r.paidOrders}</td>
                       <td className="py-3"><Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge></td>
@@ -90,7 +92,7 @@ export default function RestaurantRevenues() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 font-bold">
-                    <td className="py-3 pr-4" colSpan={4}>Grand total</td>
+                    <td className="py-3 pr-4" colSpan={5}>Grand total</td>
                     <td className="py-3 pr-4 text-right text-emerald-500">{fmtINRFull(grandTotal)}</td>
                     <td colSpan={2}></td>
                   </tr>

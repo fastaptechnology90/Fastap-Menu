@@ -21,6 +21,15 @@ export default function DocumentVault() {
     queryFn: api.documents.list,
   });
 
+  // The document "type" is whatever category the vendor uploaded under (License, GST,
+  // Safety, …). The filter used to offer a fixed list, so real categories that weren't
+  // on it — a Safety certificate, say — could never be filtered to.
+  const docTypes = Array.from(new Set(documents.map((d: any) => d.docType).filter(Boolean))).sort();
+  // Statuses come straight off the row ("active" is mapped to Verified upstream, the
+  // rest arrive raw), so "pending_renewal" was being printed at the admin verbatim.
+  const humanStatus = (v: unknown) =>
+    String(v ?? "Unknown").replace(/[_-]+/g, " ").replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
   const filtered = documents.filter((doc: any) => {
     const matchSearch = doc.vendorName?.toLowerCase().includes(search.toLowerCase()) ||
       doc.docType?.toLowerCase().includes(search.toLowerCase()) ||
@@ -100,12 +109,7 @@ export default function DocumentVault() {
               <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="GST">GST</SelectItem>
-                <SelectItem value="PAN">PAN</SelectItem>
-                <SelectItem value="Agreement">Agreement</SelectItem>
-                <SelectItem value="License">License</SelectItem>
-                <SelectItem value="FSSAI">FSSAI</SelectItem>
-                <SelectItem value="Bank Proof">Bank Proof</SelectItem>
+                {docTypes.map((t: any) => <SelectItem key={String(t)} value={String(t)}>{String(t)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -131,11 +135,11 @@ export default function DocumentVault() {
                 return <span className={`text-xs font-medium ${daysLeft < 0 ? "text-red-400" : daysLeft <= 30 ? "text-yellow-400" : "text-muted-foreground"}`}>{row.expiryDate}</span>;
               }},
               { header: "Status", cell: (row: any) => (
-                <Badge variant={row.status === "Verified" ? "default" : row.status === "Expired" ? "destructive" : "secondary"} className="text-xs">{row.status}</Badge>
+                <Badge variant={row.status === "Verified" ? "default" : /expired|rejected/i.test(String(row.status)) ? "destructive" : "secondary"} className="text-xs">{humanStatus(row.status)}</Badge>
               )},
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => row.fileUrl ? window.open(row.fileUrl, "_blank") : toast({ title: `${row.docType} — ${row.docNumber}` })}><Eye className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title={row.fileUrl ? "Open document" : "No file stored for this document"} onClick={() => row.fileUrl ? window.open(row.fileUrl, "_blank") : toast({ title: "No file stored", description: `${row.docType} — ${row.docNumber}. Ask the vendor to upload it.` })}><Eye className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => api.documents.download(row.id).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
                 </div>
               )},

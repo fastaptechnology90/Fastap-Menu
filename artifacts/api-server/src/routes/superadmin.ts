@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { eq, desc, count, and, sql, inArray, gte, lte } from "drizzle-orm";
 import {
   db, restaurantsTable, usersTable, ordersTable, documentsTable, supportTicketsTable, staffTable, branchesTable,
@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { requireSuperAdmin } from "../middlewares/superadmin-auth";
+import { requireSuperAdmin, type AdminRequest } from "../middlewares/superadmin-auth";
 import {
   ensurePlatformDefaults, getEnhancedStats, getRevenueTimeSeries, getExtendedAnalytics, getTaxReports,
   listPayments, listSettlements, syncPendingSettlements, listKycRecords, updateKycStatus, detectFraudAlerts, listQrCodes,
@@ -40,6 +40,18 @@ import { registerSuperAdminFeatureRoutes } from "./feature-modules.js";
 
 const router: IRouter = Router();
 const admin = [requireSuperAdmin] as const;
+
+/**
+ * The only roles a platform account may hold. These are the platform owner's own
+ * staff — deliberately none of the restaurant-side roles (restaurant_owner, manager,
+ * cashier, waiter…), which belong to a venue's own team and are issued per restaurant
+ * by the restaurant panel, never from here. A restaurant is a customer of the
+ * platform, not a member of its team, so the two sets must never mix.
+ */
+const PLATFORM_ADMIN_ROLES = [
+  "super_admin", "finance_admin", "support_admin",
+  "compliance_admin", "sales_admin", "operations_admin",
+] as const;
 
 router.post("/superadmin/setup", async (req, res): Promise<void> => {
   try {
@@ -108,9 +120,14 @@ router.get("/superadmin/revenue", ...admin, async (req, res): Promise<void> => {
   const rid = restaurantId && !Number.isNaN(restaurantId) ? restaurantId : null;
   const spaRevenue = await getSpaRevenue(rid, from, toEnd);
   const banquetRevenue = await getBanquetRevenue(rid, from, toEnd);
+  // These dates are parsed as LOCAL midnight, so toISOString() would shift them back
+  // across the UTC offset and echo the previous day — the dashboard then labels the
+  // "Today" range with yesterday's date. Format from the local fields instead.
+  const asDay = (d: Date | null) =>
+    d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : null;
   res.json({
-    from: from ? from.toISOString().slice(0, 10) : null,
-    to: toRaw ? toRaw.toISOString().slice(0, 10) : null,
+    from: asDay(from),
+    to: asDay(toRaw),
     revenue: Math.round((orderRevenue + spaRevenue + banquetRevenue) * 100) / 100,
     orderRevenue,
     spaRevenue,
@@ -176,7 +193,12 @@ router.post("/superadmin/subscriptions/:vendorId/action", ...admin, async (req, 
     await db.update(restaurantsTable).set({ isActive: true }).where(eq(restaurantsTable.id, vendorId));
   }
   invalidateRestaurantAnalyticsCache(vendorId);
-  if (plan && ["free", "starter", "pro", "enterprise"].includes(plan)) {
+  if (plan) {
+    // Validate against the plans that actually exist, not a hardcoded list — otherwise a
+    // plan built in the Plan Builder could never be assigned: the call returned success
+    // and the vendor silently stayed on the old plan.
+    const [target] = await db.select().from(platformPlansTable).where(eq(platformPlansTable.id, plan));
+    if (!target) { res.status(400).json({ error: `Unknown plan "${plan}"` }); return; }
     await db.update(restaurantsTable).set({ plan }).where(eq(restaurantsTable.id, vendorId));
   }
   await logPlatformAudit(req, `Subscription ${action}`, "Subscriptions", String(vendorId), { plan });
@@ -545,10 +567,15 @@ router.delete("/superadmin/vendors/:vendorId/qrcodes/:qrId", ...admin, async (re
 });
 
 router.get("/superadmin/users", ...admin, async (_req, res) => {
+    // Admin Users lists the platform owner's own team. Restaurant accounts are
+    // customers, not staff, and are managed from the restaurant side — returning them
+    // here put a venue's owner in a list whose only control is "change platform role".
     const users = await db.select({
     id: usersTable.id, name: usersTable.name, email: usersTable.email,
     role: usersTable.role, createdAt: usersTable.createdAt,
-    }).from(usersTable).orderBy(desc(usersTable.createdAt));
+    }).from(usersTable)
+    .where(inArray(usersTable.role, [...PLATFORM_ADMIN_ROLES]))
+    .orderBy(desc(usersTable.createdAt));
     res.json(users);
 });
 
@@ -564,10 +591,16 @@ router.get("/superadmin/plans", ...admin, async (_req, res) => {
 });
 
 router.post("/superadmin/plans", ...admin, async (req, res) => {
-  const { id, name, price, currency, features, maxBranches, maxItems, maxStaff, featureToggles } = req.body;
+  const { id, name, price, features, maxBranches, maxItems, maxStaff, maxTables,
+    maxOrdersPerMonth, trialDays, isPublished, featureToggles } = req.body;
+  // Every field the plan builder sends has to be persisted here. Dropping maxTables /
+  // trialDays / isPublished meant a plan created with a 14-day trial silently came back
+  // with none, and the admin got a success toast either way.
   const [plan] = await db.insert(platformPlansTable).values({
     id: id || `plan_${Date.now()}`, name, price: String(price ?? 0), currency: PLATFORM_CURRENCY,
     features: features ?? [], maxBranches: maxBranches ?? 1, maxItems: maxItems ?? 50, maxStaff: maxStaff ?? 5,
+    maxTables: maxTables ?? 20, maxOrdersPerMonth: maxOrdersPerMonth ?? null, trialDays: trialDays ?? 0,
+    isPublished: isPublished !== false,
     featureToggles: featureToggles ?? {},
   }).returning();
   res.status(201).json(plan);
@@ -803,6 +836,7 @@ router.get("/superadmin/refunds", ...admin, async (_req, res) => {
 });
 
 router.post("/superadmin/refunds/:id/approve", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const id = parseInt(String(req.params.id).replace("REF-", ""), 10);
   const [updated] = await db.update(platformRefundsTable).set({ status: "approved", processedAt: new Date() })
     .where(eq(platformRefundsTable.id, id)).returning();
@@ -811,6 +845,7 @@ router.post("/superadmin/refunds/:id/approve", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/refunds/:id/reject", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const id = parseInt(String(req.params.id).replace("REF-", ""), 10);
   const { reason } = req.body;
   const [updated] = await db.update(platformRefundsTable).set({ status: "rejected", rejectionReason: reason, processedAt: new Date() })
@@ -1075,6 +1110,15 @@ router.get("/superadmin/invoices", ...admin, async (_req, res) => {
   res.json(await listSubscriptionInvoices());
 });
 
+/**
+ * Invoice ids are `INV-<YYYYMM>-<vendorId>`, so stripping only the "INV-" prefix parsed
+ * the period as the vendor id and every Download / Email click answered 404.
+ */
+function invoiceVendorId(rawId: string): number {
+  const parts = String(rawId).split("-");
+  return parseInt(parts[parts.length - 1], 10);
+}
+
 router.post("/superadmin/white-label/verify-dns", ...admin, async (req, res) => {
   const domain = String(req.body?.domain ?? "");
   const result = await verifyWhiteLabelDomain(domain);
@@ -1099,7 +1143,7 @@ router.get("/superadmin/invoices/export", ...admin, async (_req, res) => {
 });
 
 router.get("/superadmin/invoices/:id/download", ...admin, async (req, res) => {
-  const vendorId = parseInt(String(req.params.id).replace("INV-", ""), 10);
+  const vendorId = invoiceVendorId(req.params.id);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, vendorId));
   if (!r) { res.status(404).json({ error: "Invoice not found" }); return; }
   const plans = await db.select().from(platformPlansTable);
@@ -1112,7 +1156,7 @@ router.get("/superadmin/invoices/:id/download", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/invoices/:id/email", ...admin, async (req, res) => {
-  const vendorId = parseInt(String(req.params.id).replace("INV-", ""), 10);
+  const vendorId = invoiceVendorId(req.params.id);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, vendorId));
   if (!r) { res.status(404).json({ error: "Invoice not found" }); return; }
   const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
@@ -1141,8 +1185,15 @@ router.get("/superadmin/escrow", ...admin, async (_req, res) => {
   })));
   const pending = settlements.filter(s => s.status === "pending").reduce((a, s) => a + parseFloat(String(s.finalPayout)), 0);
   const held = settlements.filter(s => s.status === "held").reduce((a, s) => a + parseFloat(String(s.finalPayout)), 0);
+  // The reserve the admin tops up via "Add Reserve" is part of the money the platform is
+  // holding. It was written to settings and then shown nowhere, so the button looked dead.
+  const platformSettings = await getPlatformSettings();
+  const reserveBalance = Number((platformSettings as { reserveBalance?: number }).reserveBalance ?? 0);
   res.json({
-    metrics: { totalEscrow: pending + held, activeHolds: held, pendingReleases: pending, lockedDisputes: held },
+    metrics: {
+      totalEscrow: pending + held + reserveBalance, activeHolds: held,
+      pendingReleases: pending, lockedDisputes: held, reserveBalance,
+    },
     ledger,
   });
 });
@@ -1267,7 +1318,9 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
     .where(eq(ordersTable.paymentStatus, "failed"))
     .orderBy(desc(ordersTable.createdAt)).limit(50);
 
-  const discrepancies = failedOrders.map(({ order, vendorName }) => ({
+  const discrepancies = failedOrders
+    .filter(({ order }) => !(order.metadata as { reconciledAt?: string } ?? {}).reconciledAt)
+    .map(({ order, vendorName }) => ({
     id: `TXN-DISC-${order.id}`, vendorName,
     gatewayAmount: parseFloat(String(order.total ?? 0)),
     bankAmount: 0,
@@ -1291,8 +1344,10 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
   // isPaid rule the dashboard / payments / settlements use — NOT the raw status string —
   // so an order that is paid but still shows paymentStatus "pending" (e.g. cash confirmed)
   // is counted here too, and every page agrees on what "paid" means.
-  const isMatchedTxn = (p: typeof payments[number]) =>
-    (p as { isPaid?: boolean }).isPaid === true || p.status === "completed" || p.status === "paid";
+  // Strictly the isPaid rule. The old `|| status === "paid"` fallback defeated the very
+  // thing this comment promises: a cancelled order keeps paymentStatus "paid", so it was
+  // counted as reconciled here while Payments/Settlements/Dashboard all valued it at zero.
+  const isMatchedTxn = (p: typeof payments[number]) => (p as { isPaid?: boolean }).isPaid === true;
   // Matched transactions — shown so the admin can see the ones that reconciled, with
   // vendor name and HOW it was paid (UPI / card / gateway / cash).
   const matchedList = payments
@@ -1313,7 +1368,7 @@ router.get("/superadmin/reconciliation", ...admin, async (_req, res) => {
     summary: {
       matched: payments.filter(isMatchedTxn).length,
       mismatched: allDisc.length,
-      missing: failedOrders.length,
+      missing: discrepancies.length,
       duplicates: 0,
       totalAmount: payments.reduce((s, p) => s + p.grossAmount, 0),
     },
@@ -1337,7 +1392,33 @@ router.post("/superadmin/reconciliation/run", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/reconciliation/adjust/:id", ...admin, async (req, res) => {
-  res.json({ id: req.params.id, adjusted: true });
+  // This used to answer `{ adjusted: true }` without touching anything, so the row was
+  // still there after the "Manual adjustment applied" toast. Writing the write-off onto
+  // the order is what makes the discrepancy actually clear.
+  const raw = String(req.params.id);
+  const txnMatch = /^TXN-DISC-(\d+)$/.exec(raw);
+  if (txnMatch) {
+    const orderId = parseInt(txnMatch[1], 10);
+    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+    if (!order) { res.status(404).json({ error: "Transaction not found" }); return; }
+    await db.update(ordersTable).set({
+      metadata: {
+        ...(order.metadata as object ?? {}),
+        reconciledAt: new Date().toISOString(),
+        reconciliationNote: req.body?.note || "Manually written off during reconciliation",
+      },
+    }).where(eq(ordersTable.id, orderId));
+    await logPlatformAudit(req, "Reconciliation Adjustment", "Reconciliation", raw);
+    res.json({ id: raw, adjusted: true });
+    return;
+  }
+  if (/^REF-DISC-\d+$/.test(raw)) {
+    res.status(400).json({
+      error: "A pending refund clears when the refund is processed — action it on the Refunds screen.",
+    });
+    return;
+  }
+  res.status(404).json({ error: "Unknown discrepancy" });
 });
 
 router.get("/superadmin/penalties", ...admin, async (_req, res) => {
@@ -1348,22 +1429,33 @@ router.get("/superadmin/penalties", ...admin, async (_req, res) => {
   res.json(rows.map(({ p, vendorName }) => ({
     id: `PEN-${p.id}`, vendorName, reason: p.reason, amount: parseFloat(String(p.amount)),
     deductFrom: p.deductFrom, notes: p.notes, appliedBy: p.appliedBy,
-    appliedAt: p.appliedAt.toISOString(), status: p.status,
+    appliedAt: p.appliedAt.toISOString(),
+    // The column stores lowercase; the rest of the admin API hands the UI Title Case, and
+    // the page compares against "Applied" / "Reversed" — so normalise it here.
+    status: p.status ? p.status.charAt(0).toUpperCase() + p.status.slice(1) : "Applied",
   })));
 });
 
 router.post("/superadmin/penalties", ...admin, async (req, res) => {
   const { vendorName, reason, amount, deductFrom, notes, vendorId } = req.body;
   let restaurantId = Number(vendorId);
+  let resolvedName = vendorName;
   if (!restaurantId && vendorName) {
     const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.name, vendorName));
     restaurantId = r?.id ?? 0;
   }
+  // Falling back to restaurant 1 meant a mistyped vendor name quietly fined a completely
+  // different (and always the same) vendor, while the caller got a success response.
+  if (!restaurantId) { res.status(400).json({ error: `No vendor matches "${vendorName ?? ""}"` }); return; }
+  const [target] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
+  if (!target) { res.status(404).json({ error: "Vendor not found" }); return; }
+  resolvedName = target.name;
   const [p] = await db.insert(platformPenaltiesTable).values({
-    restaurantId: restaurantId || 1, reason, amount: String(amount),
+    restaurantId, reason, amount: String(amount),
     deductFrom: deductFrom || "wallet", notes, appliedBy: (req as any).adminUser?.email ?? "admin",
   }).returning();
-  res.status(201).json({ id: `PEN-${p.id}`, vendorName, reason, amount: parseFloat(String(p.amount)), status: "Applied" });
+  await logPlatformAudit(req, "Penalty Applied", "Penalties", String(p.id), { vendorId: restaurantId, amount });
+  res.status(201).json({ id: `PEN-${p.id}`, vendorName: resolvedName, reason, amount: parseFloat(String(p.amount)), status: "Applied" });
 });
 
 router.post("/superadmin/penalties/:id/reverse", ...admin, async (req, res) => {
@@ -1654,13 +1746,17 @@ router.get("/superadmin/vendor-crm", ...admin, async (_req, res) => {
 });
 
 router.post("/superadmin/vendor-crm/logs", ...admin, async (req, res) => {
-  const { vendorName, type, notes, outcome, followUpDate, vendorId } = req.body;
+  const { vendorName, type, notes, outcome, followUpDate, vendorId, upsellPlan } = req.body;
   const [l] = await db.insert(platformCrmLogsTable).values({
     restaurantId: vendorId ? Number(vendorId) : null, vendorName, logType: type || "Note",
     notes, outcome, followUpDate: followUpDate ? new Date(followUpDate) : null,
+    // The CRM form has always offered an upsell target and the column has always
+    // existed; the field was simply never read off the request body, so every pitch
+    // was recorded without the plan it was pitching.
+    upsellPlan: upsellPlan ? String(upsellPlan) : null,
     loggedBy: (req as any).adminUser?.email ?? "admin",
   }).returning();
-  res.status(201).json({ id: `CRM-${l.id}`, vendorName: l.vendorName });
+  res.status(201).json({ id: `CRM-${l.id}`, vendorName: l.vendorName, upsellPlan: l.upsellPlan });
 });
 
 router.patch("/superadmin/vendor-crm/logs/:id/complete", ...admin, async (req, res) => {
@@ -1815,8 +1911,7 @@ router.post("/superadmin/users", ...admin, async (req, res) => {
     res.status(400).json({ error: "Name, email, and password (min 8 chars) required" });
     return;
   }
-  const allowed = ["super_admin", "finance_admin", "support_admin", "compliance_admin", "sales_admin", "operations_admin"];
-  if (!allowed.includes(role)) { res.status(400).json({ error: "Invalid role" }); return; }
+  if (!PLATFORM_ADMIN_ROLES.includes(role)) { res.status(400).json({ error: "Invalid role" }); return; }
   const passwordHash = await bcrypt.hash(password, 12);
   const [user] = await db.insert(usersTable).values({ name, email, passwordHash, role }).returning();
   await logPlatformAudit(req, "Admin User Created", "Users", String(user.id));
@@ -1825,9 +1920,37 @@ router.post("/superadmin/users", ...admin, async (req, res) => {
 
 router.patch("/superadmin/users/:id", ...admin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!target) { res.status(404).json({ error: "Not found" }); return; }
   const patch: Record<string, unknown> = {};
   if (req.body.name) patch.name = req.body.name;
-  if (req.body.role) patch.role = req.body.role;
+  if (req.body.role) {
+    // This route edits the platform owner's own team. A restaurant account reaching it
+    // was a way across the boundary in the dangerous direction: one PATCH turned a
+    // venue's owner into finance_admin, which requireSuperAdmin accepts, handing a
+    // customer the platform's finance module. Who may RECEIVE a platform role has to
+    // be checked as well as which role is being handed out.
+    if (!PLATFORM_ADMIN_ROLES.includes(target.role)) {
+      res.status(400).json({ error: "This account is not a platform admin" });
+      return;
+    }
+    // The create path has always checked this list; the edit path did not, so a role
+    // could be changed to anything at all — including a restaurant-side role, which
+    // would hand a venue's role to a platform account, and including free-text that
+    // resolves to no permissions and quietly bricks the account.
+    if (!PLATFORM_ADMIN_ROLES.includes(req.body.role)) {
+      res.status(400).json({ error: "Invalid role" });
+      return;
+    }
+    // Editing a user must not be a way around the role you hold yourself: only a
+    // super admin may mint another super admin.
+    const actor = (req as AdminRequest).adminUser;
+    if (req.body.role === "super_admin" && actor?.role !== "super_admin") {
+      res.status(403).json({ error: "Only a super admin can grant the super admin role" });
+      return;
+    }
+    patch.role = req.body.role;
+  }
   if (req.body.password && req.body.password.length >= 8) {
     patch.passwordHash = await bcrypt.hash(req.body.password, 12);
   }
@@ -2024,17 +2147,32 @@ router.put("/superadmin/dormant-vendors/rules", ...admin, async (req, res) => { 
 
 router.get("/superadmin/revenue-leakage", ...admin, async (_req, res) => { res.json(await getRevenueLeakage()); });
 
+/**
+ * The refund list also returns read-only rows synthesised from already-refunded
+ * orders, keyed `REF-ORD-<orderId>`. The action helpers strip the `REF-` prefix and
+ * treat what is left as a refunds-table id, so `REF-ORD-12` silently rewrites refund
+ * #12 — a different vendor's record. Reject those ids before any write happens.
+ */
+function rejectOrderDerivedRefund(id: string, res: Response): boolean {
+  if (!/^REF-ORD-/i.test(id)) return false;
+  res.status(400).json({ error: "This row is order history, not an editable refund request" });
+  return true;
+}
+
 router.post("/superadmin/refunds/:id/retry", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const updated = await retryRefund(req.params.id);
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
   res.json(updated);
 });
 router.post("/superadmin/refunds/:id/cancel", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const updated = await cancelRefund(req.params.id);
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
   res.json(updated);
 });
 router.post("/superadmin/refunds/:id/partial", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const amount = Number(req.body?.amount);
   if (!Number.isFinite(amount) || amount <= 0) {
     res.status(400).json({ error: "A positive numeric amount is required" });
@@ -2045,6 +2183,7 @@ router.post("/superadmin/refunds/:id/partial", ...admin, async (req, res) => {
   res.json(updated);
 });
 router.post("/superadmin/refunds/:id/escalate", ...admin, async (req, res) => {
+  if (rejectOrderDerivedRefund(req.params.id, res)) return;
   const item = await createApproval({ type: "refund", refundId: req.params.id, reason: req.body.reason, amount: req.body.amount });
   res.status(201).json(item);
 });

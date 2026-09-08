@@ -11,11 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { KpiCard } from "@/components/shared/KpiCard";
-import { Plus, Percent, Trash2, Loader2 } from "lucide-react";
+import { Plus, Percent, Trash2, Loader2, Pencil } from "lucide-react";
 import { api, type CommissionRule } from "@/lib/apiClient";
 import { toast } from "sonner";
 
-const defaultForm = { name: "", type: "Fixed %", value: "", unit: "%", applyTo: "All Restaurants" };
+const defaultForm = { id: "", name: "", type: "Fixed %", value: "", unit: "%", applyTo: "All Restaurants" };
+
+// The rate column renders value + unit, so a "Fixed Amount" rule left on the default "%"
+// displayed a ₹25 flat fee as "25%". Unit follows from the rule type.
+const unitFor = (type: string) => (type === "Fixed Amount" ? "₹" : "%");
 
 function fmtMoney(n: number) {
   if (n >= 1_000_000) return `₹${(n / 1_000_000).toFixed(1)}M`;
@@ -32,13 +36,16 @@ export default function Commissions() {
   const { data: rules = [], isLoading } = useQuery({ queryKey: ["commissions"], queryFn: api.commissions.list });
   // Real commission earned = order-driven amount from the platform stats (grows as paid
   // orders come in). The rules below only show the % rate — this KPI shows the ₹ amount.
-  const { data: summary } = useQuery({ queryKey: ["superadmin-analytics-summary"], queryFn: api.analytics.summary });
+  const { data: summary } = useQuery({ queryKey: ["superadmin-analytics-summary"], queryFn: () => api.analytics.summary() });
   const commissionEarned = Number(summary?.platformCommission ?? 0);
 
-  const createMutation = useMutation({
-    mutationFn: (data: typeof form) => api.commissions.create(data),
-    onSuccess: () => { toast.success("Commission rule created"); setDialog(false); setForm(defaultForm); qc.invalidateQueries({ queryKey: ["commissions"] }); },
-    onError: () => toast.error("Failed to create rule"),
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => {
+      const payload = { name: data.name, type: data.type, value: Number(data.value), unit: unitFor(data.type), applyTo: data.applyTo };
+      return data.id ? api.commissions.update(data.id, payload) : api.commissions.create(payload);
+    },
+    onSuccess: (_r, vars) => { toast.success(vars.id ? "Commission rule updated" : "Commission rule created"); setDialog(false); setForm(defaultForm); qc.invalidateQueries({ queryKey: ["commissions"] }); },
+    onError: (e: Error) => toast.error(e.message || "Failed to save rule"),
   });
 
   const deleteMutation = useMutation({
@@ -47,7 +54,8 @@ export default function Commissions() {
     onError: () => toast.error("Failed to delete"),
   });
 
-  const pctRules = rules.filter(r => r.unit === "%" || r.type === "Fixed %");
+  // Only percentage rules belong in an average take-rate; a flat ₹ fee would skew it.
+  const pctRules = rules.filter(r => r.unit === "%" && r.type !== "Fixed Amount");
   const avgRate = pctRules.length > 0
     ? (pctRules.reduce((s, r) => s + r.value, 0) / pctRules.length).toFixed(1)
     : "0";
@@ -70,10 +78,17 @@ export default function Commissions() {
             <DataTable data={rules} columns={[
               { header: "Rule Name", cell: (row: CommissionRule) => <span className="font-medium">{row.name}</span> },
               { header: "Type", accessorKey: "type" },
-              { header: "Rate", cell: (row: CommissionRule) => <span className="font-bold text-primary">{row.value}{row.unit}</span> },
+              { header: "Rate", cell: (row: CommissionRule) => <span className="font-bold text-primary">{row.unit === "₹" ? `₹${row.value}` : `${row.value}${row.unit}`}</span> },
               { header: "Applies To", accessorKey: "applyTo" },
               { header: "Status", cell: (row: CommissionRule) => <StatusBadge status={row.status} /> },
               { header: "Actions", cell: (row: CommissionRule) => (
+                <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7" title="Edit rule"
+                  onClick={() => { setForm({ id: row.id, name: row.name, type: row.type, value: String(row.value), unit: row.unit, applyTo: row.applyTo }); setDialog(true); }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
                 <AsyncButton
                   variant="ghost" size="icon" className="text-destructive h-7 w-7" title="Delete rule"
                   errorMessage="Failed to delete"
@@ -90,6 +105,7 @@ export default function Commissions() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </AsyncButton>
+                </div>
               )},
             ]} />
           )}
@@ -97,7 +113,7 @@ export default function Commissions() {
       </Card>
       <Dialog open={dialog} onOpenChange={setDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Create Commission Rule</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{form.id ? "Edit Commission Rule" : "Create Commission Rule"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1"><Label>Rule Name</Label><Input placeholder="e.g. Standard Food Delivery" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div className="grid grid-cols-2 gap-3">
@@ -107,14 +123,14 @@ export default function Commissions() {
                   <SelectContent><SelectItem value="Fixed %">Fixed %</SelectItem><SelectItem value="Fixed Amount">Fixed Amount</SelectItem><SelectItem value="Hybrid">Hybrid</SelectItem></SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Value</Label><Input type="number" placeholder="12" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></div>
+              <div className="space-y-1"><Label>Value ({unitFor(form.type)})</Label><Input type="number" placeholder="12" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></div>
             </div>
             <div className="space-y-1"><Label>Applies To</Label><Input placeholder="e.g. All Restaurants" value={form.applyTo} onChange={e => setForm(f => ({ ...f, applyTo: e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(false)}>Cancel</Button>
-            <Button disabled={!form.name || !form.value || createMutation.isPending} onClick={() => createMutation.mutate(form)}>
-              {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Create Rule
+            <Button disabled={!form.name || !form.value || saveMutation.isPending} onClick={() => saveMutation.mutate(form)}>
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />} {form.id ? "Save Rule" : "Create Rule"}
             </Button>
           </DialogFooter>
         </DialogContent>

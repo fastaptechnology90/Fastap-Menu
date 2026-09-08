@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { menu as menuApi } from "@/lib/api";
+import { menu as menuApi, foodCosting as foodCostingApi } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 type MenuItem = any;
 import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, Filter } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
-
-const CATEGORIES = ["All", "Starters", "Main Course", "Desserts", "Beverages", "Breads", "Special"];
 
 // Backend stores diet as a `dietaryTags` array (not an `isVeg` flag) and category as a
 // `categoryId` FK (not a name) — map both ways so add/edit actually persist.
@@ -15,13 +13,16 @@ function dietaryFromTags(tags: any): "veg" | "non-veg" {
   const arr = (Array.isArray(tags) ? tags : []).map((t: any) => String(t).toLowerCase());
   return arr.some(t => /non|egg|chicken|mutton|meat|fish|prawn/.test(t)) ? "non-veg" : "veg";
 }
-function mapItem(i: any, nameOf: (id: any) => string): any {
+function mapItem(i: any, nameOf: (id: any) => string, costOf: (name: string) => number): any {
   return {
     ...i, id: String(i.id),
     category: nameOf(i.categoryId),
     subcategory: i.subcategory || "",
     price: parseFloat(i.price) || 0,
-    cost: parseFloat(i.cost) || 0,
+    // menu_items has no cost column. The plate cost lives on the recipe, which is tied to
+    // the dish by name — the same link the kitchen uses to draw stock down on a sale — so
+    // the margin shown here is the one Food Costing calculated, not a second guess at it.
+    cost: costOf(i.name),
     dietary: dietaryFromTags(i.dietaryTags),
     available: i.isAvailable ?? true,
     featured: i.isFeatured ?? false,
@@ -96,14 +97,19 @@ export default function MenuManagement() {
 
   async function reload() {
     if (!restaurantId) return;
-    const [data, cats] = await Promise.all([
+    const [data, cats, recipes] = await Promise.all([
       menuApi.items(restaurantId).catch(() => []),
       menuApi.categories(restaurantId).catch(() => []),
+      foodCostingApi.list(restaurantId).catch(() => []),
     ]);
     const catList = Array.isArray(cats) ? cats : [];
     setCategories(catList.map((c: any) => ({ id: c.id, name: c.name })));
     const nameOf = (id: any) => catList.find((c: any) => c.id === id)?.name || "Uncategorized";
-    setItems(Array.isArray(data) ? data.map((i: any) => mapItem(i, nameOf)) : []);
+    const costByName = new Map<string, number>(
+      (Array.isArray(recipes) ? recipes : []).map((r: any) => [String(r.name || "").trim().toLowerCase(), Number(r.totalCost) || 0]),
+    );
+    const costOf = (name: string) => costByName.get(String(name || "").trim().toLowerCase()) ?? 0;
+    setItems(Array.isArray(data) ? data.map((i: any) => mapItem(i, nameOf, costOf)) : []);
   }
 
   // Resolve a category name → its id, creating the category if it doesn't exist yet.
@@ -126,15 +132,23 @@ export default function MenuManagement() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
   const [filterAvail, setFilterAvail] = useState<"all" | "available" | "unavailable">("all");
+  const [filterDiet, setFilterDiet] = useState<"all" | "veg" | "non-veg">("all");
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
   const [addMode, setAddMode] = useState(false);
   const [newItem, setNewItem] = useState<Partial<MenuItem>>({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
 
+  // The filter row was a fixed list of six names that this venue does not use, so every
+  // button but "All" returned nothing. Built from the categories the menu actually has.
+  const categoryNames = ["All", ...Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort()];
+
   const filtered = items.filter(i => {
     const catMatch = category === "All" || i.category === category;
-    const searchMatch = !search || i.name.toLowerCase().includes(search.toLowerCase());
+    const searchMatch = !search
+      || String(i.name ?? "").toLowerCase().includes(search.toLowerCase())
+      || String(i.description ?? "").toLowerCase().includes(search.toLowerCase());
     const availMatch = filterAvail === "all" || (filterAvail === "available" ? i.available : !i.available);
-    return catMatch && searchMatch && availMatch;
+    const dietMatch = filterDiet === "all" || i.dietary === filterDiet;
+    return catMatch && searchMatch && availMatch && dietMatch;
   });
 
   async function handleToggle(id: string) {
@@ -156,6 +170,13 @@ export default function MenuManagement() {
 
   async function handleSaveEdit() {
     if (!editItem || !restaurantId) return;
+    const missing: string[] = [];
+    if (!String(editItem.name ?? "").trim()) missing.push("Item Name");
+    if (!(Number(editItem.price) > 0)) missing.push("Price");
+    if (missing.length) {
+      toast({ title: `${missing.join(" and ")} cannot be blank`, variant: "destructive" });
+      return;
+    }
     const categoryId = await resolveCategoryId(editItem.category);
     try {
       await menuApi.updateItem(restaurantId, parseInt(editItem.id), {
@@ -179,8 +200,29 @@ export default function MenuManagement() {
   }
 
   async function handleAddItem() {
-    if (!newItem.name || !newItem.price || !restaurantId) return;
-    const categoryId = await resolveCategoryId(newItem.category || "Main Course");
+    // This used to return without a word when a field was blank, so the owner clicked
+    // "Add Item" and the app did nothing at all — the single most-reported fault on this
+    // page. Say which field is missing instead of failing mutely.
+    const missing: string[] = [];
+    if (!String(newItem.name ?? "").trim()) missing.push("Item Name");
+    if (!(Number(newItem.price) > 0)) missing.push("Price");
+    if (missing.length) {
+      toast({
+        title: `Add ${missing.join(" and ")} first`,
+        description: "A dish needs a name and a price before it can go on the menu.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!restaurantId) {
+      toast({ title: "Not signed in to a venue", description: "Reload the page and sign in again.", variant: "destructive" });
+      return;
+    }
+    const categoryId = await resolveCategoryId(newItem.category || categories[0]?.name || "Main Course");
+    if (!categoryId) {
+      toast({ title: "Could not set the category", description: "Pick a different category and try again.", variant: "destructive" });
+      return;
+    }
     try {
       await menuApi.createItem(restaurantId, {
         name: newItem.name, price: String(newItem.price), description: newItem.description || "",
@@ -247,9 +289,16 @@ export default function MenuManagement() {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          {CATEGORIES.map(cat => (
+          {categoryNames.map(cat => (
             <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${category === cat ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
               {cat}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {(["all", "veg", "non-veg"] as const).map(f => (
+            <button key={f} onClick={() => setFilterDiet(f)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${filterDiet === f ? "bg-green-500/20 border-green-500/40 text-green-300" : "border-white/10 bg-white/5 text-white/30"}`}>
+              {f === "all" ? "All Diets" : f === "veg" ? "Veg" : "Non-veg"}
             </button>
           ))}
           <div className="h-px w-px shrink-0" />
@@ -259,6 +308,7 @@ export default function MenuManagement() {
             </button>
           ))}
         </div>
+        <p className="text-xs text-white/30">Showing {filtered.length} of {items.length} items</p>
       </div>
 
       {/* Menu Items Table */}
@@ -357,10 +407,11 @@ export default function MenuManagement() {
               {[
                 { label: "Item Name", field: "name", type: "text", placeholder: "e.g. Paneer Tikka" },
                 { label: "Description", field: "description", type: "textarea", placeholder: "Brief description..." },
-                { label: "Category", field: "category", type: "select", options: ["Starters", "Main Course", "Desserts", "Beverages", "Breads"] },
-                { label: "Dietary Type", field: "dietary", type: "select", options: ["veg", "non-veg", "vegan"] },
+                // The dropdown listed five fixed names, none of which this venue uses, so a
+                // dish could not be filed under any of its real categories.
+                { label: "Category", field: "category", type: "select", options: categories.map(c => c.name) },
+                { label: "Dietary Type", field: "dietary", type: "select", options: ["veg", "non-veg"] },
                 { label: "Price (₹)", field: "price", type: "number", placeholder: "e.g. 320" },
-                { label: "Cost Price (₹)", field: "cost", type: "number", placeholder: "e.g. 85" },
                 { label: "Prep Time (min)", field: "prepTime", type: "number", placeholder: "e.g. 15" },
                 { label: "Calories", field: "calories", type: "number", placeholder: "e.g. 280" },
               ].map(({ label, field, type, placeholder, options }) => (
@@ -380,6 +431,9 @@ export default function MenuManagement() {
                       value={(editItem || newItem)[field as keyof MenuItem] as string || ""}
                       onChange={e => editItem ? setEditItem({ ...editItem, [field]: e.target.value }) : setNewItem({ ...newItem, [field]: e.target.value })}
                     >
+                      {/* Without this the box showed the first option while the value was
+                          still empty, so the dish silently landed in the wrong category. */}
+                      <option value="">Select…</option>
                       {options?.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : (
@@ -393,6 +447,21 @@ export default function MenuManagement() {
                   )}
                 </div>
               ))}
+
+              {/* Plate cost is not stored on the item — it is the sum of the recipe's
+                  ingredients. Typing a number here wrote to nothing, so show what Food
+                  Costing worked out and send the owner there to change it. */}
+              <div className="rounded-xl bg-white/5 border border-white/10 px-3 py-2.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/40 text-xs">Plate cost (from recipe)</span>
+                  <span className="font-semibold text-white/80">
+                    {(editItem || newItem).cost > 0 ? `₹${(editItem || newItem).cost}` : "No recipe yet"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/30 mt-1">
+                  Set on Food Costing, matched to this dish by name. Margin on the list is calculated from it.
+                </p>
+              </div>
 
               {/* Photo. The database has carried imageUrl all along and the guest menu
                   renders it — there was simply no way to set one, so every dish showed a

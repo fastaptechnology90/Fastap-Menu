@@ -4,38 +4,48 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { api } from "@/lib/apiClient";
-import { Server, Shield, Play } from "lucide-react";
+import { Server, Shield, Play, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DisasterRecovery() {
   const qc = useQueryClient();
   const { data, isLoading, refetch, isFetching } = useQuery({ queryKey: ["dr-status"], queryFn: api.disasterRecovery.get });
 
+  // Saving stamps the date on the record. No failover is exercised — there is no standby
+  // region to cut over to — so this records that a test was carried out, it does not run one.
   const testMutation = useMutation({
     mutationFn: () => api.disasterRecovery.save({ ...data, lastFailoverTest: new Date().toISOString(), status: "tested" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["dr-status"] }); toast.success("Failover test completed"); },
-    onError: () => toast.error("Test failed"),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["dr-status"] }); toast.success("Failover test date recorded"); },
+    onError: () => toast.error("Could not record the test"),
   });
 
   return (
     <PageShell
       title="Disaster Recovery"
-      description="Failover status, backup integrity, RPO/RTO monitoring, and recovery testing."
+      description="Recorded DR plan: target regions, RPO/RTO objectives, and failover test log."
       icon={<Server className="h-6 w-6" />}
       accent="cyan"
       badge={data?.status}
       loading={isLoading}
       onRefresh={() => refetch()}
       refreshing={isFetching}
-      actions={<Button onClick={() => testMutation.mutate()} disabled={testMutation.isPending} className="rounded-xl"><Play className="mr-2 h-4 w-4" /> Run Failover Test</Button>}
+      actions={<Button onClick={() => testMutation.mutate()} disabled={testMutation.isPending} className="rounded-xl"><Play className="mr-2 h-4 w-4" /> Record Failover Test</Button>}
     >
-      <div className="admin-stat-grid">
-        <KpiCard title="Primary Region" value={data?.primaryRegion ?? "—"} accent="primary" />
-        <KpiCard title="RPO" value={data?.rpo ?? "—"} accent="cyan" subtitle="Recovery point" />
-        <KpiCard title="RTO" value={data?.rto ?? "—"} accent="violet" subtitle="Recovery time" />
-        <KpiCard title="Integrity" value={data?.backupIntegrity ?? "—"} accent="emerald" />
+      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+        <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          <span className="font-semibold">Plan of record, not live status.</span> These values are
+          the DR targets stored in platform settings. Nothing here probes a standby region or
+          verifies backup integrity, and no failover is performed from this page.
+        </p>
       </div>
-      <PanelCard title="Backup & Recovery" description="Cross-region redundancy configuration">
+      <div className="admin-stat-grid">
+        <KpiCard title="Primary Region" value={data?.primaryRegion ?? "—"} accent="primary" subtitle="Target" />
+        <KpiCard title="RPO" value={data?.rpo ?? "—"} accent="cyan" subtitle="Objective, not measured" />
+        <KpiCard title="RTO" value={data?.rto ?? "—"} accent="violet" subtitle="Objective, not measured" />
+        <KpiCard title="Integrity" value={data?.backupIntegrity ?? "—"} accent="emerald" subtitle="Declared, unverified" />
+      </div>
+      <PanelCard title="Backup & Recovery" description="Cross-region redundancy targets recorded for this platform">
         <div className="grid gap-4 sm:grid-cols-2">
           {[
             { label: "Backup Region", value: data?.backupRegion },

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { FileText, Monitor, Printer, Tablet, Cpu, Upload, Download, CheckCircle, AlertTriangle, Clock, Battery, Loader, Eye, X, Plus } from "lucide-react";
+import { FileText, Monitor, Printer, Tablet, Cpu, Upload, Download, CheckCircle, AlertTriangle, Clock, Battery, Loader, Eye, X, Plus, Edit2, Trash2, RefreshCw } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { documentsApi, hardwareApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 type Tab = "documents" | "hardware";
 
@@ -11,7 +13,10 @@ type DocRow = {
 
 type HwRow = {
   id: string; name: string; type: string; location: string; status: string; battery: number | null; lastSeen: string; assignedTo: string; serialNo: string;
+  model: string; cost: number; purchasedOn: string;
 };
+
+const BLANK_HW = { id: "", name: "", type: "pos", location: "", status: "online", assignedTo: "", serialNo: "", model: "", cost: 0, purchasedOn: "" };
 
 const DOC_STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
   active: { label: "Valid", color: "text-emerald-400", bg: "bg-emerald-500/15", icon: CheckCircle },
@@ -76,11 +81,19 @@ function mapHw(row: any): HwRow {
     lastSeen: row.last_ping ? new Date(row.last_ping).toLocaleString() : "—",
     assignedTo: row.assignedTo || row.location || "—",
     serialNo: row.serial || row.serialNo || "—",
+    model: row.model || "",
+    // The device store keeps whatever it is given, so what a terminal cost can sit beside
+    // it rather than in a spreadsheet nobody opens.
+    cost: Number(row.cost) || 0,
+    purchasedOn: row.purchasedOn || "",
   };
 }
 
 export default function DocumentHardware() {
   const { restaurantId } = useRestaurant();
+  const { confirm, confirmDialog } = useConfirm();
+  const [hwForm, setHwForm] = useState<any | null>(null);
+  const [savingHw, setSavingHw] = useState(false);
   const [tab, setTab] = useState<Tab>("documents");
   const [catFilter, setCatFilter] = useState("all");
   const [documents, setDocuments] = useState<DocRow[]>([]);
@@ -156,6 +169,88 @@ export default function DocumentHardware() {
       await load();
     } catch { setApiError("Upload failed. Try again."); }
     finally { setUploading(false); }
+  }
+
+  /**
+   * Devices were listed and nothing more: adding a terminal, correcting a serial or
+   * retiring one all existed on the server with no control anywhere in the panel.
+   */
+  async function saveHardware() {
+    if (!restaurantId || !hwForm) return;
+    if (!String(hwForm.name || "").trim()) {
+      toast({ title: "Give the device a name", variant: "destructive" });
+      return;
+    }
+    setSavingHw(true);
+    const body = {
+      name: String(hwForm.name).trim(),
+      type: hwForm.type,
+      model: hwForm.model,
+      serial: hwForm.serialNo === "—" ? "" : hwForm.serialNo,
+      location: hwForm.location === "—" ? "" : hwForm.location,
+      assignedTo: hwForm.assignedTo === "—" ? "" : hwForm.assignedTo,
+      status: hwForm.status,
+      cost: Number(hwForm.cost) || 0,
+      purchasedOn: hwForm.purchasedOn || "",
+    };
+    try {
+      if (hwForm.id) await hardwareApi.update(restaurantId, Number(hwForm.id), body);
+      else await hardwareApi.create(restaurantId, body);
+      await load();
+      toast({ title: hwForm.id ? "Device updated" : "Device added" });
+      setHwForm(null);
+    } catch (e: any) {
+      toast({ title: "Could not save the device", description: e?.message, variant: "destructive" });
+    } finally {
+      setSavingHw(false);
+    }
+  }
+
+  async function deleteHardware(hw: HwRow) {
+    if (!restaurantId) return;
+    const ok = await confirm({
+      title: `Remove ${hw.name}?`,
+      description: "It disappears from the device list and stops being counted as online.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await hardwareApi.delete(restaurantId, Number(hw.id));
+      await load();
+      toast({ title: `${hw.name} removed` });
+    } catch (e: any) {
+      toast({ title: "Could not remove the device", description: e?.message, variant: "destructive" });
+    }
+  }
+
+  async function pingHardware(hw: HwRow) {
+    if (!restaurantId) return;
+    try {
+      await hardwareApi.ping(restaurantId, Number(hw.id));
+      await load();
+      toast({ title: `${hw.name} responded` });
+    } catch (e: any) {
+      toast({ title: "No response from the device", description: e?.message, variant: "destructive" });
+    }
+  }
+
+  async function deleteDoc(d: DocRow) {
+    if (!restaurantId) return;
+    const ok = await confirm({
+      title: `Delete ${d.name}?`,
+      description: "The stored file goes with it.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await documentsApi.delete(restaurantId, Number(d.id));
+      await load();
+      toast({ title: "Document deleted" });
+    } catch (e: any) {
+      toast({ title: "Could not delete the document", description: e?.message, variant: "destructive" });
+    }
   }
 
   function viewFile(d: DocRow) {
@@ -246,6 +341,13 @@ export default function DocumentHardware() {
                         <Download className="h-4 w-4" />
                       </a>
                     )}
+                    {/* A licence uploaded by mistake, or one that has been superseded, had
+                        no way out of the vault. */}
+                    {(
+                      <button onClick={() => deleteDoc(doc)} title="Delete document" aria-label={`Delete ${doc.name}`} className="h-9 w-9 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -257,6 +359,14 @@ export default function DocumentHardware() {
 
       {tab === "hardware" && (
         <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-white/40">
+              {hardware.length} devices · ₹{hardware.reduce((s, h) => s + h.cost, 0).toLocaleString()} of equipment
+            </p>
+            <button onClick={() => setHwForm({ ...BLANK_HW })} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
+              <Plus className="h-4 w-4" /> Add Device
+            </button>
+          </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "Total Devices", value: hardware.length, color: "text-blue-400", bg: "bg-blue-500/10" },
@@ -289,6 +399,8 @@ export default function DocumentHardware() {
                       <span>{hw.location}</span>
                       <span>{hw.assignedTo}</span>
                       <span className="font-mono text-white/20">{hw.serialNo}</span>
+                      {hw.model && <span className="text-white/30">{hw.model}</span>}
+                      {hw.cost > 0 && <span className="text-amber-400/70 font-semibold">₹{hw.cost.toLocaleString()}</span>}
                     </div>
                   </div>
                   {hw.battery !== null && (
@@ -296,11 +408,22 @@ export default function DocumentHardware() {
                       <Battery className="h-3.5 w-3.5" />{hw.battery}%
                     </div>
                   )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => pingHardware(hw)} aria-label={`Ping ${hw.name}`} title="Check the device is reachable" className="h-8 w-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/30">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setHwForm({ ...hw })} aria-label={`Edit ${hw.name}`} className="h-8 w-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center hover:bg-blue-500/30">
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => deleteHardware(hw)} aria-label={`Remove ${hw.name}`} className="h-8 w-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
           })}
-          {hardware.length === 0 && !loading && <p className="text-center text-white/30 py-12">No hardware devices — defaults appear after first API load</p>}
+          {hardware.length === 0 && !loading && <p className="text-center text-white/30 py-12">No devices yet — use Add Device to register one.</p>}
         </div>
       )}
 
@@ -362,6 +485,54 @@ export default function DocumentHardware() {
           </div>
         </div>
       )}
+
+      {hwForm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <h3 className="font-bold">{hwForm.id ? "Edit Device" : "Add Device"}</h3>
+              <button onClick={() => setHwForm(null)} aria-label="Close"><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              {[
+                { label: "Device Name", field: "name", type: "text", placeholder: "e.g. Counter POS" },
+                { label: "Type", field: "type", type: "select", options: Object.keys(HW_TYPE_CFG) },
+                { label: "Model", field: "model", type: "text", placeholder: "e.g. Sunmi T2" },
+                { label: "Serial Number", field: "serialNo", type: "text", placeholder: "SN-…" },
+                { label: "Location", field: "location", type: "text", placeholder: "e.g. Kitchen" },
+                { label: "Assigned To", field: "assignedTo", type: "text", placeholder: "Staff or station" },
+                { label: "Status", field: "status", type: "select", options: Object.keys(HW_STATUS_CFG) },
+                { label: "Purchase Price (₹)", field: "cost", type: "number", placeholder: "e.g. 24000" },
+                { label: "Purchased On", field: "purchasedOn", type: "date" },
+              ].map(({ label, field, type, placeholder, options }) => (
+                <div key={field}>
+                  <label className="block text-xs text-white/40 mb-1">{label}</label>
+                  {type === "select" ? (
+                    <select value={hwForm[field] || ""} onChange={e => setHwForm({ ...hwForm, [field]: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/40">
+                      {options?.map(o => <option key={o} value={o}>{HW_TYPE_CFG[o]?.label ?? HW_STATUS_CFG[o]?.label ?? o}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type={type}
+                      placeholder={placeholder}
+                      value={hwForm[field] === "—" ? "" : (hwForm[field] ?? "")}
+                      onChange={e => setHwForm({ ...hwForm, [field]: type === "number" ? Number(e.target.value) : e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                    />
+                  )}
+                </div>
+              ))}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setHwForm(null)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
+                <button onClick={saveHardware} disabled={savingHw} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">
+                  {savingHw ? "Saving…" : hwForm.id ? "Save Changes" : "Add Device"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDialog}
     </div>
   );
 }

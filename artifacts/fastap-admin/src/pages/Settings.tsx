@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { PLATFORM_CURRENCY, currencyDisplayLabel } from "@/lib/currency";
 import { useState, useEffect } from "react";
 
 export default function Settings() {
+  const queryClient = useQueryClient();
   const { data: settings, isLoading } = useQuery({ queryKey: ["settings"], queryFn: api.settings.get });
   const { data: settlementRules } = useQuery({ queryKey: ["settlement-rules"], queryFn: api.settlementRules.get });
   const [form, setForm] = useState<Partial<PlatformSettings>>({});
@@ -80,7 +81,14 @@ export default function Settings() {
   };
 
   const addRegion = () => {
-    if (!newRegion.country.trim()) return;
+    if (!newRegion.country.trim()) {
+      toast({ title: "Country is required", variant: "destructive" });
+      return;
+    }
+    if (geo.some(g => g.country.trim().toLowerCase() === newRegion.country.trim().toLowerCase())) {
+      toast({ title: `${newRegion.country} is already configured`, variant: "destructive" });
+      return;
+    }
     const updated = [...geo, newRegion];
     setGeo(updated);
     persistSettings({ geoSettings: updated });
@@ -89,10 +97,24 @@ export default function Settings() {
     toast({ title: `${newRegion.country} region added` });
   };
 
+  // Settlement rules live behind their own endpoint, so they save separately from the
+  // main settings form. They previously fired without awaiting or refetching, which left
+  // the controls showing stale values and swallowed every failure.
+  const settlementRulesMutation = useMutation({
+    mutationFn: (data: any) => api.settlementRules.save(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settlement-rules"] });
+      toast({ title: "Settlement rules saved" });
+    },
+    onError: () => toast({ title: "Failed to save settlement rules", variant: "destructive" }),
+  });
+
+  // This calls the infrastructure backup endpoint, which writes a CSV snapshot of the
+  // vendor table into export history. It is not a retention sweep of the data above.
   const archiveMutation = useMutation({
     mutationFn: api.infrastructure.triggerBackup,
-    onSuccess: () => toast({ title: "Data archive backup completed" }),
-    onError: () => toast({ title: "Archive failed", variant: "destructive" }),
+    onSuccess: (data: any) => toast({ title: "Vendor snapshot exported", description: `${data?.id ?? ""} — ${data?.sizeMb ?? 0} MB` }),
+    onError: () => toast({ title: "Snapshot failed", variant: "destructive" }),
   });
 
   if (isLoading) return <div className="flex justify-center py-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -196,7 +218,11 @@ export default function Settings() {
                 </div>
                 <div className="space-y-1"><Label>Settlement Hold Period (days)</Label><Input type="number" value={(form as any).settlementHoldPeriod ?? 3} onChange={e => set("settlementHoldPeriod" as any, Number(e.target.value))} /></div>
                 <div className="space-y-1"><Label>Settlement Cycle</Label>
-                  <Select value={settlementRules?.defaultCycle || form.payoutCycle || "weekly"} onValueChange={v => api.settlementRules.save({ ...settlementRules, defaultCycle: v })}>
+                  <Select
+                    value={settlementRules?.defaultCycle || form.payoutCycle || "weekly"}
+                    disabled={settlementRulesMutation.isPending}
+                    onValueChange={v => settlementRulesMutation.mutate({ ...settlementRules, defaultCycle: v })}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {(settlementRules?.cycles ?? ["daily", "weekly", "15_days", "monthly", "manual"]).map((c: string) => (
@@ -213,9 +239,9 @@ export default function Settings() {
                 {(settlementRules?.autoHoldRules ?? []).map((rule: { id: string; name: string; enabled: boolean }) => (
                   <div key={rule.id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <span className="text-sm">{rule.name}</span>
-                    <Switch checked={rule.enabled} onCheckedChange={v => {
+                    <Switch checked={rule.enabled} disabled={settlementRulesMutation.isPending} onCheckedChange={v => {
                       const updated = (settlementRules?.autoHoldRules ?? []).map((r: { id: string }) => r.id === rule.id ? { ...rule, enabled: v } : r);
-                      api.settlementRules.save({ ...settlementRules, autoHoldRules: updated });
+                      settlementRulesMutation.mutate({ ...settlementRules, autoHoldRules: updated });
                     }} />
                   </div>
                 ))}
@@ -319,7 +345,14 @@ export default function Settings() {
         <TabsContent value="security" className="mt-4">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />Admin Security</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />Admin Security</CardTitle>
+                {/* Same store as the Security Center page. Recorded as policy; the API does
+                    not act on any of it at login yet, so it must not read as protection. */}
+                <CardDescription className="text-amber-600 dark:text-amber-400">
+                  Saved as policy only — not enforced at login yet.
+                </CardDescription>
+              </CardHeader>
               <CardContent className="space-y-5">
                 {[
                   { label: "Two-Factor Authentication", key: "twoFactor", desc: "Require 2FA for all admin logins" },
@@ -329,7 +362,13 @@ export default function Settings() {
                   { label: "Device Tracking", key: "deviceTracking", desc: "Track and alert on new device logins" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between">
-                    <div><p className="font-medium text-sm">{item.label}</p><p className="text-xs text-muted-foreground">{item.desc}</p></div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-sm">{item.label}</p>
+                        <Badge variant="secondary" className="text-[10px]">Not enforced</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    </div>
                     <Switch
                       checked={form.securitySettings?.[item.key] ?? ["twoFactor", "otp", "sessionTimeout", "deviceTracking"].includes(item.key)}
                       onCheckedChange={v => persistSettings({ securitySettings: { ...form.securitySettings, [item.key]: v } })}
@@ -352,7 +391,11 @@ export default function Settings() {
                     <Badge variant="outline" className="text-xs">{item.value}</Badge>
                   </div>
                 ))}
-                <Button variant="outline" className="w-full" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate()}><RefreshCw className={`mr-2 h-4 w-4 ${archiveMutation.isPending ? "animate-spin" : ""}`} /> Run Data Archive Now</Button>
+                <Button variant="outline" className="w-full" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate()}><RefreshCw className={`mr-2 h-4 w-4 ${archiveMutation.isPending ? "animate-spin" : ""}`} /> Export Vendor Snapshot</Button>
+                <p className="text-xs text-muted-foreground">
+                  Writes a CSV of the vendor table to export history. The retention periods above
+                  are not applied by this button — use Data Retention &amp; Archival for that.
+                </p>
               </CardContent>
             </Card>
           </div>

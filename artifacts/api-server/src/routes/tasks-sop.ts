@@ -59,13 +59,13 @@ async function getChecklistProgress(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/tasks", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const tasks = await db.select().from(tasksTable).where(eq(tasksTable.restaurantId, id)).orderBy(desc(tasksTable.createdAt));
   res.json(tasks);
 });
 
 router.post("/restaurants/:restaurantId/tasks", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { title, description, category, priority, assignedTo, assignedRole, dueDate, isRecurring, recurringSchedule } = req.body;
   const [task] = await db.insert(tasksTable).values({ restaurantId: id, title, description, category, priority, assignedTo, assignedRole, dueDate: dueDate ? new Date(dueDate) : undefined, isRecurring: Boolean(isRecurring), recurringSchedule }).returning();
   res.status(201).json(task);
@@ -73,7 +73,7 @@ router.post("/restaurants/:restaurantId/tasks", requireAuth, async (req, res): P
 
 router.put("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
   const taskId = parseInt(req.params.taskId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status, assignedTo, priority, title, description } = req.body;
   const [task] = await db.update(tasksTable).set({ status, assignedTo, priority, title, description, completedAt: status === "completed" ? new Date() : undefined }).where(and(eq(tasksTable.id, taskId), eq(tasksTable.restaurantId, restaurantId))).returning();
   if (!task) { res.status(404).json({ error: "Task not found" }); return; }
@@ -82,27 +82,27 @@ router.put("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, 
 
 router.delete("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
   const taskId = parseInt(req.params.taskId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.restaurantId, restaurantId)));
   res.json({ message: "Task deleted" });
 });
 
 router.get("/restaurants/:restaurantId/sop", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const items = await db.select().from(sopItemsTable).where(eq(sopItemsTable.restaurantId, id));
   res.json(items.map(i => ({ ...i, steps: Array.isArray(i.steps) ? i.steps : [], assignedRoles: Array.isArray(i.assignedRoles) ? i.assignedRoles : [] })));
 });
 
 router.post("/restaurants/:restaurantId/sop", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { title, category, content, steps, videoUrl, assignedRoles } = req.body;
   const [item] = await db.insert(sopItemsTable).values({ restaurantId: id, title, category, content, steps: steps ?? [], videoUrl, assignedRoles: assignedRoles ?? [] }).returning();
   res.status(201).json(item);
 });
 
 router.put("/restaurants/:restaurantId/sop/:sopId", requireAuth, async (req, res): Promise<void> => {
-  const sopId = parseInt(req.params.sopId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const sopId = parseInt(String(req.params.sopId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { title, category, content, steps, videoUrl, assignedRoles, isActive } = req.body;
   const [item] = await db.update(sopItemsTable).set({ title, category, content, steps: steps ?? undefined, videoUrl, assignedRoles: assignedRoles ?? undefined, isActive }).where(and(eq(sopItemsTable.id, sopId), eq(sopItemsTable.restaurantId, restaurantId))).returning();
   if (!item) { res.status(404).json({ error: "SOP not found" }); return; }
@@ -110,8 +110,8 @@ router.put("/restaurants/:restaurantId/sop/:sopId", requireAuth, async (req, res
 });
 
 router.get("/restaurants/:restaurantId/sop/:sopId/download", requireAuth, async (req, res): Promise<void> => {
-  const sopId = parseInt(req.params.sopId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const sopId = parseInt(String(req.params.sopId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [item] = await db.select().from(sopItemsTable).where(and(eq(sopItemsTable.id, sopId), eq(sopItemsTable.restaurantId, restaurantId)));
   if (!item) { res.status(404).json({ error: "SOP not found" }); return; }
   const steps = Array.isArray(item.steps) ? item.steps : [];
@@ -131,13 +131,13 @@ router.get("/restaurants/:restaurantId/sop/:sopId/download", requireAuth, async 
 });
 
 router.get("/restaurants/:restaurantId/training-videos", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   res.json(await getTrainingVideos(rid));
 });
 
 router.post("/restaurants/:restaurantId/training-videos/:videoId/view", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const videoId = req.params.videoId;
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const videoId = String(req.params.videoId);
   const videos = await getTrainingVideos(rid);
   const idx = videos.findIndex((v: { id: string }) => v.id === videoId);
   if (idx === -1) { res.status(404).json({ error: "Video not found" }); return; }
@@ -147,8 +147,8 @@ router.post("/restaurants/:restaurantId/training-videos/:videoId/view", requireA
 });
 
 router.post("/restaurants/:restaurantId/training-videos/:videoId/complete", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const videoId = req.params.videoId;
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const videoId = String(req.params.videoId);
   const videos = await getTrainingVideos(rid);
   const idx = videos.findIndex((v: { id: string }) => v.id === videoId);
   if (idx === -1) { res.status(404).json({ error: "Video not found" }); return; }
@@ -161,20 +161,93 @@ router.post("/restaurants/:restaurantId/training-videos/:videoId/complete", requ
   res.json(videos[idx]);
 });
 
+/**
+ * Training videos could be watched and marked complete, but never added, edited or
+ * removed — so the list a restaurant saw was whatever shipped as the default, forever.
+ * They live in the restaurant's settings rather than their own table, which is why these
+ * read-modify-write the whole array.
+ */
+router.post("/restaurants/:restaurantId/training-videos", requireAuth, async (req, res): Promise<void> => {
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const { title, url, description, duration, category, assignedRoles } = req.body;
+  if (!title || !url) { res.status(400).json({ error: "title and url are required" }); return; }
+
+  const videos = await getTrainingVideos(rid);
+  const video = {
+    id: `vid-${Date.now()}`,
+    title: String(title),
+    url: String(url),
+    description: description ? String(description) : "",
+    duration: duration ? String(duration) : "",
+    category: category ? String(category) : "general",
+    assignedRoles: Array.isArray(assignedRoles) ? assignedRoles : [],
+    views: 0,
+    completions: 0,
+    addedAt: new Date().toISOString(),
+  };
+  await setSettingsSection(rid, "trainingVideos", [...videos, video]);
+  res.status(201).json(video);
+});
+
+router.put("/restaurants/:restaurantId/training-videos/:videoId", requireAuth, async (req, res): Promise<void> => {
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const videoId = String(req.params.videoId);
+  const videos = await getTrainingVideos(rid);
+  const idx = videos.findIndex((v: { id: string }) => v.id === videoId);
+  if (idx === -1) { res.status(404).json({ error: "Video not found" }); return; }
+
+  const { title, url, description, duration, category, assignedRoles } = req.body;
+  videos[idx] = {
+    ...videos[idx],
+    ...(title !== undefined && { title: String(title) }),
+    ...(url !== undefined && { url: String(url) }),
+    ...(description !== undefined && { description: String(description) }),
+    ...(duration !== undefined && { duration: String(duration) }),
+    ...(category !== undefined && { category: String(category) }),
+    ...(assignedRoles !== undefined && { assignedRoles: Array.isArray(assignedRoles) ? assignedRoles : [] }),
+  };
+  await setSettingsSection(rid, "trainingVideos", videos);
+  res.json(videos[idx]);
+});
+
+router.delete("/restaurants/:restaurantId/training-videos/:videoId", requireAuth, async (req, res): Promise<void> => {
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const videoId = String(req.params.videoId);
+  const videos = await getTrainingVideos(rid);
+  const remaining = videos.filter((v: { id: string }) => v.id !== videoId);
+  if (remaining.length === videos.length) { res.status(404).json({ error: "Video not found" }); return; }
+  await setSettingsSection(rid, "trainingVideos", remaining);
+  res.json({ success: true });
+});
+
 router.get("/restaurants/:restaurantId/checklists", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const [templates, progress] = await Promise.all([getChecklists(rid), getChecklistProgress(rid)]);
   res.json({ templates, progress });
 });
 
 router.put("/restaurants/:restaurantId/checklists/progress", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { type, checkedIds } = req.body as { type: "opening" | "closing"; checkedIds: string[] };
   if (type !== "opening" && type !== "closing") { res.status(400).json({ error: "Invalid checklist type" }); return; }
   const progress = await getChecklistProgress(rid);
   progress[type] = Array.isArray(checkedIds) ? checkedIds : [];
   await setSettingsSection(rid, "checklistProgress", progress);
   res.json(progress);
+});
+
+/**
+ * An SOP could be written and edited but never removed, so a procedure that no longer
+ * applied stayed on the staff's checklist for good.
+ */
+router.delete("/restaurants/:restaurantId/sop/:sopId", requireAuth, async (req, res): Promise<void> => {
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const sopId = parseInt(String(req.params.sopId), 10);
+  const [row] = await db.delete(sopItemsTable)
+    .where(and(eq(sopItemsTable.id, sopId), eq(sopItemsTable.restaurantId, restaurantId)))
+    .returning();
+  if (!row) { res.status(404).json({ error: "SOP not found" }); return; }
+  res.json({ success: true });
 });
 
 export default router;

@@ -32,8 +32,10 @@ export default function Coupons() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (id: string) => api.coupons.toggle(id),
-    onSuccess: (c) => { toast.success(`${c.code} is now ${c.status}`); qc.invalidateQueries({ queryKey: ["coupons"] }); },
+    // The toggle route answers with { id, status } and no code, so the code has to come
+    // from the row that was clicked — otherwise the toast read "undefined is now Suspended".
+    mutationFn: ({ id }: { id: string; code: string }) => api.coupons.toggle(id),
+    onSuccess: (c, vars) => { toast.success(`${vars.code} is now ${c.status}`); qc.invalidateQueries({ queryKey: ["coupons"] }); },
     onError: () => toast.error("Failed to toggle"),
   });
 
@@ -74,7 +76,7 @@ export default function Coupons() {
                   <AsyncButton
                     size="sm" variant="outline" className="h-7 text-xs" disabled={row.status === "Expired"}
                     errorMessage="Failed to toggle"
-                    onClick={() => toggleMutation.mutateAsync(row.id)}
+                    onClick={() => toggleMutation.mutateAsync({ id: row.id, code: row.code })}
                   >
                     {row.status === "Active" ? <><Ban className="h-3 w-3 mr-1" /> Suspend</> : "Activate"}
                   </AsyncButton>

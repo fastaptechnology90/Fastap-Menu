@@ -29,6 +29,14 @@ const channelColor: Record<string, string> = {
   whatsapp: "bg-green-500/10 text-green-400 border-green-500/20",
 };
 
+// The API returns notification status lowercase ("sent"); the create response uses
+// title case. Compare through this so both shapes count.
+const norm = (s?: string) => String(s ?? "").toLowerCase().trim();
+const pretty = (s?: string) => {
+  const n = norm(s);
+  return n ? n.replace(/\b\w/g, c => c.toUpperCase()) : "Sent";
+};
+
 export default function Notifications() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -56,13 +64,14 @@ export default function Notifications() {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       toast({ title: "Notification deleted" });
     },
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const alertTypes = ["Failed Payment", "Refund Request", "Settlement Due", "Expiring Subscription", "Fraud Alert", "KYC Rejected", "Server Alert", "General"];
   const channels = ["email", "sms", "push", "whatsapp"];
 
-  const activeAlerts = notifications.filter((n: any) => n.status === "Active" || n.status === "Sent").length;
-  const failedCount = notifications.filter((n: any) => n.status === "Failed").length;
+  const activeAlerts = notifications.filter((n: any) => ["active", "sent"].includes(norm(n.status))).length;
+  const failedCount = notifications.filter((n: any) => norm(n.status) === "failed").length;
 
   // There is no backend endpoint to persist per-alert-type routing config, so these
   // toggles are kept as local (session-only) preferences and clearly labelled as such.
@@ -143,7 +152,7 @@ export default function Notifications() {
         <KpiCard title="Total Sent" value={notifications.length} icon={<Bell className="h-4 w-4 text-primary" />} />
         <KpiCard title="Active / Sent" value={activeAlerts} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
         <KpiCard title="Failed" value={failedCount} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Pending" value={notifications.filter((n: any) => n.status === "Pending" || n.status === "Queued").length} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
+        <KpiCard title="Pending" value={notifications.filter((n: any) => ["pending", "queued"].includes(norm(n.status))).length} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-4">
@@ -207,7 +216,7 @@ export default function Notifications() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={n.status === "Failed" ? "destructive" : n.status === "Sent" ? "default" : "secondary"} className="text-[10px]">{n.status}</Badge>
+                      <Badge variant={norm(n.status) === "failed" ? "destructive" : norm(n.status) === "sent" ? "default" : "secondary"} className="text-[10px]">{pretty(n.status)}</Badge>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteMutation.mutate(n.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </Button>

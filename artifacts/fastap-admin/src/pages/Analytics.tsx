@@ -44,7 +44,10 @@ export default function Analytics() {
 
   const { data: vendors = [] } = useQuery({
     queryKey: ["superadmin-vendors"],
-    queryFn: api.vendors.list,
+    // Must stay wrapped: passed bare, react-query hands the query context in as the
+    // `includeDeleted` argument, and every count below then silently includes
+    // soft-deleted vendors that no other screen shows.
+    queryFn: () => api.vendors.list(),
   });
 
   const { data: extended } = useQuery({
@@ -348,7 +351,7 @@ export default function Analytics() {
                     <div>
                       <p className="font-medium text-sm">{v.name}</p>
                       <div className="flex gap-1 mt-1 flex-wrap">
-                        {v.signals.map((s, j) => <Badge key={j} variant="destructive" className="text-xs px-1.5">{s}</Badge>)}
+                        {v.signals.map((s: string, j: number) => <Badge key={j} variant="destructive" className="text-xs px-1.5">{s}</Badge>)}
                       </div>
                     </div>
                     <div className="text-right">
@@ -365,7 +368,7 @@ export default function Analytics() {
         {/* HEALTH SCORE TAB */}
         <TabsContent value="health" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            {healthData.map((h, i) => (
+            {healthData.map((h: any, i: number) => (
               <Card key={i}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -389,7 +392,7 @@ export default function Analytics() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={healthData} cx="50%" cy="50%" outerRadius={100} paddingAngle={4} dataKey="value">
-                      {healthData.map((h, i) => <Cell key={i} fill={h.color} />)}
+                      {healthData.map((h: any, i: number) => <Cell key={i} fill={h.color} />)}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }} />
                     <Legend />

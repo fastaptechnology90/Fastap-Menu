@@ -20,10 +20,13 @@ export default function AdminSandbox() {
     onError: () => toast.error("Save failed"),
   });
 
+  // These persist to platform settings, but no API route reads sandboxConfig back — nothing
+  // routes traffic, stubs payments, or gates features on them. They are a recorded intent
+  // until the API consumes them, and the page says so rather than implying isolation exists.
   const toggles = [
-    { key: "enabled", label: "Sandbox Enabled", desc: "Isolate test traffic from production" },
-    { key: "demoPayments", label: "Demo Payments", desc: "Simulate payment flows without charges" },
-    { key: "featureFlagsBeta", label: "Beta Features", desc: "Enable experimental features in sandbox" },
+    { key: "enabled", label: "Sandbox Enabled", desc: "Intended to isolate test traffic from production" },
+    { key: "demoPayments", label: "Demo Payments", desc: "Intended to simulate payment flows without charges" },
+    { key: "featureFlagsBeta", label: "Beta Features", desc: "Intended to enable experimental features in sandbox" },
   ];
 
   return (
@@ -37,7 +40,10 @@ export default function AdminSandbox() {
       refreshing={isFetching}
       actions={<Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-xl"><Save className="mr-2 h-4 w-4" /> Save</Button>}
     >
-      <PanelCard title="Sandbox Configuration">
+      <PanelCard
+        title="Sandbox Configuration"
+        description="Saved to platform settings. No API route acts on these yet — turning them on does not create an isolated environment, stub payments, or unlock beta features."
+      >
         <div className="space-y-1">
           {toggles.map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between py-4 border-b last:border-0 gap-4">

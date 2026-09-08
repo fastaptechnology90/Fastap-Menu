@@ -25,12 +25,20 @@ export default function Penalties() {
     queryKey: ["penalties"],
     queryFn: api.penalties.list,
   });
+  const { data: vendors = [] } = useQuery({ queryKey: ["superadmin-vendors"], queryFn: () => api.vendors.list() });
+
+  // Status arrives lowercase from the penalties table; compare and display through this so
+  // a fine never shows as an alarming red "applied" badge and the KPI counts are real.
+  const norm = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "");
 
   const createMutation = useMutation({
     mutationFn: api.penalties.create,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["penalties"] });
+      // A penalty is deducted from the vendor's payout, so the settlement figures change too.
+      qc.invalidateQueries({ queryKey: ["superadmin-settlements"] });
       setOpen(false);
+      setForm({ vendorId: "", vendorName: "", reason: "Fake Refund", amount: "", deductFrom: "wallet", notes: "" });
       toast({ title: "Penalty applied successfully" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -48,8 +56,8 @@ export default function Penalties() {
   );
 
   const totalPenalties = penalties.reduce((s: number, p: any) => s + (p.amount || 0), 0);
-  const pending = penalties.filter((p: any) => p.status === "Pending").length;
-  const applied = penalties.filter((p: any) => p.status === "Applied").length;
+  const reversed = penalties.filter((p: any) => norm(p.status) === "Reversed").length;
+  const applied = penalties.filter((p: any) => norm(p.status) === "Applied").length;
 
   const reasonColor: Record<string, string> = {
     "Fake Refund": "bg-red-500/10 text-red-400",
@@ -79,8 +87,23 @@ export default function Penalties() {
               <DialogHeader><DialogTitle>Apply Penalty / Fine</DialogTitle></DialogHeader>
               <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <Label>Vendor Name</Label>
-                  <Input placeholder="Vendor business name" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} required />
+                  <Label>Vendor</Label>
+                  {/* Picked from the real vendor list — a typed name that matched nothing used to
+                      be charged to whichever vendor happened to be first. */}
+                  <Select
+                    value={form.vendorId}
+                    onValueChange={v => setForm(f => ({
+                      ...f, vendorId: v,
+                      vendorName: (vendors as any[]).find((x: any) => String(x.id) === v)?.name ?? "",
+                    }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choose vendor…" /></SelectTrigger>
+                    <SelectContent>
+                      {(vendors as any[]).map((v: any) => (
+                        <SelectItem key={v.id} value={String(v.id)}>{v.name} (#{v.id})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Penalty Reason</Label>
@@ -114,7 +137,7 @@ export default function Penalties() {
                   <Label>Internal Notes</Label>
                   <Textarea placeholder="Reason for penalty (internal)..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
                 </div>
-                <Button type="submit" variant="destructive" className="w-full" disabled={createMutation.isPending}>
+                <Button type="submit" variant="destructive" className="w-full" disabled={createMutation.isPending || !form.vendorId || !form.amount}>
                   {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldBan className="mr-2 h-4 w-4" />}
                   Apply Penalty
                 </Button>
@@ -127,7 +150,7 @@ export default function Penalties() {
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Penalties" value={penalties.length} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
         <KpiCard title="Total Amount" value={`₹${totalPenalties.toLocaleString("en-IN")}`} icon={<DollarSign className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="Pending" value={pending} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} />
+        <KpiCard title="Reversed" value={reversed} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} />
         <KpiCard title="Applied" value={applied} icon={<ShieldBan className="h-4 w-4 text-green-500" />} />
       </div>
 
@@ -155,10 +178,10 @@ export default function Penalties() {
               { header: "Applied At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.appliedAt).toLocaleString()}</span> },
               { header: "Applied By", cell: (row: any) => <span className="text-sm">{row.appliedBy}</span> },
               { header: "Status", cell: (row: any) => (
-                <Badge variant={row.status === "Applied" ? "default" : row.status === "Reversed" ? "secondary" : "destructive"} className="text-xs">{row.status}</Badge>
+                <Badge variant={norm(row.status) === "Applied" ? "default" : norm(row.status) === "Reversed" ? "secondary" : "destructive"} className="text-xs">{norm(row.status)}</Badge>
               )},
               { header: "Action", cell: (row: any) => (
-                (row.status === "Applied" || row.status === "applied") && (
+                norm(row.status) === "Applied" && (
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-yellow-400" disabled={reverseMutation.isPending} onClick={() => reverseMutation.mutate(row.id)}>
                     Reverse
                   </Button>
