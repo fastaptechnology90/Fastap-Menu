@@ -8,7 +8,6 @@ import { ForgotPasswordModal } from "@/components/shared/ForgotPasswordModal";
 import { IMAGES } from "@/lib/media";
 import {
   RESTAURANT_LOGIN_ROLES,
-  DEMO_STAFF_PASSWORD,
   defaultPathForRole,
 } from "@/config/restaurantLoginRoles";
 
@@ -63,8 +62,8 @@ export default function RestaurantLogin() {
   const { loginStaff } = useRestaurant();
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
   const [selectedRole, setSelectedRole] = useState<StaffRole>("manager");
-  const [email, setEmail] = useState("manager@spicegarden.com");
-  const [password, setPassword] = useState(DEMO_STAFF_PASSWORD);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [mobile, setMobile] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -78,11 +77,6 @@ export default function RestaurantLogin() {
 
   function pickRole(role: StaffRole) {
     setSelectedRole(role);
-    const opt = RESTAURANT_LOGIN_ROLES.find(r => r.role === role);
-    if (opt && loginMethod === "password") {
-      setEmail(opt.demoEmail);
-      setPassword(DEMO_STAFF_PASSWORD);
-    }
     setError("");
   }
 
@@ -226,9 +220,6 @@ export default function RestaurantLogin() {
             {activeRole && (
               <p className="text-xs text-white/45 mt-2 text-center">
                 {activeRole.description}
-                {loginMethod === "password" && (
-                  <span className="text-amber-400/80"> · Demo filled — use your venue email or tap another role</span>
-                )}
               </p>
             )}
           </div>

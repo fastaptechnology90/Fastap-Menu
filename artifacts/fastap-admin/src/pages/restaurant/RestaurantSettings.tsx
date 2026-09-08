@@ -21,6 +21,16 @@ const SETTING_SECTIONS = [
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+/** Used where a section has nothing real to show yet — better than inventing a status. */
+function EmptyPanel({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
+      <p className="text-sm font-semibold text-white/70">{title}</p>
+      <p className="text-xs text-white/40 mt-1.5 max-w-sm mx-auto">{message}</p>
+    </div>
+  );
+}
+
 export default function RestaurantSettings() {
   const { restaurant, restaurantId } = useRestaurant();
   const { toast } = useToast();
@@ -331,53 +341,24 @@ export default function RestaurantSettings() {
 
           {/* Integrations */}
           {activeSection === "integrations" && (
-            <div className="space-y-3">
-              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-300">
-                Static preview — connection status shown below is sample data. <strong>NEEDS API</strong>: no integrations endpoint is wired yet, so Connect / Disconnect are not functional.
-              </div>
-              {[
-                { name: "Zomato", icon: "🔴", status: "connected", desc: "Menu sync & online orders" },
-                { name: "Swiggy", icon: "🟠", status: "disconnected", desc: "Delivery integration" },
-                { name: "Razorpay", icon: "💳", status: "connected", desc: "Payment gateway" },
-                { name: "Tally ERP", icon: "📊", status: "disconnected", desc: "Accounting integration" },
-                { name: "WhatsApp Business", icon: "💬", status: "connected", desc: "Customer notifications" },
-                { name: "Google Analytics", icon: "📈", status: "disconnected", desc: "Traffic & insights" },
-              ].map(int => (
-                <div key={int.name} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/8">
-                  <span className="text-2xl">{int.icon}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{int.name}</p>
-                    <p className="text-xs text-white/40">{int.desc}</p>
-                  </div>
-                  <button disabled title="NEEDS API — integrations endpoint not available" className={`px-3 py-1.5 rounded-lg text-xs font-semibold border opacity-60 cursor-not-allowed ${int.status === "connected" ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" : "border-white/10 bg-white/5 text-white/50"}`}>
-                    {int.status === "connected" ? "✓ Connected" : "Connect"}
-                  </button>
-                </div>
-              ))}
-            </div>
+            // This section used to list six services with invented statuses — "Zomato
+            // ✓ Connected", "Razorpay ✓ Connected" — none of which were real. An owner
+            // reading that would believe their orders were syncing. Nothing is claimed
+            // until there is an endpoint behind it.
+            <EmptyPanel
+              title="Integrations are not available yet"
+              message="Aggregator, accounting and messaging integrations will appear here once they are connected for your venue."
+            />
           )}
 
           {/* Printer */}
           {activeSection === "printer" && (
-            <div className="space-y-4">
-              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-blue-300">
-                Static preview — printer list below is sample data. <strong>NEEDS API</strong>: no printer/KOT configuration endpoint is wired yet.
-              </div>
-              {[
-                { label: "Receipt Printer", icon: "🖨️", status: "connected", model: "Epson TM-T82III" },
-                { label: "Kitchen Printer", icon: "🍳", status: "connected", model: "Star SP742" },
-                { label: "Label Printer", icon: "🏷️", status: "disconnected", model: "Not configured" },
-              ].map(p => (
-                <div key={p.label} className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/8">
-                  <span className="text-2xl">{p.icon}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{p.label}</p>
-                    <p className="text-xs text-white/40">{p.model}</p>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === "connected" ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/30"}`}>{p.status}</span>
-                </div>
-              ))}
-            </div>
+            // Likewise: a hardcoded "Epson TM-T82III — connected" told the owner a
+            // receipt printer was attached when none was.
+            <EmptyPanel
+              title="No printer configured"
+              message="Printer and KOT setup will appear here once printing is enabled for your venue."
+            />
           )}
 
           {/* Save Button */}

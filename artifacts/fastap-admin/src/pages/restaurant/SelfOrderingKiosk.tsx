@@ -161,7 +161,10 @@ export default function SelfOrderingKiosk() {
     }
   }
 
-  const previewItems = [
+  // Illustrative rows for the on-screen kiosk mock-up, so the owner can see the layout
+  // while configuring it. Calories are left unset rather than invented — this used to
+  // render Math.random() figures, which a diner at a real kiosk would have believed.
+  const previewItems: { name: string; price: number; emoji: string; calories?: number }[] = [
     {name:"Butter Chicken",price:380,emoji:"🍛"},
     {name:"Gulab Jamun",price:120,emoji:"🍮"},
     {name:"Cold Coffee",price:110,emoji:"☕"},
@@ -379,7 +382,7 @@ export default function SelfOrderingKiosk() {
                           <span className="text-2xl">{item.emoji}</span>
                           <div className="flex-1">
                             <p className="text-sm font-semibold">{item.name}</p>
-                            {settings.showCalories&&<p className="text-xs text-white/40">~{Math.floor(Math.random()*300+300)} kcal</p>}
+                            {settings.showCalories && item.calories != null && <p className="text-xs text-white/40">{item.calories} kcal</p>}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold" style={{color:settings.themeColor}}>₹{item.price}</span>

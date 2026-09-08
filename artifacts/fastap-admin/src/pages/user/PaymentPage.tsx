@@ -11,7 +11,7 @@ import {
 } from "@/lib/paymentCatalog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ChevronLeft, Receipt, Users, Wallet, CheckCircle, FileText, Download,
+  ChevronLeft, Receipt, Users, Wallet, CheckCircle, AlertCircle, FileText, Download,
   Split, Percent, Clock, QrCode, Smartphone, CreditCard, Banknote, Nfc, Building2,
 } from "lucide-react";
 
@@ -43,6 +43,9 @@ export default function PaymentPage() {
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<{ orderId: string; invoiceNumber?: string } | null>(null);
+  // The order went through but the payment did not. This is a real and common outcome —
+  // it deserves its own screen rather than being folded into the success one.
+  const [unpaid, setUnpaid] = useState<{ orderId: string; reason: string } | null>(null);
   const [showQr, setShowQr] = useState(false);
 
   const localQuote = useMemo(() => computeBillQuote({
@@ -154,8 +157,14 @@ export default function PaymentPage() {
           });
           const inv = await publicApi.payments.invoice(numericId);
           setSuccess({ orderId: String(numericId), invoiceNumber: inv.invoice?.invoiceNumber });
-        } catch {
-          setSuccess({ orderId: String(order.id), invoiceNumber: undefined });
+        } catch (err) {
+          // The order is placed and the kitchen has it — only the payment failed. Saying
+          // "Payment Successful" here (which is what this used to do) sent the guest away
+          // believing a bill was settled when no money had moved.
+          setUnpaid({
+            orderId: String(order.id),
+            reason: err instanceof Error ? err.message : "Payment could not be completed.",
+          });
         }
       } else {
         setSuccess({ orderId: String(order.id), invoiceNumber: undefined });
@@ -189,6 +198,26 @@ export default function PaymentPage() {
       a.download = `${res.invoice.invoiceNumber}.html`;
       a.click();
     }
+  }
+
+  if (unpaid) {
+    return (
+      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center px-6 text-center gap-4 relative">
+        <GuestBackButton className="absolute top-4 left-4" />
+        <AlertCircle className="h-16 w-16 text-amber-400" />
+        <h2 className="text-2xl font-bold">Order placed — payment pending</h2>
+        <p className="text-white/60 max-w-sm">
+          Your order is confirmed and the kitchen has it. {unpaid.reason}
+        </p>
+        <p className="text-white/40 text-sm">Please settle ₹{payAmount.toLocaleString("en-IN")} at the counter.</p>
+        <button
+          onClick={() => navigate(withGuestQuery(`/user/order/${unpaid.orderId}`, venue, activeTable))}
+          className="mt-4 px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-semibold text-sm"
+        >
+          Track order
+        </button>
+      </div>
+    );
   }
 
   if (success) {
@@ -365,13 +394,13 @@ export default function PaymentPage() {
             })}
           </div>
           {showQr && paymentMethod === "qr" && (
-            <div className="mt-3 p-4 rounded-xl bg-white text-center">
-              <div className="inline-grid grid-cols-5 gap-0.5 p-2">
-                {Array.from({ length: 25 }).map((_, i) => (
-                  <div key={i} className={`h-3 w-3 ${[0,1,2,4,5,6,10,12,14,18,20,22,24].includes(i) ? "bg-black" : "bg-white"}`} />
-                ))}
-              </div>
-              <p className="text-xs text-gray-600 mt-2">Scan to pay ₹{payAmount}</p>
+            // A grid of coloured squares used to be drawn here under the caption
+            // "Scan to pay ₹…". It was decorative — no scanner could read it, and a
+            // guest holding up their phone in front of a waiter got nothing. A real QR
+            // belongs here once a gateway is connected and can mint a payment intent.
+            <div className="mt-3 p-4 rounded-xl border border-white/10 bg-white/5 text-center">
+              <p className="text-sm text-white/70">Scan-to-pay is not available yet.</p>
+              <p className="text-xs text-white/40 mt-1">Please pay at the counter — your order is confirmed either way.</p>
             </div>
           )}
           {paymentMethod === "nfc" && smartEntry?.detection?.entryMethod === "nfc" && (

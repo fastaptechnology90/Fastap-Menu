@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import {
   db,
@@ -6,6 +6,7 @@ import {
   restaurantsTable,
   spaBookingsTable,
   spaServicesTable,
+  guestUsersTable,
 } from "@workspace/db";
 import {
   computeSlotAvailability,

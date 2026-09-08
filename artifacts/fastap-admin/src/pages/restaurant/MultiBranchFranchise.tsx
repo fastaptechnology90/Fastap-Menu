@@ -269,7 +269,7 @@ export default function MultiBranchFranchise() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <button onClick={() => f.status !== "paid" && markFranchisePaid(f.id)} disabled={f.status === "paid"} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${f.status!=="paid"?"bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30":"bg-white/5 text-white/30"}`}>{f.status==="paid"?"Receipt":"Mark Paid"}</button>
-                  <button disabled title="NEEDS API — franchisee messaging endpoint not available" className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-white/30 opacity-50 cursor-not-allowed">Message</button>
+                  <button disabled title="franchisee messaging endpoint not available" className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-white/30 opacity-50 cursor-not-allowed">Message</button>
                 </div>
               </div>
             </div>
@@ -280,7 +280,7 @@ export default function MultiBranchFranchise() {
       {tab==="transfers"&&(
         <div className="space-y-3">
           <div className="flex justify-end">
-            <button disabled title="NEEDS API — no endpoint to create a stock transfer request" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold opacity-50 cursor-not-allowed">
+            <button disabled title="no endpoint to create a stock transfer request" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold opacity-50 cursor-not-allowed">
               <Truck className="h-4 w-4 text-amber-400"/>Request Transfer
             </button>
           </div>
@@ -384,7 +384,7 @@ export default function MultiBranchFranchise() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <button disabled title="NEEDS API — per-branch reports endpoint not available" className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold opacity-50 cursor-not-allowed">View Reports</button>
+                <button disabled title="per-branch reports endpoint not available" className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold opacity-50 cursor-not-allowed">View Reports</button>
                 <button onClick={() => selected && openManageBranch(selected)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Manage Branch</button>
               </div>
             </div>

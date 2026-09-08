@@ -283,7 +283,10 @@ export default function UserAuth() {
               />
             </div>
           )}
-          {venues.length > 0 && (
+          {/* A guest arrives by QR, which already names their venue. Only fall back to a
+              picker when nothing in the URL or session identified one — otherwise every
+              diner is shown a list of every other restaurant on the platform. */}
+          {venues.length > 0 && !resolveGuestSlug(venue.restaurantSlug || undefined) && (
             <div className="mt-3 text-left">
               <label className="text-[11px] text-white/45 block mb-1.5">Venue</label>
               <select
@@ -297,12 +300,6 @@ export default function UserAuth() {
                 ))}
               </select>
             </div>
-          )}
-          {mode === "select" && (
-            <p className="text-white/35 text-xs mt-3 leading-relaxed">
-              Demo: OTP <span className="text-white/55">9876543210</span> / <span className="text-white/55">123456</span>
-              {" · "}Email <span className="text-white/55">rahul@example.com</span> / <span className="text-white/55">Demo@123</span>
-            </p>
           )}
         </div>
 
@@ -461,9 +458,6 @@ export default function UserAuth() {
             <div>
               <h2 className="text-xl font-bold mb-1">Verify OTP</h2>
               <p className="text-white/40 text-sm">Sent to +91 {mobile.slice(0, 5)}xxxxx</p>
-              {devOtpHint && (
-                <p className="text-orange-300/90 text-xs mt-2">Demo OTP: <span className="font-mono font-semibold">{devOtpHint}</span></p>
-              )}
             </div>
             <div className="flex gap-2 justify-between">
               {otp.map((v, i) => (
