@@ -7,7 +7,7 @@ import { buildScanUrl } from "../lib/scan-urls.js";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const codes = await db.select().from(qrCodesTable).where(eq(qrCodesTable.restaurantId, restaurantId));
   // Real scan activity: every menu open (via a QR scan or link) is logged in
   // menu_views, plus any counter on explicit QR records.
@@ -18,7 +18,7 @@ router.get("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res): 
 });
 
 router.post("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { label, type, tableId, roomNumber } = req.body;
   const normalizedType = String(type ?? "").trim();
   const normalizedRoom = String(roomNumber ?? (normalizedType === "room" ? label ?? "" : "")).trim();
@@ -55,8 +55,8 @@ router.post("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res):
 });
 
 router.delete("/restaurants/:restaurantId/qrcodes/:qrCodeId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const qrCodeId = parseInt(req.params.qrCodeId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const qrCodeId = parseInt(String(req.params.qrCodeId), 10);
   const [deleted] = await db.delete(qrCodesTable).where(and(eq(qrCodesTable.id, qrCodeId), eq(qrCodesTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "QR code not found" }); return; }
   res.json({ message: "QR code deleted" });

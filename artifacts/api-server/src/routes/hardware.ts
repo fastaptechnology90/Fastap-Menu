@@ -14,7 +14,7 @@ async function getDevices(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/hardware", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const devices = await getDevices(rid);
   const stats = {
     total: devices.length,
@@ -33,7 +33,7 @@ router.get("/restaurants/:restaurantId/hardware", requireAuth, async (req, res) 
 });
 
 router.post("/restaurants/:restaurantId/hardware", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const devices = await getDevices(rid);
   const device = { id: Date.now(), status: "online", last_ping: new Date().toISOString(), ...req.body };
   devices.push(device);
@@ -42,8 +42,8 @@ router.post("/restaurants/:restaurantId/hardware", requireAuth, async (req, res)
 });
 
 router.put("/restaurants/:restaurantId/hardware/:id", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const devices = await getDevices(rid);
   const idx = devices.findIndex((d: any) => d.id === id);
   if (idx === -1) { res.status(404).json({ error: "Device not found" }); return; }
@@ -53,16 +53,16 @@ router.put("/restaurants/:restaurantId/hardware/:id", requireAuth, async (req, r
 });
 
 router.delete("/restaurants/:restaurantId/hardware/:id", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const devices = (await getDevices(rid)).filter((d: any) => d.id !== id);
   await setSettingsSection(rid, "hardware", devices);
   res.json({ success: true });
 });
 
 router.post("/restaurants/:restaurantId/hardware/:id/ping", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const devices = await getDevices(rid);
   const idx = devices.findIndex((d: any) => d.id === id);
   if (idx === -1) { res.status(404).json({ error: "Device not found" }); return; }

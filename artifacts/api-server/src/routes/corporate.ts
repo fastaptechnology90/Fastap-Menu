@@ -42,7 +42,7 @@ function getWallets(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/corporate/accounts", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const accts = getAccounts(rid);
   const invs = getInvoices(rid);
   // Compute each account's real outstanding / billed from its invoices, instead of a
@@ -57,15 +57,15 @@ router.get("/restaurants/:restaurantId/corporate/accounts", requireAuth, (req, r
 });
 
 router.post("/restaurants/:restaurantId/corporate/accounts", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const account = { id: ++nextId, outstanding: 0, status: "active", joined: new Date().toISOString().split("T")[0], ...req.body };
   getAccounts(rid).push(account);
   res.status(201).json(account);
 });
 
 router.put("/restaurants/:restaurantId/corporate/accounts/:id", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const accts = getAccounts(rid);
   const idx = accts.findIndex(a => a.id === id);
   if (idx === -1) { res.status(404).json({ error: "Account not found" }); return; }
@@ -74,11 +74,11 @@ router.put("/restaurants/:restaurantId/corporate/accounts/:id", requireAuth, (re
 });
 
 router.get("/restaurants/:restaurantId/corporate/invoices", requireAuth, (req, res) => {
-  res.json(getInvoices(parseInt(req.params.restaurantId, 10)));
+  res.json(getInvoices(parseInt(String(req.params.restaurantId), 10)));
 });
 
 router.post("/restaurants/:restaurantId/corporate/invoices", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const count = getInvoices(rid).length + 1;
   const inv = { id: ++nextId, invoice_no: `CI-2026-${String(count).padStart(3, "0")}`, status: "pending", ...req.body, created_at: new Date().toISOString() };
   getInvoices(rid).unshift(inv);
@@ -86,8 +86,8 @@ router.post("/restaurants/:restaurantId/corporate/invoices", requireAuth, (req, 
 });
 
 router.put("/restaurants/:restaurantId/corporate/invoices/:id", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const invs = getInvoices(rid);
   const idx = invs.findIndex(i => i.id === id);
   if (idx === -1) { res.status(404).json({ error: "Invoice not found" }); return; }
@@ -96,11 +96,11 @@ router.put("/restaurants/:restaurantId/corporate/invoices/:id", requireAuth, (re
 });
 
 router.get("/restaurants/:restaurantId/corporate/wallets", requireAuth, (req, res) => {
-  res.json(getWallets(parseInt(req.params.restaurantId, 10)));
+  res.json(getWallets(parseInt(String(req.params.restaurantId), 10)));
 });
 
 router.post("/restaurants/:restaurantId/corporate/wallets", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const wallet = { id: ++nextId, used: 0, transactions: [], ...req.body };
   getWallets(rid).push(wallet);
   res.status(201).json(wallet);

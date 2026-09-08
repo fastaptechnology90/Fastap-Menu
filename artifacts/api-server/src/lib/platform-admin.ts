@@ -38,6 +38,7 @@ import {
 import type { Request } from "express";
 import crypto from "crypto";
 import dns from "node:dns/promises";
+import { runtimeSnapshot } from "./runtime-metrics.js";
 import {
   DEFAULT_INTEGRATIONS,
   mergeIntegrations,
@@ -852,7 +853,14 @@ export async function getExtendedAnalytics() {
   let healthy = 0;
   let risk = 0;
   let critical = 0;
-  const churnRiskVendors: { name: string; plan: string; score: number; signals: string[] }[] = [];
+  const churnRiskVendors: { name: string; plan: string; score: number; signals: string[]; mrr: number }[] = [];
+  // MRR at risk was the count of at-risk venues times a flat 2500 — a figure that moved
+  // when a venue was added and never when anyone changed plan. Each venue's plan has a
+  // price; that is the revenue actually at risk.
+  const planPrices = new Map(
+    (await db.select({ id: platformPlansTable.id, price: platformPlansTable.price }).from(platformPlansTable))
+      .map(pl => [String(pl.id), parseMoney(pl.price)]),
+  );
 
   for (const r of restaurants) {
     const orders = vendorOrders.get(r.id) ?? 0;
@@ -867,7 +875,8 @@ export async function getExtendedAnalytics() {
     if (orders > 0 && orders < 5) signals.push("Low activity");
     const riskScore = 100 - score;
     if (riskScore >= 60) {
-      churnRiskVendors.push({ name: r.name, plan: r.plan || "free", score: riskScore, signals: signals.length ? signals : ["Low health score"] });
+      const plan = r.plan || "free";
+      churnRiskVendors.push({ name: r.name, plan, score: riskScore, signals: signals.length ? signals : ["Low health score"], mrr: planPrices.get(plan) ?? 0 });
     }
   }
 
@@ -925,7 +934,7 @@ export async function getExtendedAnalytics() {
       projectedRevenue: forecastData[forecastData.length - 1]?.forecast ?? base,
       commissionForecast: (forecastData[forecastData.length - 1]?.forecast ?? base) * (commissionRate / 100),
       vendorCount: restaurants.length,
-      churnRiskMrr: churnRiskVendors.length * 2500,
+      churnRiskMrr: roundMoney(churnRiskVendors.reduce((t, v) => t + v.mrr, 0)),
     },
   };
 }
@@ -1045,6 +1054,11 @@ export async function getSlaMonitoring() {
 
   const pendingRefunds = await db.select().from(platformRefundsTable).where(eq(platformRefundsTable.status, "pending"));
   const pendingSettlements = await db.select().from(platformSettlementsTable).where(eq(platformSettlementsTable.status, "pending"));
+  const allSettlements = await db.select().from(platformSettlementsTable);
+  const settlementsTotal = allSettlements.length;
+  const asOf = new Date();
+  const settlementsOverdue = allSettlements.filter(x =>
+    String(x.status ?? "").toLowerCase() !== "released" && x.dueDate != null && new Date(x.dueDate) < asOf).length;
 
   const resolvedTickets = tickets.filter(t => t.status === "resolved" || t.status === "closed");
   const avgResolveHrs = resolvedTickets.length
@@ -1055,11 +1069,18 @@ export async function getSlaMonitoring() {
     supportAvg: avgResolveHrs ? `${avgResolveHrs.toFixed(1)}h` : "—",
     supportCompliance: open.length ? Math.max(0, 100 - Math.round((breaches.length / open.length) * 100)) : 100,
     refundAvg: pendingRefunds.length ? `${pendingRefunds.length} pending` : "0 pending",
-    refundCompliance: pendingRefunds.length === 0 ? 100 : Math.max(60, 100 - pendingRefunds.length * 5),
+    // Refund and settlement "compliance" were a sliding scale off the pending count and a
+    // literal 95. There is no due-by date on a refund to measure against, so refunds
+    // report no compliance figure; settlements do have a due date, so that one is real.
+    refundCompliance: null,
     settlementAvg: pendingSettlements.length ? `${pendingSettlements.length} pending` : "0 pending",
-    settlementCompliance: pendingSettlements.length === 0 ? 100 : 95,
-    uptimeActual: "99.9%",
-    uptimeCompliance: 99.9,
+    settlementCompliance: settlementsTotal === 0
+      ? 100
+      : Math.round(((settlementsTotal - settlementsOverdue) / settlementsTotal) * 1000) / 10,
+    settlementsOverdue,
+    // Uptime is not recorded anywhere; a fixed 99.9% read as a measured service level.
+    uptimeActual: null,
+    uptimeCompliance: null,
     breaches: breaches.map(t => ({
       id: `TKT-${t.id}`,
       slaType: "Support SLA",
@@ -1341,28 +1362,32 @@ export async function getApiUsageAnalytics() {
   const [errorCount] = await db.select({ count: count() }).from(platformErrorLogsTable);
   const audit24h = await db.select({ count: count() }).from(platformAuditLogsTable)
     .where(gte(platformAuditLogsTable.createdAt, new Date(Date.now() - 86400000)));
-  const totalCalls = (orderCount?.count ?? 0) * 3 + (audit24h[0]?.count ?? 0) * 2;
-  const failedCalls = errorCount?.count ?? 0;
+  // API traffic was manufactured: total calls were the order count times three plus the
+  // audit count times two, the hourly curve was an arithmetic pattern on the hour number,
+  // and the per-endpoint table was five fixed fractions of that total with invented
+  // latencies. The server does count its own requests, so the totals below are real for
+  // this process; nothing records traffic per endpoint or per hour, so those come back
+  // empty rather than shaped like data.
+  const runtime = runtimeSnapshot();
+  const totalCalls = runtime.requestsToday;
+  const failedCalls = runtime.errorsToday;
   const webhooks = await getWebhooks();
   return {
     totalCalls,
     failedCalls,
+    // Counted since this process started, which is what "today" can honestly mean here.
+    countedSince: runtime.startedAt,
+    loggedErrorsAllTime: errorCount?.count ?? 0,
+    auditEvents24h: audit24h[0]?.count ?? 0,
+    ordersAllTime: orderCount?.count ?? 0,
     successRate: totalCalls ? Math.round(((totalCalls - failedCalls) / totalCalls) * 1000) / 10 : 100,
-    avgResponseMs: 120 + (failedCalls % 40),
+    avgResponseMs: runtime.avgResponseMs,
     activeKeys: activeKeys?.count ?? 0,
     totalKeys: keyCount?.count ?? 0,
     activeWebhooks: (webhooks as { status?: string }[]).filter(w => w.status !== "disabled").length,
-    hourly: Array.from({ length: 24 }, (_, h) => {
-      const base = Math.max(5, Math.floor(totalCalls / 48));
-      return { hour: `${h}:00`, calls: base + (h % 5) * 3, errors: h % 7 === 0 ? 2 : 0 };
-    }),
-    endpoints: [
-      { path: "/api/public/venue/*", calls: Math.floor(totalCalls * 0.35), errors: Math.floor(failedCalls * 0.2), avgMs: 95 },
-      { path: "/api/orders", calls: Math.floor(totalCalls * 0.28), errors: Math.floor(failedCalls * 0.3), avgMs: 140 },
-      { path: "/api/restaurant-auth/*", calls: Math.floor(totalCalls * 0.15), errors: Math.floor(failedCalls * 0.1), avgMs: 110 },
-      { path: "/api/superadmin/*", calls: Math.floor(totalCalls * 0.12), errors: Math.floor(failedCalls * 0.15), avgMs: 180 },
-      { path: "/api/public/reservations", calls: Math.floor(totalCalls * 0.1), errors: Math.floor(failedCalls * 0.25), avgMs: 160 },
-    ],
+    hourly: [],
+    endpoints: [],
+    perEndpointTracked: false,
   };
 }
 

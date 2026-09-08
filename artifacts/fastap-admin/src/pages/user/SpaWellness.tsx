@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
@@ -19,7 +20,9 @@ export default function SpaWellness() {
   const [, navigate] = useAppLocation();
   const { venue, user, activeRestaurant } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const [tab, setTab] = useState<Tab>("spa");
   const [spaServices, setSpaServices] = useState<any[]>([]);
@@ -34,6 +37,7 @@ export default function SpaWellness() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [membershipPlan, setMembershipPlan] = useState("gold");
   const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [bookingsError, setBookingsError] = useState("");
   const [booked, setBooked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -94,19 +98,27 @@ export default function SpaWellness() {
     try {
       const list = await publicApi.spa.bookings(venue.restaurantId, user.mobile);
       setMyBookings(list);
-    } catch { setMyBookings([]); }
+      setBookingsError("");
+    } catch (e) {
+      // A failed fetch used to render as "No bookings yet", so a guest with an
+      // appointment in an hour was told they had none.
+      setMyBookings([]);
+      setBookingsError(e instanceof Error ? e.message : "We could not load your bookings.");
+    }
   }, [venue.restaurantId, user?.mobile]);
 
   useEffect(() => { if (tab === "bookings") loadBookings(); }, [tab, loadBookings]);
 
-  const displayPrice = selected
-    ? isCouple || selected.category === "couple"
-      ? Math.round(parseFloat(selected.price) * 1.85)
-      : parseFloat(selected.price)
-    : 0;
+  // The couple rate used to be the single price × 1.85, invented in the browser and
+  // never sent anywhere — so the guest was quoted a number the booking did not contain.
+  // A couple treatment is priced by the spa, at the price on its own service row.
+  const displayPrice = selected ? parseFloat(selected.price) : 0;
 
   async function bookSession(bookingType: string, extra: Record<string, unknown> = {}) {
-    if (!selected && bookingType !== "membership") return;
+    if (!selected && bookingType !== "membership") {
+      toast({ title: "Pick a treatment first", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     const scheduledAt = bookingType === "membership"
       ? new Date().toISOString()
@@ -137,8 +149,12 @@ export default function SpaWellness() {
         });
       }
       setBooked(true);
-    } catch {
-      toast({ title: "Error", description: "Booking failed. Please try again.", variant: "destructive" });
+    } catch (e) {
+      toast({
+        title: "Booking failed",
+        description: e instanceof Error ? e.message : "Please pick another slot, or call the spa.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -302,7 +318,13 @@ export default function SpaWellness() {
         {/* MY BOOKINGS TAB */}
         {tab === "bookings" && (
           <>
-            {myBookings.length === 0 && <p className="text-center text-white/40 py-10 text-sm">No bookings yet</p>}
+            {myBookings.length === 0 && (
+              bookingsError
+                ? <p role="alert" className="text-center text-red-300 py-10 text-sm">{bookingsError}</p>
+                : !user?.mobile
+                  ? <p className="text-center text-white/40 py-10 text-sm">Sign in with the phone number you booked with to see your appointments.</p>
+                  : <p className="text-center text-white/40 py-10 text-sm">No bookings yet</p>
+            )}
             {myBookings.map(b => (
               <div key={b.id} className="rounded-xl bg-white/5 border border-white/10 p-4">
                 <div className="flex justify-between mb-1">

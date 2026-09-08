@@ -49,11 +49,11 @@ async function getStore(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/signage", requireAuth, async (req, res) => {
-  res.json(await getStore(parseInt(req.params.restaurantId, 10)));
+  res.json(await getStore(parseInt(String(req.params.restaurantId), 10)));
 });
 
 router.put("/restaurants/:restaurantId/signage/settings", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const s = await getStore(rid);
   s.settings = { ...s.settings, ...req.body };
   await setSettingsSection(rid, "signage", s);
@@ -61,7 +61,7 @@ router.put("/restaurants/:restaurantId/signage/settings", requireAuth, async (re
 });
 
 router.post("/restaurants/:restaurantId/signage/slides", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const s = await getStore(rid);
   const slide = { id: Date.now(), active: true, order: s.slides.length + 1, ...req.body };
   s.slides.push(slide);
@@ -70,8 +70,8 @@ router.post("/restaurants/:restaurantId/signage/slides", requireAuth, async (req
 });
 
 router.put("/restaurants/:restaurantId/signage/slides/:id", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const sid = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const sid = parseInt(String(req.params.id), 10);
   const s = await getStore(rid);
   const idx = s.slides.findIndex((x: any) => x.id === sid);
   if (idx === -1) { res.status(404).json({ error: "Slide not found" }); return; }
@@ -81,8 +81,8 @@ router.put("/restaurants/:restaurantId/signage/slides/:id", requireAuth, async (
 });
 
 router.delete("/restaurants/:restaurantId/signage/slides/:id", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const sid = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const sid = parseInt(String(req.params.id), 10);
   const s = await getStore(rid);
   s.slides = s.slides.filter((x: any) => x.id !== sid);
   await setSettingsSection(rid, "signage", s);

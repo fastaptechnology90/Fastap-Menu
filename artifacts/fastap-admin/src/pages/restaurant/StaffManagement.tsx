@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
-import { staff as staffApi } from "@/lib/api";
+import { staff as staffApi, planLimitMessage } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { AttendancePanel } from "@/components/restaurant/AttendancePanel";
+import { fmtINR } from "@/lib/format";
 
-interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; performance: number; tablesAssigned?: string[]; weeklySchedule?: Record<string, string>; }
+interface StaffMember { id: string; name: string; role: StaffRole; email: string; mobile: string; avatar?: string; status: "active" | "on-break" | "offline"; shift: string; joinDate: string; ordersServed: number; salesTotal: number; avgOrderValue: number; tipsCollected: number; tablesAssigned?: string[]; weeklySchedule?: Record<string, string>; }
 
 // HR day-wise roster building blocks
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -31,7 +33,7 @@ function buildWeekly(s: StaffMember): Record<string, string> {
 }
 import {
   Plus, Search, Phone, Mail, Star, Clock, Shield, Edit2, X, Save,
-  CheckCircle, AlertCircle, TrendingUp, Calendar, Trash2
+  CheckCircle, AlertCircle, TrendingUp, Trash2
 } from "lucide-react";
 
 const ROLE_CONFIG: Record<StaffRole, { label: string; icon: string; color: string }> = {
@@ -56,6 +58,9 @@ export default function StaffManagement() {
   const { restaurantId, restaurant } = useRestaurant();
   const { confirm, confirmDialog } = useConfirm();
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  // The bars below are a share of the busiest person's takings, so a floor where nobody
+  // has served anything shows empty bars rather than a divide-by-zero.
+  const topSales = staff.reduce((m, p) => Math.max(m, p.salesTotal), 0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -68,7 +73,13 @@ export default function StaffManagement() {
     shift: s.shift || "Morning",
     weeklySchedule: (s.weeklySchedule && typeof s.weeklySchedule === "object") ? s.weeklySchedule : {},
     joinDate: s.createdAt?.split("T")[0] || s.joinDate?.split?.("T")[0] || "",
-    performance: 90, // NOTE: not sourced from API — no per-staff performance metric exists yet
+    // Every staff member used to be shown as "90% performance". Nothing measured it, so
+    // it was the same number for the best and worst person on the floor. What the server
+    // does measure is what they served, so that is what the screen shows.
+    ordersServed: Number(s.ordersServed ?? 0),
+    salesTotal: Number(s.salesTotal ?? 0),
+    avgOrderValue: Number(s.avgOrderValue ?? 0),
+    tipsCollected: Number(s.tipsCollected ?? 0),
   });
 
   const loadStaff = useCallback(() => {
@@ -177,13 +188,15 @@ export default function StaffManagement() {
         status: "active",
         shift: "Morning",
         joinDate: new Date().toISOString().split("T")[0],
-        performance: 0,
+        ordersServed: 0, salesTotal: 0, avgOrderValue: 0, tipsCollected: 0,
       }]);
       setAddMode(false);
       setAddForm({ name: "", email: "", mobile: "", role: "waiter", password: "" });
       toast({ title: "Staff added", description: `${created.name} can now log in.` });
     } catch (e: any) {
-      toast({ title: "Could not add staff", description: e?.message || "Please check the details and try again.", variant: "destructive" });
+      // A plan cap is a 402 naming the allowance and the current count — an owner needs
+      // that, not a "please check the details" that sends them re-typing a valid form.
+      toast({ ...planLimitMessage(e, "Could not add staff"), variant: "destructive" });
     }
     finally { setSaving(false); }
   }
@@ -216,7 +229,7 @@ export default function StaffManagement() {
           { label: "Total Staff", value: staff.length, icon: "👥", color: "text-blue-400", bg: "from-blue-500/15" },
           { label: "On Duty", value: staff.filter(s => s.status === "active").length, icon: "✅", color: "text-emerald-400", bg: "from-emerald-500/15" },
           { label: "On Break", value: staff.filter(s => s.status === "on-break").length, icon: "☕", color: "text-yellow-400", bg: "from-yellow-500/15" },
-          { label: "Avg Performance", value: `${Math.round(staff.reduce((s, m) => s + m.performance, 0) / staff.length)}%`, icon: "⭐", color: "text-amber-400", bg: "from-amber-500/15" },
+          { label: "Orders Served", value: staff.reduce((s, m) => s + m.ordersServed, 0), icon: "🧾", color: "text-amber-400", bg: "from-amber-500/15" },
         ].map(card => (
           <div key={card.label} className={`rounded-2xl bg-gradient-to-br ${card.bg} to-transparent border border-white/8 p-4`}>
             <div className="text-2xl mb-1">{card.icon}</div>
@@ -299,13 +312,13 @@ export default function StaffManagement() {
                     <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /><span className="truncate">{member.email}</span></div>
                     <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /><span>{member.mobile}</span></div>
                     <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" /><span>{member.shift} Shift</span></div>
-                    <div className="flex items-center gap-1.5"><Star className="h-3 w-3 text-yellow-400" /><span>{member.performance}% performance</span></div>
+                    <div className="flex items-center gap-1.5"><Star className="h-3 w-3 text-yellow-400" /><span>{member.ordersServed > 0 ? `${member.ordersServed} orders · ${fmtINR(member.salesTotal)}` : "No orders yet"}</span></div>
                   </div>
 
-                  {/* Performance Bar */}
+                  {/* Share of the busiest person's takings — a relative bar, not a score. */}
                   <div>
                     <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${member.performance}%` }} />
+                      <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${topSales > 0 ? Math.round((member.salesTotal / topSales) * 100) : 0}%` }} />
                     </div>
                   </div>
                 </div>
@@ -362,13 +375,7 @@ export default function StaffManagement() {
 
       {/* Attendance Tab */}
       {activeTab === "attendance" && (
-        <div className="rounded-2xl border border-white/8 p-8 text-center">
-          <Calendar className="h-10 w-10 text-white/20 mx-auto mb-3" />
-          <h3 className="font-bold text-white/80">No attendance records yet</h3>
-          <p className="text-sm text-white/40 mt-2 max-w-md mx-auto">
-            GPS check-in and attendance tracking will appear here once staff start clocking in. Staff roster data is loaded from your account ({staff.length} members).
-          </p>
-        </div>
+        <AttendancePanel restaurantId={restaurantId} staff={staff} />
       )}
 
       {/* Add Staff Modal */}
@@ -440,11 +447,11 @@ export default function StaffManagement() {
               ))}
               <div>
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-white/40">Performance Score</span>
-                  <span className="text-amber-400 font-bold">{selected.performance}%</span>
+                  <span className="text-white/40">Sales on this floor</span>
+                  <span className="text-amber-400 font-bold">{selected.ordersServed > 0 ? `${selected.ordersServed} orders · ${fmtINR(selected.salesTotal)}` : "No orders yet"}</span>
                 </div>
                 <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${selected.performance}%` }} />
+                  <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${topSales > 0 ? Math.round((selected.salesTotal / topSales) * 100) : 0}%` }} />
                 </div>
               </div>
               {selected.tablesAssigned && selected.tablesAssigned.length > 0 && (

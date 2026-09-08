@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
@@ -45,7 +46,10 @@ export default function SmartKioskPage() {
   const [, navigate] = useAppLocation();
   const { venue } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const { toast: pushToast } = useToast();
   const [tab, setTab] = useState<Tab>("order");
@@ -130,8 +134,12 @@ export default function SmartKioskPage() {
         setCart(res.cart);
         showToast(res.message);
       }
-    } catch {
-      pushToast({ title: "Error", description: "NFC tap failed.", variant: "destructive" });
+    } catch (e) {
+      pushToast({
+        title: "Tap not recognised",
+        description: e instanceof Error ? e.message : "Try tapping again, or order from the screen.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -150,8 +158,12 @@ export default function SmartKioskPage() {
       setTab("token");
       showToast(`Token ${res.tokenNumber} issued`);
       load();
-    } catch {
-      pushToast({ title: "Error", description: "Checkout failed.", variant: "destructive" });
+    } catch (e) {
+      pushToast({
+        title: "Checkout failed",
+        description: e instanceof Error ? e.message : "Please try again or ask a member of staff.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -358,15 +370,19 @@ export default function SmartKioskPage() {
                   <div className="mx-auto w-48 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 text-sm">QR Code</div>
                 )}
                 <p className="text-gray-800 font-bold mt-3 text-lg">₹{bill.grandTotal}</p>
-                <p className="text-gray-500 text-xs mt-1">{qrData?.upiId ?? "spicegarden@upi"}</p>
+                <p className="text-gray-500 text-xs mt-1">{qrData?.upiId ?? "UPI ID unavailable — please pay at the counter"}</p>
                 <p className="text-gray-400 text-[10px] mt-2">Scan with PhonePe, GPay, Paytm or any UPI app</p>
               </div>
             )}
+            {/* Nothing here verifies the transfer — no payment app calls back. The order
+                goes through on the guest's word, so the button says that rather than
+                claiming the bill is settled. */}
             <button onClick={() => { setPaymentMethod("qr"); handleCheckout(); }}
-              disabled={cart.length === 0 || submitting}
+              disabled={cart.length === 0 || submitting || !qrData?.qrImageUrl}
               className="w-full py-4 rounded-2xl bg-emerald-600 font-bold disabled:opacity-40">
-              I've Paid via QR · Confirm Order
+              Send order to the kitchen
             </button>
+            <p className="text-xs text-white/40 text-center">Keep your UPI receipt — the counter confirms payment when you collect.</p>
           </>
         )}
 
@@ -380,7 +396,7 @@ export default function SmartKioskPage() {
                 <p className="text-xs text-violet-300 uppercase tracking-widest">Your Token</p>
                 <p className="text-6xl font-black text-white my-3">{activeToken.tokenNumber}</p>
                 <p className="text-sm text-emerald-400 capitalize">{activeToken.status} · ~{activeToken.estimatedMinutes} min</p>
-                <p className="text-xs text-white/40 mt-2">Paid via {activeToken.paymentMethod} · ₹{activeToken.total}</p>
+                <p className="text-xs text-white/40 mt-2">₹{activeToken.total} · {activeToken.paymentMethod} — confirm payment at the counter</p>
               </div>
             )}
 

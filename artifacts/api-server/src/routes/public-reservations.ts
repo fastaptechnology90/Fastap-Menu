@@ -174,7 +174,7 @@ async function loadOwnedReservation(req: Request, id: number) {
 }
 
 router.post("/public/reservations/:id/deposit", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const reservation = await loadOwnedReservation(req, id);
   if (!reservation) { res.status(404).json({ error: "Reservation not found" }); return; }
 
@@ -188,7 +188,7 @@ router.post("/public/reservations/:id/deposit", async (req, res): Promise<void> 
 });
 
 router.put("/public/reservations/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const owned = await loadOwnedReservation(req, id);
   if (!owned) { res.status(404).json({ error: "Reservation not found" }); return; }
 
@@ -208,7 +208,7 @@ router.put("/public/reservations/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/public/reservations/:id/cancel", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const reservation = await loadOwnedReservation(req, id);
   if (!reservation) { res.status(404).json({ error: "Reservation not found" }); return; }
 

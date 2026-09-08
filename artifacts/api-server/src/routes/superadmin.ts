@@ -37,6 +37,7 @@ import {
   approveExport, rejectExport, mergeSupportTickets,
 } from "../lib/platform-extensions.js";
 import { registerSuperAdminFeatureRoutes } from "./feature-modules.js";
+import { runtimeSnapshot } from "../lib/runtime-metrics.js";
 
 const router: IRouter = Router();
 const admin = [requireSuperAdmin] as const;
@@ -182,7 +183,7 @@ router.get("/superadmin/taxes/reports", ...admin, async (_req, res): Promise<voi
 });
 
 router.post("/superadmin/subscriptions/:vendorId/action", ...admin, async (req, res): Promise<void> => {
-  const vendorId = parseInt(req.params.vendorId, 10);
+  const vendorId = parseInt(String(req.params.vendorId), 10);
   const { action, plan } = req.body as { action?: string; plan?: string };
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, vendorId));
   if (!r) { res.status(404).json({ error: "Vendor not found" }); return; }
@@ -265,7 +266,7 @@ router.post("/superadmin/vendors", ...admin, async (req, res): Promise<void> => 
 });
 
 router.post("/superadmin/vendors/:vendorId/toggle", ...admin, async (req, res): Promise<void> => {
-    const id = parseInt(req.params.vendorId, 10);
+    const id = parseInt(String(req.params.vendorId), 10);
     const [existing] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
     const nextActive = !existing.isActive;
@@ -304,7 +305,7 @@ router.get("/superadmin/pending-owners", ...admin, async (_req, res): Promise<vo
 });
 
 router.post("/superadmin/owners/:userId/approve", ...admin, async (req: any, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (!Number.isFinite(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -325,7 +326,7 @@ router.post("/superadmin/owners/:userId/approve", ...admin, async (req: any, res
 });
 
 router.post("/superadmin/owners/:userId/reject", ...admin, async (req: any, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   if (!Number.isFinite(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -347,7 +348,7 @@ router.post("/superadmin/owners/:userId/reject", ...admin, async (req: any, res)
 });
 
 router.put("/superadmin/vendors/:vendorId/plan", ...admin, async (req, res): Promise<void> => {
-    const id = parseInt(req.params.vendorId, 10);
+    const id = parseInt(String(req.params.vendorId), 10);
     const { plan } = req.body;
     const [updated] = await db.update(restaurantsTable).set({ plan }).where(eq(restaurantsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
@@ -358,7 +359,7 @@ router.put("/superadmin/vendors/:vendorId/plan", ...admin, async (req, res): Pro
 });
 
 router.post("/superadmin/vendors/:vendorId/freeze-payouts", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}), wallet: { ...((r.settings as { wallet?: object })?.wallet ?? {}), frozen: true } };
@@ -368,7 +369,7 @@ router.post("/superadmin/vendors/:vendorId/freeze-payouts", ...admin, async (req
 });
 
 router.post("/superadmin/vendors/:vendorId/reset-password", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const tempPassword = crypto.randomBytes(8).toString("hex");
@@ -379,7 +380,7 @@ router.post("/superadmin/vendors/:vendorId/reset-password", ...admin, async (req
 });
 
 router.get("/superadmin/vendors/:vendorId/settlements", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select({ name: restaurantsTable.name }).from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const rows = await db.select().from(platformSettlementsTable)
@@ -398,7 +399,7 @@ router.get("/superadmin/vendors/:vendorId/settlements", ...admin, async (req, re
 });
 
 router.get("/superadmin/vendors/:vendorId", ...admin, async (req, res): Promise<void> => {
-    const id = parseInt(req.params.vendorId, 10);
+    const id = parseInt(String(req.params.vendorId), 10);
     const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
     if (!r) { res.status(404).json({ error: "Not found" }); return; }
     const [owner] = await db.select({ name: usersTable.name, email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
@@ -415,7 +416,7 @@ router.get("/superadmin/vendors/:vendorId", ...admin, async (req, res): Promise<
 });
 
 router.get("/superadmin/vendors/:vendorId/staff", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const rows = await db.select().from(staffTable).where(eq(staffTable.restaurantId, id));
   res.json(rows.map(({ pinHash: _h, ...rest }) => ({
     id: `S${rest.id}`, name: rest.name, role: rest.role, branch: "Main",
@@ -426,7 +427,7 @@ router.get("/superadmin/vendors/:vendorId/staff", ...admin, async (req, res): Pr
 });
 
 router.get("/superadmin/vendors/:vendorId/branches", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const rows = await db.select().from(branchesTable).where(eq(branchesTable.restaurantId, id));
   res.json(rows.map(b => ({
     id: `B${b.id}`, name: b.name, location: b.address || "—",
@@ -435,7 +436,7 @@ router.get("/superadmin/vendors/:vendorId/branches", ...admin, async (req, res):
 });
 
 router.get("/superadmin/vendors/:vendorId/documents", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const rows = await db.select().from(documentsTable).where(eq(documentsTable.restaurantId, id)).orderBy(desc(documentsTable.createdAt));
   res.json(rows.map(d => ({
     type: d.name || d.category || "Document",
@@ -452,7 +453,7 @@ router.get("/superadmin/vendors/:vendorId/documents", ...admin, async (req, res)
 
 // Approve or reject a SINGLE KYC document (per-document review).
 router.post("/superadmin/documents/:docId/verify", ...admin, async (req, res): Promise<void> => {
-  const docId = parseInt(req.params.docId, 10);
+  const docId = parseInt(String(req.params.docId), 10);
   const action = String(req.body?.status ?? "").toLowerCase();
   const dbStatus = action === "verified" || action === "approve" || action === "approved" ? "active"
     : action === "rejected" || action === "reject" ? "rejected" : null;
@@ -479,7 +480,7 @@ router.post("/superadmin/documents/:docId/verify", ...admin, async (req, res): P
 });
 
 router.get("/superadmin/vendors/:vendorId/crm-logs", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const rows = await db.select().from(platformCrmLogsTable)
@@ -492,7 +493,7 @@ router.get("/superadmin/vendors/:vendorId/crm-logs", ...admin, async (req, res):
 });
 
 router.post("/superadmin/vendors/:vendorId/branches", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const { name, address, phone, isActive } = req.body;
   if (!name?.trim()) { res.status(400).json({ error: "Branch name is required" }); return; }
   const [branch] = await db.insert(branchesTable).values({
@@ -503,7 +504,7 @@ router.post("/superadmin/vendors/:vendorId/branches", ...admin, async (req, res)
 });
 
 router.put("/superadmin/vendors/:vendorId/branches/:branchId", ...admin, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.vendorId, 10);
+  const restaurantId = parseInt(String(req.params.vendorId), 10);
   const branchId = parseInt(String(req.params.branchId).replace("B", ""), 10);
   const { name, address, phone, isActive } = req.body;
   const [branch] = await db.update(branchesTable).set({
@@ -515,7 +516,7 @@ router.put("/superadmin/vendors/:vendorId/branches/:branchId", ...admin, async (
 });
 
 router.delete("/superadmin/vendors/:vendorId/branches/:branchId", ...admin, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.vendorId, 10);
+  const restaurantId = parseInt(String(req.params.vendorId), 10);
   const branchId = parseInt(String(req.params.branchId).replace("B", ""), 10);
   const [deleted] = await db.delete(branchesTable).where(and(eq(branchesTable.id, branchId), eq(branchesTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "Branch not found" }); return; }
@@ -524,7 +525,7 @@ router.delete("/superadmin/vendors/:vendorId/branches/:branchId", ...admin, asyn
 });
 
 router.post("/superadmin/vendors/:vendorId/staff", ...admin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const { name, email, role, phone, password } = req.body;
   if (!name?.trim() || !email?.trim() || !role) { res.status(400).json({ error: "name, email, and role are required" }); return; }
   const pinHash = await bcrypt.hash(password || crypto.randomBytes(6).toString("hex"), 10);
@@ -537,7 +538,7 @@ router.post("/superadmin/vendors/:vendorId/staff", ...admin, async (req, res): P
 });
 
 router.delete("/superadmin/vendors/:vendorId/staff/:staffId", ...admin, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.vendorId, 10);
+  const restaurantId = parseInt(String(req.params.vendorId), 10);
   const staffId = parseInt(String(req.params.staffId).replace("S", ""), 10);
   const [deleted] = await db.delete(staffTable).where(and(eq(staffTable.id, staffId), eq(staffTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "Staff not found" }); return; }
@@ -546,7 +547,7 @@ router.delete("/superadmin/vendors/:vendorId/staff/:staffId", ...admin, async (r
 });
 
 router.post("/superadmin/vendors/:vendorId/qrcodes", ...admin, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.vendorId, 10);
+  const restaurantId = parseInt(String(req.params.vendorId), 10);
   const { label, type, tableId } = req.body;
   const [restaurant] = await db.select({ slug: restaurantsTable.slug }).from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Vendor not found" }); return; }
@@ -559,8 +560,8 @@ router.post("/superadmin/vendors/:vendorId/qrcodes", ...admin, async (req, res):
 });
 
 router.delete("/superadmin/vendors/:vendorId/qrcodes/:qrId", ...admin, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.vendorId, 10);
-  const qrId = parseInt(req.params.qrId, 10);
+  const restaurantId = parseInt(String(req.params.vendorId), 10);
+  const qrId = parseInt(String(req.params.qrId), 10);
   const [deleted] = await db.delete(qrCodesTable).where(and(eq(qrCodesTable.id, qrId), eq(qrCodesTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "QR code not found" }); return; }
   res.json({ deleted: true });
@@ -1199,7 +1200,7 @@ router.get("/superadmin/escrow", ...admin, async (_req, res) => {
 });
 
 router.post("/superadmin/escrow/freeze/:vendorId", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}), wallet: { ...((r.settings as { wallet?: object })?.wallet ?? {}), frozen: true } };
@@ -1797,21 +1798,32 @@ router.get("/superadmin/metrics", ...admin, async (_req, res) => {
   const [pendingExports] = await db.select({ count: count() }).from(platformExportsTable).where(eq(platformExportsTable.status, "pending"));
   const queueDepth = (pendingTasks?.count ?? 0) + (pendingExports?.count ?? 0);
   const orders = orderCount?.count ?? 0;
-  const load = Math.min(95, Math.round(queueDepth * 8 + (failedTasks?.count ?? 0) * 5));
+  // These were arithmetic on the queue depth and the order count: CPU rose because tasks
+  // were queued, memory was 30 plus three times the queue, disk was the constant 55, and
+  // "requests per minute" was the lifetime order count. The server can read its own CPU,
+  // memory and traffic, so it does. Disk and cache hit rate are not instrumented here, so
+  // they come back null rather than as numbers an operator would act on.
+  const snap = runtimeSnapshot();
+  const uptimeMinutes = Math.max(1, snap.uptimeSeconds / 60);
   res.json({
-    cpu: load,
-    memory: Math.min(90, Math.round(30 + queueDepth * 3)),
-    disk: 55,
-    network: Math.min(1000, orders + queueDepth * 10),
-    uptime: orders > 0 ? "99.9%" : "100%",
-    dbConnections: Math.min(50, 5 + Math.floor(orders / 100)),
+    cpu: snap.cpuPercent,
+    memory: snap.memoryPercent,
+    memoryRssBytes: snap.memoryRssBytes,
+    disk: null,
+    network: null,
+    uptime: null,
+    uptimeSeconds: snap.uptimeSeconds,
+    dbConnections: null,
     queueDepth,
+    failedTasks: failedTasks?.count ?? 0,
     activeWebhooks: (await getWebhooks()).filter((w: { status?: string }) => w.status === "active").length,
     totalOrders: orders,
     totalVendors: restCount?.count ?? 0,
-    apiRpm: Math.min(5000, Math.max(orders, queueDepth * 4)),
-    cacheHitRate: "92.0",
-    estimated: true,
+    apiRpm: Math.round(snap.requestsToday / uptimeMinutes),
+    avgResponseMs: snap.avgResponseMs,
+    errorsToday: snap.errorsToday,
+    cacheHitRate: null,
+    estimated: false,
   });
 });
 
@@ -1829,7 +1841,7 @@ router.get("/superadmin/roles", ...admin, async (_req, res) => {
 });
 
 router.put("/superadmin/roles/:id", ...admin, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [r] = await db.update(platformRolesTable).set({
     name: req.body.name, description: req.body.description, permissions: req.body.permissions,
   }).where(eq(platformRolesTable.id, id)).returning();
@@ -1837,7 +1849,7 @@ router.put("/superadmin/roles/:id", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/restaurants/:restaurantId/toggle", ...admin, async (req, res) => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const [existing] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   const [updated] = await db.update(restaurantsTable).set({ isActive: !existing.isActive }).where(eq(restaurantsTable.id, id)).returning();
@@ -1845,13 +1857,13 @@ router.post("/superadmin/restaurants/:restaurantId/toggle", ...admin, async (req
 });
 
 router.put("/superadmin/restaurants/:restaurantId/plan", ...admin, async (req, res) => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const [updated] = await db.update(restaurantsTable).set({ plan: req.body.plan }).where(eq(restaurantsTable.id, id)).returning();
   res.json(updated ?? { error: "Not found" });
 });
 
 router.put("/superadmin/vendors/:vendorId", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const { name, phone, address, businessType, email, website, gstNumber, fssaiNumber } = req.body;
   const [updated] = await db.update(restaurantsTable).set({
     name, phone, address, businessType, email, website, gstNumber, fssaiNumber,
@@ -1862,7 +1874,7 @@ router.put("/superadmin/vendors/:vendorId", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/vendors/:vendorId/controls", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}) };
@@ -1874,7 +1886,7 @@ router.post("/superadmin/vendors/:vendorId/controls", ...admin, async (req, res)
 });
 
 router.post("/superadmin/vendors/:vendorId/force-logout", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}), security: { forceLogoutAt: new Date().toISOString() } };
@@ -1884,7 +1896,7 @@ router.post("/superadmin/vendors/:vendorId/force-logout", ...admin, async (req, 
 });
 
 router.delete("/superadmin/vendors/:vendorId", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}) };
@@ -1895,7 +1907,7 @@ router.delete("/superadmin/vendors/:vendorId", ...admin, async (req, res) => {
 });
 
 router.post("/superadmin/vendors/:vendorId/restore", ...admin, async (req, res) => {
-  const id = parseInt(req.params.vendorId, 10);
+  const id = parseInt(String(req.params.vendorId), 10);
   const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
   if (!r) { res.status(404).json({ error: "Not found" }); return; }
   const settings = { ...(r.settings as object ?? {}) };
@@ -1919,7 +1931,7 @@ router.post("/superadmin/users", ...admin, async (req, res) => {
 });
 
 router.patch("/superadmin/users/:id", ...admin, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
   if (!target) { res.status(404).json({ error: "Not found" }); return; }
   const patch: Record<string, unknown> = {};

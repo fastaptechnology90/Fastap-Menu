@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { orders as ordersApi, restaurantApi } from "@/lib/api";
+import { orders as ordersApi, orderAdjustments, restaurantApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { downloadText } from "@/lib/download";
 import type { RecentBill } from "@/lib/restaurant-types";
 import { emptyPosStatsDisplay } from "@/lib/restaurantPublication";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
+import { PrintControls } from "@/components/restaurant/PrintControls";
+import {
+  AdjustedLineNote, AdjustmentHistory, LineAdjustControls, RefundControls,
+  type AdjustKind,
+} from "@/components/restaurant/BillAdjustments";
 import {
   Receipt, CreditCard, Smartphone, Banknote, Wallet, Nfc,
   Plus, Minus, Trash2, CheckCircle, Printer, Download, Search, X, ChevronLeft
@@ -20,12 +25,25 @@ const PAYMENT_METHODS = [
   { id: "nfc", label: "NFC Tap", icon: Nfc, color: "text-pink-400", bg: "bg-pink-500/20" },
 ];
 
-interface BillItem { name: string; qty: number; price: number; }
+interface BillItem {
+  name: string;
+  qty: number;
+  price: number;
+  /** Position on the stored order — the adjustment routes address lines by index, and a
+   *  cashier changing quantities here must not shift what "line 2" means to the server. */
+  index: number;
+  voided?: boolean;
+  comped?: boolean;
+  adjustReason?: string;
+  adjustedBy?: string;
+}
 
 export default function BillingPOS() {
-  const { liveOrders, tables, updateOrderStatus, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
+  const { liveOrders, tables, updateOrderStatus, refreshOrders, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
   const [selectedOrder, setSelectedOrder] = useState<typeof liveOrders[0] | null>(null);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
+  // Bumped after every adjustment so the history under the bill refetches.
+  const [adjustSeq, setAdjustSeq] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [reference, setReference] = useState("");
   const [discount, setDiscount] = useState(0);
@@ -106,22 +124,85 @@ export default function BillingPOS() {
     setSelectedOrder(order);
     // Bill the order's ACTUAL amount: derive the unit price from the stored line subtotal
     // (÷ qty) so the POS total matches the order total, instead of a possibly-stale unit price.
-    setBillItems(order.items.map(i => {
+    setBillItems(order.items.map((i, index) => {
       const qty = i.qty || 1;
       // Keep FULL precision on the unit price (subtotal ÷ qty) so re-summing reproduces the
       // order's exact subtotal — rounding the unit here is what introduced a ₹0.01 drift.
       const unit = i.subtotal && i.subtotal > 0 ? (i.subtotal / qty) : i.price;
-      return { name: i.name, qty, price: unit };
+      return { name: i.name, qty, price: unit, index, voided: i.voided, comped: i.comped, adjustReason: i.adjustReason, adjustedBy: i.adjustedBy };
     }));
+    setAdjustSeq(s => s + 1);
     setPaid(false);
     setDiscount(0);
     setTip(0);
   }
 
+  /** Re-read the bill from the order the server just returned, flags and all. */
+  function applyAdjustedOrder(updated: any) {
+    const rows = Array.isArray(updated?.items) ? updated.items : [];
+    setBillItems(rows.map((i: any, index: number) => {
+      const qty = Number(i.quantity ?? i.qty ?? 1) || 1;
+      const sub = Number(i.subtotal ?? 0);
+      return {
+        name: String(i.name ?? "Item"),
+        qty,
+        price: sub > 0 ? sub / qty : Number(i.price ?? 0),
+        index,
+        voided: i.voided === true,
+        comped: i.comped === true,
+        adjustReason: i.voidReason || i.compReason || undefined,
+        adjustedBy: i.voidedBy || i.compedBy || undefined,
+      };
+    }));
+    setAdjustSeq(s => s + 1);
+  }
+
+  async function adjustLine(item: BillItem, kind: AdjustKind, reason: string) {
+    const orderId = selectedOrder ? parseInt(selectedOrder.id, 10) : NaN;
+    if (!restaurantId || Number.isNaN(orderId)) return;
+    try {
+      const call = kind === "void" ? orderAdjustments.voidItem : orderAdjustments.compItem;
+      const updated = await call(restaurantId, orderId, { itemIndex: item.index, reason });
+      applyAdjustedOrder(updated);
+      toast({
+        title: kind === "void" ? `${item.name} voided` : `${item.name} comped`,
+        description: `Recorded against this bill: ${reason}`,
+      });
+      // The kitchen and the live list both read this order; keep them in step.
+      refreshOrders().catch(() => { /* the bill on screen is already correct */ });
+    } catch (e: any) {
+      toast({
+        title: kind === "void" ? "Could not void that line" : "Could not comp that line",
+        description: e?.message ?? "The server rejected it. Nothing was changed on the bill.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function refundBill(bill: RecentBill, reason: string, amount?: number) {
+    if (!restaurantId || !bill.orderId) return;
+    try {
+      const res = await orderAdjustments.refund(restaurantId, bill.orderId, { amount, reason });
+      toast({
+        title: res.full ? "Bill refunded in full" : `${res.refunded.toFixed(2)} refunded`,
+        description: `Reason recorded: ${reason}`,
+      });
+      setBillDetail((d: any) => d ? { ...d, status: res.full ? "refunded" : "part-refunded", refundedTotal: res.refundedTotal } : d);
+      refreshOrders().catch(() => { /* the refund itself already went through */ });
+    } catch (e: any) {
+      toast({
+        title: "Refund not processed",
+        description: e?.message ?? "The server rejected it. No money has been returned.",
+        variant: "destructive",
+      });
+    }
+  }
+
   // Keep 2-decimal precision (don't round GST to whole rupees) so the POS total matches the
   // order's exact amount — no ₹ mismatch between the bill card and what's collected.
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  const subtotal = r2(billItems.reduce((s, i) => s + i.price * i.qty, 0));
+  // Voided and comped lines stay on screen but must never be charged for.
+  const subtotal = r2(billItems.reduce((s, i) => (i.voided || i.comped ? s : s + i.price * i.qty), 0));
   const gst = r2(subtotal * 0.05);
   const discountAmt = r2(subtotal * discount / 100);
   const grandTotal = r2(subtotal + gst - discountAmt + tip);
@@ -136,7 +217,11 @@ export default function BillingPOS() {
       `Payment: ${method}`,
       `Date: ${new Date().toLocaleString("en-IN")}`,
       "",
-      ...billItems.map(i => `${i.name} x${i.qty} @ ₹${r2(i.price)} = ₹${r2(i.price * i.qty)}`),
+      // A voided or comped line stays printed with its reason — a guest querying the bill
+      // needs to see what was taken off it, not a line that quietly vanished.
+      ...billItems.map(i => i.voided || i.comped
+        ? `${i.name} x${i.qty} — ${i.voided ? "VOIDED" : "COMPED"}${i.adjustReason ? ` (${i.adjustReason})` : ""} = ₹0.00`
+        : `${i.name} x${i.qty} @ ₹${r2(i.price)} = ₹${r2(i.price * i.qty)}`),
       "",
       `Subtotal: ₹${subtotal}`,
       `GST (5%): ₹${gst}`,
@@ -346,19 +431,42 @@ export default function BillingPOS() {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {/* Items */}
-              <div className="space-y-2">
-                {billItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 bg-white/5 rounded-lg p-0.5">
-                      <button onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))} className="h-6 w-6 rounded-md bg-white/10 flex items-center justify-center hover:bg-white/20"><Minus className="h-3 w-3" /></button>
-                      <span className="w-5 text-center text-xs font-bold">{item.qty}</span>
-                      <button onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-amber-500 flex items-center justify-center hover:bg-amber-400"><Plus className="h-3 w-3" /></button>
+              <div className="space-y-2.5">
+                {billItems.map((item, i) => {
+                  const adjusted = item.voided || item.comped;
+                  return (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex items-center gap-1.5 bg-white/5 rounded-lg p-0.5 ${adjusted ? "opacity-40" : ""}`}>
+                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))} className="h-6 w-6 rounded-md bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:cursor-not-allowed"><Minus className="h-3 w-3" /></button>
+                          <span className="w-5 text-center text-xs font-bold">{item.qty}</span>
+                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-amber-500 flex items-center justify-center hover:bg-amber-400 disabled:cursor-not-allowed"><Plus className="h-3 w-3" /></button>
+                        </div>
+                        <span className={`flex-1 text-sm ${adjusted ? "line-through text-white/35" : ""}`}>{item.name}</span>
+                        <span className={`font-semibold text-sm ${adjusted ? "line-through text-white/30" : "text-amber-400"}`}>₹{r2(item.price * item.qty)}</span>
+                      </div>
+                      <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
+                      <LineAdjustControls
+                        disabled={adjusted}
+                        onAdjust={(kind, reason) => adjustLine(item, kind, reason)}
+                        className="pl-[4.25rem]"
+                      />
                     </div>
-                    <span className="flex-1 text-sm">{item.name}</span>
-                    <span className="text-amber-400 font-semibold text-sm">₹{r2(item.price * item.qty)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              <AdjustmentHistory
+                restaurantId={restaurantId}
+                orderId={selectedOrder ? parseInt(selectedOrder.id, 10) : null}
+                refreshKey={adjustSeq}
+              />
+
+              <PrintControls
+                restaurantId={restaurantId}
+                orderId={selectedOrder ? parseInt(selectedOrder.id, 10) : null}
+                showHistory={false}
+              />
 
               {/* Discount */}
               <div>
@@ -476,12 +584,26 @@ export default function BillingPOS() {
                 ["Collected from", billDetail.collectedFrom || "Cashier POS"],
                 ["Time", billDetail.time || "—"],
                 ["Status", billDetail.status || "paid"],
+                ...(billDetail.refundedTotal ? [["Refunded so far", `₹${Number(billDetail.refundedTotal).toFixed(2)}`]] : []),
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-white/5 pb-2">
                   <span className="text-white/40">{k}</span>
                   <span className="font-medium text-right break-all">{v}</span>
                 </div>
               ))}
+
+              {billDetail.orderId ? (
+                <>
+                  <AdjustmentHistory restaurantId={restaurantId} orderId={billDetail.orderId} refreshKey={adjustSeq} />
+                  <PrintControls restaurantId={restaurantId} orderId={billDetail.orderId} />
+                  <RefundControls
+                    outstanding={Math.max(0, Number(billDetail.amount ?? 0) - Number(billDetail.refundedTotal ?? 0))}
+                    onRefund={(reason, amount) => refundBill(billDetail, reason, amount).then(() => setAdjustSeq(s => s + 1))}
+                  />
+                </>
+              ) : (
+                <p className="text-xs text-white/30">This bill has no linked order, so it cannot be refunded from here.</p>
+              )}
             </div>
           </div>
         </div>

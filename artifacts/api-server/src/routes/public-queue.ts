@@ -87,7 +87,7 @@ export async function sendReadyAlerts(entry: typeof queueEntriesTable.$inferSele
 }
 
 router.get("/public/queue/stats/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const partySize = parseInt(String(req.query.partySize ?? "2"), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
@@ -100,6 +100,9 @@ router.get("/public/queue/stats/:restaurantId", async (req, res): Promise<void> 
   res.json({
     restaurantId,
     restaurantName: restaurant.name,
+    // A guest waiting for a table needs a way to reach the host desk that is not another
+    // in-app form.
+    restaurantPhone: restaurant.phone ?? null,
     queueLength: waiting.length,
     freeTables,
     freeTablesSoon: prediction.freeTablesSoon,
@@ -112,7 +115,7 @@ router.get("/public/queue/stats/:restaurantId", async (req, res): Promise<void> 
 });
 
 router.get("/public/queue/waitlist/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const waiting = await getWaiting(restaurantId);
   res.json({
     queueLength: waiting.length,

@@ -7,7 +7,7 @@ import { getSettingsSection } from "../lib/restaurant-settings";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/loyalty", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   let [program] = await db.select().from(loyaltyProgramsTable).where(eq(loyaltyProgramsTable.restaurantId, id));
   if (!program) {
     [program] = await db.insert(loyaltyProgramsTable).values({ restaurantId: id }).returning();
@@ -16,7 +16,7 @@ router.get("/restaurants/:restaurantId/loyalty", requireAuth, async (req, res): 
 });
 
 router.put("/restaurants/:restaurantId/loyalty", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { isEnabled, type, pointsPerDollar, cashbackPercent, stampsForReward, rewardValue, expiryDays } = req.body;
   let [existing] = await db.select().from(loyaltyProgramsTable).where(eq(loyaltyProgramsTable.restaurantId, id));
   if (!existing) {
@@ -28,7 +28,7 @@ router.put("/restaurants/:restaurantId/loyalty", requireAuth, async (req, res): 
 });
 
 router.get("/restaurants/:restaurantId/loyalty/transactions", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const transactions = await db.select().from(loyaltyTransactionsTable).where(eq(loyaltyTransactionsTable.restaurantId, id)).orderBy(desc(loyaltyTransactionsTable.createdAt)).limit(100);
   const result = await Promise.all(transactions.map(async (t) => {
     const [cust] = await db.select({ name: customersTable.name }).from(customersTable).where(eq(customersTable.id, t.customerId));
@@ -38,7 +38,7 @@ router.get("/restaurants/:restaurantId/loyalty/transactions", requireAuth, async
 });
 
 router.get("/restaurants/:restaurantId/gift-cards", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(id, "giftCards", { cards: [] });
   res.json(Array.isArray(stored.cards) ? stored.cards : []);
 });

@@ -24,21 +24,21 @@ function parseItem(i: any) {
 
 // Categories
 router.get("/restaurants/:restaurantId/categories", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const cats = await db.select().from(categoriesTable).where(eq(categoriesTable.restaurantId, restaurantId));
   res.json(cats);
 });
 
 router.post("/restaurants/:restaurantId/categories", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, imageUrl, sortOrder, isAvailable, availableFrom, availableTo } = req.body;
   const [cat] = await db.insert(categoriesTable).values({ restaurantId, name, imageUrl, sortOrder: sortOrder ?? 0, isAvailable: isAvailable ?? true, availableFrom, availableTo }).returning();
   res.status(201).json(cat);
 });
 
 router.put("/restaurants/:restaurantId/categories/:categoryId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const categoryId = parseInt(req.params.categoryId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const categoryId = parseInt(String(req.params.categoryId), 10);
   const { name, imageUrl, sortOrder, isAvailable, availableFrom, availableTo } = req.body;
   const [cat] = await db.update(categoriesTable).set({ name, imageUrl, sortOrder, isAvailable, availableFrom, availableTo }).where(and(eq(categoriesTable.id, categoryId), eq(categoriesTable.restaurantId, restaurantId))).returning();
   if (!cat) { res.status(404).json({ error: "Category not found" }); return; }
@@ -46,8 +46,8 @@ router.put("/restaurants/:restaurantId/categories/:categoryId", requireAuth, asy
 });
 
 router.delete("/restaurants/:restaurantId/categories/:categoryId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const categoryId = parseInt(req.params.categoryId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const categoryId = parseInt(String(req.params.categoryId), 10);
   const [deleted] = await db.delete(categoriesTable).where(and(eq(categoriesTable.id, categoryId), eq(categoriesTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "Category not found" }); return; }
   res.json({ message: "Category deleted" });
@@ -55,7 +55,7 @@ router.delete("/restaurants/:restaurantId/categories/:categoryId", requireAuth, 
 
 // Items
 router.get("/restaurants/:restaurantId/items", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string, 10) : undefined;
   let items;
   if (categoryId) {
@@ -67,15 +67,15 @@ router.get("/restaurants/:restaurantId/items", requireAuth, async (req, res): Pr
 });
 
 router.get("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const itemId = parseInt(req.params.itemId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
   const [item] = await db.select().from(menuItemsTable).where(and(eq(menuItemsTable.id, itemId), eq(menuItemsTable.restaurantId, restaurantId)));
   if (!item) { res.status(404).json({ error: "Item not found" }); return; }
   res.json(parseItem(item));
 });
 
 router.post("/restaurants/:restaurantId/items", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, description, price, discountedPrice, imageUrl, videoUrl, ingredients, allergens, calories, prepTime, spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons, categoryId } = req.body;
   const [item] = await db.insert(menuItemsTable).values({
     restaurantId, categoryId, name, description, imageUrl, videoUrl, ingredients, allergens, calories, prepTime,
@@ -87,8 +87,8 @@ router.post("/restaurants/:restaurantId/items", requireAuth, async (req, res): P
 });
 
 router.put("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const itemId = parseInt(req.params.itemId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
   const { name, description, price, discountedPrice, imageUrl, videoUrl, ingredients, allergens, calories, prepTime, spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons, categoryId } = req.body;
   const [item] = await db.update(menuItemsTable).set({
     categoryId, name, description, imageUrl, videoUrl, ingredients, allergens, calories, prepTime,
@@ -100,8 +100,8 @@ router.put("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, 
 });
 
 router.delete("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const itemId = parseInt(req.params.itemId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
   const [deleted] = await db.delete(menuItemsTable).where(and(eq(menuItemsTable.id, itemId), eq(menuItemsTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "Item not found" }); return; }
   res.json({ message: "Item deleted" });

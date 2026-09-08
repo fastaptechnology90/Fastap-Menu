@@ -23,6 +23,7 @@ import {
   autoAssignPendingRoomService,
   autoAssignPendingWaiterOrders,
 } from "./mobile-actions.js";
+import { getStaffSalesMap, emptyStaffSales } from "../staff-earnings.js";
 
 const now = () => new Date().toISOString();
 
@@ -439,27 +440,48 @@ export async function buildRecipeCostingBoardFromDb(restaurantId: number, sectio
   };
 }
 
+/**
+ * The performance board reported a score of 75 plus the row's position in the list, an
+ * "orders handled" figure of three times that person's commission rows, and a prep time
+ * of 12 minutes plus the row index — so the person listed first always looked best and
+ * nobody's numbers came from their work. Orders handled and sales are counted off the
+ * orders each person closed. Nothing measures a score or a per-person prep time, so
+ * neither is invented.
+ */
 export async function buildStaffPerformanceBoardFromDb(restaurantId: number, section: string) {
-  const commissions = await db.select().from(staffCommissionsTable)
-    .where(eq(staffCommissionsTable.restaurantId, restaurantId));
+  const [commissions, staff, sales] = await Promise.all([
+    db.select().from(staffCommissionsTable).where(eq(staffCommissionsTable.restaurantId, restaurantId)),
+    db.select().from(staffTable).where(eq(staffTable.restaurantId, restaurantId)),
+    getStaffSalesMap(restaurantId),
+  ]);
 
-  const staff = await db.select().from(staffTable)
-    .where(eq(staffTable.restaurantId, restaurantId));
+  const performance = staff.map((s) => {
+    const mine = sales.byId.get(s.id) ?? sales.byName.get(s.name.trim().toLowerCase()) ?? emptyStaffSales();
+    const earned = commissions
+      .filter((c) => c.staffName === s.name)
+      .reduce((t, c) => t + (parseFloat(String(c.amount ?? 0)) || 0), 0);
+    return {
+      id: `ST-${s.id}`,
+      name: s.name,
+      score: null as number | null,
+      ordersHandled: mine.ordersServed,
+      salesTotal: mine.salesTotal,
+      commissionEarned: Math.round(earned * 100) / 100,
+      avgPrepMinutes: null as number | null,
+      role: s.role,
+      status: s.isActive ? "active" : "inactive",
+    };
+  }).sort((a, b) => b.salesTotal - a.salesTotal).slice(0, 10);
 
-  const performance = staff.slice(0, 10).map((s, idx) => ({
-    id: `ST-${s.id}`,
-    name: s.name,
-    score: 75 + (idx % 20),
-    ordersHandled: commissions.filter((c) => c.staffName === s.name).length * 3,
-    avgPrepMinutes: 12 + (idx % 5),
-    role: s.role,
-    status: "active",
-  }));
-
+  const withSales = performance.filter((p) => p.ordersHandled > 0);
   return {
     ...base(section),
-    staff: performance.length ? performance : [{ id: "ST-1", name: "Kitchen Team", score: 88, ordersHandled: 0, avgPrepMinutes: 12 }],
-    stats: { avgScore: 88, topPerformer: performance[0]?.name ?? "Kitchen Team" },
+    staff: performance,
+    stats: {
+      avgScore: null,
+      topPerformer: withSales[0]?.name ?? null,
+      totalOrdersHandled: performance.reduce((t, p) => t + p.ordersHandled, 0),
+    },
   };
 }
 

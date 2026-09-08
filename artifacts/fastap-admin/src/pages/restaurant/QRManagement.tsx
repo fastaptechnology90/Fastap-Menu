@@ -55,7 +55,9 @@ export default function QRManagement() {
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("table");
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://digitalrestuarants.thefingo.com";
+  // The fallback used to be a domain that no longer resolves. There is no server render
+  // here, so the browser's own origin is always the right answer.
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const scanUrl = (opts: { table?: string; room?: string }) => `${origin}${buildScanUrl(venueSlug, opts)}`;
   const baseUrl = scanUrl({});
 

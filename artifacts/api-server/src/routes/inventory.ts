@@ -6,7 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/inventory", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const items = await db.select().from(inventoryItemsTable).where(eq(inventoryItemsTable.restaurantId, id)).orderBy(inventoryItemsTable.name);
   const parsed = items.map(i => ({
     ...i,
@@ -20,14 +20,14 @@ router.get("/restaurants/:restaurantId/inventory", requireAuth, async (req, res)
 });
 
 router.get("/restaurants/:restaurantId/inventory/low-stock", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const items = await db.select().from(inventoryItemsTable).where(eq(inventoryItemsTable.restaurantId, id));
   const low = items.filter(i => parseFloat(String(i.currentStock)) <= parseFloat(String(i.minStock)));
   res.json(low.map(i => ({ ...i, currentStock: parseFloat(String(i.currentStock)), minStock: parseFloat(String(i.minStock)) })));
 });
 
 router.post("/restaurants/:restaurantId/inventory", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, category, unit, currentStock, minStock, maxStock, costPerUnit, supplier, expiryDate, location } = req.body;
   const [item] = await db.insert(inventoryItemsTable).values({
     restaurantId: id, name, category, unit, currentStock: String(currentStock ?? 0),
@@ -39,8 +39,8 @@ router.post("/restaurants/:restaurantId/inventory", requireAuth, async (req, res
 });
 
 router.put("/restaurants/:restaurantId/inventory/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const itemId = parseInt(req.params.itemId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, category, unit, currentStock, minStock, maxStock, costPerUnit, supplier, location, expiryDate } = req.body;
   const [item] = await db.update(inventoryItemsTable).set({
     name, category, unit, supplier, location,
@@ -56,15 +56,15 @@ router.put("/restaurants/:restaurantId/inventory/:itemId", requireAuth, async (r
 });
 
 router.delete("/restaurants/:restaurantId/inventory/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const itemId = parseInt(req.params.itemId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(inventoryItemsTable).where(and(eq(inventoryItemsTable.id, itemId), eq(inventoryItemsTable.restaurantId, restaurantId)));
   res.json({ message: "Item deleted" });
 });
 
 router.post("/restaurants/:restaurantId/inventory/:itemId/transaction", requireAuth, async (req, res): Promise<void> => {
-  const itemId = parseInt(req.params.itemId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { type, quantity, reason, reference, performedBy } = req.body;
   const [existing] = await db.select().from(inventoryItemsTable).where(and(eq(inventoryItemsTable.id, itemId), eq(inventoryItemsTable.restaurantId, restaurantId)));
   if (!existing) { res.status(404).json({ error: "Item not found" }); return; }
@@ -77,8 +77,8 @@ router.post("/restaurants/:restaurantId/inventory/:itemId/transaction", requireA
 });
 
 router.get("/restaurants/:restaurantId/inventory/:itemId/transactions", requireAuth, async (req, res): Promise<void> => {
-  const itemId = parseInt(req.params.itemId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const itemId = parseInt(String(req.params.itemId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const txs = await db.select().from(inventoryTransactionsTable).where(and(eq(inventoryTransactionsTable.itemId, itemId), eq(inventoryTransactionsTable.restaurantId, restaurantId))).orderBy(desc(inventoryTransactionsTable.createdAt));
   res.json(txs.map(t => ({ ...t, quantity: parseFloat(String(t.quantity)) })));
 });

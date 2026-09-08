@@ -44,6 +44,19 @@ export interface OrderTrackingResponse {
   tableCleared?: boolean;
 }
 
+/** What the server sends back with a 402 when a venue has used up its plan's allowance. */
+export type PlanLimit = { plan: string; allowed: number; current: number; of: string };
+
+/** The extra fields the API attaches to a failure, kept on the thrown Error. */
+export type ApiError = Error & {
+  status?: number;
+  requiresOtp?: boolean;
+  restaurants?: { id: number; name: string; slug: string; address?: string; businessType?: string }[];
+  limit?: PlanLimit;
+  /** Anything else the route sent alongside `error`, e.g. `shiftsOpen` on a day-end 409. */
+  detail?: Record<string, unknown>;
+};
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -53,7 +66,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (!res.ok) {
     const ct = res.headers.get("content-type") || "";
-    let err: { error?: string; requiresOtp?: boolean; restaurants?: { id: number; name: string; slug: string; address?: string; businessType?: string }[] } = {};
+    let err: {
+      error?: string;
+      requiresOtp?: boolean;
+      restaurants?: ApiError["restaurants"];
+      limit?: PlanLimit;
+      [key: string]: unknown;
+    } = {};
     if (ct.includes("application/json")) {
       err = await res.json().catch(() => ({ error: res.statusText })) as typeof err;
     } else {
@@ -64,17 +83,37 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         err.error = text.replace(/<[^>]+>/g, " ").trim().slice(0, 200) || res.statusText;
       }
     }
-    const e = new Error(err.error || `HTTP ${res.status}`) as Error & {
-      requiresOtp?: boolean;
-      status?: number;
-      restaurants?: typeof err.restaurants;
-    };
+    const e = new Error(err.error || `HTTP ${res.status}`) as ApiError;
     e.status = res.status;
     if (err.requiresOtp) e.requiresOtp = true;
     if (err.restaurants) e.restaurants = err.restaurants;
+    if (err.limit) e.limit = err.limit;
+    // Some refusals are actionable rather than final — a Z reading blocked by an open
+    // shift, say — and the caller needs the rest of the body to offer the way through.
+    e.detail = err as Record<string, unknown>;
     throw e;
   }
   return res.json();
+}
+
+/**
+ * Turn a failed create into something an owner can act on.
+ *
+ * A plan limit comes back as a 402 carrying the allowance and the current count. Shown
+ * as a generic "could not save" it leaves someone retrying a button that will never
+ * work, so name the plan and say what to do about it.
+ */
+export function planLimitMessage(
+  error: unknown,
+  fallbackTitle: string,
+): { title: string; description?: string } {
+  const limit = (error as ApiError | null)?.limit;
+  const detail = error instanceof Error ? error.message : undefined;
+  if (!limit) return { title: fallbackTitle, description: detail };
+  return {
+    title: `${limit.plan} plan limit reached`,
+    description: `${detail ?? `Your plan allows ${limit.allowed} ${limit.of}.`} Upgrade your subscription from Settings to add more.`,
+  };
 }
 
 const get = <T>(path: string) => request<T>("GET", path);
@@ -204,6 +243,140 @@ export const orders = {
   update: (rid: number, id: number, body: { status?: string; paymentMethod?: string; paymentStatus?: string; tipAmount?: number; finalTotal?: number; collectedBy?: string; collectedFrom?: string; utr?: string; upiId?: string }) =>
     put<any>(`/restaurants/${rid}/orders/${id}`, body),
   create: (body: any) => post<any>("/public/orders", body),
+};
+
+// ─── Bill adjustments (void / comp / refund) ──────────────────────
+export type OrderAdjustment = {
+  type: "void" | "comp" | "refund";
+  item?: string;
+  amount: number;
+  reason: string;
+  by: string;
+  at: string;
+  full?: boolean;
+};
+
+export const orderAdjustments = {
+  /** Remove a line from the bill — sent by mistake, wrong table, keyed twice. */
+  voidItem: (rid: number, orderId: number, body: { itemIndex: number; reason: string }) =>
+    post<any>(`/restaurants/${rid}/orders/${orderId}/void-item`, body),
+  /** Give a line free after a complaint. The kitchen made it, so it stays on the bill. */
+  compItem: (rid: number, orderId: number, body: { itemIndex: number; reason: string }) =>
+    post<any>(`/restaurants/${rid}/orders/${orderId}/comp-item`, body),
+  /** Omit `amount` to refund whatever is left on the order. */
+  refund: (rid: number, orderId: number, body: { amount?: number; reason: string }) =>
+    post<{ order: any; refunded: number; refundedTotal: number; full: boolean }>(
+      `/restaurants/${rid}/orders/${orderId}/refund`, body),
+  history: (rid: number, orderId: number) =>
+    get<{ adjustments: OrderAdjustment[] }>(`/restaurants/${rid}/orders/${orderId}/adjustments`),
+};
+
+// ─── Floor operations (move a tab, split a bill, merge two tabs) ───
+export const floorOps = {
+  moveTable: (rid: number, orderId: number, body: { tableId?: number; tableName?: string }) =>
+    post<{ order: any; movedFrom: string | null; movedTo: string }>(
+      `/restaurants/${rid}/orders/${orderId}/move-table`, body),
+  split: (rid: number, orderId: number, itemIndexes: number[]) =>
+    post<{ original: any; split: any }>(`/restaurants/${rid}/orders/${orderId}/split`, { itemIndexes }),
+  merge: (rid: number, body: { intoOrderId: number; fromOrderIds: number[] }) =>
+    post<{ order: any; mergedFrom: number[] }>(`/restaurants/${rid}/orders/merge`, body),
+};
+
+// ─── Printing (kitchen ticket and customer bill) ──────────────────
+export type PrintRecord = { kind: "kot" | "bill"; copy: number; by: string; at: string };
+
+/**
+ * Both documents are rendered by the server and opened in a print window, so nothing
+ * depends on a local driver. A reprint goes through `reprint` rather than opening the
+ * URL again, because a second copy of a bill has to be recorded against the order.
+ */
+export const printing = {
+  kotUrl: (rid: number, orderId: number) => `${BASE}/restaurants/${rid}/orders/${orderId}/kot`,
+  billUrl: (rid: number, orderId: number) => `${BASE}/restaurants/${rid}/orders/${orderId}/print`,
+  reprint: (rid: number, orderId: number, kind: "kot" | "bill" = "bill") =>
+    post<{ kind: string; copy: number; by: string; at: string; url: string; html: string }>(
+      `/restaurants/${rid}/orders/${orderId}/reprint`, { kind }),
+  log: (rid: number, orderId: number) =>
+    get<{ prints: PrintRecord[] }>(`/restaurants/${rid}/orders/${orderId}/prints`),
+};
+
+/**
+ * Open a document in its own window and let it print itself. Popup blockers are the one
+ * failure worth naming: a silently blocked window looks exactly like a printer that did
+ * not respond, and the cashier stands there waiting.
+ */
+export function openPrintWindow(html: string, fallbackUrl?: string): boolean {
+  const w = window.open("", "_blank", "width=420,height=640");
+  if (!w) {
+    if (fallbackUrl) window.location.href = fallbackUrl;
+    return false;
+  }
+  w.document.write(html);
+  w.document.close();
+  return true;
+}
+
+// ─── Day-end readings (X / Z) ─────────────────────────────────────
+export type DayEndReport = {
+  reading: "X" | "Z";
+  date: string;
+  orders: { placed: number; settled: number; cancelled: number; refunded: number };
+  sales: { subtotal: number; tax: number; tips: number; discounts: number; total: number; averageOrder: number };
+  byPaymentMethod: Record<string, { count: number; amount: number }>;
+  byOrderType: Record<string, { count: number; amount: number }>;
+  byStaff: Record<string, { orders: number; amount: number }>;
+  adjustments: Record<string, { count: number; amount: number }>;
+  cash: {
+    takenPerOrders: number;
+    drawerOpening: number;
+    drawerCounted: number;
+    variance: number;
+    shiftsOpen: number;
+  };
+};
+
+export const dayEnd = {
+  x: (rid: number, date: string) => get<DayEndReport>(`/restaurants/${rid}/reports/x?date=${date}`),
+  /** Refuses with 409 while a cash shift is open unless `force` is set. */
+  z: (rid: number, date: string, force = false) =>
+    get<DayEndReport>(`/restaurants/${rid}/reports/z?date=${date}${force ? "&force=true" : ""}`),
+};
+
+// ─── Attendance ───────────────────────────────────────────────────
+export type AttendanceShift = {
+  id: number;
+  restaurantId: number;
+  staffId: number;
+  staffName: string;
+  staffRole: string;
+  clockedInAt: string;
+  clockedOutAt: string | null;
+  minutesWorked: number | null;
+  breakMinutes: number;
+  salesDuringShift: string | null;
+  clockInMethod: string | null;
+  notes: string | null;
+};
+
+export type AttendanceSummaryRow = {
+  staffId: number;
+  name: string;
+  role: string;
+  shifts: number;
+  minutes: number;
+  sales: number;
+  hours: number;
+};
+
+export const attendance = {
+  open: (rid: number) => get<AttendanceShift[]>(`/restaurants/${rid}/attendance/open`),
+  range: (rid: number, from: string, to: string) =>
+    get<{ from: string; to: string; shifts: AttendanceShift[]; summary: AttendanceSummaryRow[] }>(
+      `/restaurants/${rid}/attendance?from=${from}&to=${to}`),
+  clockIn: (rid: number, staffId: number) =>
+    post<AttendanceShift>(`/restaurants/${rid}/attendance/clock-in`, { staffId }),
+  clockOut: (rid: number, staffId: number, breakMinutes?: number) =>
+    post<AttendanceShift & { hours: number }>(`/restaurants/${rid}/attendance/clock-out`, { staffId, breakMinutes }),
 };
 
 // ─── Menu ─────────────────────────────────────────────────────────
@@ -443,9 +616,39 @@ export const auditLogs = {
 };
 
 // ─── Notifications ────────────────────────────────────────────────
+export type KitchenDisplayPrefs = {
+  targetTimes: Record<string, number>;
+  soundOn: boolean;
+  autoAccept: boolean;
+  priorityMode: boolean;
+};
+
+/** Kitchen display setup belongs to the venue, not to one browser tab on one screen. */
+export const kitchenDisplayApi = {
+  prefs: (rid: number) => get<KitchenDisplayPrefs>(`/restaurants/${rid}/settings/kitchen-display`),
+  savePrefs: (rid: number, body: Partial<KitchenDisplayPrefs>) =>
+    put<KitchenDisplayPrefs>(`/restaurants/${rid}/settings/kitchen-display`, body),
+};
+
+export type NotificationPrefs = {
+  orderAlerts: boolean; stockAlerts: boolean; paymentAlerts: boolean; staffAlerts: boolean;
+  reservationAlerts: boolean; reviewAlerts: boolean; financeAlerts: boolean; systemAlerts: boolean;
+  soundEnabled: boolean; pushEnabled: boolean; emailEnabled: boolean; smsEnabled: boolean;
+  orderThreshold: number; stockThreshold: number;
+};
+
+/** Which channels the platform can actually deliver on, so the screen cannot offer one it cannot use. */
+export type NotificationChannels = { sound: boolean; push: boolean; email: boolean; sms: boolean };
+
 export const notificationsApi = {
   list: (rid: number) => get<any[]>(`/restaurants/${rid}/notifications-log`),
   send: (rid: number, body: any) => post<any>(`/restaurants/${rid}/notifications-log`, body),
+  prefs: (rid: number) =>
+    get<{ preferences: NotificationPrefs; channelsAvailable: NotificationChannels }>(
+      `/restaurants/${rid}/settings/notifications`),
+  savePrefs: (rid: number, body: Partial<NotificationPrefs>) =>
+    put<{ preferences: NotificationPrefs; channelsAvailable: NotificationChannels }>(
+      `/restaurants/${rid}/settings/notifications`, body),
 };
 
 // ─── Documents ────────────────────────────────────────────────────
@@ -993,7 +1196,20 @@ export type StaffAppEntry = {
   downloadPath?: string;
 };
 
+export type StaffAppDownload = {
+  id: number;
+  appKey: string;
+  version: string | null;
+  restaurantId: number | null;
+  staffId: number | null;
+  staffName: string | null;
+  userAgent: string | null;
+  downloadedAt: string;
+};
+
 export const staffAppsApi = {
   list: (restaurantId: number) =>
     get<{ apps: StaffAppEntry[]; restaurantSlug: string }>(`/restaurants/${restaurantId}/staff-apps`),
+  downloads: (restaurantId: number) =>
+    get<{ downloads: StaffAppDownload[] }>(`/restaurants/${restaurantId}/staff-apps/downloads`),
 };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** A–Z smoke test for Flutter kitchen app API (/api/v1) */
-const BASE = process.env.API_BASE || "https://digitalrestuarants.thefingo.com";
+const BASE = process.env.API_BASE || "https://fastap-menu-production.up.railway.app";
 const ROOT = `${BASE}/api/v1`;
 
 const GET_PATHS = [

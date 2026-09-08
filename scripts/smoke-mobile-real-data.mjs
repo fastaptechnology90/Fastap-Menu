@@ -4,9 +4,9 @@
  * and that POST actions persist real state changes.
  *
  * Usage:
- *   API_BASE=https://digitalrestuarants.thefingo.com node scripts/smoke-mobile-real-data.mjs
+ *   API_BASE=https://fastap-menu-production.up.railway.app node scripts/smoke-mobile-real-data.mjs
  */
-const BASE = process.env.API_BASE || "https://digitalrestuarants.thefingo.com";
+const BASE = process.env.API_BASE || "https://fastap-menu-production.up.railway.app";
 const ROOT = `${BASE}/api/v1`;
 const PASS = process.env.MOBILE_PASS || "Staff@123";
 

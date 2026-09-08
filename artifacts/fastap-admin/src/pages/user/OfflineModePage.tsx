@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { useOffline, OFFLINE_FEATURES } from "@/contexts/OfflineContext";
@@ -18,7 +19,10 @@ export default function OfflineModePage() {
   } = useOffline();
 
   const [toast, setToast] = useState<string | null>(null);
-  const slug = venue.restaurantSlug || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || DEMO_SLUG;
   const cache = menuCache ?? getCachedMenu(slug);
 
   const showToast = useCallback((msg: string) => {

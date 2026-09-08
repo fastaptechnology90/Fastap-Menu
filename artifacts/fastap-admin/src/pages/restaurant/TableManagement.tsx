@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { tables as tablesApi, staff as staffApi } from "@/lib/api";
+import { tables as tablesApi, staff as staffApi, floorOps, planLimitMessage } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import {
   Plus, RefreshCw, Clock, Users, X, Edit2, Trash2, Star, Lock,
   Unlock, Link2, Unlink, ChevronRight, CheckCircle2, Settings,
-  LayoutGrid, List, ArrowRight, GitMerge, Copy, MapPin
+  LayoutGrid, List, ArrowRight, GitMerge, Copy, MapPin, ArrowRightLeft
 } from "lucide-react";
 
 const STATUS_CFG = {
@@ -180,16 +180,22 @@ interface ActionModalProps {
   onUnmerge: () => void;
   onVipToggle: () => void;
   onMove: (zone: string) => void;
+  /** Move the running tab onto another table. The floor moves; the furniture does not. */
+  onMoveTab: (targetTableName: string) => void;
+  /** Pull another table's tab onto this one — two tables pushed together. */
+  onMergeTab: (fromTable: TableRow) => void;
+  busy?: boolean;
 }
 
-function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onEdit, onDelete, onMerge, onUnmerge, onVipToggle, onMove }: ActionModalProps) {
+function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onEdit, onDelete, onMerge, onUnmerge, onVipToggle, onMove, onMoveTab, onMergeTab, busy }: ActionModalProps) {
   const cfg = STATUS_CFG[table.status] || STATUS_CFG.free;
-  const [tab, setTab] = useState<"status" | "assign" | "merge" | "move">("status");
+  const [tab, setTab] = useState<"status" | "assign" | "merge" | "move" | "order">("status");
   const [guests, setGuests] = useState(table.currentGuestCount || 0);
   const [waiter, setWaiter] = useState(table.currentWaiterName || "");
   const [mergeTarget, setMergeTarget] = useState<number | null>(null);
   const waiters = staffList.filter(s => s.role === "waiter" || s.role === "manager");
   const mergeable = allTables.filter(t => t.id !== table.id && t.status === "free" && !t.mergedInto);
+  const otherTabs = allTables.filter(t => t.id !== table.id && t.activeOrder?.id);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
@@ -214,7 +220,7 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
         </div>
 
         <div className="flex border-b border-white/5 text-xs">
-          {(["status", "assign", "merge", "move"] as const).map(t => (
+          {(["status", "assign", "merge", "move", "order"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2.5 font-semibold capitalize transition-all ${tab === t ? "text-amber-400 border-b-2 border-amber-400" : "text-white/40 hover:text-white/60"}`}>
               {t}
@@ -336,6 +342,64 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {tab === "order" && (
+            <div className="space-y-3">
+              {!table.activeOrder?.id ? (
+                <p className="py-4 text-center text-xs text-white/40">
+                  No running tab on {table.name}. Move and merge become available once a party is seated and has ordered.
+                </p>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">Order #{table.activeOrder.id}</span>
+                      <span className="font-bold text-amber-400">
+                        {table.activeOrder.total ? `₹${parseFloat(table.activeOrder.total).toFixed(2)}` : "—"}
+                      </span>
+                    </div>
+                    {table.activeOrder.itemsPreview && (
+                      <p className="mt-1 truncate text-[11px] text-white/40">{table.activeOrder.itemsPreview}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 text-xs text-white/40">Move this tab to another table</p>
+                    <div className="space-y-1.5">
+                      {allTables.filter(t => t.id !== table.id && t.isActive).map(t => (
+                        <button key={t.id} type="button" disabled={busy} onClick={() => onMoveTab(t.name)}
+                          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 transition-all hover:border-white/20 disabled:opacity-40">
+                          <span className="flex items-center gap-2"><ArrowRightLeft className="h-3.5 w-3.5" /> {t.name}</span>
+                          <span className={`text-xs ${t.activeOrder?.id ? "text-orange-400" : "text-white/35"}`}>
+                            {t.activeOrder?.id ? "has a tab" : (STATUS_CFG[t.status]?.label ?? t.status)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-3">
+                    <p className="mb-1.5 text-xs text-white/40">Pull another table's tab onto {table.name}</p>
+                    {otherTabs.length === 0 ? (
+                      <p className="text-xs text-white/30">No other table has a running tab.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {otherTabs.map(t => (
+                          <button key={t.id} type="button" disabled={busy} onClick={() => onMergeTab(t)}
+                            className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 transition-all hover:border-white/20 disabled:opacity-40">
+                            <span className="flex items-center gap-2"><GitMerge className="h-3.5 w-3.5" /> {t.name}</span>
+                            <span className="text-xs text-white/35">
+                              {t.activeOrder?.total ? `₹${parseFloat(t.activeOrder.total).toFixed(0)}` : `#${t.activeOrder?.id}`}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -477,7 +541,40 @@ export default function TableManagement() {
       }
       setAddEditModal({ open: false, table: null });
     } catch (e: any) {
-      toast({ title: "Failed to save table", description: e?.message, variant: "destructive" });
+      // A plan cap comes back as a 402 naming the allowance — say that, not "failed".
+      toast({ ...planLimitMessage(e, "Failed to save table"), variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  /** Move a running tab onto another table. The old table is released by the server. */
+  async function handleMoveTab(table: TableRow, targetTableName: string) {
+    const orderId = table.activeOrder?.id;
+    if (!restaurantId || !orderId) return;
+    setSaving(true);
+    try {
+      const res = await floorOps.moveTable(restaurantId, orderId, { tableName: targetTableName });
+      toast({ title: `Tab moved to ${res.movedTo}`, description: res.movedFrom ? `${res.movedFrom} is now free.` : undefined });
+      await load();
+      setActionModal(null);
+    } catch (e: any) {
+      // Moving onto a table that already has a tab comes back as a 409 naming that table.
+      // That sentence is the entire answer, so it reaches the user unchanged.
+      toast({ title: "Could not move this tab", description: e?.message ?? "The server rejected the move.", variant: "destructive" });
+    } finally { setSaving(false); }
+  }
+
+  async function handleMergeTabs(table: TableRow, fromTable: TableRow) {
+    const into = table.activeOrder?.id;
+    const from = fromTable.activeOrder?.id;
+    if (!restaurantId || !into || !from) return;
+    setSaving(true);
+    try {
+      await floorOps.merge(restaurantId, { intoOrderId: into, fromOrderIds: [from] });
+      toast({ title: `${fromTable.name} merged into ${table.name}`, description: `${fromTable.name} is now free and its items are on one bill.` });
+      await load();
+      setActionModal(null);
+    } catch (e: any) {
+      toast({ title: "Could not merge these tabs", description: e?.message ?? "The server rejected the merge.", variant: "destructive" });
     } finally { setSaving(false); }
   }
 
@@ -747,6 +844,9 @@ export default function TableManagement() {
           onUnmerge={() => handleUnmerge(actionModal)}
           onVipToggle={() => handleVipToggle(actionModal)}
           onMove={(zone) => handleMoveZone(actionModal, zone)}
+          onMoveTab={(targetTableName) => handleMoveTab(actionModal, targetTableName)}
+          onMergeTab={(fromTable) => handleMergeTabs(actionModal, fromTable)}
+          busy={saving}
         />
       )}
 

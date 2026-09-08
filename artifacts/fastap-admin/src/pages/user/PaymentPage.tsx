@@ -148,15 +148,27 @@ export default function PaymentPage() {
       const numericId = parseInt(String(order.id).replace(/\D/g, ""), 10);
       if (numericId && venue.restaurantId && hadCartItems) {
         try {
-          await publicApi.payments.process(numericId, {
+          const processed = await publicApi.payments.process(numericId, {
             paymentMethod,
             tipAmount: quote.tip,
             splitPayments: splits,
             partialPayNow: billingTab === "partial" && partialPayNow ? parseFloat(partialPayNow) : undefined,
             advanceAmount: billingTab === "advance" && advanceAmount ? parseFloat(advanceAmount) : undefined,
           });
-          const inv = await publicApi.payments.invoice(numericId);
-          setSuccess({ orderId: String(numericId), invoiceNumber: inv.invoice?.invoiceNumber });
+          // Cash and part-payments come back as still owing. Reading only `success` and
+          // announcing "Payment Successful" told a guest who picked "Cash — pay at
+          // counter" that the bill was settled before they had handed over a rupee.
+          if (processed?.paymentStatus && processed.paymentStatus !== "paid") {
+            setUnpaid({
+              orderId: String(numericId),
+              reason: paymentMethod === "cash"
+                ? "You chose to pay at the counter, so nothing has been charged yet."
+                : "The balance is still outstanding.",
+            });
+          } else {
+            const inv = await publicApi.payments.invoice(numericId);
+            setSuccess({ orderId: String(numericId), invoiceNumber: inv.invoice?.invoiceNumber });
+          }
         } catch (err) {
           // The order is placed and the kitchen has it — only the payment failed. Saying
           // "Payment Successful" here (which is what this used to do) sent the guest away
@@ -167,10 +179,20 @@ export default function PaymentPage() {
           });
         }
       } else {
-        setSuccess({ orderId: String(order.id), invoiceNumber: undefined });
+        // No numeric order id means the payment call was never made. Showing "Payment
+        // Successful" here told the guest a bill was settled that nothing had even been
+        // attempted on.
+        setUnpaid({
+          orderId: String(order.id),
+          reason: "Your order is with the kitchen, but we could not take the payment. Please settle at the counter.",
+        });
       }
-    } catch {
-      toast({ title: "Payment failed", description: "Could not complete payment. Please try again.", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Payment failed",
+        description: err instanceof Error ? err.message : "Could not complete payment. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -183,20 +205,26 @@ export default function PaymentPage() {
       toast({ title: "Invoice unavailable", description: "No invoice found for this order.", variant: "destructive" });
       return;
     }
+    // window.open returns null when the browser blocks the popup — it does not throw, so
+    // the fallback below was unreachable and a blocked invoice was a silent dead tap.
+    const url = type === "pdf" ? publicApi.payments.invoicePdf(id) : publicApi.payments.invoiceDownload(id);
+    const opened = window.open(url, "_blank");
+    if (opened) return;
     try {
-      if (type === "pdf") {
-        window.open(publicApi.payments.invoicePdf(id), "_blank");
-      } else {
-        window.open(publicApi.payments.invoiceDownload(id), "_blank");
-      }
-    } catch {
       const res = await publicApi.payments.invoice(id);
       const blob = new Blob([res.html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objectUrl;
       a.download = `${res.invoice.invoiceNumber}.html`;
       a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      toast({
+        title: "Could not open the invoice",
+        description: err instanceof Error ? err.message : "Please allow pop-ups and try again.",
+        variant: "destructive",
+      });
     }
   }
 

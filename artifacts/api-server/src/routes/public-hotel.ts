@@ -43,7 +43,7 @@ function parseControls(raw: unknown) {
 }
 
 router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(restaurantId, "hotelGuestCatalog", {
     services: DEFAULT_SERVICES,
     tvChannels: DEFAULT_TV_CHANNELS,
@@ -56,50 +56,52 @@ router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void
 });
 
 router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
-  let [room] = await db.select().from(hotelRoomsTable).where(
+  // A read must not write. This used to create the room when the number was unknown, so
+  // any request for /public/hotel/room/5/9999 added a room to the hotel's inventory —
+  // and a stranger's room number is the only thing a caller needs to guess.
+  const [room] = await db.select().from(hotelRoomsTable).where(
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
   );
-  if (!room) {
-    [room] = await db.insert(hotelRoomsTable).values({
-      restaurantId,
-      number: roomNumber,
-      type: "deluxe",
-      floor: parseInt(roomNumber.replace(/\D/g, "")[0] || "5", 10) || 5,
-      status: "occupied",
-      roomControls: DEFAULT_CONTROLS,
-    }).returning();
-  }
+  if (!room) { res.status(404).json({ error: "Room not found" }); return; }
+  // The occupant's phone number is not something this endpoint needs to hand out; the
+  // room page only shows the name to greet the guest already standing in the room.
+  const { guestPhone: _guestPhone, ...safe } = room;
   res.json({
-    ...room,
+    ...safe,
     roomControls: parseControls(room.roomControls),
   });
 });
 
 router.patch("/public/hotel/room/:restaurantId/:roomNumber/controls", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const patch = req.body?.roomControls ?? req.body;
   let [room] = await db.select().from(hotelRoomsTable).where(
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
   );
   if (!room) {
-    [room] = await db.insert(hotelRoomsTable).values({
-      restaurantId,
-      number: roomNumber,
-      type: "deluxe",
-      floor: 5,
-      status: "occupied",
-      roomControls: { ...DEFAULT_CONTROLS, ...patch },
-    }).returning();
+    // Adjusting the lights in a room that does not exist is a mistake, not a reason to
+    // add a room to the hotel's inventory.
+    res.status(404).json({ error: "Room not found" });
+    return;
   } else {
-    const merged = { ...parseControls(room.roomControls), ...patch };
-    if (patch.ac) merged.ac = { ...parseControls(room.roomControls).ac, ...patch.ac };
-    if (patch.lights) merged.lights = { ...parseControls(room.roomControls).lights, ...patch.lights };
+    const current = parseControls(room.roomControls);
+    const merged = { ...current, ...patch };
+    // Each control is an object ({on, temp} and so on). Spreading a bare number or
+    // boolean over it produced `{}` and wiped the setting — so sending `{ac: 22}` left
+    // the room with no AC state at all rather than 22 degrees.
+    const isObj = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+    if (isObj(patch.ac)) merged.ac = { ...current.ac, ...patch.ac };
+    else if (patch.ac !== undefined) merged.ac = { ...current.ac, ...(typeof patch.ac === "boolean" ? { on: patch.ac } : { temp: Number(patch.ac) }) };
+    if (isObj(patch.lights)) merged.lights = { ...current.lights, ...patch.lights };
+    else if (patch.lights !== undefined) merged.lights = { ...current.lights, ...(typeof patch.lights === "boolean" ? { on: patch.lights } : { brightness: Number(patch.lights) }) };
     if (patch.curtain !== undefined) merged.curtains = { open: patch.curtain };
-    if (patch.curtains) merged.curtains = { ...parseControls(room.roomControls).curtains, ...patch.curtains };
-    if (patch.tv) merged.tv = { ...parseControls(room.roomControls).tv, ...patch.tv };
+    if (isObj(patch.curtains)) merged.curtains = { ...current.curtains, ...patch.curtains };
+    else if (patch.curtains !== undefined) merged.curtains = { open: Number(patch.curtains) };
+    if (isObj(patch.tv)) merged.tv = { ...current.tv, ...patch.tv };
+    else if (patch.tv !== undefined) merged.tv = { ...current.tv, on: Boolean(patch.tv) };
     if (typeof patch.dnd === "boolean") merged.dnd = patch.dnd;
     if (patch.cleaningStatus) merged.cleaningStatus = patch.cleaningStatus;
     [room] = await db.update(hotelRoomsTable).set({ roomControls: merged }).where(eq(hotelRoomsTable.id, room.id)).returning();
@@ -129,7 +131,7 @@ router.post("/public/hotel/wake-up-call", async (req, res): Promise<void> => {
 });
 
 router.get("/public/hotel/requests/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const requests = await db.select().from(roomServiceRequestsTable).where(
     and(eq(roomServiceRequestsTable.restaurantId, restaurantId), eq(roomServiceRequestsTable.roomNumber, roomNumber)),

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, menuItemsTable, ordersTable } from "@workspace/db";
+import { db, menuItemsTable, categoriesTable, ordersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import {
   resolveAnalyticsAccess,
@@ -13,23 +13,42 @@ const router: IRouter = Router();
 router.post("/restaurants/:restaurantId/ai/generate-menu", requireAuth, async (req, res): Promise<void> => {
   const { dishName } = req.body;
   if (!dishName) { res.status(400).json({ error: "dishName required" }); return; }
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const name = String(dishName).trim();
   const isVeg = /paneer|veg|dal|dosa|idli|sambar|palak|aloo|gobi/i.test(name);
+
+  // Calories and a suggested price were drawn at random, and the margin was the constant
+  // "62%" — a dish draft that a kitchen could price off. Calories are not derivable from
+  // a name, so none is offered. A price suggestion is only made where there is something
+  // to base it on: what this venue already charges for dishes in the same category.
+  const peers = await db.select({ price: menuItemsTable.price, category: categoriesTable.name })
+    .from(menuItemsTable)
+    .leftJoin(categoriesTable, eq(menuItemsTable.categoryId, categoriesTable.id))
+    .where(eq(menuItemsTable.restaurantId, rid));
+  const category = "Main Course";
+  const sameCategory = peers.filter(m => (m.category ?? "").toLowerCase() === category.toLowerCase());
+  const pool = sameCategory.length ? sameCategory : peers;
+  const prices = pool.map(m => parseFloat(String(m.price)) || 0).filter(v => v > 0).sort((a, b) => a - b);
+  const medianPrice = prices.length ? prices[Math.floor(prices.length / 2)] : null;
+
   res.json({
     name,
     description: `A signature ${name} prepared with fresh ingredients and authentic spices, slow-cooked for rich flavor and aroma.`,
     ingredients: isVeg ? ["Fresh vegetables", "Spices", "Ghee", "Herbs", "Onion", "Tomato"] : ["Premium protein", "Yogurt", "Spices", "Ghee", "Onion", "Garlic"],
     allergens: isVeg ? ["Dairy"] : ["Dairy"],
-    calories: Math.floor(Math.random() * 200) + 350,
+    calories: null,
     cuisine: "Indian",
-    category: "Main Course",
-    suggestedPrice: Math.floor(Math.random() * 150) + 250,
-    margin: "62%",
+    category,
+    suggestedPrice: medianPrice,
+    suggestedPriceBasis: medianPrice != null
+      ? `Median of ${prices.length} ${sameCategory.length ? category.toLowerCase() : "menu"} price${prices.length === 1 ? "" : "s"} on this menu`
+      : null,
+    margin: null,
   });
 });
 
 router.post("/restaurants/:restaurantId/ai/copilot", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
@@ -60,7 +79,7 @@ router.post("/restaurants/:restaurantId/ai/copilot", requireAuth, async (req, re
 });
 
 router.get("/restaurants/:restaurantId/ai/insights", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyAiInsights()); return; }

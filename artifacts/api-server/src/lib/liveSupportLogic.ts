@@ -15,31 +15,45 @@ export type SupportConfig = {
   agentsOnline: number;
 };
 
+/**
+ * Every number here used to be a placeholder that shipped as if it were real: a
+ * WhatsApp line, a 1800 helpline, a security line, a manager's line, and — worst of the
+ * set — an emergency hotline. A guest at a venue that had configured none of them was
+ * shown all six and could have dialled an invented number during a medical emergency.
+ *
+ * Nothing is invented now. A channel the venue has not set up comes back empty, and the
+ * screen shows it as unavailable rather than printing a number that reaches nobody.
+ */
 const DEFAULT_CONFIG: SupportConfig = {
   restaurantName: "Restaurant",
-  whatsappNumber: "919876543210",
-  whatsappDisplay: "+91 98765 43210",
-  voiceHelpline: "+9118001234567",
-  voiceHelplineDisplay: "1800-123-4567",
-  emergencyHotline: "+919876599999",
-  emergencyDisplay: "+91 98765 99999",
-  securityLine: "+919876588888",
-  managerLine: "+919876577777",
-  supportEmail: "support@fastapmenu.com",
-  hours: "24/7 emergency · Chat 9 AM – 11 PM",
-  agentsOnline: 2,
+  whatsappNumber: "",
+  whatsappDisplay: "",
+  voiceHelpline: "",
+  voiceHelplineDisplay: "",
+  emergencyHotline: "",
+  emergencyDisplay: "",
+  securityLine: "",
+  managerLine: "",
+  supportEmail: "",
+  hours: "",
+  agentsOnline: 0,
 };
 
-const AGENT_NAMES = ["Priya", "Arjun", "Meera", "Rahul"];
-
+/**
+ * Canned answers, written as an automated assistant would answer them. The previous set
+ * promised things nothing does: "I'll check the kitchen status right away", "our kitchen
+ * manager will review immediately", "I'm escalating this to the duty manager, they'll
+ * reach out within 5 minutes". No message reached anyone. Each reply now either points
+ * at a screen that genuinely does the thing, or at a person on the floor.
+ */
 const CHAT_RESPONSES: { match: RegExp; reply: string }[] = [
-  { match: /order|where|status|track/i, reply: "I can help track your order. Please share your order ID or table number and I'll check the kitchen status right away." },
-  { match: /refund|payment|bill|charge/i, reply: "For billing issues, I'll connect you with our accounts team. Refunds typically process within 24–48 hours to your original payment method or wallet." },
-  { match: /reserv|book|table/i, reply: "For reservations, please share your booking date, time, and party size. I can also redirect you to our reservations page." },
-  { match: /allerg|diet|vegan|jain/i, reply: "Your safety matters. Please tell us your allergy or dietary requirement and the dish in question — our kitchen manager will review immediately." },
-  { match: /manager|complaint|unhappy|bad/i, reply: "I'm escalating this to the duty manager. They'll reach out within 5 minutes. Can you briefly describe what happened?" },
-  { match: /wait|slow|delay/i, reply: "Sorry for the wait! Let me check with the kitchen on your order status. What's your table number?" },
-  { match: /wifi|app|login|technical/i, reply: "For technical issues, try refreshing the menu page or clearing browser cache. If the problem persists, I'll log a tech ticket for you." },
+  { match: /order|where|status|track/i, reply: "You can follow your order live on the order tracking screen — it updates as the kitchen moves it along. If it looks stuck, please speak to a member of staff." },
+  { match: /refund|payment|bill|charge/i, reply: "Raise a request about the bill here and the restaurant's team will see it. For anything urgent about a payment, please ask at the counter — they can look at the bill with you now." },
+  { match: /reserv|book|table/i, reply: "Reservations are handled on the reservations screen, where you can pick a date, time and party size." },
+  { match: /allerg|diet|vegan|jain/i, reply: "Please tell a member of staff about any allergy directly, before you order. This is an automated assistant, so nothing typed here reaches the kitchen in time to matter." },
+  { match: /manager|complaint|unhappy|bad/i, reply: "Raise a request here and it goes to the restaurant's team. If you would like to speak to the duty manager now, please ask any member of staff." },
+  { match: /wait|slow|delay/i, reply: "The order tracking screen shows where your food has got to. If it has been longer than that suggests, please flag a member of staff." },
+  { match: /wifi|app|login|technical/i, reply: "Try reloading the page first. If it still will not work, raise a request here with what you were doing and the restaurant's team will see it." },
 ];
 
 export function getSupportCatalog() {
@@ -80,18 +94,31 @@ export function resolveSupportConfig(
   };
 }
 
+/**
+ * The chat introduced itself with a person's name drawn at random — "I'm Priya from
+ * support" — and then answered from a fixed list of replies. Nobody read the messages
+ * and nobody was ever going to reply. A guest with a real problem sat waiting on a
+ * person who does not exist.
+ *
+ * It is an automated assistant, so it says so, and it points at the channels that do
+ * reach a human.
+ */
+export const CHAT_ASSISTANT_NAME = "Support assistant";
+
 export function createChatSession(restaurantId: number, guestName?: string) {
   const sessionId = `gs-${restaurantId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const agent = AGENT_NAMES[Math.floor(Math.random() * AGENT_NAMES.length)];
-  const welcome = `Hi${guestName ? ` ${guestName.split(" ")[0]}` : ""}! I'm ${agent} from support. How can I help you today?`;
-  return { sessionId, agentName: agent, welcome, agentsOnline: DEFAULT_CONFIG.agentsOnline };
+  const welcome = `Hi${guestName ? ` ${guestName.split(" ")[0]}` : ""} — this is an automated assistant. `
+    + `I can answer common questions straight away. For anything else, raise a request and a member of staff will see it.`;
+  return { sessionId, agentName: CHAT_ASSISTANT_NAME, automated: true, welcome, agentsOnline: 0 };
 }
 
-export function generateChatReply(message: string, agentName: string): string {
+export function generateChatReply(message: string, _agentName?: string): string {
   for (const rule of CHAT_RESPONSES) {
     if (rule.match.test(message)) return rule.reply;
   }
-  return `Thanks for your message. ${agentName} is reviewing this and will respond shortly. For faster help, you can also reach us on WhatsApp or request a voice callback.`;
+  // No promise that a person is reviewing it, because none is.
+  return "I could not answer that one automatically. Raise a request here and a member of "
+    + "staff at the restaurant will see it, or speak to someone on the floor if it is urgent.";
 }
 
 export function buildWhatsAppLink(config: SupportConfig, message: string, guestName?: string) {

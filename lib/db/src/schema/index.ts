@@ -37,3 +37,5 @@ export * from "./guest_sessions";
 export * from "./table_seating_requests";
 export * from "./platform";
 export * from "./app_releases";
+export * from "./staff_attendance";
+export * from "./app_downloads";

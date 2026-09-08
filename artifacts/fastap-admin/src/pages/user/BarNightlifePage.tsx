@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
@@ -14,19 +15,26 @@ import {
   ShoppingCart, Sparkles, MapPin,
 } from "lucide-react";
 
+/** A row from the venue's bar catalog. The shape is the venue's to decide, but naming
+ *  it stops every picker below from walking an untyped value. */
+type BarCatalogRow = Record<string, any>;
+
 type Tab = "happy-hour" | "cocktail" | "dj" | "table" | "lounge";
 
 export default function BarNightlifePage() {
   const [, navigate] = useAppLocation();
-  const { venue, user, activeRestaurant, addToCart } = useUser();
+  const { venue, user, activeRestaurant, activeTable, addToCart } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("happy-hour");
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [hhActive, setHhActive] = useState(isHappyHourActive());
+  const [hhActive, setHhActive] = useState(false);
   const [happyHourItems, setHappyHourItems] = useState<any[]>([]);
   const [barCatalog, setBarCatalog] = useState<any>(null);
 
@@ -58,18 +66,26 @@ export default function BarNightlifePage() {
   const [garnishIds, setGarnishIds] = useState<string[]>([]);
   const [cocktailQuote, setCocktailQuote] = useState<any>(null);
 
-  const barTables = barCatalog?.barTables ?? [];
-  const loungeZones = barCatalog?.loungeZones ?? [];
-  const djEvents = barCatalog?.djEvents ?? [];
+  // Shapes the venue's bar catalog returns. Typed here so the pickers below are not
+  // walking untyped values.
+  const barTables: BarCatalogRow[] = barCatalog?.barTables ?? [];
+  const loungeZones: BarCatalogRow[] = barCatalog?.loungeZones ?? [];
+  const djEvents: BarCatalogRow[] = barCatalog?.djEvents ?? [];
   const happyHourConfig = barCatalog?.happyHour ?? HAPPY_HOUR;
-  const cocktailBases = barCatalog?.cocktailBases ?? COCKTAIL_BASES;
+  const cocktailBases: BarCatalogRow[] = barCatalog?.cocktailBases ?? COCKTAIL_BASES;
   const [submitting, setSubmitting] = useState(false);
   const [cartToast, setCartToast] = useState<string | null>(null);
 
+  // Happy hour used to be decided by the device clock against a hardcoded Mon-Fri
+  // 16:00-19:00 window, so a phone in another timezone (or with the wrong time) showed a
+  // "LIVE" discount the venue was not running and the bill did not honour. Ask the venue.
   useEffect(() => {
-    const tick = setInterval(() => setHhActive(isHappyHourActive()), 60_000);
+    if (!slug) return;
+    const tick = setInterval(() => {
+      publicApi.bar.happyHour(slug).then(hh => setHhActive(Boolean(hh.isActive))).catch(() => undefined);
+    }, 60_000);
     return () => clearInterval(tick);
-  }, []);
+  }, [slug]);
 
   const loadBarData = useCallback(async () => {
     if (!venue.restaurantId) {
@@ -84,14 +100,14 @@ export default function BarNightlifePage() {
         publicApi.bar.catalog(venue.restaurantId),
         publicApi.bar.happyHour(slug),
       ]);
-      setHhActive(hh.isActive ?? catalog.isHappyHourNow ?? isHappyHourActive());
+      setHhActive(Boolean(hh.isActive ?? catalog.isHappyHourNow));
       setHappyHourItems(hh.items ?? []);
       setBarCatalog(catalog);
       if (!tableId && Array.isArray(catalog.barTables) && catalog.barTables[0]) setTableId(catalog.barTables[0].id);
       if (!loungeId && Array.isArray(catalog.loungeZones) && catalog.loungeZones[0]) setLoungeId(catalog.loungeZones[0].id);
       if (!djEventId && Array.isArray(catalog.djEvents) && catalog.djEvents[0]) setDjEventId(catalog.djEvents[0].id);
-    } catch {
-      setApiError("Could not load bar data.");
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Could not load bar data.");
       setHappyHourItems([]);
       setBarCatalog(null);
     } finally {
@@ -109,9 +125,9 @@ export default function BarNightlifePage() {
     try {
       const res = await publicApi.bar.tableSlots(venue.restaurantId, tableDate, tableId);
       setTableSlots(res.slots ?? []);
-    } catch {
+    } catch (e) {
       setTableSlots([]);
-      toast({ title: "Error", description: "Could not load table slots.", variant: "destructive" });
+      toast({ title: "Could not load table times", description: e instanceof Error ? e.message : "Please pick another date.", variant: "destructive" });
     }
   }, [tableDate, tableId, venue.restaurantId, toast]);
 
@@ -144,27 +160,52 @@ export default function BarNightlifePage() {
     setTimeout(() => setCartToast(null), 2500);
   }
 
-  function addCocktailToCart() {
-    const base = cocktailBases.find(b => b.id === baseId) ?? cocktailBases[0];
-    if (!base) return;
-    const mixer = COCKTAIL_MIXERS.find(m => m.id === mixerId)!;
-    const style = COCKTAIL_STYLES.find(s => s.id === styleId)!;
+  /**
+   * Send a built cocktail to the bar.
+   *
+   * It used to go into the cart under a made-up id ("cocktail-gin-soda-double"). The
+   * order route prices every line against the menu table, so that id parsed to NaN and
+   * the WHOLE basket was rejected with "Menu item null not found" — a guest who built a
+   * cocktail could no longer order anything at all. A custom drink is not a menu row, so
+   * it goes to the bar as a request instead of poisoning the basket.
+   */
+  async function sendCocktailToBar() {
+    const base = cocktailBases.find((b: { id: string }) => b.id === baseId) ?? cocktailBases[0];
+    if (!base) {
+      setCartToast("Pick a base spirit first.");
+      setTimeout(() => setCartToast(null), 3000);
+      return;
+    }
+    if (!venue.restaurantId) {
+      setCartToast("We do not know which venue you are in. Scan the QR code at your table.");
+      setTimeout(() => setCartToast(null), 4000);
+      return;
+    }
+    const mixer = COCKTAIL_MIXERS.find(m => m.id === mixerId);
+    const style = COCKTAIL_STYLES.find(s => s.id === styleId);
     const garnishLabels = garnishIds.map(g => COCKTAIL_GARNISHES.find(x => x.id === g)?.label).filter(Boolean);
-    const name = `Custom ${base.label} ${style.label !== "Regular" ? `(${style.label})` : ""}`.trim();
-    const price = cocktailQuote?.finalPrice ?? buildCocktailPrice(320 + base.price, styleId, garnishIds, COCKTAIL_GARNISHES);
+    const name = `Custom ${base.label}${style && style.label !== "Regular" ? ` (${style.label})` : ""}`;
+    const spec = [name, mixer?.label, garnishLabels.length ? `Garnish: ${garnishLabels.join(", ")}` : null]
+      .filter(Boolean).join(" · ");
 
-    addToCart({
-      menuItemId: `cocktail-${baseId}-${mixerId}-${styleId}`,
-      name,
-      price,
-      quantity: 1,
-      customizations: [mixer.label, ...garnishLabels as string[]],
-      addons: [],
-      course: "beverage",
-      specialInstructions: garnishLabels.length ? `Garnish: ${garnishLabels.join(", ")}` : undefined,
-    });
-    setCartToast("Custom cocktail added to cart");
-    setTimeout(() => setCartToast(null), 2500);
+    setSubmitting(true);
+    try {
+      await publicApi.waiterCall({
+        restaurantId: venue.restaurantId,
+        tableId: venue.tableId,
+        tableName: activeTable,
+        type: "custom_cocktail",
+        message: spec,
+      });
+    } catch (e) {
+      setCartToast(e instanceof Error ? e.message : "We could not reach the bar. Please order at the counter.");
+      setTimeout(() => setCartToast(null), 5000);
+      return;
+    } finally {
+      setSubmitting(false);
+    }
+    setCartToast("Sent to the bar — they will confirm the price when they bring it over.");
+    setTimeout(() => setCartToast(null), 5000);
   }
 
   async function bookTable() {
@@ -392,13 +433,14 @@ export default function BarNightlifePage() {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-sm text-white/50">Your cocktail</p>
-                  <p className="text-2xl font-bold text-violet-300">₹{cocktailQuote?.finalPrice ?? "—"}</p>
+                  {/* An indicative figure: a custom mix is not a menu row, so the bar prices it. */}
+                  <p className="text-2xl font-bold text-violet-300">about ₹{cocktailQuote?.finalPrice ?? "—"}</p>
                   {cocktailQuote?.happyHourApplied && (
                     <p className="text-xs text-amber-400">Happy hour applied (−{cocktailQuote.discount}%)</p>
                   )}
                 </div>
-                <button onClick={addCocktailToCart} className="px-5 py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-medium flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4" /> Add to Cart
+                <button onClick={sendCocktailToBar} disabled={submitting} className="px-5 py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-medium flex items-center gap-2 disabled:opacity-50">
+                  <ShoppingCart className="h-4 w-4" /> {submitting ? "Sending…" : "Send to the bar"}
                 </button>
               </div>
             </div>
@@ -545,7 +587,7 @@ export default function BarNightlifePage() {
                           </div>
                           <p className="text-xs text-white/50 mt-0.5">Up to {l.capacity} guests · Min spend ₹{l.minSpend.toLocaleString()}</p>
                           <ul className="flex flex-wrap gap-1 mt-2">
-                            {l.features.map(f => (
+                            {(l.features as string[]).map((f: string) => (
                               <li key={f} className="text-[10px] bg-white/5 px-2 py-0.5 rounded-full text-white/60">{f}</li>
                             ))}
                           </ul>

@@ -2,13 +2,64 @@ import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { db, suppliersTable, purchaseOrdersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { taxRateFor, round2 } from "../lib/order-pricing.js";
 
 const router: IRouter = Router();
 
+/**
+ * What a supplier has actually been billed comes from that supplier's purchase orders.
+ * The panel had no such figure to read, so it showed the outstanding balance scaled up
+ * by a constant — a number that moved when a payment was made and had nothing to do
+ * with what was ever bought.
+ *
+ * `totalSpend` counts only orders that were received: money committed on a draft or a
+ * cancelled order was never spent. `orderedValue` is the wider commitment, so a buyer
+ * can still see what is in flight.
+ */
 router.get("/restaurants/:restaurantId/suppliers", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
-  const suppliers = await db.select().from(suppliersTable).where(eq(suppliersTable.restaurantId, id));
-  res.json(suppliers.map(s => ({ ...s, creditLimit: parseFloat(String(s.creditLimit)), outstandingBalance: parseFloat(String(s.outstandingBalance)) })));
+  const [suppliers, pos] = await Promise.all([
+    db.select().from(suppliersTable).where(eq(suppliersTable.restaurantId, id)),
+    db.select({
+      supplierId: purchaseOrdersTable.supplierId,
+      supplierName: purchaseOrdersTable.supplierName,
+      status: purchaseOrdersTable.status,
+      total: purchaseOrdersTable.total,
+      createdAt: purchaseOrdersTable.createdAt,
+      deliveredAt: purchaseOrdersTable.deliveredAt,
+    }).from(purchaseOrdersTable).where(eq(purchaseOrdersTable.restaurantId, id)),
+  ]);
+
+  const RECEIVED = new Set(["received", "delivered", "completed"]);
+  const VOID = new Set(["cancelled", "canceled", "rejected"]);
+
+  res.json(suppliers.map(s => {
+    const mine = pos.filter(p =>
+      p.supplierId === s.id || (p.supplierId == null && (p.supplierName ?? "").trim() === s.name.trim()));
+    const live = mine.filter(p => !VOID.has(String(p.status ?? "").toLowerCase()));
+    const received = live.filter(p => RECEIVED.has(String(p.status ?? "").toLowerCase()));
+    const money = (rows: typeof mine) => round2(rows.reduce((t, p) => t + (parseFloat(String(p.total ?? 0)) || 0), 0));
+    const lastAt = mine.reduce<Date | null>((latest, p) => {
+      const at = p.deliveredAt ?? p.createdAt;
+      if (!at) return latest;
+      const d = new Date(at);
+      return latest && latest >= d ? latest : d;
+    }, null);
+
+    return {
+      ...s,
+      creditLimit: parseFloat(String(s.creditLimit)),
+      outstandingBalance: parseFloat(String(s.outstandingBalance)),
+      totalSpend: money(received),
+      orderedValue: money(live),
+      pendingValue: round2(money(live) - money(received)),
+      totalOrders: live.length,
+      receivedOrders: received.length,
+      lastOrderAt: lastAt ? lastAt.toISOString() : null,
+      // A supplier nobody has rated has no rating — not five stars.
+      rating: s.rating ?? null,
+    };
+  }));
 });
 
 router.post("/restaurants/:restaurantId/suppliers", requireAuth, async (req, res): Promise<void> => {
@@ -19,7 +70,7 @@ router.post("/restaurants/:restaurantId/suppliers", requireAuth, async (req, res
 });
 
 router.put("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, async (req, res): Promise<void> => {
-  const supplierId = parseInt(req.params.supplierId, 10);
+  const supplierId = parseInt(String(req.params.supplierId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, contactPerson, phone, email, address, gstNumber, category, paymentTerms, creditLimit, rating } = req.body;
   const [supplier] = await db.update(suppliersTable).set({ name, contactPerson, phone, email, address, gstNumber, category, paymentTerms, rating, creditLimit: creditLimit !== undefined ? String(creditLimit) : undefined }).where(and(eq(suppliersTable.id, supplierId), eq(suppliersTable.restaurantId, restaurantId))).returning();
@@ -28,7 +79,7 @@ router.put("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, asyn
 });
 
 router.delete("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, async (req, res): Promise<void> => {
-  const supplierId = parseInt(req.params.supplierId, 10);
+  const supplierId = parseInt(String(req.params.supplierId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(suppliersTable).where(and(eq(suppliersTable.id, supplierId), eq(suppliersTable.restaurantId, restaurantId)));
   res.json({ message: "Supplier deleted" });
@@ -37,17 +88,37 @@ router.delete("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, a
 router.get("/restaurants/:restaurantId/purchase-orders", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const pos = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.restaurantId, id)).orderBy(desc(purchaseOrdersTable.createdAt));
-  res.json(pos.map(p => ({ ...p, subtotal: parseFloat(String(p.subtotal)), tax: parseFloat(String(p.tax)), total: parseFloat(String(p.total)), items: Array.isArray(p.items) ? p.items : [] })));
+  res.json(pos.map(p => {
+    const subtotal = parseFloat(String(p.subtotal)) || 0;
+    const tax = parseFloat(String(p.tax)) || 0;
+    return {
+      ...p,
+      subtotal,
+      tax,
+      total: parseFloat(String(p.total)) || 0,
+      // The GST on a purchase is the tax that was recorded against it. Sending the rate
+      // alongside it stops a screen re-deriving the tax at a rate of its own choosing.
+      taxAmount: tax,
+      taxPercent: subtotal > 0 ? round2((tax / subtotal) * 100) : null,
+      items: Array.isArray(p.items) ? p.items : [],
+    };
+  }));
 });
 
 router.post("/restaurants/:restaurantId/purchase-orders", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
-  const { supplierId, supplierName, items, notes, expectedDelivery } = req.body;
+  const { supplierId, supplierName, items, notes, expectedDelivery, taxPercent } = req.body;
   const poNumber = `PO-${Date.now()}`;
   let subtotal = 0;
   if (Array.isArray(items)) for (const item of items) subtotal += (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
-  const tax = subtotal * 0.05;
-  const total = subtotal + tax;
+  // A supplier invoice carries its own GST rate; when the buyer states one, use it.
+  // Otherwise fall back to the rate this venue has configured rather than a fixed 5%.
+  const requestedRate = parseFloat(String(taxPercent ?? ""));
+  const rate = Number.isFinite(requestedRate) && requestedRate >= 0 && requestedRate <= 40
+    ? requestedRate / 100
+    : await taxRateFor(id);
+  const tax = round2(subtotal * rate);
+  const total = round2(subtotal + tax);
   const [po] = await db.insert(purchaseOrdersTable).values({
     restaurantId: id, supplierId: supplierId ? parseInt(supplierId) : null, supplierName, poNumber,
     items: items ?? [], subtotal: String(subtotal.toFixed(2)), tax: String(tax.toFixed(2)), total: String(total.toFixed(2)),

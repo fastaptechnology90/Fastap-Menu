@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
+import { getPublicBaseUrl } from "../lib/scan-urls.js";
 import { eq, desc } from "drizzle-orm";
-import { db, restaurantsTable, feedbackTable } from "@workspace/db";
+import { db, restaurantsTable, feedbackTable, guestUsersTable } from "@workspace/db";
 import {
   getSocialReviewCatalog, mapFeedbackRow, computeRatingStats,
   getReviewsForRestaurant, createFoodPhoto, likePhotoInList, buildSharePayload,
@@ -70,7 +71,16 @@ router.get("/public/social/reviews/:slug", async (req, res): Promise<void> => {
 router.post("/public/social/reviews", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.body.restaurantId ?? 0), 10);
   const rating = parseInt(String(req.body.rating ?? req.body.overall ?? 0), 10);
-  const customerName = String(req.body.customerName ?? req.body.reviewer ?? "Guest");
+  // A signed-in diner's review used to be published as "Guest" whenever the page did not
+  // repeat their name in the body, so nobody could tell their own review from anyone
+  // else's. Fall back to the account they are signed in with before giving up.
+  const signedInName = req.session.guestUserId
+    ? (await db.select({ name: guestUsersTable.name }).from(guestUsersTable)
+        .where(eq(guestUsersTable.id, req.session.guestUserId)).limit(1))[0]?.name
+    : null;
+  const customerName = String(
+    req.body.customerName ?? req.body.reviewer ?? req.body.name ?? signedInName ?? "Guest",
+  );
   const comment = String(req.body.comment ?? req.body.text ?? "");
   const foodRating = parseInt(String(req.body.foodRating ?? req.body.food ?? rating), 10);
   const serviceRating = parseInt(String(req.body.serviceRating ?? req.body.service ?? rating), 10);
@@ -127,7 +137,9 @@ router.post("/public/social/food-photos/:photoId/like", async (req, res): Promis
 router.post("/public/social/share", async (req, res): Promise<void> => {
   const slug = String(req.body.slug ?? "spice-garden");
   const restaurant = await loadRestaurant(slug);
-  const baseUrl = String(req.body.baseUrl ?? "https://digitalrestuarants.thefingo.com");
+  // This defaulted to a domain that no longer resolves, so a share link a guest posted
+  // to Instagram led nowhere. Use the deployment's own address.
+  const baseUrl = String(req.body.baseUrl ?? getPublicBaseUrl());
   const shareUrl = `${baseUrl}/user/menu?slug=${slug}${req.body.table ? `&table=${req.body.table}` : ""}`;
   const payload = buildSharePayload({
     platform: String(req.body.platform ?? "whatsapp"),

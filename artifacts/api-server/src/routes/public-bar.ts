@@ -13,7 +13,7 @@ import { loadCatalogSection } from "../lib/restaurant-catalogs.js";
 const router: IRouter = Router();
 
 router.get("/public/bar/catalog/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Venue not found" }); return; }
   const overrides = await loadCatalogSection(restaurantId, "barCatalog", {});
@@ -146,7 +146,9 @@ router.post("/public/bar/dj-booking", async (req, res): Promise<void> => {
     notes,
     status: "confirmed",
     totalAmount: String(dj.cover * (guestCount ?? 2)),
-    advancePaid: String(dj.cover),
+    // The cover charge is collected at the door. Recording it as already paid on a
+    // booking made from the guest's phone credited the venue money it never took.
+    advancePaid: "0",
     metadata: { djEventId, genre: dj.genre, coverCharge: dj.cover },
   }).returning();
 

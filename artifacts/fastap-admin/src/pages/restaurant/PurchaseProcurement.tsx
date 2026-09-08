@@ -2,18 +2,21 @@ import { useState, useEffect } from "react";
 import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter, Eye } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { procurement as procurementApi } from "@/lib/api";
+import { fmtINR } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 
 type PurchaseOrderRow = {
   id: string; supplier: string; items: { name: string; qty: number; unit: string; price: number; total: number }[];
+  subtotal: number; tax: number; taxPercent: number;
   total: number; status: string; createdAt: string; expectedBy: string; deliveredAt: string | null;
   paymentStatus: string; invoiceNo: string;
 };
 type SupplierRow = {
   id: string; name: string; category: string; contact: string; phone: string; email: string;
-  rating: number; totalOrders: number; totalSpend: number; creditLimit: number; creditUsed: number;
+  rating: number | null; totalOrders: number; totalSpend: number; creditLimit: number; creditUsed: number;
+  lastOrderAt: string | null;
   paymentStatus?: string; paymentTerms: string; status: string;
 };
 
@@ -49,7 +52,7 @@ export default function PurchaseProcurement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPO, setSelectedPO] = useState<PurchaseOrderRow | null>(null);
   const [detailSupplier, setDetailSupplier] = useState<SupplierRow | null>(null);
-  const [detailInvoice, setDetailInvoice] = useState<{ id: string; po: string; supplier: string; amount: number; dueDate: string; status: string; paidOn: string | null; gst: number } | null>(null);
+  const [detailInvoice, setDetailInvoice] = useState<{ id: string; po: string; supplier: string; amount: number; dueDate: string; status: string; paidOn: string | null; gst: number; gstPercent: number; grandTotal: number } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [poForm, setPoForm] = useState({ supplierName: "", itemName: "", qty: 1, unitPrice: 0 });
   const [creatingPo, setCreatingPo] = useState(false);
@@ -71,7 +74,12 @@ export default function PurchaseProcurement() {
         id: created.poNumber || String(created.id),
         supplier: poForm.supplierName,
         items: [{ name: poForm.itemName, qty: poForm.qty, unit: "kg", price: poForm.unitPrice, total }],
-        total,
+        // The server taxes the order at the venue's own rate, so take its figures back
+        // rather than showing the untaxed line total as if it were the amount payable.
+        subtotal: parseFloat(String(created.subtotal ?? total)),
+        tax: parseFloat(String(created.taxAmount ?? created.tax ?? 0)),
+        taxPercent: Number(created.taxPercent ?? 0),
+        total: parseFloat(String(created.total ?? total)),
         status: "pending",
         createdAt: new Date().toISOString().split("T")[0],
         expectedBy: new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0],
@@ -104,9 +112,16 @@ export default function PurchaseProcurement() {
           // undefined.toLocaleString() and crashes the whole page.
           items: (Array.isArray(o.items) ? o.items : []).map((it: any) => {
             const qty = Number(it.qty ?? it.quantity ?? 0);
-            const price = Number(it.price ?? it.unitPrice ?? 0);
-            return { name: it.name || "Item", qty, unit: it.unit || "unit", price, total: Number(it.total ?? qty * price) };
+            // The API writes a line as {rate, amount}; reading only price/unitPrice made
+            // every purchase-order line render as ₹0.
+            const price = Number(it.price ?? it.unitPrice ?? it.rate ?? 0);
+            return { name: it.name || "Item", qty, unit: it.unit || "unit", price, total: Number(it.total ?? it.amount ?? qty * price) };
           }),
+          subtotal: parseFloat(String(o.subtotal ?? 0)),
+          // The order carries its own tax and the rate it was raised at. Recomputing it
+          // here at a flat 18% overstated the GST on every purchase order.
+          tax: parseFloat(String(o.taxAmount ?? o.tax ?? 0)),
+          taxPercent: Number(o.taxPercent ?? 0),
           total: parseFloat(String(o.total||0)),
           status: o.status === "received" ? "delivered" : o.status || "pending",
           createdAt: o.createdAt?.split("T")[0] || "",
@@ -124,9 +139,12 @@ export default function PurchaseProcurement() {
           contact: s.contactPerson || "—",
           phone: s.phone || "",
           email: s.email || "",
-          rating: (s.rating ?? 5) / 1,
-          totalOrders: 0,
-          totalSpend: parseFloat(String(s.outstandingBalance ?? 0)) * 10,
+          // An unrated supplier used to show five stars, and spend was invented from the
+          // outstanding balance. Both now come from the server, or say nothing.
+          rating: s.rating == null ? null : Number(s.rating),
+          totalOrders: Number(s.totalOrders ?? 0),
+          totalSpend: parseFloat(String(s.totalSpend ?? 0)),
+          lastOrderAt: s.lastOrderAt ? String(s.lastOrderAt).split("T")[0] : null,
           creditLimit: parseFloat(String(s.creditLimit ?? 0)),
           creditUsed: parseFloat(String(s.outstandingBalance ?? 0)),
           paymentTerms: s.paymentTerms || "7 days",
@@ -142,11 +160,13 @@ export default function PurchaseProcurement() {
       id: o.invoiceNo !== "—" ? o.invoiceNo : `INV-${o.id}`,
       po: o.id,
       supplier: o.supplier,
-      amount: o.total,
+      amount: o.subtotal || Math.max(0, o.total - o.tax),
       dueDate: o.expectedBy,
       status: o.paymentStatus === "paid" ? "paid" : "pending",
       paidOn: o.deliveredAt,
-      gst: Math.round(o.total * 0.18),
+      gst: o.tax,
+      gstPercent: o.taxPercent,
+      grandTotal: o.total,
     }));
 
   const filtered = orders.filter(o =>
@@ -295,8 +315,8 @@ export default function PurchaseProcurement() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
                         {label:"Total Orders",value:s.totalOrders,color:"text-blue-400"},
-                        {label:"Total Spend",value:`₹${(s.totalSpend/1000).toFixed(0)}K`,color:"text-amber-400"},
-                        {label:"Rating",value:`${s.rating}★`,color:"text-yellow-400"},
+                        {label:"Total Spend",value:fmtINR(s.totalSpend),color:"text-amber-400"},
+                        {label:"Rating",value:s.rating == null ? "Not rated" : `${s.rating}★`,color:"text-yellow-400"},
                         {label:"Credit Used",value:`₹${(s.creditUsed/1000).toFixed(0)}K/₹${(s.creditLimit/1000).toFixed(0)}K`,color:creditPct>80?"text-red-400":"text-emerald-400"},
                       ].map(m=>(
                         <div key={m.label} className="bg-white/5 rounded-lg p-2 text-center">
@@ -454,9 +474,10 @@ export default function PurchaseProcurement() {
           ["Email", s.email || "—"],
           ["Payment terms", s.paymentTerms || "—"],
           ["Status", s.status === "inactive" ? "Inactive" : "Active"],
-          ["Rating", `${s.rating}★`],
+          ["Rating", s.rating == null ? "Not rated" : `${s.rating}★`],
           ["Total orders", String(s.totalOrders)],
           ["Total spend", `₹${s.totalSpend.toLocaleString("en-IN")}`],
+          ["Last order", s.lastOrderAt || "Never ordered"],
           ["Credit limit", `₹${s.creditLimit.toLocaleString("en-IN")}`],
           ["Credit used", `₹${s.creditUsed.toLocaleString("en-IN")}`],
         ];
@@ -504,8 +525,9 @@ export default function PurchaseProcurement() {
           ["PO Reference", inv.po],
           ["Supplier", inv.supplier],
           ["Amount", `₹${inv.amount.toLocaleString("en-IN")}`],
-          ["GST (18%)", `₹${inv.gst.toLocaleString("en-IN")}`],
-          ["Total (incl. GST)", `₹${(inv.amount + inv.gst).toLocaleString("en-IN")}`],
+          // The old row added an invented 18% on top of a total that already carried tax.
+          [inv.gstPercent ? `GST (${inv.gstPercent}%)` : "GST", `₹${inv.gst.toLocaleString("en-IN")}`],
+          ["Total (incl. GST)", `₹${inv.grandTotal.toLocaleString("en-IN")}`],
           ["Due date", inv.dueDate || "—"],
           ["Status", inv.status],
           ["Paid on", inv.paidOn || "—"],

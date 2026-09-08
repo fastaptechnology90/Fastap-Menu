@@ -73,15 +73,24 @@ export default function CartPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [couponError, setCouponError] = useState("");
   const [groupError, setGroupError] = useState("");
+  const [placeError, setPlaceError] = useState("");
+  const [couponRefused, setCouponRefused] = useState("");
 
   useEffect(() => {
     if (activeTable) {
       setOrderType("dine-in");
       return;
     }
-    const mapped = serviceModeToOrderType(venue.serviceMode, smartEntry?.params?.zone);
-    setOrderType(mapped === "drive-in" ? "drive-in" : "takeaway");
-  }, [activeTable, venue.serviceMode, smartEntry?.params?.zone]);
+    // Keep whatever the scan actually resolved to. Collapsing everything that was not
+    // drive-in into "takeaway" filed room service, poolside, spa, bar, lounge and
+    // cabana orders as takeaway — so a guest ordering to their room was told to come
+    // and collect it, and the order never reached room service.
+    if (venue.roomNumber) {
+      setOrderType("room-service");
+      return;
+    }
+    setOrderType(serviceModeToOrderType(venue.serviceMode, smartEntry?.params?.zone));
+  }, [activeTable, venue.serviceMode, venue.roomNumber, smartEntry?.params?.zone]);
 
   useEffect(() => {
     const courses = [...new Set(cart.map(c => c.course))];
@@ -141,13 +150,22 @@ export default function CartPage() {
   }
 
   async function joinGroup() {
-    if (!groupCode.trim()) return;
+    setGroupError("");
+    if (!groupCode.trim()) {
+      setGroupError("Enter the code the other person is showing you");
+      return;
+    }
     try {
       await joinShareSession(groupCode.trim().toUpperCase());
-    } catch { /* ignore */ }
+    } catch (e) {
+      // A wrong code used to be swallowed outright, so "Join" was indistinguishable
+      // from a broken button.
+      setGroupError(e instanceof Error ? e.message : "That code did not work — check it and try again");
+    }
   }
 
   async function handlePlaceOrder() {
+    setPlaceError("");
     setPlacing(true);
     try {
       const order = await placeOrder({
@@ -172,9 +190,25 @@ export default function CartPage() {
       });
       const isQueued = String(order.id).startsWith("pending-");
       setQueuedOffline(isQueued);
+      // A coupon that was live when it was typed can be spent by someone else, or
+      // expire, before the order is sent. The server says so; a guest who was shown a
+      // discount and then charged full price has to be told why.
+      const refused = (order as { couponNotApplied?: string }).couponNotApplied;
+      if (refused) setAppliedCoupon(null);
+      setCouponRefused(refused ?? "");
       setShowSuccess(true);
-      setTimeout(() => navigate(isQueued ? "/user/offline" : `/user/order/${order.id}`), 1800);
-    } catch {
+      // A guest who was shown a discount and then charged full price needs long enough
+      // to read why before the page moves on.
+      setTimeout(() => navigate(isQueued ? "/user/offline" : `/user/order/${order.id}`), refused ? 5000 : 1800);
+    } catch (e) {
+      // A failed order was swallowed entirely: the spinner stopped and nothing else
+      // happened, while the basket was quietly queued for offline sync behind the
+      // guest's back. They sat waiting for food nobody was cooking.
+      setPlaceError(
+        e instanceof Error
+          ? `${e.message} Your basket is saved — you can try again, or ask a member of staff.`
+          : "We could not send your order. Your basket is saved — please try again or ask a member of staff.",
+      );
       setPlacing(false);
     }
   }
@@ -189,6 +223,11 @@ export default function CartPage() {
         </div>
         <h2 className="text-2xl font-bold">{queuedOffline ? "Order Saved Offline" : "Order Placed!"}</h2>
         <p className="text-white/50">{queuedOffline ? "Will sync automatically when you're back online…" : "Taking you to live tracking…"}</p>
+        {couponRefused && (
+          <div className="mx-8 max-w-sm rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">
+            {couponRefused} You were charged the full amount — please speak to a member of staff if this looks wrong.
+          </div>
+        )}
       </div>
     );
   }
@@ -611,6 +650,11 @@ export default function CartPage() {
       </div>
 
       <div className="guest-bottom-bar">
+        {placeError && (
+          <p role="alert" className="mb-2 text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+            {placeError}
+          </p>
+        )}
         <button onClick={handlePlaceOrder} disabled={placing} className="guest-btn-primary w-full py-4 text-base font-bold disabled:opacity-60 disabled:transform-none">
           {placing ? <><div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Placing Order…</> : <><ShoppingBag className="h-5 w-5" /> Place Order · ₹{grandTotal}</>}
         </button>

@@ -24,7 +24,7 @@ export function registerSuperAdminFeatureRoutes(
     "/superadmin/vendors/:vendorId/features",
     ...adminMiddleware,
     async (req, res) => {
-      const id = parseInt(req.params.vendorId, 10);
+      const id = parseInt(String(req.params.vendorId), 10);
       if (!Number.isFinite(id)) {
         res.status(400).json({ error: "Invalid vendor id" });
         return;
@@ -37,7 +37,7 @@ export function registerSuperAdminFeatureRoutes(
     "/superadmin/vendors/:vendorId/features",
     ...adminMiddleware,
     async (req, res) => {
-      const id = parseInt(req.params.vendorId, 10);
+      const id = parseInt(String(req.params.vendorId), 10);
       const { overrides } = req.body as { overrides?: Record<string, boolean> };
       if (!Number.isFinite(id) || !overrides) {
         res.status(400).json({ error: "overrides object required" });
@@ -56,7 +56,7 @@ export function registerRestaurantFeatureRoutes(
     "/restaurants/:restaurantId/features",
     requireAuth,
     async (req, res) => {
-      const id = parseInt(req.params.restaurantId, 10);
+      const id = parseInt(String(req.params.restaurantId), 10);
       res.json(await getRestaurantFeatureControls(id));
     },
   );
@@ -65,7 +65,7 @@ export function registerRestaurantFeatureRoutes(
     "/restaurants/:restaurantId/features",
     requireAuth,
     async (req, res) => {
-      const id = parseInt(req.params.restaurantId, 10);
+      const id = parseInt(String(req.params.restaurantId), 10);
       const { toggles } = req.body as { toggles?: Record<string, boolean> };
       if (!toggles) {
         res.status(400).json({ error: "toggles object required" });

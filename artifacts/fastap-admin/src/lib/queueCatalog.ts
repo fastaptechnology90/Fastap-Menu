@@ -40,6 +40,8 @@ export interface QueueStats {
   groupsAhead: number;
   predictionLabel: string;
   liveWaitTime: number;
+  /** The host desk's number, so a waiting guest can actually ring it. */
+  restaurantPhone?: string | null;
 }
 
 export interface QueueStatusResponse {

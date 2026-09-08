@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +26,9 @@ export default function Reservation() {
   const goBack = useGuestBack();
   const { venue, user, activeRestaurant } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
   const prefilledTable = params.get("table") || undefined;
   const prefilledRoom = params.get("room") || undefined;
 
@@ -46,6 +49,8 @@ export default function Reservation() {
   const [myBookings, setMyBookings] = useState<ReservationRecord[]>([]);
   const [bookingToken, setBookingToken] = useState("");
   const [createdId, setCreatedId] = useState<number | null>(null);
+  const [createdStatus, setCreatedStatus] = useState<string>("pending");
+  const [depositNotice, setDepositNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const [editBooking, setEditBooking] = useState<ReservationRecord | null>(null);
@@ -148,13 +153,20 @@ export default function Reservation() {
       const res = await publicApi.createReservation(payload);
       setCreatedId(res.id);
       setBookingToken(res.bookingToken ?? `#REV${res.id}`);
+      // A booking that still owes a deposit comes back as "pending", not confirmed. The
+      // success screen used to announce "Booking Confirmed!" either way.
+      setCreatedStatus(String(res.status ?? "pending"));
       if (deposit > 0 && !withDeposit) {
         setStep("deposit");
       } else {
         setStep("success");
       }
-    } catch {
-      toast({ title: "Error", description: "Could not create reservation.", variant: "destructive" });
+    } catch (e) {
+      toast({
+        title: "Could not book",
+        description: e instanceof Error ? e.message : "Please try again, or call the restaurant.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -165,9 +177,15 @@ export default function Reservation() {
     setSubmitting(true);
     try {
       await publicApi.payReservationDeposit(createdId, { paymentMethod });
+      setCreatedStatus("confirmed");
       setStep("success");
-    } catch {
-      toast({ title: "Error", description: "Could not pay deposit.", variant: "destructive" });
+    } catch (e) {
+      // The server's answer here is usually "online deposits are not available yet, your
+      // booking is held and the deposit is collected at the venue" — which is good news,
+      // not an error. Showing "Could not pay deposit" instead made the guest think the
+      // booking had failed.
+      setDepositNotice(e instanceof Error ? e.message : "The deposit is collected at the venue. Your booking is held.");
+      setStep("success");
     } finally {
       setSubmitting(false);
     }
@@ -233,9 +251,17 @@ export default function Reservation() {
       {step === "success" && (
         <div className="flex flex-col items-center px-4 pt-10 text-center">
           <CheckCircle className="h-16 w-16 text-emerald-400 mb-4" />
-          <h2 className="text-2xl font-extrabold mb-2">Booking Confirmed!</h2>
+          <h2 className="text-2xl font-extrabold mb-2">
+            {createdStatus === "confirmed" ? "Booking Confirmed!" : "Booking Requested"}
+          </h2>
           <p className="text-white/50 mb-1">{TYPE_ICONS[bookingType]} {RESERVATION_TYPES.find(t => t.id === bookingType)?.label}</p>
-          <p className="text-white/50 mb-6">{date} · {timeLabel || time} · {guests} guests</p>
+          <p className="text-white/50 mb-2">{date} · {timeLabel || time} · {guests} guests</p>
+          {createdStatus !== "confirmed" && (
+            <p className="text-amber-300/90 text-sm mb-3 max-w-sm">
+              The restaurant confirms this shortly — you will not have a table until they do.
+            </p>
+          )}
+          {depositNotice && <p className="text-white/60 text-sm mb-4 max-w-sm">{depositNotice}</p>}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 w-full max-w-sm mb-6">
             <div className="text-4xl font-black text-orange-400 font-mono">{bookingToken}</div>
             <p className="text-xs text-white/40 mt-2">Show this token at arrival</p>
@@ -289,7 +315,14 @@ export default function Reservation() {
           {tab === "my" && (
             <div className="px-4 mt-4 space-y-3">
               {myBookings.length === 0 && (
-                <p className="text-center text-white/40 py-8 text-sm">No bookings yet</p>
+                // Bookings are found by the phone number they were made with, so a guest
+                // who never signed in has nothing to look them up by. Saying "No bookings
+                // yet" to someone holding a confirmation token is worse than useless.
+                <p className="text-center text-white/40 py-8 text-sm">
+                  {user?.mobile
+                    ? "No bookings yet"
+                    : "Sign in with the phone number you booked with to see your bookings."}
+                </p>
               )}
               {myBookings.map(b => (
                 <div key={b.id} className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">

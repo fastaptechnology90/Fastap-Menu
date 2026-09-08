@@ -15,7 +15,7 @@ function sentimentFromRating(r: number): "positive" | "negative" | "neutral" {
 }
 
 router.get("/restaurants/:restaurantId/reviews", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { source, sentiment, replied } = req.query;
 
   const rows = await db.select().from(feedbackTable)
@@ -61,8 +61,8 @@ router.get("/restaurants/:restaurantId/reviews", requireAuth, async (req, res): 
 });
 
 router.post("/restaurants/:restaurantId/reviews/:id/reply", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const { reply } = req.body;
 
   const [feedback] = await db.select().from(feedbackTable)
@@ -90,7 +90,7 @@ router.post("/restaurants/:restaurantId/reviews/:id/reply", requireAuth, async (
 });
 
 router.post("/restaurants/:restaurantId/reviews", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { reviewer, rating, text, source } = req.body;
   const parsedRating = parseInt(String(rating), 10);
   if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
@@ -120,8 +120,8 @@ router.post("/restaurants/:restaurantId/reviews", requireAuth, async (req, res):
 });
 
 router.delete("/restaurants/:restaurantId/reviews/:id", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
 
   const [deleted] = await db.delete(feedbackTable)
     .where(and(eq(feedbackTable.id, id), eq(feedbackTable.restaurantId, rid)))

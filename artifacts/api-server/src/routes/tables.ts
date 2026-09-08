@@ -74,13 +74,13 @@ async function enrichTables(restaurantId: number, tables: (typeof tablesMapTable
 }
 
 router.get("/restaurants/:restaurantId/tables", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const tables = await db.select().from(tablesMapTable).where(eq(tablesMapTable.restaurantId, id));
   res.json(await enrichTables(id, tables));
 });
 
 router.get("/restaurants/:restaurantId/tables/summary", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const tables = await db.select().from(tablesMapTable).where(and(eq(tablesMapTable.restaurantId, id), eq(tablesMapTable.isActive, true)));
   const counts: Record<string, number> = {};
   for (const t of tables) counts[t.status] = (counts[t.status] ?? 0) + 1;
@@ -88,14 +88,14 @@ router.get("/restaurants/:restaurantId/tables/summary", requireAuth, async (req,
 });
 
 router.get("/restaurants/:restaurantId/tables/zones", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const rows = await db.selectDistinct({ zone: tablesMapTable.zone }).from(tablesMapTable)
     .where(and(eq(tablesMapTable.restaurantId, id), sql`${tablesMapTable.zone} IS NOT NULL`));
   res.json(rows.map(r => r.zone).filter(Boolean));
 });
 
 router.get("/restaurants/:restaurantId/table-areas", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const areas = await db.select().from(tableAreasTable)
     .where(eq(tableAreasTable.restaurantId, id))
     .orderBy(tableAreasTable.sortOrder);
@@ -103,7 +103,7 @@ router.get("/restaurants/:restaurantId/table-areas", requireAuth, async (req, re
 });
 
 router.post("/restaurants/:restaurantId/table-areas", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, areaType, description, colorCode, sortOrder, layoutConfig } = req.body;
   const [area] = await db.insert(tableAreasTable).values({
     restaurantId: id,
@@ -118,7 +118,7 @@ router.post("/restaurants/:restaurantId/table-areas", requireAuth, async (req, r
 });
 
 router.post("/restaurants/:restaurantId/tables", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, branchId, zone, capacity, isActive, isVip, colorCode, areaId, positionX, positionY, notes, tableType, tableCategory } = req.body;
   // Building the QR menu URL below calls name.toLowerCase(). With no name that
   // threw before the database was ever reached — a 500 on the first thing every
@@ -142,8 +142,8 @@ router.post("/restaurants/:restaurantId/tables", requireAuth, async (req, res): 
 });
 
 router.put("/restaurants/:restaurantId/tables/:tableId", requireAuth, async (req, res): Promise<void> => {
-  const tableId = parseInt(req.params.tableId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const tableId = parseInt(String(req.params.tableId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, branchId, zone, capacity, isActive, isVip, colorCode, areaId, positionX, positionY, notes } = req.body;
   const [table] = await db.update(tablesMapTable)
     .set({ name, branchId, zone, capacity, isActive, isVip, colorCode, areaId, positionX, positionY, notes })
@@ -155,8 +155,8 @@ router.put("/restaurants/:restaurantId/tables/:tableId", requireAuth, async (req
 });
 
 router.patch("/restaurants/:restaurantId/tables/:tableId/status", requireAuth, async (req, res): Promise<void> => {
-  const tableId = parseInt(req.params.tableId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const tableId = parseInt(String(req.params.tableId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status, currentGuestCount, currentWaiterName, currentCustomerName, isVip, notes, reservedUntil, reservationId } = req.body;
 
   const updateData: Record<string, unknown> = {};
@@ -191,7 +191,7 @@ router.patch("/restaurants/:restaurantId/tables/:tableId/status", requireAuth, a
 });
 
 router.post("/restaurants/:restaurantId/tables/merge", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { primaryId, secondaryIds } = req.body as { primaryId: number; secondaryIds: number[] };
   if (!primaryId || !Array.isArray(secondaryIds) || secondaryIds.length === 0) {
     res.status(400).json({ error: "primaryId and secondaryIds[] required" }); return;
@@ -216,8 +216,8 @@ router.post("/restaurants/:restaurantId/tables/merge", requireAuth, async (req, 
 });
 
 router.post("/restaurants/:restaurantId/tables/:tableId/unmerge", requireAuth, async (req, res): Promise<void> => {
-  const tableId = parseInt(req.params.tableId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const tableId = parseInt(String(req.params.tableId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.update(tablesMapTable)
     .set({ mergedInto: null, status: "free", isActive: true })
     .where(and(eq(tablesMapTable.mergedInto, tableId), eq(tablesMapTable.restaurantId, restaurantId)));
@@ -230,8 +230,8 @@ router.post("/restaurants/:restaurantId/tables/:tableId/unmerge", requireAuth, a
 });
 
 router.delete("/restaurants/:restaurantId/tables/:tableId", requireAuth, async (req, res): Promise<void> => {
-  const tableId = parseInt(req.params.tableId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const tableId = parseInt(String(req.params.tableId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [deleted] = await db.delete(tablesMapTable)
     .where(and(eq(tablesMapTable.id, tableId), eq(tablesMapTable.restaurantId, restaurantId)))
     .returning();

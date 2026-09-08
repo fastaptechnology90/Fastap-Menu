@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Building2, Users, MapPin, Plus, X, ChevronRight, Truck, DollarSign, CheckCircle } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { branches as branchesApi } from "@/lib/api";
+import { branches as branchesApi, planLimitMessage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/restaurant/EmptyState";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
@@ -96,7 +96,8 @@ export default function MultiBranchFranchise() {
       toast({ title: "Branch added" });
     } catch (e: any) {
       console.error(e);
-      toast({ variant: "destructive", title: "Could not add branch", description: e?.message || "Failed to create the branch." });
+      // A plan cap comes back as a 402 carrying the allowance and the current count.
+      toast({ variant: "destructive", ...planLimitMessage(e, "Could not add branch") });
     }
   }
 

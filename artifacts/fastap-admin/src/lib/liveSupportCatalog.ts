@@ -6,12 +6,17 @@ export type SupportChannelId =
   | "ticket"
   | "emergency";
 
+/**
+ * Every response time here was a promise nothing keeps — no queue is measured and no
+ * agent is staffed, so "avg 2 min response" and "Immediate" were decoration on a
+ * safety screen. What each channel actually is, is described instead.
+ */
 export const SUPPORT_CHANNELS = [
-  { id: "live_chat" as const, label: "Live Chat", icon: "💬", desc: "Instant chat with support agent · avg 2 min response", avgWait: "2 min" },
-  { id: "whatsapp" as const, label: "WhatsApp Support", icon: "📱", desc: "Message us on WhatsApp · share photos & receipts", avgWait: "5 min" },
-  { id: "voice" as const, label: "Voice Support", icon: "📞", desc: "Request a callback or call our helpline directly", avgWait: "10 min" },
-  { id: "ticket" as const, label: "Ticket Support", icon: "🎫", desc: "Submit a ticket · track status until resolved", avgWait: "24 hrs" },
-  { id: "emergency" as const, label: "Emergency Support", icon: "🚨", desc: "Urgent safety, medical or security issues · 24/7", avgWait: "Immediate" },
+  { id: "live_chat" as const, label: "Quick answers", icon: "💬", desc: "Automated assistant · answers common questions straight away", avgWait: "" },
+  { id: "whatsapp" as const, label: "WhatsApp", icon: "📱", desc: "Message the restaurant on WhatsApp · share photos & receipts", avgWait: "" },
+  { id: "voice" as const, label: "Phone", icon: "📞", desc: "Call the restaurant, or ask them to call you back", avgWait: "" },
+  { id: "ticket" as const, label: "Raise a request", icon: "🎫", desc: "Goes to the restaurant's team · track it here until it is closed", avgWait: "" },
+  { id: "emergency" as const, label: "Emergency", icon: "🚨", desc: "Urgent safety, medical or security issues — also tell a member of staff", avgWait: "" },
 ];
 
 export const TICKET_CATEGORIES = [

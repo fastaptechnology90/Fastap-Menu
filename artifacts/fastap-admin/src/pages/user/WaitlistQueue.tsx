@@ -286,8 +286,11 @@ export default function WaitlistQueue() {
                 <span className="text-2xl font-extrabold">{guests} <span className="text-sm text-white/40">guests</span></span>
                 <button onClick={() => setGuests(g => Math.min(12, g + 1))} className="h-10 w-10 rounded-xl bg-amber-500 hover:bg-amber-400 text-lg">+</button>
               </div>
+              {/* This claimed "Family priority auto-applied for 5+ guests" while the join
+                  request sent no priority at all — the "dining" queue type carries none.
+                  Larger parties wait longer for a table, they do not jump the line. */}
               {guests >= 5 && queueType === "dining" && (
-                <p className="text-xs text-blue-400 text-center mt-2">Family priority auto-applied for 5+ guests</p>
+                <p className="text-xs text-white/40 text-center mt-2">Larger parties may wait longer while a big enough table frees up.</p>
               )}
             </div>
 
@@ -398,9 +401,17 @@ export default function WaitlistQueue() {
               <button onClick={() => navigate("/user/support")} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-semibold hover:bg-blue-500/30">
                 <MessageSquare className="h-4 w-4" /> Message Host
               </button>
-              <button onClick={() => navigate("/user/support")} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30">
+              {/* This used to navigate to /user/support, exactly like the button beside
+                  it — two differently-labelled buttons going to the same form, and no
+                  way to actually reach the host desk. */}
+              <a
+                href={stats?.restaurantPhone ? `tel:${String(stats.restaurantPhone).replace(/[^\d+]/g, "")}` : undefined}
+                aria-disabled={!stats?.restaurantPhone}
+                onClick={e => { if (!stats?.restaurantPhone) { e.preventDefault(); navigate("/user/support"); } }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30"
+              >
                 <Phone className="h-4 w-4" /> Call Reception
-              </button>
+              </a>
             </div>
 
             <button onClick={leaveQueue} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/10">

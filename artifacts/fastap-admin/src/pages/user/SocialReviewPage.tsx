@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
@@ -11,7 +12,7 @@ import {
 } from "@/lib/socialReviewCatalog";
 import {
   ChevronLeft, Star, MessageSquare, Camera, Share2, Gift,
-  CheckCircle, Loader, RefreshCw, Heart, Upload, Copy, ExternalLink,
+  CheckCircle, AlertCircle, Loader, RefreshCw, Heart, Upload, Copy, ExternalLink,
 } from "lucide-react";
 
 type Tab = "ratings" | "reviews" | "photos" | "share" | "referral";
@@ -49,7 +50,10 @@ export default function SocialReviewPage() {
   const [, navigate] = useAppLocation();
   const { venue, user, activeTable } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const { toast: pushToast } = useToast();
   const [tab, setTab] = useState<Tab>("ratings");
@@ -59,7 +63,7 @@ export default function SocialReviewPage() {
   const [referral, setReferral] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -105,8 +109,11 @@ export default function SocialReviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function showToast(msg: string) {
-    setToast(msg);
+  // One green tick banner was used for confirmations AND for failures, so "Permission
+  // denied", "Sync failed" and "Image too large" all read as good news. `ok: false`
+  // paints the same banner as a problem.
+  function showToast(msg: string, ok = true) {
+    setToast({ text: msg, ok });
     setTimeout(() => setToast(null), 2800);
   }
 
@@ -134,7 +141,7 @@ export default function SocialReviewPage() {
   }
 
   async function handlePhotoUpload(file: File) {
-    if (file.size > 1_500_000) { showToast("Image too large (max 1.5MB)"); return; }
+    if (file.size > 1_500_000) { showToast("That photo is too large — please pick one under 1.5 MB", false); return; }
     setUploading(true);
     const reader = new FileReader();
     reader.onload = async () => {
@@ -249,8 +256,11 @@ export default function SocialReviewPage() {
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" /> {toast}
+          <div
+            role={toast.ok ? undefined : "alert"}
+            className={`mx-4 mb-2 rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${toast.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}
+          >
+            {toast.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />} {toast.text}
           </div>
         )}
 

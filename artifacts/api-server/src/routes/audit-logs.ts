@@ -6,7 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/audit-logs", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { severity, category, limit: limitQ } = req.query;
   const limit = parseInt(String(limitQ ?? "200"));
   const logs = await db.select().from(auditLogsTable).where(eq(auditLogsTable.restaurantId, id)).orderBy(desc(auditLogsTable.createdAt)).limit(limit);
@@ -15,7 +15,7 @@ router.get("/restaurants/:restaurantId/audit-logs", requireAuth, async (req, res
 });
 
 router.post("/restaurants/:restaurantId/audit-logs", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { action, category, severity, performedBy, role, ipAddress, deviceInfo, details, resourceType, resourceId } = req.body;
   const [log] = await db.insert(auditLogsTable).values({ restaurantId: id, action, category, severity, performedBy, role, ipAddress, deviceInfo, details: details ?? {}, resourceType, resourceId }).returning();
   res.status(201).json(log);

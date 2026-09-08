@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db, auditLogsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { runtimeSnapshot } from "../lib/runtime-metrics.js";
 import {
   resolveAnalyticsAccess,
   sendAnalyticsNotFound,
@@ -33,46 +34,69 @@ function appendMetricHistory(rid: number, point: HistoryPoint) {
   setPeakStats(rid, peaks);
 }
 
+/**
+ * Every one of these was a random number, sitting beside a fixed "99.87%" uptime. They
+ * are now readings: CPU and memory off this process, request and error counts and latency
+ * off the API router's own counter, sessions off the session table.
+ *
+ * `uptime` was never measurable from inside a single process — there is no record of the
+ * outages it would have to average over — so it reports null instead of a figure that
+ * would be read as a service-level number.
+ */
 function generateMetrics() {
+  const snap = runtimeSnapshot();
   return {
-    uptime: "99.87%",
-    uptime_seconds: Math.floor(process.uptime()),
-    cpu_usage: (Math.random() * 30 + 5).toFixed(1),
-    memory_usage: (Math.random() * 40 + 30).toFixed(1),
-    db_connections: Math.floor(Math.random() * 10) + 2,
-    db_response_ms: Math.floor(Math.random() * 50) + 10,
-    api_requests_today: Math.floor(Math.random() * 5000) + 1000,
-    api_errors_today: Math.floor(Math.random() * 20),
-    avg_response_ms: Math.floor(Math.random() * 200) + 50,
-    active_sessions: Math.floor(Math.random() * 15) + 1,
-    queue_size: Math.floor(Math.random() * 5),
+    uptime: null as string | null,
+    uptime_seconds: snap.uptimeSeconds,
+    started_at: snap.startedAt,
+    cpu_usage: snap.cpuPercent.toFixed(1),
+    memory_usage: snap.memoryPercent.toFixed(1),
+    memory_rss_bytes: snap.memoryRssBytes,
+    heap_used_bytes: snap.heapUsedBytes,
+    db_connections: null as number | null,
+    db_response_ms: 0,
+    api_requests_today: snap.requestsToday,
+    api_errors_today: snap.errorsToday,
+    avg_response_ms: snap.avgResponseMs ?? 0,
+    requests_in_flight: snap.requestsInFlight,
+    peak_concurrent_requests: snap.peakConcurrentRequests,
+    load_average_1m: snap.loadAverage1m,
+    active_sessions: 0,
+    queue_size: snap.requestsInFlight,
     last_checked: new Date().toISOString(),
   };
 }
 
+/**
+ * A venue with no audit trail has no incidents to show. It used to be handed four
+ * invented ones — including a database timeout and a memory warning that never happened.
+ */
 function ensureErrorLogs(rid: number) {
-  if (getErrorLogs(rid)) return getErrorLogs(rid)!;
-  const logs = [
-    { id: 1, level: "warning", message: "High memory usage detected (78%)", timestamp: new Date(Date.now() - 3600000).toISOString(), resolved: true, count: 1 },
-    { id: 2, level: "error", message: "Database connection timeout on orders query", timestamp: new Date(Date.now() - 7200000).toISOString(), resolved: true, count: 3 },
-    { id: 3, level: "info", message: "Scheduled backup completed successfully", timestamp: new Date(Date.now() - 86400000).toISOString(), resolved: true, count: 1 },
-    { id: 4, level: "warning", message: "API response time > 2s for /api/analytics/summary", timestamp: new Date(Date.now() - 172800000).toISOString(), resolved: false, count: 5 },
-  ];
-  setErrorLogs(rid, logs);
-  return logs;
+  return getErrorLogs(rid) ?? [];
 }
 
 router.get("/restaurants/:restaurantId/monitoring/metrics", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyMonitoringMetrics()); return; }
 
   const metrics = generateMetrics();
+  // The ping was issued in a shape the driver rejects, so it always threw: the database
+  // never actually got checked and the latency beside it was a random number.
   try {
     const start = Date.now();
-    await db.execute({ sql: "SELECT 1", params: [] } as any);
+    await db.execute(sql`SELECT 1`);
     metrics.db_response_ms = Date.now() - start;
+  } catch {
+    metrics.db_response_ms = -1;
+  }
+  // Sessions that have not yet expired — a real count of who is signed in. The store is
+  // the session table express writes, which drizzle does not model, hence the raw count.
+  try {
+    const rows = await db.execute(sql`SELECT COUNT(*)::int AS n FROM user_sessions WHERE expire > NOW()`);
+    const first = (Array.isArray(rows) ? rows[0] : (rows as { rows?: { n?: number }[] }).rows?.[0]) as { n?: number } | undefined;
+    metrics.active_sessions = Number(first?.n ?? 0);
   } catch {}
   const cpu = parseFloat(metrics.cpu_usage);
   const mem = parseFloat(metrics.memory_usage);
@@ -88,7 +112,7 @@ router.get("/restaurants/:restaurantId/monitoring/metrics", requireAuth, async (
 });
 
 router.get("/restaurants/:restaurantId/monitoring/history", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") {
@@ -119,14 +143,15 @@ router.get("/restaurants/:restaurantId/monitoring/history", requireAuth, async (
       peakCpu: `${Math.round(peaks.peakCpu)}%`,
       peakMem: `${Math.round(peaks.peakMem)}%`,
       peakRps: String(peaks.peakRps),
-      slowestEndpoint: "/api/analytics/summary",
+      // Per-endpoint timing is not collected, so naming one would be a guess.
+      slowestEndpoint: null,
       slowestLatency: `${peaks.slowestLatency}ms`,
     },
   });
 });
 
 router.get("/restaurants/:restaurantId/monitoring/logs", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -151,12 +176,15 @@ router.get("/restaurants/:restaurantId/monitoring/logs", requireAuth, async (req
 });
 
 router.get("/restaurants/:restaurantId/monitoring/health", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
   let dbOk = false;
-  try { await db.execute({ sql: "SELECT 1", params: [] } as any); dbOk = true; } catch {}
+  let dbLatencyMs: number | null = null;
+  const dbStart = Date.now();
+  try { await db.execute(sql`SELECT 1`); dbOk = true; dbLatencyMs = Date.now() - dbStart; } catch {}
+  const snapshot = runtimeSnapshot();
 
   if (access.kind === "unpublished") {
     res.json({
@@ -177,10 +205,12 @@ router.get("/restaurants/:restaurantId/monitoring/health", requireAuth, async (r
     isPublished: true,
     status: dbOk ? "healthy" : "degraded",
     components: {
-      api: { status: "up", latency_ms: Math.floor(Math.random() * 50) + 5 },
-      database: { status: dbOk ? "up" : "down", latency_ms: Math.floor(Math.random() * 100) + 10 },
+      // Latency here was drawn at random, so a slow database still read as fast. These are
+      // the API's own measured average and the round trip of the check just performed.
+      api: { status: "up", latency_ms: snapshot.avgResponseMs },
+      database: { status: dbOk ? "up" : "down", latency_ms: dbLatencyMs },
       sessions: { status: "up" },
-      queue: { status: "up", pending: Math.floor(Math.random() * 5) },
+      queue: { status: "up", pending: snapshot.requestsInFlight },
       notifications: { status: "up" },
     },
   });

@@ -33,46 +33,50 @@ export default function StaffCommissionChat() {
   useEffect(()=>{
     if(!restaurantId)return;
     commissionsApi.list(restaurantId).then((d: any) => {
-      if (Array.isArray(d) && d.length > 0) {
-        const periodStart = period === "today"
-          ? (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })()
-          : period === "week"
-            ? (() => { const t = new Date(); t.setDate(t.getDate() - 7); return t; })()
-            : (() => { const t = new Date(); t.setDate(t.getDate() - 30); return t; })();
-        const filtered = d.filter((c: any) => !c.createdAt || new Date(c.createdAt) >= periodStart);
-        const byStaff = new Map<string, { sales: number; commission: number; tips: number; orders: number; name: string; role: string }>();
-        for (const c of filtered) {
-          const key = c.staffName || "Staff";
-          const cur = byStaff.get(key) ?? { sales: 0, commission: 0, tips: 0, orders: 0, name: key, role: c.staffRole || "Waiter" };
-          const amt = parseFloat(String(c.amount || 0));
-          if (c.type === "tip") cur.tips += amt;
-          else cur.commission += amt;
-          if (c.orderId) { cur.orders += 1; cur.sales += amt * 10; }
-          byStaff.set(key, cur);
-        }
-        const rows = [...byStaff.entries()].map(([name, v], i) => {
-          const staffMember = staffList.find(s => s.name === name);
-          const performanceScore = staffMember?.performance ?? 0;
-          return {
-            id: `S${String(i + 1).padStart(2, "0")}`,
-            name: v.name,
-            role: v.role,
-            avatar: "🍽️",
-            sales: v.sales,
-            commission: v.commission,
-            tips: v.tips,
-            orders: v.orders,
-            avg: v.orders ? Math.round(v.sales / v.orders) : 0,
-            rating: performanceScore > 0 ? Math.min(5, performanceScore / 20) : 0,
-            target: 0,
-            shift: staffMember?.shift ? staffMember.shift.charAt(0).toUpperCase() + staffMember.shift.slice(1) : "—",
-          };
-        });
-        const maxSales = Math.max(...rows.map(r => r.sales), 1);
-        setCommissions(rows.map(r => ({ ...r, target: maxSales })));
-      } else {
-        setCommissions([]);
+      const periodStart = period === "today"
+        ? (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })()
+        : period === "week"
+          ? (() => { const t = new Date(); t.setDate(t.getDate() - 7); return t; })()
+          : (() => { const t = new Date(); t.setDate(t.getDate() - 30); return t; })();
+      const rowsIn: any[] = Array.isArray(d) ? d : [];
+      const earned = rowsIn.filter(c => !c.createdAt || new Date(c.createdAt) >= periodStart);
+
+      // Commission and tips come from the commission ledger. Sales do NOT: this used to
+      // reconstruct them as `commission * 10`, which tracks the commission rate rather
+      // than anything anybody sold, and read as zero for every venue that pays no
+      // commission at all. The server now measures each person's paid orders directly.
+      const byName = new Map<string, { commission: number; tips: number }>();
+      for (const c of earned) {
+        const key = c.staffName || "Staff";
+        const cur = byName.get(key) ?? { commission: 0, tips: 0 };
+        const amt = parseFloat(String(c.amount || 0)) || 0;
+        if (c.type === "tip") cur.tips += amt; else cur.commission += amt;
+        byName.set(key, cur);
       }
+
+      const serving = staffList.filter(m => m.ordersServed > 0 || byName.has(m.name));
+      const rows: CommissionRow[] = serving.map((m, i) => {
+        const led = byName.get(m.name) ?? { commission: 0, tips: 0 };
+        return {
+          id: `S${String(i + 1).padStart(2, "0")}`,
+          name: m.name,
+          role: m.role,
+          avatar: "🍽️",
+          sales: m.salesTotal,
+          commission: led.commission || m.commissionAccrued,
+          tips: led.tips || m.tipsCollected,
+          orders: m.ordersServed,
+          avg: m.avgOrderValue,
+          // A star rating built out of an unmeasured score is a made-up review. Until
+          // something actually scores performance, this stays 0 and the card says so.
+          rating: m.hasMeasuredPerformance && m.performance > 0 ? Math.min(5, m.performance / 20) : 0,
+          target: 0,
+          shift: m.shift ? m.shift.charAt(0).toUpperCase() + m.shift.slice(1) : "—",
+        };
+      }).sort((a, b) => b.sales - a.sales);
+
+      const maxSales = Math.max(...rows.map(r => r.sales), 1);
+      setCommissions(rows.map(r => ({ ...r, target: maxSales })));
     }).catch(e => toast({ title: "Could not load commissions", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
     commissionsApi.chatMessages(restaurantId).then((rows: any[]) => {
       if (Array.isArray(rows) && rows.length > 0) {

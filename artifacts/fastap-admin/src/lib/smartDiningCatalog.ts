@@ -52,6 +52,13 @@ export const DEFAULT_BILL_CONFIG: DiningBillConfig = {
   splitCount: 2,
 };
 
+/**
+ * A line's money.
+ *
+ * `price` is the full unit price the guest was shown — portion and add-ons already
+ * folded in by whoever built the line. `addons` is therefore only ever passed by a
+ * caller holding a bare base price, and defaults to nothing.
+ */
 export function lineTotal(price: number, qty: number, addons: { price: number }[] = []) {
   return (price + addons.reduce((s, a) => s + a.price, 0)) * qty;
 }

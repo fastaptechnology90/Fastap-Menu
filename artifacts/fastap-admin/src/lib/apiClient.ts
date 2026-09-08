@@ -507,6 +507,7 @@ export const api = {
       request<{ updated: number }>("/superadmin/app-releases/visibility/bulk", {
         method: "PUT", body: JSON.stringify({ appKey, visible }),
       }),
+    downloads: () => request<AppDownloadsResponse>("/superadmin/app-releases/downloads"),
     /**
      * Send the APK up in slices. An 80 MB file cannot go in one request — the body
      * limit would reject it and a dropped connection would lose the whole upload.
@@ -576,6 +577,27 @@ export type AppVisibilityRow = {
   isActive: boolean;
   plan: string;
   apps: Record<string, boolean>;
+};
+
+export type AppDownloadRow = {
+  id: number;
+  appKey: string;
+  version: string | null;
+  restaurantId: number | null;
+  restaurantName: string | null;
+  staffId: number | null;
+  staffName: string | null;
+  userAgent: string | null;
+  downloadedAt: string;
+};
+
+/** `byVenue` answers the question the raw log cannot: which venue is on which build. */
+export type AppDownloadsResponse = {
+  downloads: AppDownloadRow[];
+  byVenue: Record<string, {
+    restaurant: string;
+    apps: Record<string, { version: string | null; count: number; last: string }>;
+  }>;
 };
 
 export interface KYCRecord {

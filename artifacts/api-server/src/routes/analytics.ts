@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, gte, sql, desc } from "drizzle-orm";
-import { db, menuItemsTable, ordersTable, qrCodesTable, customersTable, feedbackTable, reservationsTable } from "@workspace/db";
+import { db, menuItemsTable, categoriesTable, ordersTable, qrCodesTable, customersTable, feedbackTable, reservationsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import {
   resolveAnalyticsAccess,
@@ -72,7 +72,7 @@ function formatGrowth(recent: number, previous: number): string {
 }
 
 router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
@@ -98,13 +98,54 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
 
   const [totalCustomers] = await db.select({ count: count() }).from(customersTable).where(eq(customersTable.restaurantId, restaurantId));
   const [totalScansRow] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).where(eq(qrCodesTable.restaurantId, restaurantId));
-  const [repeatCustomers] = await db.select({ count: count() }).from(customersTable).where(and(eq(customersTable.restaurantId, restaurantId)));
+  // A "repeat" customer is one who has come back. This ran the same query as the total,
+  // so the two figures were always identical and the panel showed 100% repeat business.
+  const [repeatCustomers] = await db.select({ count: count() }).from(customersTable)
+    .where(and(eq(customersTable.restaurantId, restaurantId), gte(customersTable.totalOrders, 2)));
   const feedbackRows = await db.select({ rating: feedbackTable.rating, foodRating: feedbackTable.foodRating }).from(feedbackTable).where(eq(feedbackTable.restaurantId, restaurantId));
   const [reservationsRow] = await db.select({ count: count() }).from(reservationsTable).where(eq(reservationsTable.restaurantId, restaurantId));
   const avgRating = feedbackRows.length ? feedbackRows.reduce((s, f) => s + f.rating, 0) / feedbackRows.length : 0;
   const avgFoodRating = feedbackRows.length
     ? feedbackRows.reduce((s, f) => s + (f.foodRating ?? f.rating), 0) / feedbackRows.length
     : 0;
+
+  // Top category and growth were shipped as an empty string and a literal 0. Both are
+  // derivable: the category comes from the menu rows the period's paid orders name, and
+  // growth compares this period's revenue with the preceding period of the same length.
+  const categoryRows = await db.select({ name: menuItemsTable.name, category: categoriesTable.name })
+    .from(menuItemsTable)
+    .leftJoin(categoriesTable, eq(menuItemsTable.categoryId, categoriesTable.id))
+    .where(eq(menuItemsTable.restaurantId, restaurantId));
+  const categoryOf = new Map(categoryRows.map(m => [m.name.toLowerCase(), m.category ?? ""]));
+  const lineOrders = await db.select({ items: ordersTable.items, total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, createdAt: ordersTable.createdAt })
+    .from(ordersTable).where(orderWhere);
+  const categoryTotals = new Map<string, number>();
+  for (const o of lineOrders) {
+    if (!isPaidOrder(o)) continue;
+    const lines = Array.isArray(o.items) ? o.items as Record<string, unknown>[] : [];
+    for (const line of lines) {
+      const cat = categoryOf.get(String(line.name ?? line.itemName ?? "").toLowerCase()) || "";
+      if (!cat) continue;
+      const qty = parseInt(String(line.quantity ?? 1), 10) || 1;
+      const price = parseFloat(String(line.price ?? 0)) || 0;
+      categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + qty * price);
+    }
+  }
+  const topCategory = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+
+  let growth = 0;
+  if (since) {
+    const spanMs = Date.now() - since.getTime();
+    const priorStart = new Date(since.getTime() - spanMs);
+    const priorRows = await db.select({ total: ordersTable.total, paymentStatus: ordersTable.paymentStatus, status: ordersTable.status, createdAt: ordersTable.createdAt })
+      .from(ordersTable)
+      .where(and(eq(ordersTable.restaurantId, restaurantId), gte(ordersTable.createdAt, priorStart)));
+    const priorRevenue = priorRows
+      .filter(o => isPaidOrder(o) && new Date(o.createdAt) < since)
+      .reduce((sum, o) => sum + orderGrossTotal(o), 0);
+    if (priorRevenue > 0) growth = Math.round(((totalRevenue - priorRevenue) / priorRevenue) * 100);
+    else if (totalRevenue > 0) growth = 100;
+  }
 
   res.json({
     isPublished: true,
@@ -118,17 +159,17 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
     repeatCustomers: repeatCustomers?.count ?? 0,
     feedbackAvgRating: parseFloat(avgRating.toFixed(1)),
     avgFoodRating: parseFloat(avgFoodRating.toFixed(1)),
-    topCategory: "",
+    topCategory,
     views: parseInt(String(totalScansRow?.total ?? 0)),
     ratings: parseFloat(avgRating.toFixed(1)),
     reviews: feedbackRows.length,
     reservations: reservationsRow?.count ?? 0,
-    growth: 0,
+    growth,
   });
 });
 
 router.get("/restaurants/:restaurantId/analytics/popular-items", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -145,16 +186,62 @@ router.get("/restaurants/:restaurantId/analytics/popular-items", requireAuth, as
     .orderBy(sql`${menuItemsTable.orderCount} DESC`)
     .limit(10);
 
-  const allOrders = await db.select({ items: ordersTable.items, createdAt: ordersTable.createdAt })
+  const allOrders = await db.select({
+    id: ordersTable.id, items: ordersTable.items, createdAt: ordersTable.createdAt,
+    paymentStatus: ordersTable.paymentStatus, status: ordersTable.status,
+  })
     .from(ordersTable)
     .where(eq(ordersTable.restaurantId, restaurantId));
 
-  const feedbackRows = await db.select({ foodRating: feedbackTable.foodRating, rating: feedbackTable.rating })
+  // A dish's rating used to be the restaurant's overall food rating, printed identically
+  // against every dish — so a dish nobody liked wore the venue's average. A rating only
+  // belongs to a dish if a guest who ate it left one, which is what the order link on the
+  // feedback row gives us. A dish with no such feedback reports no rating at all.
+  const feedbackRows = await db.select({
+    orderId: feedbackTable.orderId, foodRating: feedbackTable.foodRating, rating: feedbackTable.rating,
+  })
     .from(feedbackTable)
     .where(eq(feedbackTable.restaurantId, restaurantId));
-  const restaurantFoodRating = feedbackRows.length
-    ? feedbackRows.reduce((s, f) => s + (f.foodRating ?? f.rating), 0) / feedbackRows.length
-    : 0;
+
+  const itemsInOrder = new Map<number, Set<string>>();
+  for (const o of allOrders) {
+    const lines = Array.isArray(o.items) ? o.items as Record<string, unknown>[] : [];
+    const names = new Set(lines.map(l => String(l.name ?? l.itemName ?? "").toLowerCase()).filter(Boolean));
+    if (names.size) itemsInOrder.set(o.id, names);
+  }
+  const ratingsByItem = new Map<string, { sum: number; n: number }>();
+  for (const f of feedbackRows) {
+    if (f.orderId == null) continue;
+    const names = itemsInOrder.get(f.orderId);
+    if (!names) continue;
+    const score = f.foodRating ?? f.rating;
+    if (score == null) continue;
+    for (const n of names) {
+      const cur = ratingsByItem.get(n) ?? { sum: 0, n: 0 };
+      cur.sum += score;
+      cur.n += 1;
+      ratingsByItem.set(n, cur);
+    }
+  }
+
+  // Revenue per dish is what its lines actually billed on paid orders, not list price
+  // multiplied by a lifetime order counter that no discount or price change ever touched.
+  const revenueByItem = new Map<string, number>();
+  const unitsByItem = new Map<string, number>();
+  for (const o of allOrders) {
+    if (!isPaidOrder(o)) continue;
+    const lines = Array.isArray(o.items) ? o.items as Record<string, unknown>[] : [];
+    for (const line of lines) {
+      const key = String(line.name ?? line.itemName ?? "").toLowerCase();
+      if (!key) continue;
+      const qty = parseInt(String(line.quantity ?? 1), 10) || 1;
+      const lineTotal = line.subtotal != null
+        ? parseFloat(String(line.subtotal)) || 0
+        : (parseFloat(String(line.price ?? 0)) || 0) * qty;
+      revenueByItem.set(key, (revenueByItem.get(key) ?? 0) + lineTotal);
+      unitsByItem.set(key, (unitsByItem.get(key) ?? 0) + qty);
+    }
+  }
 
   const now = new Date();
   const recentStart = new Date(now);
@@ -165,20 +252,24 @@ router.get("/restaurants/:restaurantId/analytics/popular-items", requireAuth, as
   res.json(items.map(i => {
     const recent = countItemInOrders(allOrders, i.name, recentStart);
     const previous = countItemInOrders(allOrders, i.name, previousStart, recentStart);
+    const key = i.name.toLowerCase();
+    const rated = ratingsByItem.get(key);
     return {
       itemId: i.id,
       name: i.name,
-      imageUrl: i.imageUrl,
       totalOrders: i.orderCount,
-      totalRevenue: parseFloat(String(i.price)) * i.orderCount,
-      avgRating: restaurantFoodRating > 0 ? parseFloat(restaurantFoodRating.toFixed(1)) : 0,
+      imageUrl: i.imageUrl,
+      unitsSold: unitsByItem.get(key) ?? 0,
+      totalRevenue: Math.round((revenueByItem.get(key) ?? 0) * 100) / 100,
+      avgRating: rated && rated.n > 0 ? Math.round((rated.sum / rated.n) * 10) / 10 : null,
+      ratingCount: rated?.n ?? 0,
       growth: formatGrowth(recent, previous),
     };
   }));
 });
 
 router.get("/restaurants/:restaurantId/analytics/daily-sales", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -213,7 +304,7 @@ router.get("/restaurants/:restaurantId/analytics/daily-sales", requireAuth, asyn
 });
 
 router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyOrderStats()); return; }
@@ -287,7 +378,7 @@ router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, asyn
 });
 
 router.get("/restaurants/:restaurantId/analytics/export", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 

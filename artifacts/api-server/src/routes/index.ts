@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import healthRouter from "./health";
 import restaurantAuthRouter from "./restaurant-auth";
 import authRouter from "./auth";
@@ -10,6 +10,11 @@ import menusRouter from "./menus";
 import qrcodesRouter from "./qrcodes";
 import analyticsRouter from "./analytics";
 import ordersRouter from "./orders";
+import orderAdjustmentsRouter from "./order-adjustments";
+import dayEndRouter from "./day-end";
+import attendanceRouter from "./attendance";
+import tableOperationsRouter from "./table-operations";
+import printingRouter from "./printing";
 import staffRouter from "./staff";
 import customersRouter from "./customers";
 import loyaltyRouter from "./loyalty";
@@ -76,8 +81,24 @@ import { requireAuth } from "../middlewares/auth";
 import { requireRestaurantSubscription } from "../middlewares/restaurant-subscription.js";
 import { requireTenantScope } from "../middlewares/tenant-scope.js";
 import { requireStaffPermission } from "../middlewares/staff-permissions.js";
+import { enforcePlanLimits } from "../middlewares/plan-limits.js";
+import { recordRequest, requestStarted, requestFinished } from "../lib/runtime-metrics.js";
 
 const router: IRouter = Router();
+
+// Every API request is counted here so the monitoring screen can report traffic, errors
+// and latency this process actually served. It used to report random numbers.
+const countRequest: RequestHandler = (_req, res, next) => {
+  const startedAt = Date.now();
+  requestStarted();
+  res.on("finish", () => {
+    requestFinished();
+    recordRequest(res.statusCode, Date.now() - startedAt);
+  });
+  res.on("close", () => { if (!res.writableEnded) requestFinished(); });
+  next();
+};
+router.use(countRequest);
 
 // Ownership is checked once, here, for every path that names a restaurant — so a new
 // route is covered the day it is written instead of relying on each one remembering.
@@ -85,6 +106,9 @@ router.use(requireTenantScope);
 // Then the venue's own role matrix. Tenant scoping keeps one restaurant out of another's
 // data; this keeps a waiter out of the finance ledger and the staff list within their own.
 router.use(requireStaffPermission);
+// A venue may only create what its plan allows. Reading, editing and deleting stay open
+// so a venue over its limit can still work with — and reduce — what it already has.
+router.use(enforcePlanLimits);
 router.use(requireRestaurantSubscription);
 
 router.use(healthRouter);
@@ -100,6 +124,11 @@ router.use(menusRouter);
 router.use(qrcodesRouter);
 router.use(analyticsRouter);
 router.use(ordersRouter);
+router.use(orderAdjustmentsRouter);
+router.use(dayEndRouter);
+router.use(attendanceRouter);
+router.use(tableOperationsRouter);
+router.use(printingRouter);
 router.use(staffRouter);
 router.use(customersRouter);
 router.use(loyaltyRouter);

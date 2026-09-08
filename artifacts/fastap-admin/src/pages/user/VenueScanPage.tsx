@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useParams } from "wouter";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { useUser } from "@/contexts/UserContext";
@@ -55,7 +56,9 @@ export default function VenueScanPage() {
   const [, navigate] = useAppLocation();
   const { loadVenue } = useUser();
   const qs = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const slug = params.slug || qs.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+  const slug = params.slug || qs.get("slug") || DEMO_SLUG;
   const table = qs.get("table") || undefined;
   const room = qs.get("room") || undefined;
 

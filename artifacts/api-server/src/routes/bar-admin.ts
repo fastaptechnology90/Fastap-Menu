@@ -38,13 +38,13 @@ async function saveBarSection(rid: number, key: string, value: unknown) {
 }
 
 router.get("/restaurants/:restaurantId/bar/inventory", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const inventory = await loadBarSection(rid, "inventory", [] as typeof DEFAULT_INVENTORY);
   res.json(inventory);
 });
 
 router.put("/restaurants/:restaurantId/bar/inventory", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { items } = req.body as { items?: typeof DEFAULT_INVENTORY };
   if (!Array.isArray(items)) { res.status(400).json({ error: "items array required" }); return; }
   await saveBarSection(rid, "inventory", items);
@@ -52,7 +52,7 @@ router.put("/restaurants/:restaurantId/bar/inventory", requireAuth, async (req, 
 });
 
 router.patch("/restaurants/:restaurantId/bar/inventory/:itemId", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const itemId = req.params.itemId;
   const inventory = await loadBarSection(rid, "inventory", [] as typeof DEFAULT_INVENTORY);
   const idx = inventory.findIndex(i => i.id === itemId);
@@ -63,13 +63,13 @@ router.patch("/restaurants/:restaurantId/bar/inventory/:itemId", requireAuth, as
 });
 
 router.get("/restaurants/:restaurantId/bar/recipes", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const recipes = await loadBarSection(rid, "recipes", [] as typeof DEFAULT_RECIPES);
   res.json(recipes);
 });
 
 router.put("/restaurants/:restaurantId/bar/recipes", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { recipes } = req.body;
   if (!Array.isArray(recipes)) { res.status(400).json({ error: "recipes array required" }); return; }
   await saveBarSection(rid, "recipes", recipes);
@@ -77,14 +77,14 @@ router.put("/restaurants/:restaurantId/bar/recipes", requireAuth, async (req, re
 });
 
 router.get("/restaurants/:restaurantId/bar/catalog", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const catalogOverrides = await getSettingsSection(rid, "barCatalog", {});
   const happyHour = await getSettingsSection(rid, "barHappyHour", HAPPY_HOUR);
   res.json({ ...getBarCatalog(), happyHour, ...catalogOverrides });
 });
 
 router.put("/restaurants/:restaurantId/bar/happy-hour", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   await setSettingsSection(rid, "barHappyHour", req.body);
   res.json({ success: true, happyHour: req.body });
 });

@@ -12,7 +12,7 @@ import {
 } from "@/lib/liveSupportCatalog";
 import {
   ChevronLeft, MessageCircle, Phone, Send, AlertTriangle, Ticket,
-  CheckCircle, Headphones, Clock, ExternalLink, Mic, Shield, Loader,
+  CheckCircle, AlertCircle, Headphones, Clock, ExternalLink, Mic, Shield, Loader,
 } from "lucide-react";
 
 type Tab = SupportChannelId;
@@ -32,12 +32,14 @@ export default function UserSupport() {
   const [config, setConfig] = useState<any>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Live chat
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [agentName, setAgentName] = useState("Support Agent");
+  // The chat is automated. It used to open as a named person ("I'm Priya from
+  // support"), which left a guest waiting on someone who does not exist.
+  const [agentName, setAgentName] = useState("Support assistant");
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -135,8 +137,11 @@ export default function UserSupport() {
     return () => clearInterval(t);
   }, [sessionId, venue.restaurantId, tab]);
 
-  function showToast(msg: string) {
-    setToast(msg);
+  // One green tick banner was used for confirmations AND for failures, so "Permission
+  // denied", "Sync failed" and "Image too large" all read as good news. `ok: false`
+  // paints the same banner as a problem.
+  function showToast(msg: string, ok = true) {
+    setToast({ text: msg, ok });
     setTimeout(() => setToast(null), 3000);
   }
 
@@ -192,7 +197,7 @@ export default function UserSupport() {
   }
 
   async function requestVoiceCallback() {
-    if (!voicePhone.trim()) { showToast("Enter your phone number"); return; }
+    if (!voicePhone.trim()) { showToast("Enter your phone number so we can call you back", false); return; }
     setSubmitting(true);
     try {
       const res = await publicApi.support.voice({
@@ -264,19 +269,24 @@ export default function UserSupport() {
         <div className="px-4 py-3 flex items-center gap-3">
           <GuestBackButton />
           <div className="flex-1">
-            <p className="text-xs text-white/40">Live Support System</p>
+            <p className="text-xs text-white/40">Help &amp; requests</p>
             <h1 className="text-base font-bold flex items-center gap-2">
               <Headphones className="h-4 w-4 text-cyan-400" /> Guest Support
             </h1>
           </div>
-          <div className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">
-            {config?.agentsOnline ?? 0} online
+          <div className="text-xs text-white/50 bg-white/5 px-2 py-1 rounded-full">
+            {/* This said "2 online" whether or not anyone was. Chat is automated; the
+                channels that reach a person are listed below. */}
+            Automated assistant
           </div>
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" /> {toast}
+          <div
+            role={toast.ok ? undefined : "alert"}
+            className={`mx-4 mb-2 rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${toast.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}
+          >
+            {toast.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />} {toast.text}
           </div>
         )}
 
@@ -316,12 +326,12 @@ export default function UserSupport() {
               <span className="text-lg">{c.icon}</span>
               <p className="text-xs font-semibold mt-1">{c.label}</p>
               <p className="text-[10px] text-white/40 line-clamp-2">{c.desc}</p>
-              <p className="text-[10px] text-cyan-400 mt-1 flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {c.avgWait}</p>
+              {c.avgWait ? <p className="text-[10px] text-cyan-400 mt-1 flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {c.avgWait}</p> : null}
             </button>
           ))}
         </div>
 
-        <p className="text-xs text-white/40 text-center">{config?.hours ?? ""}</p>
+        {config?.hours ? <p className="text-xs text-white/40 text-center">{config.hours}</p> : null}
 
         {/* Live Chat */}
         {tab === "live_chat" && (
@@ -369,7 +379,9 @@ export default function UserSupport() {
         {tab === "whatsapp" && (
           <>
             <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-4">
-              <p className="text-sm font-semibold text-emerald-200">WhatsApp: {config?.whatsappDisplay ?? "—"}</p>
+              <p className="text-sm font-semibold text-emerald-200">
+                {config?.whatsappDisplay ? `WhatsApp: ${config.whatsappDisplay}` : "This restaurant has not set up a WhatsApp line"}
+              </p>
               <p className="text-xs text-white/50 mt-1">Send photos, receipts, or voice notes directly to our support team.</p>
             </div>
             <textarea
@@ -391,7 +403,9 @@ export default function UserSupport() {
           <>
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 p-4 text-center">
               <Phone className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-              <p className="text-lg font-bold text-blue-300">{config?.voiceHelplineDisplay ?? "—"}</p>
+              <p className="text-lg font-bold text-blue-300">
+                {config?.voiceHelplineDisplay || config?.voiceHelpline || "No helpline number on file"}
+              </p>
               <p className="text-xs text-white/50 mt-1">Call directly or request a callback below</p>
               <a href={`tel:${config?.voiceHelpline ?? ""}`} className="inline-block mt-3 px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-300 text-sm font-semibold">
                 Call Now
@@ -482,12 +496,22 @@ export default function UserSupport() {
         {tab === "emergency" && (
           <>
             <div className="rounded-xl bg-red-500/15 border border-red-500/40 p-4">
-              <p className="text-sm font-bold text-red-200 flex items-center gap-2">
-                <Shield className="h-4 w-4" /> 24/7 Emergency Line: {config?.emergencyDisplay ?? "—"}
-              </p>
-              <a href={`tel:${config?.emergencyHotline ?? ""}`} className="block mt-2 text-center py-3 rounded-xl bg-red-600 font-bold text-sm">
-                CALL EMERGENCY HOTLINE
-              </a>
+              {/* This printed a placeholder number as a 24/7 emergency line and offered
+                  to dial it. A venue that has not set one up must not appear to have one. */}
+              {config?.emergencyHotline ? (
+                <>
+                  <p className="text-sm font-bold text-red-200 flex items-center gap-2">
+                    <Shield className="h-4 w-4" /> Emergency line: {config.emergencyDisplay || config.emergencyHotline}
+                  </p>
+                  <a href={`tel:${config.emergencyHotline}`} className="block mt-2 text-center py-3 rounded-xl bg-red-600 font-bold text-sm">
+                    CALL THIS RESTAURANT&apos;S EMERGENCY LINE
+                  </a>
+                </>
+              ) : (
+                <p className="text-sm font-bold text-red-200 flex items-center gap-2">
+                  <Shield className="h-4 w-4" /> In a real emergency, tell a member of staff and call your local emergency number.
+                </p>
+              )}
             </div>
 
             {!emergencySent ? (
@@ -518,13 +542,27 @@ export default function UserSupport() {
             ) : (
               <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-center space-y-3">
                 <CheckCircle className="h-10 w-10 text-red-400 mx-auto" />
-                <p className="font-bold text-red-200">Emergency Alert Sent</p>
-                <p className="text-xs text-white/60">Staff and security have been notified. Help is on the way.</p>
-                <div className="text-left text-xs space-y-1 pt-2 border-t border-white/10">
-                  <p>🚨 Emergency: {hotlines?.emergencyDisplay ?? config?.emergencyDisplay}</p>
-                  <p>🛡️ Security: {hotlines?.securityLine ?? config?.securityLine}</p>
-                  <p>👤 Manager: {hotlines?.managerLine ?? config?.managerLine}</p>
-                </div>
+                <p className="font-bold text-red-200">Alert raised</p>
+                {/* It used to say help was on the way. All that happens is a record
+                    appearing in the restaurant's system; nobody is paged. */}
+                <p className="text-xs text-white/60">
+                  This has been recorded for the restaurant&apos;s team. Do not wait on it —
+                  tell a member of staff now, and call your local emergency number if
+                  anyone is at risk.
+                </p>
+                {[
+                  ["🚨 Emergency", hotlines?.emergencyDisplay || config?.emergencyDisplay],
+                  ["🛡️ Security", hotlines?.securityLine || config?.securityLine],
+                  ["👤 Manager", hotlines?.managerLine || config?.managerLine],
+                ].filter(([, v]) => Boolean(v)).length > 0 && (
+                  <div className="text-left text-xs space-y-1 pt-2 border-t border-white/10">
+                    {[
+                      ["🚨 Emergency", hotlines?.emergencyDisplay || config?.emergencyDisplay],
+                      ["🛡️ Security", hotlines?.securityLine || config?.securityLine],
+                      ["👤 Manager", hotlines?.managerLine || config?.managerLine],
+                    ].filter(([, v]) => Boolean(v)).map(([label, v]) => <p key={label}>{label}: {v}</p>)}
+                  </div>
+                )}
               </div>
             )}
           </>

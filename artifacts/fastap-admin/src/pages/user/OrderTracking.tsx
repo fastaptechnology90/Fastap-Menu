@@ -256,8 +256,13 @@ export default function OrderTracking() {
       if (phone) {
         window.location.href = `tel:${phone.replace(/\s/g, "")}`;
         showToast(phone === contactInfo.waiterPhone ? "Calling your waiter…" : "Calling restaurant…");
-      } else {
+      } else if (!Number.isNaN(orderId)) {
         showToast("Waiter notified — they will call you shortly");
+      } else {
+        // No order id means notifyWaiter above was skipped, and with no phone there is
+        // nothing left to try. Claiming a waiter was notified sent the guest on to wait
+        // for someone who had heard nothing.
+        showToast("We could not reach anyone from here — please wave a member of staff over.");
       }
     } catch {
       if (phone) window.location.href = `tel:${phone.replace(/\s/g, "")}`;

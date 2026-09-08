@@ -2,9 +2,9 @@
 /**
  * Full-stack verification: 3 web panels + 3 Flutter mobile apps (kitchen, waiter, housekeeping).
  * Usage:
- *   API_BASE=https://digitalrestuarants.thefingo.com/api \
- *   MOBILE_BASE=https://digitalrestuarants.thefingo.com \
- *   WEB_BASE=https://digitalrestuarants.thefingo.com \
+ *   API_BASE=https://fastap-menu-production.up.railway.app/api \
+ *   MOBILE_BASE=https://fastap-menu-production.up.railway.app \
+ *   WEB_BASE=https://fastap-menu-production.up.railway.app \
  *   node scripts/smoke-full-stack.mjs
  */
 import { execSync } from "node:child_process";
@@ -14,9 +14,9 @@ import path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
-const API_BASE = process.env.API_BASE || "https://digitalrestuarants.thefingo.com/api";
-const MOBILE_BASE = process.env.MOBILE_BASE || "https://digitalrestuarants.thefingo.com";
-const WEB_BASE = process.env.WEB_BASE || "https://digitalrestuarants.thefingo.com";
+const API_BASE = process.env.API_BASE || "https://fastap-menu-production.up.railway.app/api";
+const MOBILE_BASE = process.env.MOBILE_BASE || "https://fastap-menu-production.up.railway.app";
+const WEB_BASE = process.env.WEB_BASE || "https://fastap-menu-production.up.railway.app";
 
 const MOBILE_ROLES = [
   {

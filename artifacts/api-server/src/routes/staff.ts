@@ -4,17 +4,57 @@ import { eq, and } from "drizzle-orm";
 import { db, staffTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { makeStaffQrToken } from "../lib/mobile-kitchen/staff-tokens.js";
+import {
+  getStaffSalesMap, getStaffCommissionTotals, getStaffCommissionPolicy,
+  commissionPercentFor, emptyStaffSales,
+} from "../lib/staff-earnings.js";
 
 const router: IRouter = Router();
 
+/**
+ * Staff rows carry what each person actually sold.
+ *
+ * Screens wanting a server's sales had no field to read and were inferring it from a
+ * commission amount, which measures the rate rather than the sales. These figures come
+ * from the orders that person closed, under the same paid-only rule as revenue, so a
+ * server's total and the venue's revenue reconcile against each other.
+ *
+ * `performanceScore` is whatever a manager stored on the record; nothing measures it, so
+ * `hasMeasuredPerformance` says plainly that it is not derived from the data below.
+ */
 router.get("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const rows = await db.select().from(staffTable).where(eq(staffTable.restaurantId, id));
-  res.json(rows.map(({ pinHash: _pinHash, ...rest }) => rest));
+
+  const [sales, commissionTotals, policy] = await Promise.all([
+    getStaffSalesMap(id),
+    getStaffCommissionTotals(id, rows.map(r => r.name)),
+    getStaffCommissionPolicy(id),
+  ]);
+
+  res.json(rows.map(({ pinHash: _pinHash, ...rest }) => {
+    const nameKey = String(rest.name ?? "").trim().toLowerCase();
+    const mine = sales.byId.get(rest.id) ?? sales.byName.get(nameKey) ?? emptyStaffSales();
+    const earned = commissionTotals.get(nameKey) ?? { accrued: 0, paid: 0, tips: 0 };
+    const percent = commissionPercentFor(policy, rest.role);
+    return {
+      ...rest,
+      ordersServed: mine.ordersServed,
+      salesTotal: mine.salesTotal,
+      avgOrderValue: mine.avgOrderValue,
+      tipsCollected: mine.tipsCollected,
+      lastOrderAt: mine.lastOrderAt,
+      commissionAccrued: earned.accrued,
+      commissionPaid: earned.paid,
+      commissionPending: Math.round((earned.accrued - earned.paid) * 100) / 100,
+      commissionPercent: percent > 0 ? percent : null,
+      hasMeasuredPerformance: false,
+    };
+  }));
 });
 
 router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, email, role, phone, password, isActive } = req.body;
   if (!name?.trim() || !email?.trim() || !role) {
     res.status(400).json({ error: "name, email, and role are required" });
@@ -43,8 +83,8 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
 });
 
 router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.staffId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const staffId = parseInt(String(req.params.staffId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, email, role, phone, password, isActive, shift, weeklySchedule } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
@@ -78,8 +118,8 @@ router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req,
 });
 
 router.delete("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.staffId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const staffId = parseInt(String(req.params.staffId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [deleted] = await db
     .delete(staffTable)
     .where(and(eq(staffTable.id, staffId), eq(staffTable.restaurantId, restaurantId)))
@@ -104,8 +144,8 @@ router.post(
   "/restaurants/:restaurantId/staff/:staffId/login-qr",
   requireAuth,
   async (req, res): Promise<void> => {
-    const restaurantId = parseInt(req.params.restaurantId, 10);
-    const staffId = parseInt(req.params.staffId, 10);
+    const restaurantId = parseInt(String(req.params.restaurantId), 10);
+    const staffId = parseInt(String(req.params.staffId), 10);
     if (!Number.isFinite(restaurantId) || !Number.isFinite(staffId)) {
       res.status(400).json({ error: "Invalid restaurant or staff id" });
       return;

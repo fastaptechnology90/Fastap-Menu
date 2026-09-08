@@ -13,7 +13,7 @@ function parseNum(v: unknown): number {
 }
 
 router.get("/public/spa/catalog/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   const services = await db.select().from(spaServicesTable).where(
     and(eq(spaServicesTable.restaurantId, restaurantId), eq(spaServicesTable.isAvailable, true)),
@@ -30,7 +30,7 @@ router.get("/public/spa/catalog/:restaurantId", async (req, res): Promise<void> 
 });
 
 router.get("/public/spa/services/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const services = await db.select().from(spaServicesTable).where(
     and(eq(spaServicesTable.restaurantId, restaurantId), eq(spaServicesTable.isAvailable, true)),
   );
@@ -156,7 +156,7 @@ router.get("/public/spa/bookings", async (req, res): Promise<void> => {
 });
 
 router.patch("/public/spa/bookings/:id/cancel", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [booking] = await db.update(spaBookingsTable).set({ status: "cancelled" }).where(eq(spaBookingsTable.id, id)).returning();
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
   res.json(booking);

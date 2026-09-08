@@ -1,11 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, desc, gte, lte } from "drizzle-orm";
-import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable, spaBookingsTable, banquetEventsTable, financeTransactionsTable } from "@workspace/db";
+import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, menuViewsTable, platformSettlementsTable, feedbackTable, spaBookingsTable, banquetEventsTable, financeTransactionsTable } from "@workspace/db";
 import { CreateRestaurantBody, UpdateRestaurantBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { createRestaurantRateLimit } from "../middlewares/rate-limit.js";
 import { getAccessibleRestaurant } from "../lib/restaurant-access.js";
 import { getSettingsSection, setSettingsSection } from "../lib/restaurant-settings.js";
+import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
+import { getPublicIntegrationsConfig } from "../lib/platform-integrations.js";
 import {
   resolveAnalyticsAccess,
   sendAnalyticsNotFound,
@@ -15,6 +17,7 @@ import {
 } from "../lib/restaurant-publication.js";
 import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
 import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenue, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
+import { getCommissionRate } from "../lib/platform-admin.js";
 
 const router: IRouter = Router();
 
@@ -47,7 +50,7 @@ router.post("/restaurants", requireAuth, createRestaurantRateLimit, async (req, 
 });
 
 router.get("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const whiteLabelSettings = await getSettingsSection(id, "whiteLabel", {});
@@ -60,7 +63,7 @@ router.get("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<
 });
 
 router.put("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
 
@@ -108,8 +111,129 @@ router.put("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<
   res.json(updated);
 });
 
+/**
+ * Which alerts a venue wants, and on which channels.
+ *
+ * The Notification Hub carried twelve toggles and two thresholds that lived only in
+ * React state: nothing saved them, nothing read them, and a refresh put them all back.
+ * They are now stored against the venue, and the response also says which channels the
+ * platform can actually deliver on — a venue turning on SMS when no provider is
+ * configured is being sold a switch that does nothing.
+ */
+const NOTIFICATION_DEFAULTS = {
+  orderAlerts: true, stockAlerts: true, paymentAlerts: true, staffAlerts: true,
+  reservationAlerts: true, reviewAlerts: true, financeAlerts: false, systemAlerts: false,
+  soundEnabled: true, pushEnabled: true, emailEnabled: false, smsEnabled: false,
+  orderThreshold: 3, stockThreshold: 20,
+};
+
+async function deliverableChannels() {
+  try {
+    const platform = await getPlatformSettingsRaw();
+    const messaging = getPublicIntegrationsConfig(platform.integrations).messaging;
+    // Sound and browser push need nothing from the platform; email and SMS need a
+    // provider somebody has actually configured.
+    return { sound: true, push: true, email: messaging.email, sms: messaging.sms };
+  } catch {
+    return { sound: true, push: true, email: false, sms: false };
+  }
+}
+
+router.get("/restaurants/:restaurantId/settings/notifications", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  const saved = await getSettingsSection(id, "notificationPrefs", {});
+  res.json({
+    preferences: { ...NOTIFICATION_DEFAULTS, ...(saved as object) },
+    channelsAvailable: await deliverableChannels(),
+  });
+});
+
+router.put("/restaurants/:restaurantId/settings/notifications", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const current = await getSettingsSection(id, "notificationPrefs", {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...NOTIFICATION_DEFAULTS, ...current };
+
+  // Only the keys this screen owns, and only in the shape they are declared — a
+  // settings blob that accepts anything is how a stray field ends up disabling a venue.
+  for (const [key, fallback] of Object.entries(NOTIFICATION_DEFAULTS)) {
+    if (!(key in body)) continue;
+    if (typeof fallback === "boolean") merged[key] = Boolean(body[key]);
+    else {
+      const n = Number(body[key]);
+      if (Number.isFinite(n) && n >= 0 && n <= 10000) merged[key] = Math.round(n);
+    }
+  }
+
+  await setSettingsSection(id, "notificationPrefs", merged);
+  res.json({ preferences: merged, channelsAvailable: await deliverableChannels() });
+});
+
+/**
+ * How the kitchen display is set up: target times per station, sound, auto-accept.
+ *
+ * These belonged to the browser tab. A kitchen that set its grill target to 25 minutes
+ * lost it on the next refresh, and a venue running two KDS screens had two different
+ * sets of targets — so the same ticket went red on one screen and green on the other.
+ * They belong to the venue.
+ */
+const KDS_DEFAULTS = {
+  targetTimes: { hot: 18, grill: 22, cold: 8, bar: 5, desserts: 10, expo: 25, all: 20 } as Record<string, number>,
+  soundOn: true,
+  autoAccept: false,
+  priorityMode: false,
+};
+
+router.get("/restaurants/:restaurantId/settings/kitchen-display", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  const saved = await getSettingsSection(id, "kitchenDisplay", {}) as Record<string, unknown>;
+  res.json({
+    ...KDS_DEFAULTS,
+    ...saved,
+    targetTimes: { ...KDS_DEFAULTS.targetTimes, ...((saved.targetTimes ?? {}) as Record<string, number>) },
+  });
+});
+
+router.put("/restaurants/:restaurantId/settings/kitchen-display", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const saved = await getSettingsSection(id, "kitchenDisplay", {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = {
+    ...KDS_DEFAULTS,
+    ...saved,
+    targetTimes: { ...KDS_DEFAULTS.targetTimes, ...((saved.targetTimes ?? {}) as Record<string, number>) },
+  };
+
+  for (const key of ["soundOn", "autoAccept", "priorityMode"]) {
+    if (key in body) merged[key] = Boolean(body[key]);
+  }
+  if (body.targetTimes && typeof body.targetTimes === "object") {
+    const times = { ...(merged.targetTimes as Record<string, number>) };
+    for (const [station, value] of Object.entries(body.targetTimes as Record<string, unknown>)) {
+      const n = Number(value);
+      // A target of zero would paint every ticket red the moment it arrived, and one of
+      // several hours would never warn at all.
+      if (Number.isFinite(n) && n >= 1 && n <= 240) times[station] = Math.round(n);
+    }
+    merged.targetTimes = times;
+  }
+
+  await setSettingsSection(id, "kitchenDisplay", merged);
+  res.json(merged);
+});
+
 router.get("/restaurants/:restaurantId/settings/white-label", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const whiteLabelSettings = await getSettingsSection(id, "whiteLabel", {});
@@ -122,7 +246,7 @@ router.get("/restaurants/:restaurantId/settings/white-label", requireAuth, async
 });
 
 router.get("/restaurants/:restaurantId/settings/app", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const appSettings = await getSettingsSection(id, "appSettings", {});
@@ -130,7 +254,7 @@ router.get("/restaurants/:restaurantId/settings/app", requireAuth, async (req, r
 });
 
 router.put("/restaurants/:restaurantId/settings/app", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const current = await getSettingsSection(id, "appSettings", {});
@@ -140,7 +264,7 @@ router.put("/restaurants/:restaurantId/settings/app", requireAuth, async (req, r
 });
 
 router.put("/restaurants/:restaurantId/settings/white-label", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   await setSettingsSection(id, "whiteLabel", req.body);
@@ -148,14 +272,14 @@ router.put("/restaurants/:restaurantId/settings/white-label", requireAuth, async
 });
 
 router.delete("/restaurants/:restaurantId", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const [deleted] = await db.delete(restaurantsTable).where(and(eq(restaurantsTable.id, id), eq(restaurantsTable.userId, req.session.userId!))).returning();
   if (!deleted) { res.status(404).json({ error: "Restaurant not found" }); return; }
   res.json({ message: "Restaurant deleted" });
 });
 
 router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, id);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") {
@@ -193,6 +317,7 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   const sumTotal = (list: typeof allOrders) => Math.round(list.filter(isPaidOrder).reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
 
   const activeOrders = allOrders.filter(o => ["pending", "confirmed", "preparing", "ready"].includes(o.status));
+  const paidToday = todayOrders.filter(isPaidOrder);
   const cancelledOrders = allOrders.filter(o => o.status === "cancelled");
   const byType = (type: string) => allOrders.filter(o => o.type === type).length;
 
@@ -210,6 +335,10 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     and(eq(waiterCallsTable.restaurantId, id), eq(waiterCallsTable.isResolved, false)),
   );
   const [totalScansRow] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).where(eq(qrCodesTable.restaurantId, id));
+  // The QR counter on the code row is a lifetime tally with no dates on it, so it can
+  // never answer "today". Menu views carry a timestamp, which can.
+  const [scansTodayRow] = await db.select({ count: count() }).from(menuViewsTable)
+    .where(and(eq(menuViewsTable.restaurantId, id), gte(menuViewsTable.viewedAt, today)));
 
   const feedbackRows = await db.select({ rating: feedbackTable.rating }).from(feedbackTable).where(eq(feedbackTable.restaurantId, id));
   const avgRating = feedbackRows.length ? feedbackRows.reduce((s, f) => s + f.rating, 0) / feedbackRows.length : 0;
@@ -224,9 +353,18 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
       if (ONLINE_METHODS.has(method)) totalOnlineSales += parseFloat(String(o.total || 0));
     }
   }
-  const commissionRate = 0.02;
-  const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount * 0.5);
-  const pendingSettlement = Math.round(Math.max(0, onlineBalance * 0.15));
+  // The owner's wallet used to net off a 2% fee while the platform charged whatever the
+  // commission rule said, and then held back 15% of the result as "pending settlement" —
+  // a fraction with nothing behind it. The fee is now the rate the platform actually
+  // applies, refunds come off in full rather than at half, and what is pending is the
+  // sum of this venue's unreleased settlements.
+  const commissionRate = (await getCommissionRate()) / 100;
+  const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount);
+  const settlementRows = await db.select({ finalPayout: platformSettlementsTable.finalPayout, status: platformSettlementsTable.status })
+    .from(platformSettlementsTable).where(eq(platformSettlementsTable.restaurantId, id));
+  const pendingSettlement = Math.round(settlementRows
+    .filter(r => String(r.status ?? "").toLowerCase() !== "released")
+    .reduce((t, r) => t + (parseFloat(String(r.finalPayout ?? 0)) || 0), 0));
 
   // Fold every other revenue stream into the same buckets so the owner's total is
   // the whole business, not just restaurant orders: spa, hotel rooms (rent + bar /
@@ -264,9 +402,12 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     totalCustomers: customers[0]?.count ?? 0,
     vipCustomers: vipCustomers[0]?.count ?? 0,
     loyaltyCustomers: loyaltyCustomers[0]?.count ?? 0,
-    avgOrderValue: todayOrders.length ? sumTotal(todayOrders) / todayOrders.length : 0,
+    // Average order value divided PAID revenue by EVERY order raised today, unpaid ones
+    // included — so an open table dragged the average down as if it were a free meal.
+    avgOrderValue: paidToday.length ? r2(sumTotal(todayOrders) / paidToday.length) : 0,
     avgRating: parseFloat(avgRating.toFixed(1)),
-    qrScansToday: parseInt(String(totalScansRow?.total ?? 0)),
+    qrScansToday: scansTodayRow?.count ?? 0,
+    qrScansTotal: parseInt(String(totalScansRow?.total ?? 0)),
     pendingReservations: pendingReservations[0]?.count ?? 0,
     lowStockItems,
     activeWaiterCalls: activeWaiterCalls[0]?.count ?? 0,
@@ -288,7 +429,7 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
 // Custom-date revenue for a restaurant panel — same PAID rule as everywhere else, so any
 // panel (owner / cashier / finance / cash-counter) can show revenue for any day or range.
 router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, id);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json({ from: null, to: null, revenue: 0, totalOrders: 0 }); return; }
@@ -341,7 +482,7 @@ router.get("/restaurants/:restaurantId/revenue", requireAuth, async (req, res): 
 // order type, and which payment method. Uses the SAME paid-order rule + spa fold as
 // /revenue, so every section sums to the same grand total (no mismatch).
 router.get("/restaurants/:restaurantId/revenue-breakdown", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, id);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json({ from: null, to: null, total: 0, orderRevenue: 0, spaRevenue: 0, totalOrders: 0, bySource: [], byType: [], byMethod: [] }); return; }

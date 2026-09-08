@@ -25,7 +25,7 @@ function billStorageKey(table: string) {
 
 export default function SmartDiningPage() {
   const [, navigate] = useAppLocation();
-  const { cart, orders, cartTotal, activeTable, activeRestaurant, venue, user } = useUser();
+  const { cart, orders, activeTable, activeRestaurant, venue } = useUser();
   const [sent, setSent] = useState<SentRequest[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [billConfig, setBillConfig] = useState<DiningBillConfig>(() => {
@@ -68,18 +68,21 @@ export default function SmartDiningPage() {
     return () => clearInterval(t);
   }, [fetchRunningBill]);
 
+  // A cart line's `price` is already the full unit price the guest was shown, with the
+  // portion and every add-on folded in. Adding the add-ons again here billed the table
+  // more for the same food than the order it came from.
   const cartLines: RunningBillLine[] = useMemo(() =>
     cart.map(c => ({
       id: `cart-${c.id}`,
       name: c.name,
-      unitPrice: c.price + c.addons.reduce((s, a) => s + a.price, 0),
+      unitPrice: c.price,
       quantity: c.quantity,
-      lineTotal: lineTotal(c.price, c.quantity, c.addons),
+      lineTotal: lineTotal(c.price, c.quantity),
       seat: billConfig.seatAssignments[c.id] ?? 1,
-      paid: billConfig.paidItemIds.includes(c.id),
+      paid: false,
       source: "cart" as const,
     })),
-  [cart, billConfig.seatAssignments, billConfig.paidItemIds]);
+  [cart, billConfig.seatAssignments]);
 
   const orderLines: RunningBillLine[] = useMemo(() =>
     orders
@@ -87,29 +90,40 @@ export default function SmartDiningPage() {
       .flatMap(o => o.items.map((item, idx) => ({
         id: `order-${o.id}-${item.id}-${idx}`,
         name: item.name,
-        unitPrice: item.price + item.addons.reduce((s, a) => s + a.price, 0),
+        unitPrice: item.price,
         quantity: item.quantity,
-        lineTotal: lineTotal(item.price, item.quantity, item.addons),
+        lineTotal: lineTotal(item.price, item.quantity),
         seat: billConfig.seatAssignments[item.id] ?? 1,
-        paid: billConfig.paidItemIds.includes(`order-${o.id}-${item.id}-${idx}`),
+        // Only the server decides whether money has changed hands.
+        paid: o.paymentStatus === "paid",
         source: "order" as const,
         orderId: o.id,
       }))),
-  [orders, activeTable, billConfig.seatAssignments, billConfig.paidItemIds]);
+  [orders, activeTable, billConfig.seatAssignments]);
 
   const allLines = useMemo(() => {
     const merged = [...orderLines, ...cartLines];
     if (apiLines.length > 0) {
-      const ids = new Set(merged.map(l => l.name));
+      // Deduplicate on line id, not on dish name — a table that ordered chai in the
+      // first round and again in the second had the second one dropped from the bill.
+      const ids = new Set(merged.map(l => l.id));
       for (const l of apiLines) {
-        if (!ids.has(l.name)) merged.push({ ...l, seat: billConfig.seatAssignments[l.id] ?? 1, paid: billConfig.paidItemIds.includes(l.id) });
+        if (!ids.has(l.id)) merged.push({ ...l, seat: billConfig.seatAssignments[l.id] ?? 1 });
       }
     }
     return merged;
-  }, [cartLines, orderLines, apiLines, billConfig.seatAssignments, billConfig.paidItemIds]);
+  }, [cartLines, orderLines, apiLines, billConfig.seatAssignments]);
 
   const summary = computeBillSummary(allLines, billConfig);
-  const liveTotal = cartTotal + orderLines.reduce((s, l) => s + l.lineTotal, 0);
+  // `paidItemIds` is the guest's own tick-list of which dishes are theirs. It has never
+  // been a record of payment — nothing on this page can take money for single items —
+  // so it drives the "your items" figure and nothing else.
+  const selectedIds = billConfig.paidItemIds;
+  const selectedTotal = allLines
+    .filter(l => !l.paid && selectedIds.includes(l.id))
+    .reduce((s, l) => s + l.lineTotal, 0);
+  const selectedWithGst = Math.round(selectedTotal * 1.05);
+  const amountDue = summary.total;
 
   // Real assigned waiter for this table (falls back to "being assigned" until
   // the kitchen marks an order ready and auto-assignment picks a waiter).
@@ -119,7 +133,12 @@ export default function SmartDiningPage() {
   );
 
   async function sendRequest(label: string, type: string) {
-    if (!venue.restaurantId) return;
+    if (!venue.restaurantId) {
+      // Silently doing nothing left the guest tapping "Call Waiter" over and over.
+      setPayToast("We do not know which restaurant you are in. Scan the QR code on your table and try again.");
+      setTimeout(() => setPayToast(null), 5000);
+      return;
+    }
     try {
       await publicApi.waiterCall({
         restaurantId: venue.restaurantId,
@@ -137,9 +156,9 @@ export default function SmartDiningPage() {
     setSent(prev => [{ label, time: new Date(), status: "sent" }, ...prev]);
     setToast(label);
     setTimeout(() => setToast(null), 3000);
-    setTimeout(() => {
-      setSent(prev => prev.map(r => r.label === label && r.status === "sent" ? { ...r, status: "acknowledged" } : r));
-    }, 3500);
+    // The list used to flip to "On the way" on a 3.5-second timer. No member of staff
+    // had acknowledged anything; there is no acknowledgement to poll for. A guest who
+    // believes someone is coming stops looking for one.
   }
 
   function setMode(mode: BillMode) {
@@ -160,7 +179,8 @@ export default function SmartDiningPage() {
     setBillConfig(c => ({ ...c, seatAssignments: { ...c.seatAssignments, [lineId]: seat } }));
   }
 
-  function togglePaid(lineId: string) {
+  /** Tick the dishes that are yours, so the page can total your share. */
+  function toggleSelected(lineId: string) {
     setBillConfig(c => ({
       ...c,
       paidItemIds: c.paidItemIds.includes(lineId)
@@ -172,40 +192,47 @@ export default function SmartDiningPage() {
   async function payGroup() {
     if (payingGroup) return;
     const total = summary.total;
+    if (!venue.restaurantId) {
+      setPayToast("We do not know which restaurant you are in. Scan the QR code on your table and try again.");
+      setTimeout(() => setPayToast(null), 5000);
+      return;
+    }
     setPayingGroup(true);
     try {
-      // Nothing is marked paid until the server has taken the payment — a guest
-      // shown a settled bill that never settled walks out owing money.
-      await publicApi.dining.groupPayment({ total, payments: [{ method: "group", amount: total }] });
+      // `dining.groupPayment` only works the arithmetic out — it takes no money and
+      // records nothing. The bill was still being marked paid afterwards, so the whole
+      // table could be shown a settled bill and walk out owing every rupee of it. Until
+      // there is an endpoint that actually collects, the honest thing is to tell the
+      // floor one person is settling and let the counter take the payment.
+      await publicApi.waiterCall({
+        restaurantId: venue.restaurantId,
+        tableId: venue.tableId,
+        tableName: activeTable,
+        type: "group_payment",
+        message: `One bill for the table — ₹${total}${billConfig.groupPayerName ? ` (paying: ${billConfig.groupPayerName})` : ""}`,
+      });
     } catch (e) {
-      setPayToast(e instanceof Error ? e.message : "The payment did not go through. Nothing has been charged.");
+      setPayToast(e instanceof Error ? e.message : "We could not reach the staff. Please settle at the counter.");
       setTimeout(() => setPayToast(null), 5000);
       setPayingGroup(false);
       return;
     }
-    const unpaidIds = allLines.filter(l => !l.paid).map(l => l.id);
-    setBillConfig(c => ({ ...c, paidItemIds: [...new Set([...c.paidItemIds, ...unpaidIds])] }));
-    setPayToast(`Group payment of ₹${total} processed${billConfig.groupPayerName ? ` by ${billConfig.groupPayerName}` : ""}`);
-    setTimeout(() => setPayToast(null), 4000);
+    setPayToast(`Staff notified — one bill of ₹${total} for the table${billConfig.groupPayerName ? `, paying: ${billConfig.groupPayerName}` : ""}. Nothing has been charged yet.`);
+    setTimeout(() => setPayToast(null), 6000);
     setPayingGroup(false);
-    // Telling the floor is best-effort; the payment itself already succeeded.
-    void publicApi.waiterCall({
-      restaurantId: venue.restaurantId ?? 0,
-      tableId: venue.tableId,
-      tableName: activeTable,
-      type: "group_payment",
-      message: `Group payment ₹${total}`,
-    }).catch(() => undefined);
   }
 
   function paySelectedItems() {
-    const unpaid = allLines.filter(l => !l.paid);
-    if (unpaid.length === 0) return;
+    if (selectedTotal <= 0) {
+      setPayToast("Tick the dishes that are yours first.");
+      setTimeout(() => setPayToast(null), 4000);
+      return;
+    }
     // This used to announce "Item-wise payment: ₹…" and then do nothing at all — no
     // request, no record, nothing marked paid. A guest could walk out believing their
     // share was settled. There is no per-item payment endpoint, so say so plainly.
-    setPayToast(`Paying for individual items isn't available yet — please settle ₹${summary.total} at the counter.`);
-    setTimeout(() => setPayToast(null), 5000);
+    setPayToast(`Your share is ₹${selectedWithGst}. Paying for individual items in the app isn't available yet — please settle it at the counter.`);
+    setTimeout(() => setPayToast(null), 6000);
   }
 
   return (
@@ -258,9 +285,9 @@ export default function SmartDiningPage() {
             <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Recent Requests</p>
             {sent.slice(0, 4).map((r, i) => (
               <div key={i} className="flex items-center gap-2 py-1.5 text-sm">
-                <div className={`h-2 w-2 rounded-full ${r.status === "acknowledged" ? "bg-blue-400 animate-pulse" : "bg-orange-400"}`} />
+                <div className="h-2 w-2 rounded-full bg-orange-400" />
                 <span className="flex-1">{r.label}</span>
-                <span className="text-xs text-white/40">{r.status === "acknowledged" ? "On the way" : "Sent"}</span>
+                <span className="text-xs text-white/40">Sent</span>
               </div>
             ))}
           </div>
@@ -276,8 +303,13 @@ export default function SmartDiningPage() {
           {/* Live running bill header */}
           <div className="rounded-xl bg-black/25 border border-emerald-500/20 p-4 mb-4 text-center">
             <p className="text-xs text-emerald-300/80 mb-1">Live Running Bill</p>
-            <p className="text-4xl font-extrabold text-emerald-400">₹{liveTotal + summary.gst}</p>
-            <p className="text-xs text-white/40 mt-1">{allLines.length} items · Cart ₹{cartTotal} + Orders ₹{orderLines.reduce((s, l) => s + l.lineTotal, 0)}</p>
+            {/* The headline used to add every line's value to the GST of the unpaid ones
+                only, so it matched neither the total nor what was still owed. */}
+            <p className="text-4xl font-extrabold text-emerald-400">₹{amountDue}</p>
+            <p className="text-xs text-white/40 mt-1">
+              {allLines.length} items · incl. GST
+              {summary.paidTotal > 0 ? ` · ₹${summary.paidTotal} already settled` : ""}
+            </p>
           </div>
 
           {/* Bill mode tabs */}
@@ -347,8 +379,13 @@ export default function SmartDiningPage() {
             ) : allLines.map(line => (
               <div key={line.id} className={`flex items-center gap-2 p-2.5 rounded-xl border text-sm ${line.paid ? "bg-emerald-500/10 border-emerald-500/20 opacity-60" : "bg-white/5 border-white/10"}`}>
                 {billConfig.mode === "item_wise" && (
-                  <button onClick={() => togglePaid(line.id)} className={`h-5 w-5 rounded border flex items-center justify-center shrink-0 ${line.paid ? "bg-emerald-500 border-emerald-500" : "border-white/30"}`}>
-                    {line.paid && <CheckCircle className="h-3 w-3 text-white" />}
+                  <button
+                    onClick={() => toggleSelected(line.id)}
+                    disabled={line.paid}
+                    aria-label={`Mark ${line.name} as mine`}
+                    className={`h-5 w-5 rounded border flex items-center justify-center shrink-0 disabled:opacity-30 ${selectedIds.includes(line.id) ? "bg-emerald-500 border-emerald-500" : "border-white/30"}`}
+                  >
+                    {selectedIds.includes(line.id) && <CheckCircle className="h-3 w-3 text-white" />}
                   </button>
                 )}
                 <div className="flex-1 min-w-0">
@@ -389,6 +426,9 @@ export default function SmartDiningPage() {
             <div className="flex justify-between text-white/50"><span>Subtotal (unpaid)</span><span>₹{summary.subtotal}</span></div>
             <div className="flex justify-between text-white/50"><span>GST 5%</span><span>₹{summary.gst}</span></div>
             {summary.paidTotal > 0 && <div className="flex justify-between text-emerald-400"><span>Already paid</span><span>₹{summary.paidTotal}</span></div>}
+            {billConfig.mode === "item_wise" && selectedTotal > 0 && (
+              <div className="flex justify-between text-emerald-300"><span>Your items (incl. GST)</span><span>₹{selectedWithGst}</span></div>
+            )}
             <div className="flex justify-between font-bold text-base pt-1">
               <span>{billConfig.mode === "split" ? "Your share" : billConfig.mode === "shared" ? "Shared total" : "Amount due"}</span>
               <span className="text-emerald-400">₹{billConfig.mode === "split" ? summary.perPerson : summary.total}</span>
@@ -399,7 +439,7 @@ export default function SmartDiningPage() {
           <div className="flex gap-2">
             {billConfig.mode === "item_wise" ? (
               <button onClick={paySelectedItems} disabled={summary.unpaidCount === 0} className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 font-bold text-sm flex items-center justify-center gap-2">
-                <CreditCard className="h-4 w-4" /> Pay Selected · ₹{summary.total}
+                <CreditCard className="h-4 w-4" /> My share · ₹{selectedWithGst}
               </button>
             ) : billConfig.mode === "group" ? (
               <button onClick={payGroup} className="flex-1 py-3 rounded-xl bg-violet-500 hover:bg-violet-400 font-bold text-sm flex items-center justify-center gap-2">
