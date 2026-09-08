@@ -10,9 +10,11 @@ export const PAYMENT_MODES = [
   { id: "netbanking", label: "Net Banking", instant: true },
 ];
 
-const GST_RATE = 0.05;
-const CGST_RATE = 0.025;
-const SGST_RATE = 0.025;
+/**
+ * The rate to fall back on when a venue has not configured one. It is the rate the code
+ * hardcoded everywhere before, so an unconfigured venue bills exactly as it used to.
+ */
+const DEFAULT_GST_RATE = 0.05;
 
 function parseNum(v: unknown, fallback = 0): number {
   const n = parseFloat(String(v ?? fallback));
@@ -25,15 +27,37 @@ export function generateInvoiceNumber(orderId: number, restaurantId?: number): s
   return `INV-${prefix}-${year}-${String(orderId).padStart(5, "0")}`;
 }
 
-export function computeGstBreakdown(taxableAmount: number) {
-  const cgst = Math.round(taxableAmount * CGST_RATE * 100) / 100;
-  const sgst = Math.round(taxableAmount * SGST_RATE * 100) / 100;
+/**
+ * Split GST into its halves at the venue's own rate.
+ *
+ * The rate was fixed at 5% here while the ordering code already read a per-venue rate,
+ * so a venue billing at any other rate got an invoice whose tax lines disagreed with the
+ * bill the guest paid — and the CGST/SGST captions said 2.5% regardless. The rates come
+ * back with the numbers so a caption can never drift from the arithmetic again.
+ *
+ * `actualTax` is the tax the order really carries: when it is supplied, that is what the
+ * invoice apportions, so the invoice restates the bill instead of recomputing it.
+ */
+export function computeGstBreakdown(taxableAmount: number, rate = DEFAULT_GST_RATE, actualTax?: number) {
+  const usableRate = Number.isFinite(rate) && rate >= 0 ? rate : DEFAULT_GST_RATE;
+  const totalGst = actualTax != null && Number.isFinite(actualTax) && actualTax >= 0
+    ? Math.round(actualTax * 100) / 100
+    : Math.round(taxableAmount * usableRate * 100) / 100;
+  const cgst = Math.round((totalGst / 2) * 100) / 100;
+  const sgst = Math.round((totalGst - cgst) * 100) / 100;
+  // When the invoice restates a stored tax, the caption has to describe that tax — not
+  // the configured rate, which may have been changed since the bill was raised.
+  const effectiveRate = taxableAmount > 0 ? totalGst / taxableAmount : usableRate;
+  const halfPercent = Math.round((effectiveRate / 2) * 10000) / 100;
   return {
     taxableAmount,
     cgst,
     sgst,
-    totalGst: Math.round((cgst + sgst) * 100) / 100,
-    gstRate: GST_RATE,
+    totalGst,
+    gstRate: Math.round(effectiveRate * 10000) / 10000,
+    gstRatePercent: Math.round(effectiveRate * 10000) / 100,
+    cgstRatePercent: halfPercent,
+    sgstRatePercent: halfPercent,
     hsn: "996331",
     sac: "Restaurant services",
   };
@@ -46,11 +70,12 @@ export function computeBillQuote(input: {
   splitCount?: number;
   partialPayNow?: number;
   advanceAmount?: number;
+  taxRate?: number;
 }) {
   const subtotal = input.subtotal;
   const discount = input.discount ?? 0;
   const taxableAmount = Math.max(0, subtotal - discount);
-  const gst = computeGstBreakdown(taxableAmount);
+  const gst = computeGstBreakdown(taxableAmount, input.taxRate);
   const tip = input.tip ?? 0;
   const grandTotal = Math.round((taxableAmount + gst.totalGst + tip) * 100) / 100;
 
@@ -104,11 +129,18 @@ export function buildGstInvoice(order: {
   paymentStatus?: string | null;
   createdAt: Date;
   metadata?: unknown;
-}, restaurantName = "Restaurant", billingSettings?: { gstin?: string; legalName?: string; address?: string }) {
+}, restaurantName = "Restaurant", billingSettings?: { gstin?: string | null; legalName?: string; address?: string; taxRate?: number }) {
   const subtotal = parseNum(order.subtotal);
   const discount = parseNum(order.discountAmount);
   const taxableAmount = Math.max(0, subtotal - discount);
-  const gst = computeGstBreakdown(taxableAmount);
+  // The tax on the order is what the guest was charged; the invoice restates it rather
+  // than recomputing it at whatever rate happens to be configured today.
+  const storedTax = parseNum(order.tax, NaN);
+  const gst = computeGstBreakdown(
+    taxableAmount,
+    billingSettings?.taxRate,
+    Number.isFinite(storedTax) && storedTax > 0 ? storedTax : undefined,
+  );
   const tip = parseNum(order.tipAmount);
   const total = parseNum(order.total);
   const items = Array.isArray(order.items) ? order.items : [];
@@ -119,7 +151,9 @@ export function buildGstInvoice(order: {
     invoiceNumber: order.invoiceNumber ?? generateInvoiceNumber(order.id, order.restaurantId),
     invoiceDate: order.createdAt.toISOString(),
     restaurantName: (metaBilling.legalName as string) || billingSettings?.legalName || restaurantName,
-    restaurantGstin: (metaBilling.gstin as string) ?? billingSettings?.gstin ?? "27AABCU9603R1ZM",
+    // A GSTIN that is not the venue's own turns a tax invoice into a false document.
+    // An unregistered venue now says so; it never borrows somebody else's number.
+    restaurantGstin: ((metaBilling.gstin as string) || billingSettings?.gstin || null),
     restaurantAddress: (metaBilling.address as string) ?? billingSettings?.address ?? "",
     customerName: order.customerName ?? "Guest",
     customerPhone: order.customerPhone ?? "",
@@ -137,6 +171,10 @@ export function buildGstInvoice(order: {
     cgst: gst.cgst,
     sgst: gst.sgst,
     totalGst: gst.totalGst,
+    gstRatePercent: gst.gstRatePercent,
+    cgstRatePercent: gst.cgstRatePercent,
+    sgstRatePercent: gst.sgstRatePercent,
+    gstRegistered: Boolean((metaBilling.gstin as string) || billingSettings?.gstin),
     tip,
     grandTotal: total,
     paymentMethod: order.paymentMethod,
@@ -164,7 +202,7 @@ export function buildInvoiceHtml(invoice: ReturnType<typeof buildGstInvoice>): s
 </style></head><body>
   <h1>TAX INVOICE</h1>
   <p class="muted">${invoice.restaurantName}${invoice.restaurantAddress ? ` · ${invoice.restaurantAddress}` : ""}</p>
-  <p class="muted">GSTIN: ${invoice.restaurantGstin}</p>
+  <p class="muted">${invoice.restaurantGstin ? `GSTIN: ${invoice.restaurantGstin}` : "Not registered for GST"}</p>
   <p class="muted">Invoice: <strong>${invoice.invoiceNumber}</strong> · Date: ${new Date(invoice.invoiceDate).toLocaleString()}</p>
   <p>Customer: ${invoice.customerName}${invoice.customerPhone ? ` · ${invoice.customerPhone}` : ""}${invoice.tableName ? ` · Table ${invoice.tableName}` : ""}</p>
   <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
@@ -172,8 +210,8 @@ export function buildInvoiceHtml(invoice: ReturnType<typeof buildGstInvoice>): s
     <div><span>Subtotal</span><span>₹${invoice.subtotal.toFixed(2)}</span></div>
     ${invoice.discount > 0 ? `<div><span>Discount</span><span>-₹${invoice.discount.toFixed(2)}</span></div>` : ""}
     <div><span>Taxable Amount</span><span>₹${invoice.taxableAmount.toFixed(2)}</span></div>
-    <div><span>CGST (2.5%)</span><span>₹${invoice.cgst.toFixed(2)}</span></div>
-    <div><span>SGST (2.5%)</span><span>₹${invoice.sgst.toFixed(2)}</span></div>
+    <div><span>CGST (${invoice.cgstRatePercent}%)</span><span>₹${invoice.cgst.toFixed(2)}</span></div>
+    <div><span>SGST (${invoice.sgstRatePercent}%)</span><span>₹${invoice.sgst.toFixed(2)}</span></div>
     ${invoice.tip > 0 ? `<div><span>Tip</span><span>₹${invoice.tip.toFixed(2)}</span></div>` : ""}
     <div class="grand"><span>Grand Total</span><span>₹${invoice.grandTotal.toFixed(2)}</span></div>
   </div>
@@ -189,7 +227,7 @@ export function getPaymentCatalog() {
   return {
     paymentModes: PAYMENT_MODES,
     tipPresets: [0, 20, 50, 100, 150, 200],
-    gstRate: GST_RATE,
+    gstRate: DEFAULT_GST_RATE,
     billingFeatures: ["split_payment", "partial_payment", "advance_payment", "tip_management", "gst_invoice", "pdf_invoice"],
   };
 }

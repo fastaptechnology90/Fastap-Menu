@@ -1,14 +1,43 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
-import { db, staffCommissionsTable, chatMessagesTable } from "@workspace/db";
+import { eq, and, desc, inArray } from "drizzle-orm";
+import { db, staffCommissionsTable, chatMessagesTable, ordersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { orderGrossTotal, orderCommissionBase } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
 
+/**
+ * Each row now carries the value of the order it came from.
+ *
+ * Without it a screen wanting "sales per server" had nothing to read and was scaling the
+ * commission amount by a constant instead — a figure that tracked the commission rate
+ * rather than the sales. `orderAmount` is what the guest actually paid; `orderBase` is
+ * the pre-tax value the commission was worked out on. A row not tied to an order (a
+ * manual incentive, a tips pool) reports null rather than a number that looks like sales.
+ */
 router.get("/restaurants/:restaurantId/commissions", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(req.params.restaurantId, 10);
   const commissions = await db.select().from(staffCommissionsTable).where(eq(staffCommissionsTable.restaurantId, id)).orderBy(desc(staffCommissionsTable.createdAt));
-  res.json(commissions.map(c => ({ ...c, amount: parseFloat(String(c.amount)), percentage: c.percentage ? parseFloat(String(c.percentage)) : null })));
+
+  const orderIds = [...new Set(commissions.map(c => c.orderId).filter((x): x is number => x != null))];
+  const orders = orderIds.length
+    ? await db.select({
+        id: ordersTable.id, total: ordersTable.total, subtotal: ordersTable.subtotal,
+        paymentStatus: ordersTable.paymentStatus, status: ordersTable.status,
+      }).from(ordersTable).where(and(eq(ordersTable.restaurantId, id), inArray(ordersTable.id, orderIds)))
+    : [];
+  const byOrder = new Map(orders.map(o => [o.id, o]));
+
+  res.json(commissions.map(c => {
+    const order = c.orderId != null ? byOrder.get(c.orderId) : undefined;
+    return {
+      ...c,
+      amount: parseFloat(String(c.amount)),
+      percentage: c.percentage ? parseFloat(String(c.percentage)) : null,
+      orderAmount: order ? orderGrossTotal(order) : null,
+      orderBase: order ? orderCommissionBase(order) : null,
+    };
+  }));
 });
 
 router.post("/restaurants/:restaurantId/commissions", requireAuth, async (req, res): Promise<void> => {

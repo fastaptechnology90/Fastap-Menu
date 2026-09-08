@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, desc, gte, lte } from "drizzle-orm";
-import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, feedbackTable, spaBookingsTable, banquetEventsTable, financeTransactionsTable } from "@workspace/db";
+import { db, restaurantsTable, usersTable, ordersTable, customersTable, inventoryItemsTable, reservationsTable, waiterCallsTable, qrCodesTable, menuViewsTable, platformSettlementsTable, feedbackTable, spaBookingsTable, banquetEventsTable, financeTransactionsTable } from "@workspace/db";
 import { CreateRestaurantBody, UpdateRestaurantBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { createRestaurantRateLimit } from "../middlewares/rate-limit.js";
@@ -15,6 +15,7 @@ import {
 } from "../lib/restaurant-publication.js";
 import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
 import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenue, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
+import { getCommissionRate } from "../lib/platform-admin.js";
 
 const router: IRouter = Router();
 
@@ -193,6 +194,7 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   const sumTotal = (list: typeof allOrders) => Math.round(list.filter(isPaidOrder).reduce((s, o) => s + orderGrossTotal(o), 0) * 100) / 100;
 
   const activeOrders = allOrders.filter(o => ["pending", "confirmed", "preparing", "ready"].includes(o.status));
+  const paidToday = todayOrders.filter(isPaidOrder);
   const cancelledOrders = allOrders.filter(o => o.status === "cancelled");
   const byType = (type: string) => allOrders.filter(o => o.type === type).length;
 
@@ -210,6 +212,10 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     and(eq(waiterCallsTable.restaurantId, id), eq(waiterCallsTable.isResolved, false)),
   );
   const [totalScansRow] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).where(eq(qrCodesTable.restaurantId, id));
+  // The QR counter on the code row is a lifetime tally with no dates on it, so it can
+  // never answer "today". Menu views carry a timestamp, which can.
+  const [scansTodayRow] = await db.select({ count: count() }).from(menuViewsTable)
+    .where(and(eq(menuViewsTable.restaurantId, id), gte(menuViewsTable.viewedAt, today)));
 
   const feedbackRows = await db.select({ rating: feedbackTable.rating }).from(feedbackTable).where(eq(feedbackTable.restaurantId, id));
   const avgRating = feedbackRows.length ? feedbackRows.reduce((s, f) => s + f.rating, 0) / feedbackRows.length : 0;
@@ -224,9 +230,18 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
       if (ONLINE_METHODS.has(method)) totalOnlineSales += parseFloat(String(o.total || 0));
     }
   }
-  const commissionRate = 0.02;
-  const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount * 0.5);
-  const pendingSettlement = Math.round(Math.max(0, onlineBalance * 0.15));
+  // The owner's wallet used to net off a 2% fee while the platform charged whatever the
+  // commission rule said, and then held back 15% of the result as "pending settlement" —
+  // a fraction with nothing behind it. The fee is now the rate the platform actually
+  // applies, refunds come off in full rather than at half, and what is pending is the
+  // sum of this venue's unreleased settlements.
+  const commissionRate = (await getCommissionRate()) / 100;
+  const onlineBalance = Math.round(totalOnlineSales * (1 - commissionRate) - refundAmount);
+  const settlementRows = await db.select({ finalPayout: platformSettlementsTable.finalPayout, status: platformSettlementsTable.status })
+    .from(platformSettlementsTable).where(eq(platformSettlementsTable.restaurantId, id));
+  const pendingSettlement = Math.round(settlementRows
+    .filter(r => String(r.status ?? "").toLowerCase() !== "released")
+    .reduce((t, r) => t + (parseFloat(String(r.finalPayout ?? 0)) || 0), 0));
 
   // Fold every other revenue stream into the same buckets so the owner's total is
   // the whole business, not just restaurant orders: spa, hotel rooms (rent + bar /
@@ -264,9 +279,12 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
     totalCustomers: customers[0]?.count ?? 0,
     vipCustomers: vipCustomers[0]?.count ?? 0,
     loyaltyCustomers: loyaltyCustomers[0]?.count ?? 0,
-    avgOrderValue: todayOrders.length ? sumTotal(todayOrders) / todayOrders.length : 0,
+    // Average order value divided PAID revenue by EVERY order raised today, unpaid ones
+    // included — so an open table dragged the average down as if it were a free meal.
+    avgOrderValue: paidToday.length ? r2(sumTotal(todayOrders) / paidToday.length) : 0,
     avgRating: parseFloat(avgRating.toFixed(1)),
-    qrScansToday: parseInt(String(totalScansRow?.total ?? 0)),
+    qrScansToday: scansTodayRow?.count ?? 0,
+    qrScansTotal: parseInt(String(totalScansRow?.total ?? 0)),
     pendingReservations: pendingReservations[0]?.count ?? 0,
     lowStockItems,
     activeWaiterCalls: activeWaiterCalls[0]?.count ?? 0,

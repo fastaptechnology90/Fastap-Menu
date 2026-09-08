@@ -1,5 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, ordersTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
+import { accrueStaffEarningsForOrder } from "./staff-earnings.js";
 
 /**
  * Records a paid order in the finance ledger.
@@ -25,6 +26,11 @@ export async function recordOrderPaymentInLedger(opts: {
   try {
     const amount = String(parseFloat(String(order.total ?? "0")).toFixed(2));
     const method = (opts.method || order.paymentMethod || "cash") as string;
+
+    // The server who closed the table earns on this order the moment it is paid. Doing it
+    // here — not at the ledger's duplicate guard below — means an order whose income row
+    // already exists still accrues, and it runs for every payment path that books money.
+    await accrueStaffEarningsForOrder({ restaurantId, order });
 
     const [dup] = await db.select({ id: financeTransactionsTable.id })
       .from(financeTransactionsTable)

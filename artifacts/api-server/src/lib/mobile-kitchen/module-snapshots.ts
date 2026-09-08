@@ -244,7 +244,9 @@ const PATH_BUILDERS: Record<string, (section: string, orders: MappedKitchenOrder
   "/qc/board": (section, orders) => ({
     ...base(section),
     checks: [], complaints: [],
-    orders: ordersFromKitchen(orders).map(o => ({ id: o.id, kotNumber: o.kotNumber, status: "pending", score: 95 })),
+    // A quality check that nobody has carried out has no score. Every ticket used to
+    // arrive marked 95, so the board reported passing marks before anyone looked.
+    orders: ordersFromKitchen(orders).map(o => ({ id: o.id, kotNumber: o.kotNumber, status: "pending", score: null })),
     stats: { pendingChecks: 0, failedToday: 0, randomAudits: 0 },
     qcFeatures: { randomAudit: true, complaintTracking: true },
   }),

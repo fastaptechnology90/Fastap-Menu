@@ -37,6 +37,7 @@ import {
   approveExport, rejectExport, mergeSupportTickets,
 } from "../lib/platform-extensions.js";
 import { registerSuperAdminFeatureRoutes } from "./feature-modules.js";
+import { runtimeSnapshot } from "../lib/runtime-metrics.js";
 
 const router: IRouter = Router();
 const admin = [requireSuperAdmin] as const;
@@ -1797,21 +1798,32 @@ router.get("/superadmin/metrics", ...admin, async (_req, res) => {
   const [pendingExports] = await db.select({ count: count() }).from(platformExportsTable).where(eq(platformExportsTable.status, "pending"));
   const queueDepth = (pendingTasks?.count ?? 0) + (pendingExports?.count ?? 0);
   const orders = orderCount?.count ?? 0;
-  const load = Math.min(95, Math.round(queueDepth * 8 + (failedTasks?.count ?? 0) * 5));
+  // These were arithmetic on the queue depth and the order count: CPU rose because tasks
+  // were queued, memory was 30 plus three times the queue, disk was the constant 55, and
+  // "requests per minute" was the lifetime order count. The server can read its own CPU,
+  // memory and traffic, so it does. Disk and cache hit rate are not instrumented here, so
+  // they come back null rather than as numbers an operator would act on.
+  const snap = runtimeSnapshot();
+  const uptimeMinutes = Math.max(1, snap.uptimeSeconds / 60);
   res.json({
-    cpu: load,
-    memory: Math.min(90, Math.round(30 + queueDepth * 3)),
-    disk: 55,
-    network: Math.min(1000, orders + queueDepth * 10),
-    uptime: orders > 0 ? "99.9%" : "100%",
-    dbConnections: Math.min(50, 5 + Math.floor(orders / 100)),
+    cpu: snap.cpuPercent,
+    memory: snap.memoryPercent,
+    memoryRssBytes: snap.memoryRssBytes,
+    disk: null,
+    network: null,
+    uptime: null,
+    uptimeSeconds: snap.uptimeSeconds,
+    dbConnections: null,
     queueDepth,
+    failedTasks: failedTasks?.count ?? 0,
     activeWebhooks: (await getWebhooks()).filter((w: { status?: string }) => w.status === "active").length,
     totalOrders: orders,
     totalVendors: restCount?.count ?? 0,
-    apiRpm: Math.min(5000, Math.max(orders, queueDepth * 4)),
-    cacheHitRate: "92.0",
-    estimated: true,
+    apiRpm: Math.round(snap.requestsToday / uptimeMinutes),
+    avgResponseMs: snap.avgResponseMs,
+    errorsToday: snap.errorsToday,
+    cacheHitRate: null,
+    estimated: false,
   });
 });
 

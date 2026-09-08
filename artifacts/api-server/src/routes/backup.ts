@@ -6,21 +6,23 @@ const router: IRouter = Router();
 const backups: Record<number, any[]> = {};
 const settings: Record<number, any> = {};
 
+/**
+ * No backup history is invented here.
+ *
+ * The list used to open with four completed backups, each with a size and a sha256
+ * checksum — an owner reading it would believe their data had been copied nightly and
+ * verified. None of those runs happened and none of those checksums covered anything.
+ */
 function getBackups(rid: number) {
-  if (!backups[rid]) {
-    backups[rid] = [
-      { id: 1, name: "Auto Backup - Full", type: "auto", status: "completed", size: "24.5 MB", tables: ["orders", "customers", "menu_items", "staff", "inventory", "finance", "reservations"], created_at: new Date(Date.now() - 86400000).toISOString(), duration: "12s", checksum: "sha256:a1b2c3d4" },
-      { id: 2, name: "Manual Backup", type: "manual", status: "completed", size: "23.1 MB", tables: ["all"], created_at: new Date(Date.now() - 3 * 86400000).toISOString(), duration: "11s", checksum: "sha256:e5f6a7b8" },
-      { id: 3, name: "Auto Backup - Full", type: "auto", status: "completed", size: "22.8 MB", tables: ["orders", "customers", "menu_items", "staff", "inventory", "finance", "reservations"], created_at: new Date(Date.now() - 7 * 86400000).toISOString(), duration: "10s", checksum: "sha256:c9d0e1f2" },
-      { id: 4, name: "Pre-Update Backup", type: "manual", status: "completed", size: "21.5 MB", tables: ["all"], created_at: new Date(Date.now() - 14 * 86400000).toISOString(), duration: "10s", checksum: "sha256:b3c4d5e6" },
-    ];
-  }
+  if (!backups[rid]) backups[rid] = [];
   return backups[rid];
 }
 
 function getSettings(rid: number) {
   if (!settings[rid]) {
-    settings[rid] = { auto_backup: true, frequency: "daily", time: "02:00", retention_days: 30, include_media: false, compress: true, encrypt: false, last_backup: new Date(Date.now() - 86400000).toISOString(), next_backup: new Date(Date.now() + 86400000).toISOString() };
+      // Nothing schedules a backup, so no last/next run is claimed and auto-backup is off
+    // rather than reported as on.
+    settings[rid] = { auto_backup: false, frequency: "daily", time: "02:00", retention_days: 30, include_media: false, compress: true, encrypt: false, last_backup: null, next_backup: null };
   }
   return settings[rid];
 }
@@ -38,19 +40,17 @@ router.post("/restaurants/:restaurantId/backup/create", requireAuth, async (req,
     name: name || `Manual Backup - ${new Date().toLocaleDateString()}`,
     type: "manual",
     status: "in_progress",
-    size: "0 MB",
+    size: null,
     tables: tables || ["all"],
     created_at: new Date().toISOString(),
     duration: null,
-    checksum: null
+    checksum: null,
+    // The request is recorded; nothing here copies a database. A size, a duration and a
+    // sha256 were previously made up three seconds later, which made an unperformed
+    // backup look like a verified one.
+    performed: false,
   };
   getBackups(rid).unshift(backup);
-  setTimeout(() => {
-    const idx = getBackups(rid).findIndex(b => b.id === backup.id);
-    if (idx !== -1) {
-      getBackups(rid)[idx] = { ...backup, status: "completed", size: `${(20 + Math.random() * 10).toFixed(1)} MB`, duration: `${Math.floor(8 + Math.random() * 10)}s`, checksum: `sha256:${Math.random().toString(36).slice(2, 10)}` };
-    }
-  }, 3000);
   res.status(201).json(backup);
 });
 

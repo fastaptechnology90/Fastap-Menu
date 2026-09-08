@@ -74,8 +74,14 @@ router.get("/restaurants/:restaurantId/marketing/automation", requireAuth, async
       channel: c.type?.includes("sms") ? "sms" : c.type?.includes("email") ? "email" : "whatsapp",
       status: c.isActive ? "active" : "paused",
       condition: c.description || c.targetSegment || "Automated trigger",
-      fires: c.isActive ? Math.max(1, customers.filter(cx => cx.segment === (c.targetSegment || "regular")).length) : 0,
-      conversions: c.isActive ? Math.max(0, Math.floor(customers.length * 0.05)) : 0,
+      // Nothing records a campaign send or a conversion, so these were the size of the
+      // target segment and 5% of the customer list — a conversion rate that only ever
+      // reflected how many customers the venue had. Until sends are logged against a
+      // campaign there is no figure to report, and the panel is told so.
+      fires: 0,
+      conversions: 0,
+      deliveryTracked: false,
+      audienceSize: customers.filter(cx => cx.segment === (c.targetSegment || "regular")).length,
       message: c.description || c.name,
     }));
 

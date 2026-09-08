@@ -3,7 +3,7 @@ type Invoice = {
   invoiceNumber: string;
   invoiceDate: string;
   restaurantName: string;
-  restaurantGstin: string;
+  restaurantGstin: string | null;
   customerName: string;
   tableName?: string;
   items: { name: string; qty: number; rate: number; amount: number }[];
@@ -11,6 +11,8 @@ type Invoice = {
   discount: number;
   cgst: number;
   sgst: number;
+  cgstRatePercent?: number;
+  sgstRatePercent?: number;
   grandTotal: number;
   paymentMethod?: string | null;
 };
@@ -22,7 +24,7 @@ function esc(s: string) {
 export function buildInvoicePdfBuffer(invoice: Invoice): Buffer {
   const lines: string[] = [
     `TAX INVOICE — ${invoice.restaurantName}`,
-    `GSTIN: ${invoice.restaurantGstin}`,
+    invoice.restaurantGstin ? `GSTIN: ${invoice.restaurantGstin}` : "Not registered for GST",
     `Invoice: ${invoice.invoiceNumber}`,
     `Date: ${new Date(invoice.invoiceDate).toLocaleString()}`,
     `Customer: ${invoice.customerName}${invoice.tableName ? ` · Table ${invoice.tableName}` : ""}`,
@@ -34,8 +36,8 @@ export function buildInvoicePdfBuffer(invoice: Invoice): Buffer {
     "",
     `Subtotal: INR ${invoice.subtotal.toFixed(2)}`,
     invoice.discount > 0 ? `Discount: -INR ${invoice.discount.toFixed(2)}` : "",
-    `CGST (2.5%): INR ${invoice.cgst.toFixed(2)}`,
-    `SGST (2.5%): INR ${invoice.sgst.toFixed(2)}`,
+    `CGST (${invoice.cgstRatePercent ?? 2.5}%): INR ${invoice.cgst.toFixed(2)}`,
+    `SGST (${invoice.sgstRatePercent ?? 2.5}%): INR ${invoice.sgst.toFixed(2)}`,
     `Grand Total: INR ${invoice.grandTotal.toFixed(2)}`,
     invoice.paymentMethod ? `Payment: ${invoice.paymentMethod}` : "",
     "",

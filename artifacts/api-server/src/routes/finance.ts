@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, gte, sql, sum } from "drizzle-orm";
-import { db, financeTransactionsTable, cashShiftsTable, ordersTable } from "@workspace/db";
+import { db, financeTransactionsTable, cashShiftsTable, ordersTable, platformSettlementsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import {
   resolveAnalyticsAccess,
@@ -9,6 +9,8 @@ import {
   emptyFinanceWallet,
 } from "../lib/restaurant-publication.js";
 import { isPaidOrder } from "../lib/payment-calculations.js";
+import { round2 } from "../lib/order-pricing.js";
+import { getCommissionRate } from "../lib/platform-admin.js";
 
 const router: IRouter = Router();
 
@@ -121,8 +123,10 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
   let refundAmount = 0;
   let taxCollected = 0;
   for (const o of orders) {
-    taxCollected += parseFloat(String(o.tax || 0));
     if (o.paymentStatus === "refunded") { refundAmount += parseFloat(String(o.total)); continue; }
+    // Tax is only collected on a bill that was paid. Summing it over every row counted
+    // GST on abandoned and cancelled orders as money owed to the tax authority.
+    if (isPaidOrder(o)) taxCollected += parseFloat(String(o.tax || 0));
     // Same PAID rule as owner dashboard / analytics / super-admin — one consistent number.
     if (!isPaidOrder(o)) continue;
     const method = (o.paymentMethod || "cash").toLowerCase();
@@ -139,12 +143,24 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
     if (t.type === "refund") refundAmount += parseFloat(String(t.amount));
   }
 
-  const commissionRate = 0.02;
+  // Four figures here were fractions of other figures and measured nothing: a 2% fee
+  // while the platform charged whatever its commission rule said, half of refunds
+  // deducted rather than all of them, 15% of the balance called "pending settlement" and
+  // 5% called "reserve". The fee is now the platform's real rate, and settlement figures
+  // come from this venue's settlement rows. Nothing here holds a reserve, so the panel is
+  // told there is none rather than being handed a percentage.
+  const commissionRate = (await getCommissionRate()) / 100;
   const commission = totalOnlineSales * commissionRate;
-  const onlineBalance = totalOnlineSales - commission - refundAmount * 0.5;
-  const pendingSettlement = Math.max(0, onlineBalance * 0.15);
-  const lockedBalance = Math.max(0, refundAmount * 0.3);
-  const reserveBalance = Math.max(0, onlineBalance * 0.05);
+  const onlineBalance = totalOnlineSales - commission - refundAmount;
+  const settlementRows = await db.select().from(platformSettlementsTable)
+    .where(eq(platformSettlementsTable.restaurantId, id));
+  const isReleased = (r: typeof settlementRows[number]) => String(r.status ?? "").toLowerCase() === "released";
+  const isHeld = (r: typeof settlementRows[number]) => String(r.status ?? "").toLowerCase() === "hold";
+  const money = (v: unknown) => parseFloat(String(v ?? 0)) || 0;
+  const pendingSettlement = settlementRows.filter(r => !isReleased(r) && !isHeld(r))
+    .reduce((t, r) => t + money(r.finalPayout), 0);
+  const lockedBalance = settlementRows.filter(isHeld).reduce((t, r) => t + money(r.finalPayout), 0);
+  const reserveBalance = null;
 
   const onlineTxns = orders
     .filter(o => ONLINE_METHODS.has((o.paymentMethod || "").toLowerCase()))
@@ -156,52 +172,92 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
         id: `ORD-${o.id}`,
         type: (o.paymentMethod || "upi").toLowerCase(),
         amount: parseFloat(String(o.total)),
-        gateway: "Fastap Gateway",
-        utr: pay.utr || pay.upiId || (o.paymentStatus === "paid" ? `UTR${o.id}` : "Pending"),
+        gateway: (pay.gatewayId as string) || (md.gatewayId as string) || null,
+        // A UTR is a bank's own reference. Minting one from the order id put a number on
+        // screen that no bank statement would ever match; an unrecorded reference is null.
+        utr: pay.utr || null,
         upiId: pay.upiId ?? null,
         collectedBy: pay.collectedBy ?? null,
         collectedFrom: pay.collectedFrom ?? null,
         customerName: o.customerName ?? null,
         tableName: o.tableName ?? null,
         tax: parseFloat(String(o.tax)),
-        commission: parseFloat(String(o.total)) * commissionRate,
-        net: parseFloat(String(o.total)) * (1 - commissionRate),
+        commission: round2(parseFloat(String(o.total)) * commissionRate),
+        net: round2(parseFloat(String(o.total)) * (1 - commissionRate)),
         time: new Date(o.createdAt).toLocaleString("en-IN"),
         status: o.paymentStatus === "refunded" ? "refund" : o.paymentStatus === "paid" ? "success" : "pending",
       };
     });
 
-  const cashLedger = txs
+  // Every ledger line carried a balance of 0, so the column was decoration. Walk the cash
+  // entries oldest-first to get a real running balance, then show the most recent ones.
+  const cashRows = txs
     .filter(t => !ONLINE_METHODS.has((t.paymentMethod || "cash").toLowerCase()))
-    .slice(0, 30)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .map(t => ({
+      at: new Date(t.createdAt).getTime(),
       date: new Date(t.createdAt).toLocaleDateString("en-IN"),
       type: t.type === "expense" ? "expense" : "sale",
-      amount: t.type === "expense" ? -parseFloat(String(t.amount)) : parseFloat(String(t.amount)),
+      amount: t.type === "expense" ? -(parseFloat(String(t.amount)) || 0) : (parseFloat(String(t.amount)) || 0),
       note: t.description,
       balance: 0,
     }));
+  let running = 0;
+  for (const row of cashRows) {
+    running = Math.round((running + row.amount) * 100) / 100;
+    row.balance = running;
+  }
+  const cashLedger = cashRows.slice(-30).reverse().map(({ at: _at, ...row }) => row);
 
+  // Every figure below is money. Rounding it to whole rupees, as this did, means the
+  // wallet can never be reconciled against a bank statement — the paise are real.
   res.json({
-    onlineBalance: Math.round(onlineBalance),
-    pendingSettlement: Math.round(pendingSettlement),
-    lockedBalance: Math.round(lockedBalance),
-    reserveBalance: Math.round(reserveBalance),
-    totalCashSales: Math.round(totalCashSales),
-    totalOnlineSales: Math.round(totalOnlineSales),
-    refundAmount: Math.round(refundAmount),
-    taxCollected: Math.round(taxCollected),
-    pendingRefunds: Math.round(refundAmount),
+    onlineBalance: round2(onlineBalance),
+    pendingSettlement: round2(pendingSettlement),
+    lockedBalance: round2(lockedBalance),
+    reserveBalance,
+    commissionRatePercent: Math.round(commissionRate * 10000) / 100,
+    totalCashSales: round2(totalCashSales),
+    totalOnlineSales: round2(totalOnlineSales),
+    refundAmount: round2(refundAmount),
+    taxCollected: round2(taxCollected),
+    pendingRefunds: round2(refundAmount),
     onlineTxns,
     cashLedger,
-    settlements: [
-      { id: "STL001", amount: Math.round(pendingSettlement), utr: "Pending", bank: "Settlement Account", date: new Date().toLocaleDateString("en-IN"), status: "pending", mode: "NEFT" },
-    ],
-    pnl: {
-      revenue: totalOnlineSales + totalCashSales,
-      netProfit: totalOnlineSales + totalCashSales - commission,
-      margin: totalOnlineSales + totalCashSales > 0 ? ((totalOnlineSales + totalCashSales - commission) / (totalOnlineSales + totalCashSales)) * 100 : 0,
-    },
+    // One invented settlement row used to stand in for the schedule. These are the
+    // venue's real settlement records.
+    settlements: settlementRows
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map(r => ({
+        id: `STL${String(r.id).padStart(3, "0")}`,
+        amount: round2(money(r.finalPayout)),
+        grossSales: money(r.grossSales),
+        commission: money(r.commission),
+        refunds: money(r.refunds),
+        penalties: money(r.penalties),
+        utr: null,
+        bank: "Settlement Account",
+        date: new Date(r.createdAt).toLocaleDateString("en-IN"),
+        dueDate: r.dueDate ? new Date(r.dueDate).toLocaleDateString("en-IN") : null,
+        releasedAt: r.releasedAt ? new Date(r.releasedAt).toISOString() : null,
+        status: r.status,
+        mode: "NEFT",
+      })),
+    // Net profit ignored expenses entirely — it was revenue minus the platform fee, which
+    // is a gross figure with a fee taken off, not a profit. Recorded expenses come off too.
+    pnl: (() => {
+      const revenue = Math.round((totalOnlineSales + totalCashSales) * 100) / 100;
+      const expenses = Math.round(txs.filter(t => t.type === "expense")
+        .reduce((t, x) => t + (parseFloat(String(x.amount)) || 0), 0) * 100) / 100;
+      const netProfit = Math.round((revenue - commission - expenses) * 100) / 100;
+      return {
+        revenue,
+        commission: Math.round(commission * 100) / 100,
+        expenses,
+        netProfit,
+        margin: revenue > 0 ? Math.round((netProfit / revenue) * 10000) / 100 : 0,
+      };
+    })(),
   });
 });
 
