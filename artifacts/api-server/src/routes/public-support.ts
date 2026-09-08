@@ -4,7 +4,7 @@ import {
   db, restaurantsTable, guestUsersTable, supportTicketsTable, chatMessagesTable,
 } from "@workspace/db";
 import {
-  getSupportCatalog, resolveSupportConfig, createChatSession, generateChatReply,
+  getSupportCatalog, resolveSupportConfig, createChatSession, generateChatReply, CHAT_ASSISTANT_NAME,
   buildWhatsAppLink, buildVoiceRequest, buildEmergencyAlert, formatTicketNumber,
 } from "../lib/liveSupportLogic.js";
 
@@ -75,7 +75,9 @@ router.post("/public/support/chat/start", async (req, res): Promise<void> => {
     channel: "guest_support",
   });
 
-  res.json({ ...session, live: true });
+  // `live: true` told the page a person was on the other end. Nobody is — this is an
+  // automated assistant, and the screen has to be able to say so.
+  res.json({ ...session, live: false, automated: true });
 });
 
 router.get("/public/support/chat/:sessionId/messages", async (req, res): Promise<void> => {
@@ -106,7 +108,9 @@ router.post("/public/support/chat/:sessionId/message", async (req, res): Promise
   const { sessionId } = req.params;
   const restaurantId = parseInt(String(req.body.restaurantId ?? 0), 10);
   const message = String(req.body.message ?? "").trim();
-  const agentName = String(req.body.agentName ?? "Support Agent");
+  // The name is not the client's to choose: it used to accept whatever the page sent,
+  // so a reply could be written into the transcript under a member of staff's name.
+  const agentName = CHAT_ASSISTANT_NAME;
   const guestName = String(req.body.guestName ?? "Guest");
 
   if (!restaurantId || !message) {
@@ -137,7 +141,7 @@ router.post("/public/support/chat/:sessionId/message", async (req, res): Promise
 
   res.json({
     guestMessage: { id: guestMsg.id, role: "guest", name: guestName, message, at: guestMsg.createdAt },
-    agentMessage: { id: agentMsg.id, role: "agent", name: agentName, message: reply, at: agentMsg.createdAt },
+    agentMessage: { id: agentMsg.id, role: "agent", name: agentName, automated: true, message: reply, at: agentMsg.createdAt },
   });
 });
 
