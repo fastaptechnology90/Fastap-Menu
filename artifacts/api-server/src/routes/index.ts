@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type RequestHandler } from "express";
 import healthRouter from "./health";
 import restaurantAuthRouter from "./restaurant-auth";
 import authRouter from "./auth";
@@ -14,6 +14,7 @@ import orderAdjustmentsRouter from "./order-adjustments";
 import dayEndRouter from "./day-end";
 import attendanceRouter from "./attendance";
 import tableOperationsRouter from "./table-operations";
+import printingRouter from "./printing";
 import staffRouter from "./staff";
 import customersRouter from "./customers";
 import loyaltyRouter from "./loyalty";
@@ -81,8 +82,23 @@ import { requireRestaurantSubscription } from "../middlewares/restaurant-subscri
 import { requireTenantScope } from "../middlewares/tenant-scope.js";
 import { requireStaffPermission } from "../middlewares/staff-permissions.js";
 import { enforcePlanLimits } from "../middlewares/plan-limits.js";
+import { recordRequest, requestStarted, requestFinished } from "../lib/runtime-metrics.js";
 
 const router: IRouter = Router();
+
+// Every API request is counted here so the monitoring screen can report traffic, errors
+// and latency this process actually served. It used to report random numbers.
+const countRequest: RequestHandler = (_req, res, next) => {
+  const startedAt = Date.now();
+  requestStarted();
+  res.on("finish", () => {
+    requestFinished();
+    recordRequest(res.statusCode, Date.now() - startedAt);
+  });
+  res.on("close", () => { if (!res.writableEnded) requestFinished(); });
+  next();
+};
+router.use(countRequest);
 
 // Ownership is checked once, here, for every path that names a restaurant — so a new
 // route is covered the day it is written instead of relying on each one remembering.
@@ -112,6 +128,7 @@ router.use(orderAdjustmentsRouter);
 router.use(dayEndRouter);
 router.use(attendanceRouter);
 router.use(tableOperationsRouter);
+router.use(printingRouter);
 router.use(staffRouter);
 router.use(customersRouter);
 router.use(loyaltyRouter);
