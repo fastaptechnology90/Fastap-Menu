@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError } from "@/components/user/GuestApiState";
-import { withGuestQuery } from "@/lib/guestDemo";
+import { withGuestQuery, DEMO_SLUG } from "@/lib/guestDemo";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
 import { publicApi } from "@/lib/api";
@@ -29,10 +29,15 @@ const STATUS_BADGE: Record<string, string> = {
 
 type Tab = "live" | "suggest" | "requests";
 
+type SeatingTableRow = Record<string, any>;
+
 export default function TableSeating() {
   const [, navigate] = useAppLocation();
   const { venue, user, activeTable } = useUser();
-  const slug = venue.restaurantSlug || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || DEMO_SLUG;
 
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("live");
@@ -41,7 +46,9 @@ export default function TableSeating() {
   const [partySize, setPartySize] = useState(2);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [data, setData] = useState<any>(null);
+  /** One table as the venue reports it. Named so the lists below are not untyped. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [data, setData] = useState<{ tables?: SeatingTableRow[] } & Record<string, any> | null>(null);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [waitEstimate, setWaitEstimate] = useState<any>(null);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);

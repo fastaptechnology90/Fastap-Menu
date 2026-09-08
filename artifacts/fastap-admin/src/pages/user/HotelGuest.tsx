@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { useUser } from "@/contexts/UserContext";
@@ -50,8 +51,11 @@ export default function HotelGuest() {
   const [serviceCatalog, setServiceCatalog] = useState<{ id: string; label: string; icon: string; desc: string; api: string; type: string }[]>([]);
   const [tvChannels, setTvChannels] = useState<{ id: number; name: string }[]>([]);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [submittingService, setSubmittingService] = useState(false);
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const loadCatalog = useCallback(async () => {
     if (!venue.restaurantId) return;
@@ -102,18 +106,36 @@ export default function HotelGuest() {
       try {
         const res = await publicApi.hotel.updateControls(venue.restaurantId, roomNumber, merged);
         if (res.roomControls) setControls({ ...DEFAULT_ROOM_CONTROLS, ...res.roomControls });
-      } catch { /* local fallback */ }
+      } catch (e) {
+        // "Room updated" was shown whether or not anything reached the room. A guest who
+        // turned the lights off and walked away had no idea nothing had happened.
+        setControls(controls);
+        saveLocalControls(roomNumber, controls);
+        setToast(e instanceof Error ? e.message : "The room did not respond — please use the panel by the door.");
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
     }
     setToast("Room updated");
     setTimeout(() => setToast(null), 2000);
   }
 
   async function submitService() {
-    if (!roomNumber) return;
+    setRequestError(null);
+    if (!roomNumber) {
+      setRequestError("We do not know which room you are in. Scan the QR code in your room and try again.");
+      return;
+    }
     const svc = serviceCatalog.find(r => r.id === selectedService);
-    if (!svc) return;
+    if (!svc) {
+      setRequestError("Pick a service first.");
+      return;
+    }
+    if (submittingService) return;
+    setSubmittingService(true);
 
     if (svc.id === "food") {
+      setSubmittingService(false);
       navigate(`/user/menu?slug=${slug}&room=${encodeURIComponent(roomNumber)}`);
       return;
     }
@@ -165,9 +187,16 @@ export default function HotelGuest() {
       }
       setSentAssignee(assignee);
       setSent(svc.label);
-    } catch {
-      setSentAssignee(null);
-      setSent(svc.label);
+    } catch (e) {
+      // The success screen used to be shown here too, telling a guest whose request
+      // never left the phone that "our team has been notified". Nobody was.
+      setRequestError(
+        e instanceof Error
+          ? `${e.message} Please try again, or call reception.`
+          : "We could not send your request. Please try again, or call reception.",
+      );
+    } finally {
+      setSubmittingService(false);
     }
   }
 
@@ -296,12 +325,17 @@ export default function HotelGuest() {
                       value={notes}
                       onChange={e => setNotes(e.target.value)}
                     />
+                    {requestError && (
+                      <p role="alert" className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                        {requestError}
+                      </p>
+                    )}
                     <button
                       onClick={submitService}
-                      disabled={!roomNumber}
+                      disabled={!roomNumber || submittingService}
                       className="w-full py-3 rounded-xl bg-blue-500 font-semibold text-sm disabled:opacity-40"
                     >
-                      Submit {selected.label}
+                      {submittingService ? "Sending…" : `Submit ${selected.label}`}
                     </button>
                   </>
                 )}

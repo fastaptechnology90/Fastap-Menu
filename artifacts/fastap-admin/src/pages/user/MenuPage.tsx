@@ -538,6 +538,7 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [menuError, setMenuError] = useState("");
   const [aiForYou, setAiForYou] = useState<{ menuItemId: number; name: string; score: number; reason: string; price: number }[]>([]);
+  const [promo, setPromo] = useState<{ title: string; detail: string } | null>(null);
 
   useEffect(() => {
     if (!venue.restaurantId) return;
@@ -622,6 +623,18 @@ export default function MenuPage() {
           })
         : [];
       setFeaturedItems(featured.length > 0 ? featured : items.filter(i => i.badges.includes("bestseller") || i.chefRecommended));
+
+      // The promo strip used to be the words "Happy Hour · 3–6 PM / 20% off beverages",
+      // hardcoded and shown to every venue, discounting nothing. Drive it from the
+      // venue's own live campaigns, and show nothing when there are none.
+      const today = new Date().toISOString().slice(0, 10);
+      const campaigns = (Array.isArray(data.activeCampaigns) ? data.activeCampaigns : []) as Record<string, unknown>[];
+      const live = campaigns.find(c =>
+        c.isActive !== false
+        && (!c.startDate || String(c.startDate).slice(0, 10) <= today)
+        && (!c.endDate || String(c.endDate).slice(0, 10) >= today),
+      );
+      setPromo(live ? { title: String(live.name ?? ""), detail: String(live.description ?? "") } : null);
     }
   }, [setActiveRestaurant, setActiveTable, loadVenue]);
 
@@ -784,13 +797,15 @@ export default function MenuPage() {
       </div>
 
       <main className="menu-page__main">
-          <div className="menu-app__promo">
-            <div>
-              <p className="text-[11px] font-semibold text-orange-300">Happy Hour · 3–6 PM</p>
-              <p className="text-sm font-bold mt-0.5">20% off beverages</p>
+          {promo && (
+            <div className="menu-app__promo">
+              <div>
+                <p className="text-[11px] font-semibold text-orange-300">{promo.title}</p>
+                {promo.detail && <p className="text-sm font-bold mt-0.5">{promo.detail}</p>}
+              </div>
+              <Icon name="local_offer" size={26} className="text-orange-400 shrink-0" />
             </div>
-            <Icon name="local_bar" size={26} className="text-orange-400 shrink-0" />
-          </div>
+          )}
 
           {loading && (
             <div className="menu-skeleton">

@@ -243,8 +243,12 @@ function mapOrderFromApi(o: any, restaurantName: string): Order {
     name: i.name,
     price: parseFloat(String(i.price ?? 0)),
     quantity: i.quantity ?? 1,
-    customizations: i.customizations ?? (i.variant ? [i.variant] : []),
+    customizations: i.customizations ?? [],
     addons: Array.isArray(i.addons) ? i.addons : [],
+    // Carry the portion through as a variant, not folded into the customization strings.
+    // Dropping it meant a reorder of a half plate came back as a full one at full price,
+    // and the kitchen ticket said nothing about the size.
+    variant: i.variant ?? undefined,
     specialInstructions: i.notes,
     course: i.course ?? "main",
   }));
@@ -258,6 +262,8 @@ function mapOrderFromApi(o: any, restaurantName: string): Order {
     placedAt: new Date(o.createdAt),
     estimatedTime: 20,
     waiterName: o.waiterName ?? undefined,
+    paymentStatus: o.paymentStatus ?? undefined,
+    billRequested: Boolean((o.metadata as { billRequested?: boolean } | null)?.billRequested),
   };
 }
 
@@ -328,8 +334,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch { /* optional */ }
   }, []);
 
+  /**
+   * Pull the signed-in guest's real order history.
+   *
+   * `orders` was only ever filled by placing one in this browser tab, so every page that
+   * reads it — reorder, the running bill, "your last meal" — was empty for a returning
+   * guest and after any refresh.
+   */
+  const refreshOrders = useCallback(async (restaurantName: string) => {
+    try {
+      const list = await publicApi.myOrders();
+      if (Array.isArray(list)) setOrders(list.map(o => mapOrderFromApi(o, restaurantName)));
+    } catch { /* a guest with no identity has no history to show */ }
+  }, []);
+
   useEffect(() => {
     refreshUser().finally(() => setAuthLoading(false));
+    refreshOrders(activeRestaurant);
     const saved = localStorage.getItem("fastap_waitlist");
     if (saved) {
       try { setWaitlist(JSON.parse(saved)); } catch { /* ignore */ }
@@ -343,6 +364,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("fastap_favorites", JSON.stringify(r.favorites));
       }
     }).catch(() => {});
+  // Deliberately mount-only: the history is fetched once the session is known, and
+  // placeOrder keeps it current afterwards.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshUser]);
 
   const loadVenue = useCallback(async (slug: string, params?: VenueLoadParams) => {

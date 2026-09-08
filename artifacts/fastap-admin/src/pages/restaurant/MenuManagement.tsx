@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { menu as menuApi, foodCosting as foodCostingApi } from "@/lib/api";
+import { menu as menuApi, foodCosting as foodCostingApi, planLimitMessage } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 type MenuItem = any;
 import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, Filter } from "lucide-react";
@@ -239,8 +239,9 @@ export default function MenuManagement() {
       setNewItem({ dietary: "veg", available: true, featured: false, spiceLevel: 1 });
       toast({ title: "Item added" });
     } catch (e: any) {
-      // Keep the form open with what was typed so nothing has to be re-entered.
-      toast({ title: "Could not add item", description: e?.message, variant: "destructive" });
+      // Keep the form open with what was typed so nothing has to be re-entered. A plan
+      // cap arrives as a 402 naming the allowance — say that rather than "could not add".
+      toast({ ...planLimitMessage(e, "Could not add item"), variant: "destructive" });
     }
   }
 

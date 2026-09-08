@@ -18,22 +18,29 @@ export default function FutureAIPage() {
   const goBack = useGuestBack();
   const [features, setFeatures] = useState<FutureFeature[]>([]);
   const [waitlistFeature, setWaitlistFeature] = useState<string | null>(null);
+  const [joining, setJoining] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const [msg, setMsg] = useState("");
+  // Failures were rendered in the same green success line as confirmations, so "Could
+  // not load" and "Enter your email" both read as good news.
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     publicApi.aiFuture.catalog().then(r => setFeatures((r.features ?? []) as FutureFeature[]))
-      .catch(() => setMsg("Could not load what is coming next. Please try again later."));
+      .catch(() => setMsg({ text: "Could not load what is coming next. Please try again later.", ok: false }));
   }, []);
 
   async function joinWaitlist(featureId: string) {
-    if (!email) { setMsg("Enter your email"); return; }
+    if (!email) { setMsg({ text: "Enter your email so we can tell you when it is ready.", ok: false }); return; }
+    if (joining) return;
+    setJoining(featureId);
     try {
       const r = await publicApi.aiFuture.waitlist({ featureId, email });
-      setMsg(r.message);
+      setMsg({ text: r.message, ok: true });
       setWaitlistFeature(null);
     } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Failed to join waitlist");
+      setMsg({ text: e instanceof Error ? e.message : "Could not add you to the list. Please try again.", ok: false });
+    } finally {
+      setJoining(null);
     }
   }
 
@@ -58,7 +65,9 @@ export default function FutureAIPage() {
           </div>
         </div>
 
-        {msg && <p className="text-sm text-emerald-400 mb-4 text-center">{msg}</p>}
+        {msg && (
+          <p role={msg.ok ? undefined : "alert"} className={`text-sm mb-4 text-center ${msg.ok ? "text-emerald-400" : "text-red-300"}`}>{msg.text}</p>
+        )}
 
         <div className="space-y-3">
           {features.map(f => (
@@ -91,7 +100,13 @@ export default function FutureAIPage() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                   />
-                  <button onClick={() => joinWaitlist(f.id)} className="px-4 py-2 rounded-lg bg-violet-500 text-sm font-semibold">Join</button>
+                  <button
+                    onClick={() => joinWaitlist(f.id)}
+                    disabled={joining === f.id}
+                    className="px-4 py-2 rounded-lg bg-violet-500 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {joining === f.id ? "Adding…" : "Join"}
+                  </button>
                 </div>
               )}
             </div>

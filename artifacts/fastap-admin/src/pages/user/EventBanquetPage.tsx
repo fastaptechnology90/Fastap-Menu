@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { useToast } from "@/hooks/use-toast";
@@ -79,7 +80,9 @@ export default function EventBanquetPage() {
   const goBack = useGuestBack();
   const { venue, user, activeRestaurant } = useUser();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const [tab, setTab] = useState<Tab>("plan");
   const [step, setStep] = useState<Step>("type");

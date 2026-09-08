@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError, GuestEmpty } from "@/components/user/GuestApiState";
@@ -39,7 +40,10 @@ export default function DigitalExperiencePage() {
   const { venue } = useUser();
   const { festivalTheme, seasonalAnimation, setFestivalTheme, setSeasonalAnimation } = useDigitalExperience();
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-  const slug = venue.restaurantSlug || params.get("slug") || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
 
   const { toast: pushToast } = useToast();
   const [tab, setTab] = useState<Tab>("offers");
@@ -317,8 +321,12 @@ export default function DigitalExperiencePage() {
             </div>
 
             <p className="text-sm font-semibold">Scratch Cards</p>
+            <p className="text-xs text-white/40 -mt-1">Show the reveal to a member of staff — these are not applied automatically at checkout.</p>
             <div className="grid grid-cols-3 gap-2">
               {scratchCards.map((sc: { id: string; title: string; hidden: string }) => (
+                // Revealing is local only — nothing is claimed, coded or redeemable,
+                // and a reload hides it again. Say what it is rather than dressing a
+                // React Set up as a prize.
                 <button key={sc.id} onClick={() => setRevealedScratch(prev => new Set(prev).add(sc.id))}
                   className={`aspect-square rounded-xl border p-2 text-center text-xs font-bold transition-all ${
                     revealedScratch.has(sc.id) ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300" : "border-white/20 bg-gradient-to-br from-slate-600 to-slate-800 text-transparent"
@@ -329,9 +337,10 @@ export default function DigitalExperiencePage() {
             </div>
 
             <p className="text-sm font-semibold">Tap to Reveal</p>
+            <p className="text-xs text-white/40 -mt-1">Show the reveal to a member of staff — these are not applied automatically at checkout.</p>
             <div className="space-y-2">
               {tapPromos.map((tp: { id: string; emoji: string; title: string; reward: string }) => (
-                <button key={tp.id} onClick={() => { setRevealedTap(prev => new Set(prev).add(tp.id)); showToast(tp.reward); }}
+                <button key={tp.id} onClick={() => { setRevealedTap(prev => new Set(prev).add(tp.id)); showToast(`${tp.reward} — show this to a member of staff`); }}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left ${revealedTap.has(tp.id) ? "border-emerald-500/40 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}>
                   <span className="text-2xl">{tp.emoji}</span>
                   <div className="flex-1">

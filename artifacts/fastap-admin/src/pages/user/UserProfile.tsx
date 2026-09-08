@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Wallet, Star, Gift, Crown,
   History, Heart, LogOut, Plus, ArrowUpRight, ArrowDownLeft,
   Bell, Shield, Globe, Headphones, Award, Zap, Brain, Wifi, Smartphone, Monitor, Film,
+  Receipt, CalendarDays, Hourglass, Flower2, Martini, PartyPopper,
 } from "lucide-react";
 
 const TIER_CONFIG = {
@@ -50,6 +51,9 @@ export default function UserProfile() {
   const [rechargeError, setRechargeError] = useState("");
   const [ordersHistory, setOrdersHistory] = useState<OrderHistoryRow[]>([]);
   const [walletTx, setWalletTx] = useState<WalletTxRow[]>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [recharging, setRecharging] = useState(false);
+  const [walletError, setWalletError] = useState("");
 
   useEffect(() => {
     publicApi.myOrders().then(list => {
@@ -62,7 +66,13 @@ export default function UserProfile() {
         status: o.status,
         rawItems: o.items,
       })));
-    }).catch(() => setOrdersHistory([]));
+      setHistoryError("");
+    }).catch(e => {
+      // A failed request used to be indistinguishable from an empty history, so a
+      // regular customer was told in the venue's own voice that they had never ordered.
+      setOrdersHistory([]);
+      setHistoryError(e instanceof Error ? e.message : "We could not load your orders.");
+    });
     publicApi.wallet().then(w => {
       setWalletTx((w.transactions ?? []).map((t: { amount: number; description?: string; type: string; createdAt: string }) => ({
         type: parseFloat(String(t.amount)) >= 0 ? "credit" : "debit",
@@ -71,7 +81,11 @@ export default function UserProfile() {
         date: new Date(t.createdAt).toLocaleDateString(),
         icon: t.type === "recharge" ? Plus : Gift,
       })));
-    }).catch(() => setWalletTx([]));
+      setWalletError("");
+    }).catch(e => {
+      setWalletTx([]);
+      setWalletError(e instanceof Error ? e.message : "We could not load your wallet.");
+    });
   }, [user, venue.restaurantName]);
 
   if (!user) {
@@ -89,7 +103,10 @@ export default function UserProfile() {
   }
 
   const profile = user;
-  const tierCfg = TIER_CONFIG[profile.tier];
+  // The tier string comes straight from the API. Indexing a fixed map with it and then
+  // reading .color/.icon/.perks white-screened the whole profile for any tier name the
+  // map does not know.
+  const tierCfg = TIER_CONFIG[profile.tier] ?? TIER_CONFIG.silver;
   const progressToNext = tierCfg.nextAt ? Math.min(100, (profile.points / tierCfg.nextAt) * 100) : 100;
 
   return (
@@ -186,6 +203,16 @@ export default function UserProfile() {
                 { icon: Monitor, label: "Smart Kiosk & Self Order", sub: "Self order, checkout, NFC, QR & tokens", action: () => goGuest("/user/kiosk") },
                 { icon: Film, label: "Digital Experience", sub: "Live offers, videos, promos, themes & FX", action: () => goGuest("/user/experience") },
                 { icon: Star, label: "Social & Reviews", sub: "Ratings, reviews, photos, share & referrals", action: () => goGuest("/user/reviews") },
+                // These six pages existed with no way in: the only links to them lived in
+                // a service sheet on the menu that nothing ever opened, so the running
+                // bill, reservations, the queue, the spa, the bar and events were all
+                // dead ends unless the guest typed the URL.
+                { icon: Receipt, label: "Table Bill & Service", sub: "Running bill, split it, call a waiter", action: () => goGuest("/user/dining") },
+                { icon: CalendarDays, label: "Book a Table", sub: "Reserve a table, or a room, spa or event slot", action: () => goGuest("/user/reserve") },
+                { icon: Hourglass, label: "Join the Queue", sub: "Take a token and track your place", action: () => goGuest("/user/queue") },
+                { icon: Flower2, label: "Spa & Wellness", sub: "Treatments, therapists & memberships", action: () => goGuest("/user/spa") },
+                { icon: Martini, label: "Bar & Nightlife", sub: "Happy hour, tables, lounges & DJ nights", action: () => goGuest("/user/bar") },
+                { icon: PartyPopper, label: "Events & Banquets", sub: "Halls, catering, decor & quotations", action: () => goGuest("/user/events") },
               ].map(item => (
                 <button key={item.label} onClick={item.action} className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-all">
                   <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center">
@@ -259,23 +286,34 @@ export default function UserProfile() {
                   onChange={e => setRechargeAmt(e.target.value)}
                 />
                 <button
+                  disabled={recharging}
                   onClick={async () => {
                     const amt = parseFloat(rechargeAmt);
-                    if (!amt) return;
+                    // A blank or non-numeric amount used to return in silence, so the
+                    // button looked broken. It is also re-entrant: two taps were two
+                    // real top-ups.
+                    if (!Number.isFinite(amt) || amt <= 0) {
+                      setRechargeError("Enter an amount to add.");
+                      return;
+                    }
+                    if (recharging) return;
+                    setRecharging(true);
                     try {
                       // Clearing the field on a failed top-up reads as success.
                       await publicApi.rechargeWallet(amt);
                     } catch (e) {
                       setRechargeError(e instanceof Error ? e.message : "The top-up did not go through. You have not been charged.");
                       return;
+                    } finally {
+                      setRecharging(false);
                     }
                     setRechargeError("");
                     await refreshUser();
                     setRechargeAmt("");
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/30"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/30 disabled:opacity-50"
                 >
-                  Add Money
+                  {recharging ? "Adding…" : "Add Money"}
                 </button>
               </div>
               {rechargeError && <p role="alert" className="mt-2 text-xs text-red-400">{rechargeError}</p>}
@@ -284,6 +322,11 @@ export default function UserProfile() {
             {/* Transactions */}
             <div className="rounded-2xl bg-white/[0.03] border border-white/8 divide-y divide-white/5">
               <div className="p-4"><p className="text-sm font-semibold">Recent Transactions</p></div>
+              {walletTx.length === 0 && (
+                walletError
+                  ? <p role="alert" className="p-6 text-center text-sm text-red-300">{walletError}</p>
+                  : <p className="p-6 text-center text-sm text-white/40">No transactions yet.</p>
+              )}
               {walletTx.map((t, i) => (
                 <div key={i} className="flex items-center gap-3 p-4">
                   <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${t.type === "credit" ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
@@ -307,7 +350,9 @@ export default function UserProfile() {
           <div className="rounded-2xl bg-white/[0.03] border border-white/8 divide-y divide-white/5">
             <div className="p-4"><p className="text-sm font-semibold">Order History</p></div>
             {ordersHistory.length === 0 && (
-              <p className="p-6 text-center text-sm text-white/40">No orders yet. Place one from the menu.</p>
+              historyError
+                ? <p role="alert" className="p-6 text-center text-sm text-red-300">{historyError} Pull down to refresh, or try again in a moment.</p>
+                : <p className="p-6 text-center text-sm text-white/40">No orders yet. Place one from the menu.</p>
             )}
             {ordersHistory.map(order => (
               <div key={order.id} className="p-4">

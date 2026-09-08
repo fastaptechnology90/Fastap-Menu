@@ -12,7 +12,7 @@ import {
 } from "@/lib/liveSupportCatalog";
 import {
   ChevronLeft, MessageCircle, Phone, Send, AlertTriangle, Ticket,
-  CheckCircle, Headphones, Clock, ExternalLink, Mic, Shield, Loader,
+  CheckCircle, AlertCircle, Headphones, Clock, ExternalLink, Mic, Shield, Loader,
 } from "lucide-react";
 
 type Tab = SupportChannelId;
@@ -32,7 +32,7 @@ export default function UserSupport() {
   const [config, setConfig] = useState<any>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Live chat
@@ -135,8 +135,11 @@ export default function UserSupport() {
     return () => clearInterval(t);
   }, [sessionId, venue.restaurantId, tab]);
 
-  function showToast(msg: string) {
-    setToast(msg);
+  // One green tick banner was used for confirmations AND for failures, so "Permission
+  // denied", "Sync failed" and "Image too large" all read as good news. `ok: false`
+  // paints the same banner as a problem.
+  function showToast(msg: string, ok = true) {
+    setToast({ text: msg, ok });
     setTimeout(() => setToast(null), 3000);
   }
 
@@ -192,7 +195,7 @@ export default function UserSupport() {
   }
 
   async function requestVoiceCallback() {
-    if (!voicePhone.trim()) { showToast("Enter your phone number"); return; }
+    if (!voicePhone.trim()) { showToast("Enter your phone number so we can call you back", false); return; }
     setSubmitting(true);
     try {
       const res = await publicApi.support.voice({
@@ -275,8 +278,11 @@ export default function UserSupport() {
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" /> {toast}
+          <div
+            role={toast.ok ? undefined : "alert"}
+            className={`mx-4 mb-2 rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${toast.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}
+          >
+            {toast.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />} {toast.text}
           </div>
         )}
 

@@ -8,15 +8,17 @@ import { Shield, Smartphone, Bell, AlertTriangle, Trash2, CheckCircle } from "lu
 
 type Device = { id: string; name: string; lastSeen: string; trusted: boolean; loginCount: number };
 type LoginAlert = { id: string; at: string; deviceName: string; suspicious: boolean; message: string; read: boolean };
+type Security = { sessionTimeoutMinutes: number; fraudProtection: boolean; loginAlertsEnabled: boolean };
 
 export default function UserSecurityPage() {
   const goBack = useGuestBack();
   const { user } = useUser();
   const [devices, setDevices] = useState<Device[]>([]);
   const [alerts, setAlerts] = useState<LoginAlert[]>([]);
-  const [security, setSecurity] = useState({ sessionTimeoutMinutes: 30, fraudProtection: true, loginAlertsEnabled: true });
+  const [security, setSecurity] = useState<Security>({ sessionTimeoutMinutes: 30, fraudProtection: true, loginAlertsEnabled: true });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const currentId = getDeviceId();
 
   useEffect(() => {
@@ -26,34 +28,57 @@ export default function UserSecurityPage() {
       publicApi.auth.loginAlerts(),
       publicApi.auth.security(),
     ]).then(([d, a, s]) => {
-      setDevices(d.devices ?? []);
-      setAlerts(a.alerts ?? []);
-      setSecurity(s.security ?? security);
+      setDevices((d.devices ?? []) as Device[]);
+      setAlerts((a.alerts ?? []) as LoginAlert[]);
+      setSecurity(s.security ? { ...security, ...(s.security as Partial<Security>) } : security);
       setLoadError("");
       // An empty device list would otherwise read as "no one else is signed in".
     }).catch(e => setLoadError(e instanceof Error ? e.message : "Could not reach the server."))
       .finally(() => setLoading(false));
   }, [user]);
 
+  // None of these four had any error handling: a failed request threw into nowhere and
+  // the screen simply did not change. Someone trying to sign a lost phone out was left
+  // believing they had, with no message of any kind.
   async function removeDevice(id: string) {
-    const r = await publicApi.auth.removeDevice(id);
-    setDevices(r.devices ?? []);
+    setActionError("");
+    try {
+      const r = await publicApi.auth.removeDevice(id);
+      setDevices((r.devices ?? []) as Device[]);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "That device is still signed in — please try again.");
+    }
   }
 
   async function trustDevice(id: string) {
-    const r = await publicApi.auth.trustDevice(id);
-    setDevices(r.devices ?? []);
+    setActionError("");
+    try {
+      const r = await publicApi.auth.trustDevice(id);
+      setDevices((r.devices ?? []) as Device[]);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not mark that device as trusted.");
+    }
   }
 
   async function markRead() {
-    await publicApi.auth.markAlertsRead();
-    setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+    setActionError("");
+    try {
+      await publicApi.auth.markAlertsRead();
+      setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not mark these as read.");
+    }
   }
 
-  async function updateSecurity(patch: Partial<typeof security>) {
+  async function updateSecurity(patch: Partial<Security>) {
+    setActionError("");
     const next = { ...security, ...patch };
-    const r = await publicApi.auth.updateSecurity(next);
-    setSecurity(r.security);
+    try {
+      const r = await publicApi.auth.updateSecurity(next);
+      setSecurity(r.security ? { ...next, ...(r.security as Partial<Security>) } : next);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "That setting was not saved. Please try again.");
+    }
   }
 
   if (!user) {
@@ -76,6 +101,11 @@ export default function UserSecurityPage() {
       </div>
 
       <div className="px-4 space-y-6">
+        {actionError && (
+          <p role="alert" className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+            {actionError}
+          </p>
+        )}
         <section className="guest-card p-4">
           <h2 className="text-sm font-semibold flex items-center gap-2 mb-3"><Shield className="h-4 w-4 text-orange-400" /> Security Features</h2>
           <div className="space-y-3 text-xs">

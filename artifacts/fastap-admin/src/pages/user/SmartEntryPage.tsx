@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DEMO_SLUG } from "@/lib/guestDemo";
 import { useParams } from "wouter";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { useSmartEntry } from "@/hooks/useSmartEntry";
@@ -20,7 +21,10 @@ const ENTRY_ICONS: Record<string, typeof QrCode> = {
 
 export default function SmartEntryPage() {
   const params = useParams<{ slug: string }>();
-  const slug = params.slug || "spice-garden";
+  // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
+  // pinned every unresolved page to one live restaurant and put its slug in the URL.
+
+  const slug = params.slug || DEMO_SLUG;
   const [, navigate] = useAppLocation();
   const { loading, offline, entry, joinShareCode, createFamilySession } = useSmartEntry(slug);
   const [redirecting, setRedirecting] = useState(false);

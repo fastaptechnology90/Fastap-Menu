@@ -5,7 +5,7 @@ import { usePwa, PWA_FEATURES, HOME_SCREEN_SHORTCUTS, PUSH_NOTIFICATION_TYPES } 
 import { useOffline } from "@/contexts/OfflineContext";
 import {
   ChevronLeft, Smartphone, Download, Bell, WifiOff, Zap, Rocket,
-  CheckCircle, ExternalLink, Gauge, Share,
+  CheckCircle, AlertCircle, ExternalLink, Gauge, Share,
 } from "lucide-react";
 
 type Tab = "install" | "push" | "shortcuts" | "performance";
@@ -20,21 +20,24 @@ export default function PwaExperiencePage() {
   const { menuCache, settings: offlineSettings, pendingOrders } = useOffline();
 
   const [tab, setTab] = useState<Tab>("install");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
 
-  function showToast(msg: string) {
-    setToast(msg);
+  // One green tick banner was used for confirmations AND for failures, so "Permission
+  // denied", "Sync failed" and "Image too large" all read as good news. `ok: false`
+  // paints the same banner as a problem.
+  function showToast(msg: string, ok = true) {
+    setToast({ text: msg, ok });
     setTimeout(() => setToast(null), 3000);
   }
 
   async function handleInstall() {
     if (canInstall) {
       const ok = await installApp();
-      showToast(ok ? "App installed!" : "Install cancelled");
+      showToast(ok ? "App installed!" : "Install cancelled", ok);
     } else if (isStandalone) {
       showToast("Already running as installed app");
     } else {
-      showToast("Use browser menu → Add to Home Screen");
+      showToast("Use your browser menu → Add to Home Screen", false);
     }
   }
 
@@ -58,8 +61,11 @@ export default function PwaExperiencePage() {
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" /> {toast}
+          <div
+            role={toast.ok ? undefined : "alert"}
+            className={`mx-4 mb-2 rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${toast.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}
+          >
+            {toast.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />} {toast.text}
           </div>
         )}
 
@@ -144,7 +150,7 @@ export default function PwaExperiencePage() {
               <p className="text-sm font-semibold text-amber-200">Push status: {pushPermission}</p>
               <p className="text-xs text-white/50 mt-1">Get notified when your order is ready, waitlist is called, or offers arrive</p>
               {pushPermission !== "granted" && (
-                <button onClick={async () => { const ok = await enablePush(); showToast(ok ? "Notifications enabled" : "Permission denied"); }}
+                <button onClick={async () => { const ok = await enablePush(); showToast(ok ? "Notifications enabled" : "Permission denied — turn notifications on in your browser settings", ok); }}
                   className="mt-3 w-full py-2.5 rounded-xl bg-amber-500/30 border border-amber-500/40 text-amber-200 text-sm font-semibold">
                   Enable Push Notifications
                 </button>
@@ -242,7 +248,7 @@ export default function PwaExperiencePage() {
               </button>
             </div>
 
-            <button onClick={() => registerServiceWorker().then(ok => showToast(ok ? "Service worker updated" : "SW registration failed"))}
+            <button onClick={() => registerServiceWorker().then(ok => showToast(ok ? "App updated" : "The app could not update itself — reload the page", ok))}
               className="w-full py-3 rounded-xl border border-white/10 text-sm text-white/60">
               Refresh service worker cache
             </button>
