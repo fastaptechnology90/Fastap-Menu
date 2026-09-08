@@ -126,9 +126,19 @@ async function main() {
       "a new venue starts in a defined, queryable state",
       `active=${r.is_active} plan=${r.plan} publication=${JSON.stringify(settings.publication ?? null)} kyc=${JSON.stringify(settings.kyc ?? null)}`);
 
+    // Seeing the menu while onboarding is deliberate — an owner needs to preview it.
+    // Taking a real customer's order before anyone has checked the business is not.
     const guestSees = await anon("GET", `/public/menu/audit-bistro-${stamp}`);
-    note(guestSees.status === 200 ? "broken" : "works",
-      "an unapproved venue is not yet visible to guests", `guest menu HTTP ${guestSees.status}`);
+    note(guestSees.status === 200 ? "works" : "partial",
+      "an onboarding venue can preview its own menu", `HTTP ${guestSees.status}`);
+
+    const tryOrder = await anon("POST", "/public/orders", {
+      restaurantId: newRid, tableName: "AUDIT-T1", customerName: "AUDIT",
+      items: [{ menuItemId: 1, quantity: 1 }],
+    });
+    note(tryOrder.status === 403 ? "works" : "broken",
+      "an unapproved venue cannot take real orders",
+      `HTTP ${tryOrder.status}${tryOrder.body?.publicationStatus ? ` (${tryOrder.body.publicationStatus})` : ""}`);
   }
 
   // Plan limits

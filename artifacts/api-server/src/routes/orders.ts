@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, inArray, gte } from "drizzle-orm";
-import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
+import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable, restaurantsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
@@ -9,6 +9,12 @@ import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { priceMenuItem, resolveDiscount, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
+import { canTransition } from "../lib/order-status.js";
+import {
+  isRestaurantPublished,
+  getPublicationStatus,
+  guestVenueAccessError,
+} from "../lib/restaurant-publication.js";
 
 const router: IRouter = Router();
 
@@ -49,6 +55,17 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     finalTotal, collectedBy, collectedFrom, utr, upiId } = req.body;
   const [existing] = await db.select().from(ordersTable).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)));
   if (!existing) { res.status(404).json({ error: "Order not found" }); return; }
+
+  // The status column is free text and nothing checked it, so any string was accepted and
+  // an order could go from completed back to new. Everything downstream — the kitchen
+  // board, the waiter board, billing, revenue — keys off this field.
+  if (status !== undefined && status !== existing.status) {
+    const allowed = canTransition(String(existing.status), String(status));
+    if (!allowed.ok) {
+      res.status(400).json({ error: allowed.reason });
+      return;
+    }
+  }
 
   const meta = (typeof existing.metadata === "object" && existing.metadata !== null ? existing.metadata : {}) as Record<string, unknown>;
   const tracking = (typeof meta.tracking === "object" && meta.tracking !== null ? meta.tracking : {}) as Record<string, unknown>;
@@ -217,6 +234,23 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     scheduledAt, splitPayments, partialPayNow, advanceAmount, nfcTagId, qrCodeId,
   } = req.body;
   if (!restaurantId || !items || !Array.isArray(items)) { res.status(400).json({ error: "restaurantId and items required" }); return; }
+
+  // A venue that has not been approved must not take real orders. Viewing the menu while
+  // onboarding is deliberate — an owner needs to preview it — but ordering was open too,
+  // so anyone could register, skip KYC, and start serving customers and issuing invoices
+  // against an account nobody had checked.
+  const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId)).limit(1);
+  if (!venue) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  if (!isRestaurantPublished(venue)) {
+    const status = getPublicationStatus(venue);
+    res.status(403).json({
+      error: status === "Pending"
+        ? "This restaurant is not open for orders yet."
+        : guestVenueAccessError(status),
+      publicationStatus: status,
+    });
+    return;
+  }
 
   const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
