@@ -302,13 +302,18 @@ async function main() {
     "the vendor list matches the database", `${vendorRows.length} listed vs ${dbVenues} in DB`);
 
   const revenue = await superAdmin("GET", "/superadmin/restaurant-revenues");
-  const revRows = Array.isArray(revenue.body) ? revenue.body : (revenue.body?.rows ?? []);
-  const dbRevenue = (await db(
-    "select coalesce(sum(total),0)::numeric t from orders where restaurant_id=$1 and payment_status='paid'", [RID],
-  ))[0].t;
-  const claimed = revRows.find(r => String(r.id ?? r.restaurantId) === String(RID));
-  note(claimed ? "partial" : "missing", "platform revenue per venue is reported",
-    claimed ? `claims ${claimed.revenue ?? claimed.total ?? "?"}, DB paid total ${dbRevenue}` : "");
+  const revRows = revenue.body?.restaurants ?? (Array.isArray(revenue.body) ? revenue.body : []);
+  // Same exclusions the report applies: a cancelled or refunded order is not revenue.
+  const dbRevenue = Number((await db(
+    `select coalesce(sum(total),0)::numeric t from orders
+     where restaurant_id=$1 and payment_status='paid'
+       and status <> 'cancelled' and payment_status not in ('refunded','failed')`, [RID],
+  ))[0].t);
+  const claimed = revRows.find(r => String(r.id) === String(RID));
+  const matches = claimed && money(claimed.orderRevenue) === money(dbRevenue);
+  note(!claimed ? "missing" : matches ? "works" : "broken",
+    "platform revenue per venue reconciles with the database",
+    claimed ? `report ${claimed.orderRevenue} vs DB ${dbRevenue}` : "");
 
   const appReleases = await superAdmin("GET", "/superadmin/app-releases");
   note(appReleases.status === 200 ? "works" : "broken", "APK releases are listable", `HTTP ${appReleases.status}`);

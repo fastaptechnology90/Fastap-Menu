@@ -80,6 +80,7 @@ import { requireAuth } from "../middlewares/auth";
 import { requireRestaurantSubscription } from "../middlewares/restaurant-subscription.js";
 import { requireTenantScope } from "../middlewares/tenant-scope.js";
 import { requireStaffPermission } from "../middlewares/staff-permissions.js";
+import { enforcePlanLimits } from "../middlewares/plan-limits.js";
 
 const router: IRouter = Router();
 
@@ -89,6 +90,9 @@ router.use(requireTenantScope);
 // Then the venue's own role matrix. Tenant scoping keeps one restaurant out of another's
 // data; this keeps a waiter out of the finance ledger and the staff list within their own.
 router.use(requireStaffPermission);
+// A venue may only create what its plan allows. Reading, editing and deleting stay open
+// so a venue over its limit can still work with — and reduce — what it already has.
+router.use(enforcePlanLimits);
 router.use(requireRestaurantSubscription);
 
 router.use(healthRouter);
