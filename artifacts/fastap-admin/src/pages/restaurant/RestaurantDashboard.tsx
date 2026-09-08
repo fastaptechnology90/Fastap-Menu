@@ -11,10 +11,16 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+// The owner reads these tiles as their books, not as a headline. "₹47.9K" hides up to
+// ₹99 of takings and cannot be reconciled against anything, so print the rupee figure.
 function formatRevenue(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${Math.round(n).toLocaleString()}`;
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+function greetingFor(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 // Small payment-method chip so the dashboard's Live Orders show how each order was paid.
@@ -146,7 +152,7 @@ export default function RestaurantDashboard() {
     <div className="p-4 lg:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold">Good morning, {currentStaff?.name?.split(" ")[0]}! 👋</h1>
+          <h1 className="text-xl font-extrabold">{greetingFor(new Date().getHours())}, {currentStaff?.name?.split(" ")[0]}! 👋</h1>
           <p className="text-white/40 text-sm mt-0.5">{restaurant.name} · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
         </div>
         <div className="flex items-center gap-3">

@@ -8,7 +8,7 @@ import { PermissionGate } from "@/components/restaurant/PermissionGate";
 import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import {
   Receipt, CreditCard, Smartphone, Banknote, Wallet, Nfc,
-  Plus, Minus, Trash2, CheckCircle, Printer, Download, Search, X
+  Plus, Minus, Trash2, CheckCircle, Printer, Download, Search, X, ChevronLeft
 } from "lucide-react";
 
 const PAYMENT_METHODS = [
@@ -278,8 +278,33 @@ export default function BillingPOS() {
         )}
       </div>
 
-      {/* Right: Bill Panel */}
-      <div className="hidden xl:flex w-96 border-l border-white/5 flex-col bg-[#0e1520]">
+      {/* Right: Bill Panel.
+          This was `hidden xl:flex`, so on anything narrower than 1280px — which is every
+          tablet a restaurant actually uses — a cashier tapped an order and nothing
+          appeared: no total, no Collect button. Below xl it now slides in as a full-height
+          sheet once an order is selected, and stays the fixed sidebar from xl upwards. */}
+      {(selectedOrder || paid) && (
+        <button
+          type="button"
+          aria-label="Close bill"
+          onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
+          className="xl:hidden fixed inset-0 z-30 bg-black/60"
+        />
+      )}
+      <div
+        className={`${selectedOrder || paid ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md
+          xl:static xl:flex xl:w-96 xl:max-w-none xl:z-auto
+          border-l border-white/5 flex-col bg-[#0e1520]`}
+      >
+        {/* Only needed while the panel is a sheet — at xl it is a permanent sidebar. */}
+        {(selectedOrder || paid) && (
+          <button
+            onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
+            className="xl:hidden flex items-center gap-1.5 px-4 py-3 text-sm text-white/50 hover:text-white border-b border-white/5"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back to orders
+          </button>
+        )}
         {!selectedOrder && !paid ? (
           <div className="flex-1 flex flex-col items-center justify-center text-white/20 p-8 text-center">
             <Receipt className="h-16 w-16 mb-4" />
