@@ -75,12 +75,16 @@ import featureModulesRouter, {
 import { requireAuth } from "../middlewares/auth";
 import { requireRestaurantSubscription } from "../middlewares/restaurant-subscription.js";
 import { requireTenantScope } from "../middlewares/tenant-scope.js";
+import { requireStaffPermission } from "../middlewares/staff-permissions.js";
 
 const router: IRouter = Router();
 
 // Ownership is checked once, here, for every path that names a restaurant — so a new
 // route is covered the day it is written instead of relying on each one remembering.
 router.use(requireTenantScope);
+// Then the venue's own role matrix. Tenant scoping keeps one restaurant out of another's
+// data; this keeps a waiter out of the finance ledger and the staff list within their own.
+router.use(requireStaffPermission);
 router.use(requireRestaurantSubscription);
 
 router.use(healthRouter);
