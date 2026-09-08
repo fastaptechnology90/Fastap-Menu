@@ -225,7 +225,7 @@ async function main() {
     "refund an order": ["POST", `/restaurants/${RID}/orders/${orderId}/refund`],
     "X reading (mid-service)": ["GET", `/restaurants/${RID}/reports/x`],
     "day-end Z report": ["GET", `/restaurants/${RID}/reports/z`],
-    "clock in / attendance": ["POST", `/restaurants/${RID}/attendance`],
+    "clock in / attendance": ["GET", `/restaurants/${RID}/attendance/open`],
   };
   for (const [what, [method, path]] of Object.entries(everyday)) {
     const r = await owner(method, path, method === "GET" ? undefined : {});
@@ -312,10 +312,9 @@ async function main() {
 
   const appReleases = await superAdmin("GET", "/superadmin/app-releases");
   note(appReleases.status === 200 ? "works" : "broken", "APK releases are listable", `HTTP ${appReleases.status}`);
-  const anyDownloadRecord = await db(
-    "select count(*)::int n from information_schema.tables where table_name = 'app_downloads'",
-  );
-  note(anyDownloadRecord[0].n ? "works" : "missing", "who downloaded which app is recorded");
+  const downloadReport = await superAdmin("GET", "/superadmin/app-releases/downloads");
+  note(downloadReport.status === 200 ? "works" : "missing",
+    "who downloaded which app is recorded", `HTTP ${downloadReport.status}`);
 
   // ───────────────────────── SUMMARY ─────────────────────────
   const counts = findings.reduce((acc, f) => ({ ...acc, [f.state]: (acc[f.state] ?? 0) + 1 }), {});

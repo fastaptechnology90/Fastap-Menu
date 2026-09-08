@@ -2,8 +2,9 @@ import express, { Router, type IRouter, type Request, type Response } from "expr
 import { eq, and, desc, asc, inArray } from "drizzle-orm";
 import {
   db, appReleasesTable, appReleaseChunksTable, appReleaseVisibilityTable,
-  restaurantsTable, APP_KEYS,
+  appDownloadsTable, restaurantsTable, APP_KEYS,
 } from "@workspace/db";
+import { logger } from "../lib/logger.js";
 import { requireAuth, requireSuperAdmin } from "../middlewares/auth";
 import { type AdminRequest } from "../middlewares/superadmin-auth.js";
 
@@ -137,6 +138,24 @@ router.get("/public/app-releases/:appKey/download", async (req: Request, res: Re
   await db.update(appReleasesTable)
     .set({ downloads: release.downloads + 1 })
     .where(eq(appReleasesTable.id, release.id));
+
+  // The counter alone only ever said "fetched forty times" — not which venue, which
+  // staff member, or which build anyone ended up running. When an app misbehaves the
+  // first question is who has which version, and it could not be answered.
+  const venue = slug
+    ? (await db.select({ id: restaurantsTable.id }).from(restaurantsTable)
+        .where(eq(restaurantsTable.slug, slug)).limit(1))[0]
+    : undefined;
+  const forStaff = typeof req.query.s === "string" ? req.query.s : undefined;
+  await db.insert(appDownloadsTable).values({
+    releaseId: release.id,
+    appKey,
+    version: release.version,
+    restaurantId: venue?.id ?? null,
+    staffId: forStaff && /^[0-9]+$/.test(forStaff) ? Number(forStaff) : null,
+    userAgent: String(req.headers["user-agent"] ?? "").slice(0, 200) || null,
+    ipAddress: String(req.ip ?? req.socket.remoteAddress ?? "").slice(0, 60) || null,
+  }).catch(err => logger.error({ err, appKey }, "could not record an app download"));
 
   if (release.storage === "link" && release.downloadUrl) {
     res.redirect(302, release.downloadUrl);
@@ -410,6 +429,54 @@ router.delete("/superadmin/app-releases/:id", requireSuperAdmin, async (req: Req
   await db.delete(appReleaseChunksTable).where(eq(appReleaseChunksTable.releaseId, id));
   await db.delete(appReleasesTable).where(eq(appReleasesTable.id, id));
   res.json({ success: true });
+});
+
+/**
+ * Who downloaded what. The question a platform owner asks when an app misbehaves, and
+ * the one the plain counter could never answer.
+ */
+router.get("/superadmin/app-releases/downloads", requireSuperAdmin, async (req, res): Promise<void> => {
+  const rows = await db
+    .select({
+      id: appDownloadsTable.id,
+      appKey: appDownloadsTable.appKey,
+      version: appDownloadsTable.version,
+      restaurantId: appDownloadsTable.restaurantId,
+      restaurantName: restaurantsTable.name,
+      staffId: appDownloadsTable.staffId,
+      staffName: appDownloadsTable.staffName,
+      userAgent: appDownloadsTable.userAgent,
+      downloadedAt: appDownloadsTable.downloadedAt,
+    })
+    .from(appDownloadsTable)
+    .leftJoin(restaurantsTable, eq(appDownloadsTable.restaurantId, restaurantsTable.id))
+    .orderBy(desc(appDownloadsTable.downloadedAt))
+    .limit(500);
+
+  // Which build each venue is actually on, which is the practical question.
+  const byVenue: Record<string, { restaurant: string; apps: Record<string, { version: string | null; count: number; last: string }> }> = {};
+  for (const r of rows) {
+    const key = String(r.restaurantId ?? "direct");
+    byVenue[key] ??= { restaurant: r.restaurantName ?? "Direct link (no venue)", apps: {} };
+    const app = byVenue[key].apps[r.appKey];
+    if (!app) {
+      byVenue[key].apps[r.appKey] = { version: r.version, count: 1, last: r.downloadedAt.toISOString() };
+    } else {
+      app.count += 1;
+    }
+  }
+
+  res.json({ downloads: rows, byVenue });
+});
+
+/** The same, for one restaurant's own Staff Apps page. */
+router.get("/restaurants/:restaurantId/staff-apps/downloads", requireAuth, async (req, res): Promise<void> => {
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const rows = await db.select().from(appDownloadsTable)
+    .where(eq(appDownloadsTable.restaurantId, restaurantId))
+    .orderBy(desc(appDownloadsTable.downloadedAt))
+    .limit(200);
+  res.json({ downloads: rows });
 });
 
 export default router;
