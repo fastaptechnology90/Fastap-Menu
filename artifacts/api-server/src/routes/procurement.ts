@@ -70,7 +70,7 @@ router.post("/restaurants/:restaurantId/suppliers", requireAuth, async (req, res
 });
 
 router.put("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, async (req, res): Promise<void> => {
-  const supplierId = parseInt(req.params.supplierId, 10);
+  const supplierId = parseInt(String(req.params.supplierId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, contactPerson, phone, email, address, gstNumber, category, paymentTerms, creditLimit, rating } = req.body;
   const [supplier] = await db.update(suppliersTable).set({ name, contactPerson, phone, email, address, gstNumber, category, paymentTerms, rating, creditLimit: creditLimit !== undefined ? String(creditLimit) : undefined }).where(and(eq(suppliersTable.id, supplierId), eq(suppliersTable.restaurantId, restaurantId))).returning();
@@ -79,7 +79,7 @@ router.put("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, asyn
 });
 
 router.delete("/restaurants/:restaurantId/suppliers/:supplierId", requireAuth, async (req, res): Promise<void> => {
-  const supplierId = parseInt(req.params.supplierId, 10);
+  const supplierId = parseInt(String(req.params.supplierId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(suppliersTable).where(and(eq(suppliersTable.id, supplierId), eq(suppliersTable.restaurantId, restaurantId)));
   res.json({ message: "Supplier deleted" });

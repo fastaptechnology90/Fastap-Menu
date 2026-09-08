@@ -53,13 +53,13 @@ function apiKeyForRestaurant(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/platform/offline", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(rid, "offlineAdmin", DEFAULT_OFFLINE);
   res.json({ ...DEFAULT_OFFLINE, ...stored, catalog: getOfflineCatalog() });
 });
 
 router.put("/restaurants/:restaurantId/platform/offline", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const current = await getSettingsSection(rid, "offlineAdmin", DEFAULT_OFFLINE);
   const merged = { ...current, ...req.body, catalog: undefined };
   await setSettingsSection(rid, "offlineAdmin", merged);
@@ -67,7 +67,7 @@ router.put("/restaurants/:restaurantId/platform/offline", requireAuth, async (re
 });
 
 router.post("/restaurants/:restaurantId/platform/offline/sync", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const current = await getSettingsSection(rid, "offlineAdmin", DEFAULT_OFFLINE);
   const merged = { ...current, lastSyncAt: new Date().toISOString(), pendingOrders: 0 };
   await setSettingsSection(rid, "offlineAdmin", merged);
@@ -75,13 +75,13 @@ router.post("/restaurants/:restaurantId/platform/offline/sync", requireAuth, asy
 });
 
 router.get("/restaurants/:restaurantId/platform/communications", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const history = await getSettingsSection(rid, "communications", DEFAULT_COMMUNICATIONS);
   res.json({ history, channels: ["push", "email", "sms", "whatsapp", "internal"] });
 });
 
 router.post("/restaurants/:restaurantId/platform/communications/broadcast", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { title, message, channel, target } = req.body;
   if (!title || !message) { res.status(400).json({ error: "title and message required" }); return; }
   const history = await getSettingsSection(rid, "communications", DEFAULT_COMMUNICATIONS);
@@ -102,7 +102,7 @@ router.post("/restaurants/:restaurantId/platform/communications/broadcast", requ
 });
 
 router.get("/restaurants/:restaurantId/platform/aggregators", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection<Record<string, unknown>>(rid, "aggregators", {});
   const list = DEFAULT_AGGREGATORS.map(a => ({
     ...a,
@@ -112,7 +112,7 @@ router.get("/restaurants/:restaurantId/platform/aggregators", requireAuth, async
 });
 
 router.put("/restaurants/:restaurantId/platform/aggregators/:aggregatorId", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const id = req.params.aggregatorId;
   const current = await getSettingsSection<Record<string, unknown>>(rid, "aggregators", {});
   current[id] = { ...(typeof current[id] === "object" ? current[id] as object : {}), ...req.body, id };
@@ -125,7 +125,7 @@ router.put("/restaurants/:restaurantId/platform/aggregators/:aggregatorId", requ
 });
 
 router.post("/restaurants/:restaurantId/platform/aggregators/:aggregatorId/sync", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const id = req.params.aggregatorId;
   const current = await getSettingsSection<Record<string, unknown>>(rid, "aggregators", {});
   const entry = {
@@ -143,7 +143,7 @@ router.post("/restaurants/:restaurantId/platform/aggregators/:aggregatorId/sync"
 // order so the kitchen app, order management and finance all pick it up. Until the
 // partner API keys are wired, the admin UI can call this to simulate an incoming order.
 router.post("/restaurants/:restaurantId/platform/aggregators/:aggregatorId/ingest-order", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const source = req.params.aggregatorId; // swiggy | zomato | ondc
   const { customerName, customerPhone, items, total, notes } = req.body;
   const list = Array.isArray(items) ? items : [];
@@ -171,7 +171,7 @@ router.post("/restaurants/:restaurantId/platform/aggregators/:aggregatorId/inges
 // The real channel-manager API POSTs an online booking here; a vacant room is
 // auto-allotted and the guest checked in. The admin UI can call this to simulate one.
 router.post("/restaurants/:restaurantId/platform/ota/:provider/ingest-booking", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const provider = req.params.provider; // makemytrip | goibibo | oyo | booking
   const { guestName, guestPhone, roomType, checkIn, checkOut, rate } = req.body;
   const rooms = await db.select().from(hotelRoomsTable).where(eq(hotelRoomsTable.restaurantId, rid));
@@ -194,13 +194,13 @@ router.post("/restaurants/:restaurantId/platform/ota/:provider/ingest-booking", 
 // Party" event package, a spa combo, a housekeeping plan). Stored per module in the
 // restaurant settings — no new table needed.
 router.get("/restaurants/:restaurantId/module-packages/:module", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const store = await getSettingsSection<Record<string, any[]>>(rid, "modulePackages", {});
   res.json(Array.isArray(store[req.params.module]) ? store[req.params.module] : []);
 });
 
 router.post("/restaurants/:restaurantId/module-packages/:module", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const mod = req.params.module;
   const { name, price, description, duration } = req.body ?? {};
   if (!name || String(name).trim() === "") { res.status(400).json({ error: "name is required" }); return; }
@@ -220,7 +220,7 @@ router.post("/restaurants/:restaurantId/module-packages/:module", requireAuth, a
 });
 
 router.delete("/restaurants/:restaurantId/module-packages/:module/:pkgId", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const mod = req.params.module;
   const store = await getSettingsSection<Record<string, any[]>>(rid, "modulePackages", {});
   store[mod] = (Array.isArray(store[mod]) ? store[mod] : []).filter((p: any) => p.id !== req.params.pkgId);
@@ -229,13 +229,13 @@ router.delete("/restaurants/:restaurantId/module-packages/:module/:pkgId", requi
 });
 
 router.get("/restaurants/:restaurantId/platform/sandbox", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(rid, "sandbox", DEFAULT_SANDBOX);
   res.json({ ...DEFAULT_SANDBOX, ...stored });
 });
 
 router.put("/restaurants/:restaurantId/platform/sandbox", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const current = await getSettingsSection(rid, "sandbox", DEFAULT_SANDBOX);
   const merged = { ...current, ...req.body };
   await setSettingsSection(rid, "sandbox", merged);
@@ -243,13 +243,13 @@ router.put("/restaurants/:restaurantId/platform/sandbox", requireAuth, async (re
 });
 
 router.get("/restaurants/:restaurantId/platform/accessibility", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(rid, "accessibilityAdmin", DEFAULT_ACCESSIBILITY);
   res.json({ ...DEFAULT_ACCESSIBILITY, ...stored, catalog: getLocaleCatalog() });
 });
 
 router.put("/restaurants/:restaurantId/platform/accessibility", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const current = await getSettingsSection(rid, "accessibilityAdmin", DEFAULT_ACCESSIBILITY);
   const merged = { ...current, ...req.body, catalog: undefined };
   await setSettingsSection(rid, "accessibilityAdmin", merged);
@@ -257,7 +257,7 @@ router.put("/restaurants/:restaurantId/platform/accessibility", requireAuth, asy
 });
 
 router.get("/restaurants/:restaurantId/platform/api-keys", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(rid, "apiPlatform", { keyCreatedAt: null as string | null });
   res.json({
     endpoints: [
@@ -273,7 +273,7 @@ router.get("/restaurants/:restaurantId/platform/api-keys", requireAuth, async (r
 });
 
 router.post("/restaurants/:restaurantId/platform/api-keys/regenerate", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const key = `fm_live_${crypto.randomBytes(16).toString("hex")}`;
   await setSettingsSection(rid, "apiPlatform", { apiKey: key, keyCreatedAt: new Date().toISOString() });
   res.json({ apiKey: key, keyCreatedAt: new Date().toISOString() });

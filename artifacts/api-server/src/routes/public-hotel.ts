@@ -43,7 +43,7 @@ function parseControls(raw: unknown) {
 }
 
 router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const stored = await getSettingsSection(restaurantId, "hotelGuestCatalog", {
     services: DEFAULT_SERVICES,
     tvChannels: DEFAULT_TV_CHANNELS,
@@ -56,7 +56,7 @@ router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void
 });
 
 router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   // A read must not write. This used to create the room when the number was unknown, so
   // any request for /public/hotel/room/5/9999 added a room to the hotel's inventory —
@@ -75,7 +75,7 @@ router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Pro
 });
 
 router.patch("/public/hotel/room/:restaurantId/:roomNumber/controls", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const patch = req.body?.roomControls ?? req.body;
   let [room] = await db.select().from(hotelRoomsTable).where(
@@ -131,7 +131,7 @@ router.post("/public/hotel/wake-up-call", async (req, res): Promise<void> => {
 });
 
 router.get("/public/hotel/requests/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const requests = await db.select().from(roomServiceRequestsTable).where(
     and(eq(roomServiceRequestsTable.restaurantId, restaurantId), eq(roomServiceRequestsTable.roomNumber, roomNumber)),

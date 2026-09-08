@@ -65,7 +65,7 @@ router.post("/public/payments/quote", async (req, res): Promise<void> => {
 });
 
 router.post("/public/payments/intent/:orderId", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
@@ -106,7 +106,7 @@ router.post("/public/payments/intent/:orderId", async (req, res): Promise<void> 
 });
 
 router.post("/public/payments/process/:orderId", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   // The order used to be fetched by id alone, with no check that the caller had
   // anything to do with it — so walking the sequential ids let anyone mark strangers'
   // orders as settled.
@@ -220,7 +220,7 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
 });
 
 router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
   // venue.
@@ -240,7 +240,7 @@ router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> 
 });
 
 router.get("/public/payments/invoice/:orderId/download", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
   // venue.
@@ -259,7 +259,7 @@ router.get("/public/payments/invoice/:orderId/download", async (req, res): Promi
 });
 
 router.get("/public/payments/invoice/:orderId/pdf", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
   // venue.

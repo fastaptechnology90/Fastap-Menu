@@ -38,13 +38,13 @@ async function loadPermissions(rid: number): Promise<Record<string, Record<strin
 }
 
 router.get("/restaurants/:restaurantId/rbac", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const perms = await loadPermissions(rid);
   res.json({ permissions: perms, groups: PERMISSION_GROUPS, roles: Object.keys(DEFAULT_PERMISSIONS) });
 });
 
 router.put("/restaurants/:restaurantId/rbac/:role", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const role = req.params.role;
   const { permissions } = req.body;
   const current = await loadPermissions(rid);
@@ -54,7 +54,7 @@ router.put("/restaurants/:restaurantId/rbac/:role", requireAuth, async (req, res
 });
 
 router.put("/restaurants/:restaurantId/rbac", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { permissions } = req.body as { permissions?: Record<string, Record<string, boolean>> };
   if (!permissions || typeof permissions !== "object") {
     res.status(400).json({ error: "permissions object required" });
@@ -69,7 +69,7 @@ router.put("/restaurants/:restaurantId/rbac", requireAuth, async (req, res): Pro
 });
 
 router.post("/restaurants/:restaurantId/rbac/reset/:role", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const role = req.params.role;
   const current = await loadPermissions(rid);
   if (DEFAULT_PERMISSIONS[role]) current[role] = { ...DEFAULT_PERMISSIONS[role] };

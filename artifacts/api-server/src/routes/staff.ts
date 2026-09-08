@@ -23,7 +23,7 @@ const router: IRouter = Router();
  * `hasMeasuredPerformance` says plainly that it is not derived from the data below.
  */
 router.get("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const rows = await db.select().from(staffTable).where(eq(staffTable.restaurantId, id));
 
   const [sales, commissionTotals, policy] = await Promise.all([
@@ -54,7 +54,7 @@ router.get("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Pr
 });
 
 router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, email, role, phone, password, isActive } = req.body;
   if (!name?.trim() || !email?.trim() || !role) {
     res.status(400).json({ error: "name, email, and role are required" });
@@ -83,8 +83,8 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
 });
 
 router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.staffId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const staffId = parseInt(String(req.params.staffId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, email, role, phone, password, isActive, shift, weeklySchedule } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
@@ -118,8 +118,8 @@ router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req,
 });
 
 router.delete("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.staffId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const staffId = parseInt(String(req.params.staffId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [deleted] = await db
     .delete(staffTable)
     .where(and(eq(staffTable.id, staffId), eq(staffTable.restaurantId, restaurantId)))
@@ -144,8 +144,8 @@ router.post(
   "/restaurants/:restaurantId/staff/:staffId/login-qr",
   requireAuth,
   async (req, res): Promise<void> => {
-    const restaurantId = parseInt(req.params.restaurantId, 10);
-    const staffId = parseInt(req.params.staffId, 10);
+    const restaurantId = parseInt(String(req.params.restaurantId), 10);
+    const staffId = parseInt(String(req.params.staffId), 10);
     if (!Number.isFinite(restaurantId) || !Number.isFinite(staffId)) {
       res.status(400).json({ error: "Invalid restaurant or staff id" });
       return;

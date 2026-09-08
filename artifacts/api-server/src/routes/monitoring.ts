@@ -76,7 +76,7 @@ function ensureErrorLogs(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/monitoring/metrics", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyMonitoringMetrics()); return; }
@@ -112,7 +112,7 @@ router.get("/restaurants/:restaurantId/monitoring/metrics", requireAuth, async (
 });
 
 router.get("/restaurants/:restaurantId/monitoring/history", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") {
@@ -151,7 +151,7 @@ router.get("/restaurants/:restaurantId/monitoring/history", requireAuth, async (
 });
 
 router.get("/restaurants/:restaurantId/monitoring/logs", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -176,7 +176,7 @@ router.get("/restaurants/:restaurantId/monitoring/logs", requireAuth, async (req
 });
 
 router.get("/restaurants/:restaurantId/monitoring/health", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 

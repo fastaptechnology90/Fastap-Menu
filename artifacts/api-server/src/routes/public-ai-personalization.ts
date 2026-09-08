@@ -110,7 +110,7 @@ router.post("/public/ai/engine", async (req, res): Promise<void> => {
 });
 
 router.get("/public/ai/personalized-menu/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const guest = await getGuestUser(req);
   const items = await enrichMenuItems(restaurantId);
   const dietaryFilter = String(req.query.dietaryFilter ?? "all");
@@ -121,7 +121,7 @@ router.get("/public/ai/personalized-menu/:restaurantId", async (req, res): Promi
 });
 
 router.get("/public/ai/favorite-predictions/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const guest = await getGuestUser(req);
   const items = await enrichMenuItems(restaurantId);
   const favorites = await loadFavorites(restaurantId, guest);
@@ -158,7 +158,7 @@ router.post("/public/ai/dietary-suggestions", async (req, res): Promise<void> =>
 });
 
 router.get("/public/ai/spending-analysis/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const guest = await getGuestUser(req);
   const orderHistory = await loadOrderHistory(restaurantId, guest);
   const analysis = runPersonalizationEngine([], { orderHistory }).spendingAnalysis;

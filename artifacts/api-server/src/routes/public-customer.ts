@@ -450,7 +450,7 @@ router.get("/public/session/info", async (req, res): Promise<void> => {
 });
 
 router.get("/public/tables/availability/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const tables = await db.select().from(tablesMapTable).where(eq(tablesMapTable.restaurantId, restaurantId));
   res.json(tables.map(t => ({
     id: t.id,
@@ -1063,7 +1063,7 @@ router.post("/public/maintenance", async (req, res): Promise<void> => {
 });
 
 router.get("/public/room/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [room] = await db.select().from(hotelRoomsTable).where(
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, req.params.roomNumber)),
   );
@@ -1094,7 +1094,7 @@ router.post("/public/support/tickets", async (req, res): Promise<void> => {
 
 // ─── Order live tracking ─────────────────────────────────────────────
 router.get("/public/orders/:orderId/status", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
@@ -1128,7 +1128,7 @@ router.get("/public/orders/:orderId/status", async (req, res): Promise<void> => 
 });
 
 router.post("/public/orders/:orderId/message", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const text = String(req.body?.message ?? "").trim();
   if (!text) { res.status(400).json({ error: "message required" }); return; }
 
@@ -1161,7 +1161,7 @@ router.post("/public/orders/:orderId/message", async (req, res): Promise<void> =
 });
 
 router.get("/public/orders/:orderId/live", (req, res): void => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   if (Number.isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
   const cleanup = addOrderSSEClient(res, orderId);
   req.on("close", cleanup);

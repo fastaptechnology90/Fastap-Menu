@@ -16,7 +16,7 @@ const router: IRouter = Router();
  * manual incentive, a tips pool) reports null rather than a number that looks like sales.
  */
 router.get("/restaurants/:restaurantId/commissions", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const commissions = await db.select().from(staffCommissionsTable).where(eq(staffCommissionsTable.restaurantId, id)).orderBy(desc(staffCommissionsTable.createdAt));
 
   const orderIds = [...new Set(commissions.map(c => c.orderId).filter((x): x is number => x != null))];
@@ -41,15 +41,15 @@ router.get("/restaurants/:restaurantId/commissions", requireAuth, async (req, re
 });
 
 router.post("/restaurants/:restaurantId/commissions", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { staffId, staffName, staffRole, type, orderId, amount, percentage, description, month } = req.body;
   const [commission] = await db.insert(staffCommissionsTable).values({ restaurantId: id, staffId: staffId ? parseInt(staffId) : null, staffName, staffRole, type, orderId: orderId ? parseInt(orderId) : null, amount: String(parseFloat(amount) || 0), percentage: percentage ? String(parseFloat(percentage)) : null, description, month }).returning();
   res.status(201).json(commission);
 });
 
 router.put("/restaurants/:restaurantId/commissions/:commissionId", requireAuth, async (req, res): Promise<void> => {
-  const commissionId = parseInt(req.params.commissionId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const commissionId = parseInt(String(req.params.commissionId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status } = req.body;
   const [commission] = await db.update(staffCommissionsTable).set({ status, paidAt: status === "paid" ? new Date() : undefined }).where(and(eq(staffCommissionsTable.id, commissionId), eq(staffCommissionsTable.restaurantId, restaurantId))).returning();
   if (!commission) { res.status(404).json({ error: "Commission not found" }); return; }
@@ -57,7 +57,7 @@ router.put("/restaurants/:restaurantId/commissions/:commissionId", requireAuth, 
 });
 
 router.get("/restaurants/:restaurantId/chat", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { channel } = req.query;
   const messages = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.restaurantId, id)).orderBy(desc(chatMessagesTable.createdAt)).limit(100);
   const filtered = channel ? messages.filter(m => m.channel === channel) : messages;
@@ -65,7 +65,7 @@ router.get("/restaurants/:restaurantId/chat", requireAuth, async (req, res): Pro
 });
 
 router.post("/restaurants/:restaurantId/chat", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { senderId, senderName, senderRole, message, messageType, channel } = req.body;
   const [msg] = await db.insert(chatMessagesTable).values({ restaurantId: id, senderId, senderName, senderRole, message, messageType, channel }).returning();
   res.status(201).json(msg);

@@ -29,7 +29,7 @@ function parseOrder(o: any) {
 }
 
 router.get("/restaurants/:restaurantId/orders", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status } = req.query;
   let orders;
   if (status) {
@@ -41,16 +41,16 @@ router.get("/restaurants/:restaurantId/orders", requireAuth, async (req, res): P
 });
 
 router.get("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const orderId = parseInt(req.params.orderId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const [order] = await db.select().from(ordersTable).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)));
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
   res.json(parseOrder(order));
 });
 
 router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
-  const orderId = parseInt(req.params.orderId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const { status, chefName, waiterName, isDelayed, delayReason, paymentMethod, paymentStatus, tipAmount,
     finalTotal, collectedBy, collectedFrom, utr, upiId } = req.body;
   const [existing] = await db.select().from(ordersTable).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)));
@@ -459,7 +459,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
 // Live-edit a still-open order from the guest menu: +1 / -1 a plain (un-customized) item.
 // Only while the order is not yet prepared/billed. Recomputes totals so the bill stays exact.
 router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const { menuItemId, delta } = req.body;
   const d = parseInt(String(delta), 10);
   if (Number.isNaN(orderId) || !menuItemId || !d) { res.status(400).json({ error: "orderId, menuItemId and delta required" }); return; }
@@ -508,7 +508,7 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
 });
 
 router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   if (Number.isNaN(orderId)) { res.status(400).json({ error: "Invalid order ID" }); return; }
   const [original] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   if (!original) { res.status(404).json({ error: "Order not found" }); return; }
@@ -566,7 +566,7 @@ router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> =
 });
 
 router.get("/public/orders/:orderId", async (req, res): Promise<void> => {
-  const orderId = parseInt(req.params.orderId, 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
   res.json(parseOrder(order));

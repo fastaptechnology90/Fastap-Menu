@@ -7,7 +7,7 @@ import { getSettingsSection } from "../lib/restaurant-settings";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/campaigns", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const [campaigns, customers] = await Promise.all([
     db.select().from(campaignsTable).where(eq(campaignsTable.restaurantId, id)),
     db.select().from(customersTable).where(eq(customersTable.restaurantId, id)),
@@ -35,15 +35,15 @@ router.get("/restaurants/:restaurantId/campaigns", requireAuth, async (req, res)
 });
 
 router.post("/restaurants/:restaurantId/campaigns", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, type, description, discountPercent, discountAmount, triggerType, startDate, endDate, isActive, targetSegment } = req.body;
   const [campaign] = await db.insert(campaignsTable).values({ restaurantId: id, name, type, description, discountPercent, discountAmount, triggerType: triggerType ?? "manual", startDate, endDate, isActive: isActive ?? true, targetSegment }).returning();
   res.status(201).json(campaign);
 });
 
 router.put("/restaurants/:restaurantId/campaigns/:campaignId", requireAuth, async (req, res): Promise<void> => {
-  const campaignId = parseInt(req.params.campaignId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const campaignId = parseInt(String(req.params.campaignId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, type, description, discountPercent, discountAmount, triggerType, startDate, endDate, isActive, targetSegment } = req.body;
   const [campaign] = await db.update(campaignsTable).set({ name, type, description, discountPercent, discountAmount, triggerType, startDate, endDate, isActive, targetSegment }).where(and(eq(campaignsTable.id, campaignId), eq(campaignsTable.restaurantId, restaurantId))).returning();
   if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
@@ -51,15 +51,15 @@ router.put("/restaurants/:restaurantId/campaigns/:campaignId", requireAuth, asyn
 });
 
 router.delete("/restaurants/:restaurantId/campaigns/:campaignId", requireAuth, async (req, res): Promise<void> => {
-  const campaignId = parseInt(req.params.campaignId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const campaignId = parseInt(String(req.params.campaignId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [deleted] = await db.delete(campaignsTable).where(and(eq(campaignsTable.id, campaignId), eq(campaignsTable.restaurantId, restaurantId))).returning();
   if (!deleted) { res.status(404).json({ error: "Campaign not found" }); return; }
   res.json({ message: "Campaign deleted" });
 });
 
 router.get("/restaurants/:restaurantId/marketing/automation", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const campaigns = await db.select().from(campaignsTable).where(eq(campaignsTable.restaurantId, id));
   const customers = await db.select().from(customersTable).where(eq(customersTable.restaurantId, id));
   const monthAgo = new Date(); monthAgo.setDate(monthAgo.getDate() - 30);

@@ -28,12 +28,12 @@ function getSettings(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/backup", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   res.json({ backups: getBackups(rid), settings: getSettings(rid) });
 });
 
 router.post("/restaurants/:restaurantId/backup/create", requireAuth, async (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const { name, tables } = req.body;
   const backup = {
     id: Date.now(),
@@ -55,14 +55,14 @@ router.post("/restaurants/:restaurantId/backup/create", requireAuth, async (req,
 });
 
 router.put("/restaurants/:restaurantId/backup/settings", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   settings[rid] = { ...getSettings(rid), ...req.body };
   res.json(settings[rid]);
 });
 
 router.delete("/restaurants/:restaurantId/backup/:id", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  backups[rid] = getBackups(rid).filter(b => b.id !== parseInt(req.params.id, 10));
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  backups[rid] = getBackups(rid).filter(b => b.id !== parseInt(String(req.params.id), 10));
   res.json({ success: true });
 });
 
@@ -71,8 +71,8 @@ router.post("/restaurants/:restaurantId/backup/:id/restore", requireAuth, (req, 
 });
 
 router.get("/restaurants/:restaurantId/backup/:id/download", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
-  const id = parseInt(req.params.id, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
+  const id = parseInt(String(req.params.id), 10);
   const backup = getBackups(rid).find(b => b.id === id);
   if (!backup) { res.status(404).json({ error: "Backup not found" }); return; }
   const manifest = [

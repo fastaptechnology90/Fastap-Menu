@@ -6,7 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/recipes", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const recipes = await db.select().from(recipesTable).where(eq(recipesTable.restaurantId, id));
   const result = await Promise.all(recipes.map(async r => {
     const ingredients = await db.select().from(recipeIngredientsTable).where(eq(recipeIngredientsTable.recipeId, r.id));
@@ -22,7 +22,7 @@ router.get("/restaurants/:restaurantId/recipes", requireAuth, async (req, res): 
 });
 
 router.post("/restaurants/:restaurantId/recipes", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, category, servings, preparationTime, sellingPrice, instructions, ingredients } = req.body;
   let totalCost = 0;
   if (Array.isArray(ingredients)) {
@@ -55,8 +55,8 @@ router.post("/restaurants/:restaurantId/recipes", requireAuth, async (req, res):
 });
 
 router.put("/restaurants/:restaurantId/recipes/:recipeId", requireAuth, async (req, res): Promise<void> => {
-  const recipeId = parseInt(req.params.recipeId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const recipeId = parseInt(String(req.params.recipeId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, category, servings, preparationTime, sellingPrice, instructions, ingredients } = req.body;
   let totalCost = 0;
   if (Array.isArray(ingredients)) {
@@ -100,8 +100,8 @@ router.put("/restaurants/:restaurantId/recipes/:recipeId", requireAuth, async (r
 });
 
 router.delete("/restaurants/:restaurantId/recipes/:recipeId", requireAuth, async (req, res): Promise<void> => {
-  const recipeId = parseInt(req.params.recipeId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const recipeId = parseInt(String(req.params.recipeId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(recipeIngredientsTable).where(eq(recipeIngredientsTable.recipeId, recipeId));
   await db.delete(recipesTable).where(and(eq(recipesTable.id, recipeId), eq(recipesTable.restaurantId, restaurantId)));
   res.json({ message: "Recipe deleted" });

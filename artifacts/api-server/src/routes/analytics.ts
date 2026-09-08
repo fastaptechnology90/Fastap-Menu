@@ -72,7 +72,7 @@ function formatGrowth(recent: number, previous: number): string {
 }
 
 router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
@@ -169,7 +169,7 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
 });
 
 router.get("/restaurants/:restaurantId/analytics/popular-items", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -269,7 +269,7 @@ router.get("/restaurants/:restaurantId/analytics/popular-items", requireAuth, as
 });
 
 router.get("/restaurants/:restaurantId/analytics/daily-sales", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json([]); return; }
@@ -304,7 +304,7 @@ router.get("/restaurants/:restaurantId/analytics/daily-sales", requireAuth, asyn
 });
 
 router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyOrderStats()); return; }
@@ -378,7 +378,7 @@ router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, asyn
 });
 
 router.get("/restaurants/:restaurantId/analytics/export", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, restaurantId);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 

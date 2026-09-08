@@ -15,7 +15,7 @@ import { getCommissionRate } from "../lib/platform-admin.js";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/finance/transactions", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { type, days } = req.query;
   let query = db.select().from(financeTransactionsTable).where(eq(financeTransactionsTable.restaurantId, id));
   const txs = await db.select().from(financeTransactionsTable).where(eq(financeTransactionsTable.restaurantId, id)).orderBy(desc(financeTransactionsTable.createdAt)).limit(200);
@@ -23,7 +23,7 @@ router.get("/restaurants/:restaurantId/finance/transactions", requireAuth, async
 });
 
 router.post("/restaurants/:restaurantId/finance/transactions", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { type, category, description, amount, paymentMethod, reference, orderId, performedBy } = req.body;
   const [tx] = await db.insert(financeTransactionsTable).values({
     restaurantId: id, type, category, description, amount: String(parseFloat(amount) || 0),
@@ -33,7 +33,7 @@ router.post("/restaurants/:restaurantId/finance/transactions", requireAuth, asyn
 });
 
 router.get("/restaurants/:restaurantId/finance/summary", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, id);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyFinanceSummary()); return; }
@@ -57,7 +57,7 @@ router.get("/restaurants/:restaurantId/finance/summary", requireAuth, async (req
 });
 
 router.get("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const shifts = await db.select().from(cashShiftsTable).where(eq(cashShiftsTable.restaurantId, id)).orderBy(desc(cashShiftsTable.openedAt)).limit(50);
   res.json(shifts.map(s => ({
     ...s,
@@ -69,7 +69,7 @@ router.get("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, re
 });
 
 router.post("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { staffName, staffRole, openingBalance, denominations } = req.body;
   await db.update(cashShiftsTable).set({ status: "closed", closedAt: new Date() }).where(and(eq(cashShiftsTable.restaurantId, id), eq(cashShiftsTable.status, "open")));
   const [shift] = await db.insert(cashShiftsTable).values({ restaurantId: id, staffName, staffRole, openingBalance: String(parseFloat(openingBalance) || 0), denominations }).returning();
@@ -77,8 +77,8 @@ router.post("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, r
 });
 
 router.put("/restaurants/:restaurantId/cash-shifts/:shiftId/close", requireAuth, async (req, res): Promise<void> => {
-  const shiftId = parseInt(req.params.shiftId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const shiftId = parseInt(String(req.params.shiftId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { closingBalance, notes } = req.body;
   const [shift] = await db.select().from(cashShiftsTable).where(and(eq(cashShiftsTable.id, shiftId), eq(cashShiftsTable.restaurantId, restaurantId)));
   if (!shift) { res.status(404).json({ error: "Shift not found" }); return; }
@@ -90,7 +90,7 @@ router.put("/restaurants/:restaurantId/cash-shifts/:shiftId/close", requireAuth,
 });
 
 router.get("/restaurants/:restaurantId/cash-shifts/active", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const [shift] = await db.select().from(cashShiftsTable).where(and(eq(cashShiftsTable.restaurantId, id), eq(cashShiftsTable.status, "open")));
   res.json(shift ? { ...shift, openingBalance: parseFloat(String(shift.openingBalance)), cashSales: parseFloat(String(shift.cashSales)) } : null);
 });
@@ -98,7 +98,7 @@ router.get("/restaurants/:restaurantId/cash-shifts/active", requireAuth, async (
 const ONLINE_METHODS = new Set(["upi", "card", "netbanking", "wallet", "online", "razorpay", "gateway"]);
 
 router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, id);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") {
@@ -262,7 +262,7 @@ router.get("/restaurants/:restaurantId/finance/wallet", requireAuth, async (req,
 });
 
 router.get("/restaurants/:restaurantId/finance/export", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const orders = await db.select().from(ordersTable).where(eq(ordersTable.restaurantId, id));
   const txs = await db.select().from(financeTransactionsTable).where(eq(financeTransactionsTable.restaurantId, id)).orderBy(desc(financeTransactionsTable.createdAt)).limit(200);
   const lines = [

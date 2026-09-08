@@ -9,7 +9,7 @@ const router: IRouter = Router();
 
 router.get("/public/events/catalog/:restaurantId", async (req, res): Promise<void> => {
   const eventType = req.query.eventType as string | undefined;
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Venue not found" }); return; }
   const overrides = await loadCatalogSection(restaurantId, "eventCatalog", {});
@@ -34,7 +34,7 @@ router.post("/public/events/quotation", async (req, res): Promise<void> => {
 });
 
 router.get("/public/events/detail/:eventId", async (req, res): Promise<void> => {
-  const eventId = parseInt(req.params.eventId, 10);
+  const eventId = parseInt(String(req.params.eventId), 10);
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
   res.json(event);
@@ -87,7 +87,7 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
 });
 
 router.post("/public/events/:eventId/invitations", async (req, res): Promise<void> => {
-  const eventId = parseInt(req.params.eventId, 10);
+  const eventId = parseInt(String(req.params.eventId), 10);
   const { invitations } = req.body as { invitations: { name: string; phone?: string; email?: string }[] };
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
@@ -112,7 +112,7 @@ router.post("/public/events/:eventId/invitations", async (req, res): Promise<voi
 });
 
 router.patch("/public/events/:eventId/invitations/:inviteId", async (req, res): Promise<void> => {
-  const eventId = parseInt(req.params.eventId, 10);
+  const eventId = parseInt(String(req.params.eventId), 10);
   const { status } = req.body;
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
@@ -128,7 +128,7 @@ router.patch("/public/events/:eventId/invitations/:inviteId", async (req, res): 
 });
 
 router.get("/public/events/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (Number.isNaN(restaurantId)) { res.status(400).json({ error: "Invalid restaurant id" }); return; }
   const events = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.restaurantId, restaurantId));
   res.json(events);

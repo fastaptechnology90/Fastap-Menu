@@ -44,13 +44,13 @@ async function loadMinibarCatalog(restaurantId: number) {
 }
 
 router.get("/restaurants/:restaurantId/minibar", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const items = await loadMinibarCatalog(id);
   res.json(items);
 });
 
 router.get("/restaurants/:restaurantId/rooms", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const rooms = await db.select().from(hotelRoomsTable).where(eq(hotelRoomsTable.restaurantId, id)).orderBy(hotelRoomsTable.number);
   res.json(rooms);
 });
@@ -66,7 +66,7 @@ function billingPatchFromBody(body: Record<string, unknown>): { rate?: number; d
 }
 
 router.post("/restaurants/:restaurantId/rooms", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { number, type, floor, status, guestName, guestPhone, checkIn, checkOut, notes } = req.body;
   const patch = billingPatchFromBody(req.body);
   const roomControls = Object.keys(patch).length ? mergeRoomBilling(DEFAULT_ROOM_CONTROLS, patch) : undefined;
@@ -79,8 +79,8 @@ router.post("/restaurants/:restaurantId/rooms", requireAuth, async (req, res): P
 });
 
 router.put("/restaurants/:restaurantId/rooms/:roomId", requireAuth, async (req, res): Promise<void> => {
-  const roomId = parseInt(req.params.roomId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const roomId = parseInt(String(req.params.roomId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status, guestName, guestPhone, checkIn, checkOut, notes } = req.body;
   const patch = billingPatchFromBody(req.body);
   let roomControls: Record<string, unknown> | undefined;
@@ -99,7 +99,7 @@ router.put("/restaurants/:restaurantId/rooms/:roomId", requireAuth, async (req, 
 
 // ── Room folio (running bill) ────────────────────────────────────────────────
 router.get("/restaurants/:restaurantId/rooms/:roomNumber/folio", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const folio = await computeRoomFolio(restaurantId, req.params.roomNumber);
   res.json(folio);
 });
@@ -107,7 +107,7 @@ router.get("/restaurants/:restaurantId/rooms/:roomNumber/folio", requireAuth, as
 // Record a (partial) payment against a room folio — increments the paid amount so
 // reception can show "paid" vs "remaining". No schema change: paid lives in billing.
 router.post("/restaurants/:restaurantId/rooms/:roomNumber/payment", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const amount = parseMoney(req.body?.amount);
   if (amount <= 0) { res.status(400).json({ error: "amount must be greater than 0" }); return; }
@@ -140,7 +140,7 @@ router.post("/restaurants/:restaurantId/rooms/:roomNumber/payment", requireAuth,
 
 // Check-out: settle the folio, free the room. Returns the final bill.
 router.post("/restaurants/:restaurantId/rooms/:roomNumber/checkout", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
   const folio = await computeRoomFolio(restaurantId, roomNumber);
   // Close out any open service requests for this room.
@@ -155,13 +155,13 @@ router.post("/restaurants/:restaurantId/rooms/:roomNumber/checkout", requireAuth
 });
 
 router.get("/restaurants/:restaurantId/room-service", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const requests = await db.select().from(roomServiceRequestsTable).where(eq(roomServiceRequestsTable.restaurantId, id)).orderBy(desc(roomServiceRequestsTable.createdAt));
   res.json(requests.map(r => ({ ...r, total: parseFloat(String(r.total)), items: Array.isArray(r.items) ? r.items : [] })));
 });
 
 router.post("/restaurants/:restaurantId/room-service", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { roomNumber, guestName, guestPhone, type, items, notes, total, paymentMethod, assignedTo } = req.body;
   const [request] = await db.insert(roomServiceRequestsTable).values({ restaurantId: id, roomNumber, guestName, guestPhone, type, items: items ?? [], notes, total: String(parseFloat(total) || 0), paymentMethod }).returning();
 
@@ -192,8 +192,8 @@ router.post("/restaurants/:restaurantId/room-service", requireAuth, async (req, 
 });
 
 router.put("/restaurants/:restaurantId/room-service/:requestId", requireAuth, async (req, res): Promise<void> => {
-  const requestId = parseInt(req.params.requestId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const requestId = parseInt(String(req.params.requestId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status, assignedTo } = req.body;
   const [request] = await db.update(roomServiceRequestsTable).set({ status, assignedTo, completedAt: status === "completed" ? new Date() : undefined }).where(and(eq(roomServiceRequestsTable.id, requestId), eq(roomServiceRequestsTable.restaurantId, restaurantId))).returning();
   if (!request) { res.status(404).json({ error: "Request not found" }); return; }

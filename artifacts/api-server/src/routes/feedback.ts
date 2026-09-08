@@ -6,7 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/feedback", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const feedback = await db.select().from(feedbackTable).where(eq(feedbackTable.restaurantId, id));
   res.json(feedback);
 });

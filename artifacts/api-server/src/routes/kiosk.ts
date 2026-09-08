@@ -21,17 +21,17 @@ function getSettings(rid: number) {
 }
 
 router.get("/restaurants/:restaurantId/kiosk/settings", requireAuth, (req, res) => {
-  res.json(getSettings(parseInt(req.params.restaurantId, 10)));
+  res.json(getSettings(parseInt(String(req.params.restaurantId), 10)));
 });
 
 router.put("/restaurants/:restaurantId/kiosk/settings", requireAuth, (req, res) => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   kioskSettings[rid] = { ...getSettings(rid), ...req.body };
   res.json(kioskSettings[rid]);
 });
 
 router.get("/restaurants/:restaurantId/kiosk/menu", async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, rid));
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const categories = await db.select().from(categoriesTable).where(eq(categoriesTable.restaurantId, rid));
@@ -40,7 +40,7 @@ router.get("/restaurants/:restaurantId/kiosk/menu", async (req, res): Promise<vo
 });
 
 router.get("/restaurants/:restaurantId/kiosk/stats", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyKioskStats()); return; }
@@ -86,7 +86,7 @@ router.get("/restaurants/:restaurantId/kiosk/stats", requireAuth, async (req, re
 });
 
 router.get("/restaurants/:restaurantId/kiosk/devices/:deviceId/qr", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const deviceId = req.params.deviceId;
   const [restaurant] = await db.select({ slug: restaurantsTable.slug, name: restaurantsTable.name }).from(restaurantsTable).where(eq(restaurantsTable.id, rid));
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }

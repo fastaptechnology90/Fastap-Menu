@@ -45,7 +45,7 @@ router.post("/restaurants/:restaurantId/reservations", requireAuth, async (req, 
 });
 
 router.put("/restaurants/:restaurantId/reservations/:reservationId", requireAuth, async (req, res): Promise<void> => {
-  const reservationId = parseInt(req.params.reservationId, 10);
+  const reservationId = parseInt(String(req.params.reservationId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   // Every field the booking form offers has to be accepted here. The guest's name, phone,
@@ -77,7 +77,7 @@ router.put("/restaurants/:restaurantId/reservations/:reservationId", requireAuth
 });
 
 router.delete("/restaurants/:restaurantId/reservations/:reservationId", requireAuth, async (req, res): Promise<void> => {
-  const reservationId = parseInt(req.params.reservationId, 10);
+  const reservationId = parseInt(String(req.params.reservationId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const [deleted] = await db.delete(reservationsTable).where(

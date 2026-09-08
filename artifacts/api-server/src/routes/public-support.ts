@@ -51,7 +51,7 @@ router.get("/public/support/catalog", (_req, res) => {
 });
 
 router.get("/public/support/config/:restaurantId", async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await loadRestaurant(restaurantId);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
   res.json(resolveSupportConfig(restaurant));

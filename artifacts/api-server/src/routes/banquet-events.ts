@@ -6,7 +6,7 @@ import { requireAuth } from "../middlewares/auth";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/events", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const rows = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.restaurantId, id)).orderBy(desc(banquetEventsTable.createdAt));
   res.json(rows.map(r => ({
     ...r,
@@ -16,7 +16,7 @@ router.get("/restaurants/:restaurantId/events", requireAuth, async (req, res): P
 });
 
 router.post("/restaurants/:restaurantId/events", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   const { name, type, eventDate, eventTime, guestCount, venue, status, advancePaid, totalAmount, contactName, contactPhone, menu, notes, catering, decor, staffAssigned } = req.body;
   const [row] = await db.insert(banquetEventsTable).values({
     restaurantId: id,
@@ -41,8 +41,8 @@ router.post("/restaurants/:restaurantId/events", requireAuth, async (req, res): 
 });
 
 router.put("/restaurants/:restaurantId/events/:eventId", requireAuth, async (req, res): Promise<void> => {
-  const eventId = parseInt(req.params.eventId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const eventId = parseInt(String(req.params.eventId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const body = req.body;
   const patch: Record<string, unknown> = {};
   for (const k of ["name", "type", "eventTime", "venue", "status", "contactName", "contactPhone", "menu", "notes", "catering", "decor", "staffAssigned"]) {
@@ -58,8 +58,8 @@ router.put("/restaurants/:restaurantId/events/:eventId", requireAuth, async (req
 });
 
 router.delete("/restaurants/:restaurantId/events/:eventId", requireAuth, async (req, res): Promise<void> => {
-  const eventId = parseInt(req.params.eventId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const eventId = parseInt(String(req.params.eventId), 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(banquetEventsTable).where(and(eq(banquetEventsTable.id, eventId), eq(banquetEventsTable.restaurantId, restaurantId)));
   res.json({ success: true });
 });

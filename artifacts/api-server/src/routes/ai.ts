@@ -48,7 +48,7 @@ router.post("/restaurants/:restaurantId/ai/generate-menu", requireAuth, async (r
 });
 
 router.post("/restaurants/:restaurantId/ai/copilot", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
 
@@ -79,7 +79,7 @@ router.post("/restaurants/:restaurantId/ai/copilot", requireAuth, async (req, re
 });
 
 router.get("/restaurants/:restaurantId/ai/insights", requireAuth, async (req, res): Promise<void> => {
-  const rid = parseInt(req.params.restaurantId, 10);
+  const rid = parseInt(String(req.params.restaurantId), 10);
   const access = await resolveAnalyticsAccess(req, rid);
   if (access.kind === "not_found") { sendAnalyticsNotFound(res); return; }
   if (access.kind === "unpublished") { res.json(emptyAiInsights()); return; }

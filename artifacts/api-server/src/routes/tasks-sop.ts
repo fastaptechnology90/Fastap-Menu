@@ -72,7 +72,7 @@ router.post("/restaurants/:restaurantId/tasks", requireAuth, async (req, res): P
 });
 
 router.put("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
-  const taskId = parseInt(req.params.taskId, 10);
+  const taskId = parseInt(String(req.params.taskId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { status, assignedTo, priority, title, description } = req.body;
   const [task] = await db.update(tasksTable).set({ status, assignedTo, priority, title, description, completedAt: status === "completed" ? new Date() : undefined }).where(and(eq(tasksTable.id, taskId), eq(tasksTable.restaurantId, restaurantId))).returning();
@@ -81,7 +81,7 @@ router.put("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, 
 });
 
 router.delete("/restaurants/:restaurantId/tasks/:taskId", requireAuth, async (req, res): Promise<void> => {
-  const taskId = parseInt(req.params.taskId, 10);
+  const taskId = parseInt(String(req.params.taskId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   await db.delete(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.restaurantId, restaurantId)));
   res.json({ message: "Task deleted" });
