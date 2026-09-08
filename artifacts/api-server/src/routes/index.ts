@@ -74,9 +74,13 @@ import featureModulesRouter, {
 } from "./feature-modules";
 import { requireAuth } from "../middlewares/auth";
 import { requireRestaurantSubscription } from "../middlewares/restaurant-subscription.js";
+import { requireTenantScope } from "../middlewares/tenant-scope.js";
 
 const router: IRouter = Router();
 
+// Ownership is checked once, here, for every path that names a restaurant — so a new
+// route is covered the day it is written instead of relying on each one remembering.
+router.use(requireTenantScope);
 router.use(requireRestaurantSubscription);
 
 router.use(healthRouter);
