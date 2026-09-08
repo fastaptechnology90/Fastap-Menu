@@ -80,3 +80,10 @@ replit.md
 .replitignore
 # test / run logs
 *.log
+
+# ── local working files (never push these) ──
+CLAUDE.md
+.claude/
+_audit/
+_work/
+.pgdata/

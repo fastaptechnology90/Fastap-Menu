@@ -6,12 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { api, type BlogPost } from "@/lib/apiClient";
 import { Plus, Pencil, Trash2, X, Loader2, Newspaper, Eye, Globe, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 type Draft = Partial<BlogPost>;
 
 export default function Blog() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const [editing, setEditing] = useState<Draft | null>(null);
   const [preview, setPreview] = useState<BlogPost | null>(null);
 
@@ -76,9 +79,22 @@ export default function Blog() {
                 <div className="flex gap-2 mt-3">
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => setPreview(post)}><Eye className="h-3.5 w-3.5 mr-1" /> View</Button>
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditing(post)}><Pencil className="h-3.5 w-3.5 mr-1" /> Edit</Button>
-                  <Button variant="outline" size="sm" onClick={() => { if (confirm(`Delete "${post.title}"?`)) deleteMutation.mutate(post.id); }}>
+                  <AsyncButton
+                    variant="outline" size="sm" title="Delete post"
+                    errorMessage="Delete failed"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Delete "${post.title}"?`,
+                        description: "The post and its published page are removed for good.",
+                        destructive: true,
+                        confirmLabel: "Delete post",
+                      });
+                      if (!ok) return;
+                      await deleteMutation.mutateAsync(post.id);
+                    }}
+                  >
                     <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                  </Button>
+                  </AsyncButton>
                 </div>
               </CardContent>
             </Card>
@@ -150,6 +166,7 @@ export default function Blog() {
           </Card>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

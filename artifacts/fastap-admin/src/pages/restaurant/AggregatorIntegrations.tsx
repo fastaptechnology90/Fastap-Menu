@@ -3,14 +3,19 @@ import { RefreshCw, Link2, CheckCircle, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { platformApi } from "@/lib/api";
 import { FEATURES } from "@/lib/featureFlags";
+import { useToast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/restaurant/EmptyState";
 
 const LOGO: Record<string, string> = { swiggy: "🟠", zomato: "🔴", ondc: "🌐" };
 
 export default function AggregatorIntegrations() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [list, setList] = useState<any[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [ingesting, setIngesting] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // WIP: simulate a Swiggy/Zomato order arriving. Once the partner API keys are wired,
   // their webhook POSTs to the same ingest endpoint — nothing else changes downstream.
@@ -23,30 +28,50 @@ export default function AggregatorIntegrations() {
         items: [{ name: "Butter Chicken", qty: 1, price: 320 }, { name: "Garlic Naan", qty: 2, price: 40 }],
         notes: "Simulated incoming order",
       });
-      alert(`✅ ${id.toUpperCase()} order #${res?.order?.id ?? ""} ingested — ab Kitchen app + Order Management + Finance sab me dikhega.`);
-    } catch { alert("Ingest failed"); }
-    finally { setIngesting(null); }
+      toast({
+        title: `${id.toUpperCase()} order #${res?.order?.id ?? ""} ingested`,
+        description: "It now appears in the kitchen app, Live Orders and Finance.",
+      });
+    } catch (e) {
+      toast({ title: "Ingest failed", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setIngesting(null); }
   }
 
   const load = () => {
     if (!restaurantId) return;
-    platformApi.aggregators(restaurantId).then(d => setList(Array.isArray(d) ? d : [])).catch(() => {});
+    setLoading(true);
+    platformApi.aggregators(restaurantId)
+      .then(d => { setList(Array.isArray(d) ? d : []); setLoadError(null); })
+      // An empty grid used to be indistinguishable from a failed request.
+      .catch(e => setLoadError(e instanceof Error ? e.message : "Could not reach the integrations service."))
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, [restaurantId]);
 
   async function toggle(id: string, enabled: boolean) {
     if (!restaurantId) return;
-    await platformApi.updateAggregator(restaurantId, id, { enabled }).catch(() => {});
-    load();
+    try {
+      await platformApi.updateAggregator(restaurantId, id, { enabled });
+      toast({ title: enabled ? `${id.toUpperCase()} enabled` : `${id.toUpperCase()} disabled` });
+      load();
+    } catch (e) {
+      toast({ title: "Could not change the integration", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function sync(id: string) {
     if (!restaurantId) return;
     setSyncing(id);
-    await platformApi.syncAggregator(restaurantId, id).catch(() => {});
-    load();
-    setSyncing(null);
+    try {
+      await platformApi.syncAggregator(restaurantId, id);
+      toast({ title: `${id.toUpperCase()} synced` });
+      load();
+    } catch (e) {
+      toast({ title: "Sync failed", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSyncing(null);
+    }
   }
 
   return (
@@ -55,6 +80,20 @@ export default function AggregatorIntegrations() {
         <h1 className="text-xl font-extrabold">Aggregator Integrations</h1>
         <p className="text-xs text-white/40">Swiggy, Zomato & ONDC — sync-only (orders & menu catalog)</p>
       </div>
+
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-red-200/90">We could not load your integrations. {loadError}</p>
+          <button onClick={load} className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 text-xs font-semibold">Try again</button>
+        </div>
+      )}
+
+      {!loading && !loadError && list.length === 0 && (
+        <EmptyState
+          title="No aggregators connected"
+          description="Swiggy, Zomato and ONDC appear here once their partner API keys are configured."
+        />
+      )}
 
       <div className="grid gap-4">
         {list.map(agg => (

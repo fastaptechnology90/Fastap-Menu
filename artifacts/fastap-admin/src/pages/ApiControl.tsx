@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +21,7 @@ const defaultForm = { name: "", environment: "Production" };
 
 export default function ApiControl() {
   const qc = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
   const [dialog, setDialog] = useState(false);
   const [webhookDialog, setWebhookDialog] = useState(false);
   const [newKey, setNewKey] = useState<ApiKey | null>(null);
@@ -38,6 +41,7 @@ export default function ApiControl() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.apiKeys.delete(id),
     onSuccess: () => { toast.success("API key revoked"); qc.invalidateQueries({ queryKey: ["api-keys"] }); },
+    onError: () => toast.error("Failed to revoke key"),
   });
 
   const createWebhookMutation = useMutation({
@@ -94,9 +98,22 @@ export default function ApiControl() {
                   { header: "Last Used", cell: (row: ApiKey) => <span className="text-xs text-muted-foreground">{formatTime(row.lastUsed)}</span> },
                   { header: "Status", cell: (row: ApiKey) => <StatusBadge status={row.status} /> },
                   { header: "", cell: (row: ApiKey) => (
-                    <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => { if (confirm(`Revoke "${row.name}"?`)) deleteMutation.mutate(row.id); }}>
+                    <AsyncButton
+                      variant="ghost" size="icon" className="text-destructive h-7 w-7" title="Revoke key"
+                      errorMessage="Failed to revoke key"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `Revoke "${row.name}"?`,
+                          description: "Anything still calling the API with this key stops working immediately. Keys cannot be restored.",
+                          destructive: true,
+                          confirmLabel: "Revoke key",
+                        });
+                        if (!ok) return;
+                        await deleteMutation.mutateAsync(row.id);
+                      }}
+                    >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </AsyncButton>
                   )},
                 ]} />
               )}
@@ -192,6 +209,7 @@ export default function ApiControl() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

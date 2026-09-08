@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +19,7 @@ const defaultForm = { code: "", type: "Percentage", discount: "", maxUses: "1000
 
 export default function Coupons() {
   const qc = useQueryClient();
+  const { confirm, confirmDialog } = useConfirm();
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(defaultForm);
 
@@ -68,10 +71,27 @@ export default function Coupons() {
               { header: "Status", cell: (row: Coupon) => <StatusBadge status={row.status} /> },
               { header: "Actions", cell: (row: Coupon) => (
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={row.status === "Expired" || toggleMutation.isPending} onClick={() => toggleMutation.mutate(row.id)}>
+                  <AsyncButton
+                    size="sm" variant="outline" className="h-7 text-xs" disabled={row.status === "Expired"}
+                    errorMessage="Failed to toggle"
+                    onClick={() => toggleMutation.mutateAsync(row.id)}
+                  >
                     {row.status === "Active" ? <><Ban className="h-3 w-3 mr-1" /> Suspend</> : "Activate"}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => { if (confirm(`Delete ${row.code}?`)) deleteMutation.mutate(row.id); }}>Delete</Button>
+                  </AsyncButton>
+                  <AsyncButton
+                    size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                    errorMessage="Failed to delete"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: `Delete coupon ${row.code}?`,
+                        description: "Guests who already have the code will no longer be able to redeem it.",
+                        destructive: true,
+                        confirmLabel: "Delete coupon",
+                      });
+                      if (!ok) return;
+                      await deleteMutation.mutateAsync(row.id);
+                    }}
+                  >Delete</AsyncButton>
                 </div>
               )},
             ]} />
@@ -105,6 +125,7 @@ export default function Coupons() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

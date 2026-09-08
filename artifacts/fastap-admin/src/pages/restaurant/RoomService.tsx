@@ -3,6 +3,8 @@ import { BedDouble, Coffee, Shirt, Wrench, LogOut, Bell, Clock, CheckCircle, Plu
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { roomService as roomServiceApi, platformApi, menu as menuApi } from "@/lib/api";
 import { FEATURES } from "@/lib/featureFlags";
+import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 const ROOM_TYPES = ["standard", "deluxe", "premium", "suite"];
 const ROOM_STATUSES = ["vacant", "occupied", "cleaning", "maintenance", "reserved"];
@@ -133,6 +135,7 @@ type Tab = "requests"|"rooms"|"new-request"|"minibar-pos"|"food-pos";
 type MenuItem = { id: number; name: string; price: number; categoryId: number; isAvailable: boolean };
 
 export default function RoomService() {
+  const { confirm, confirmDialog } = useConfirm();
   const { restaurantId } = useRestaurant();
   const [tab, setTab] = useState<Tab>("requests");
   const [requests, setRequests] = useState<RoomRequest[]>([]);
@@ -195,8 +198,12 @@ export default function RoomService() {
       setApiRooms(Array.isArray(roomData) ? roomData : []);
       setRooms((Array.isArray(roomData) ? roomData : []).map(r => mapRoom(r, pendingCounts)));
       setMinibar(Array.isArray(minibarData) ? minibarData : []);
-    } catch (e) { console.error(e); }
-    finally { if (!silent) setLoading(false); }
+      setLoadError(null);
+    } catch (e) {
+      console.error(e);
+      // A background poll must not shout, but the screen has to admit it is stale.
+      setLoadError(e instanceof Error ? e.message : "Could not reach the server.");
+    } finally { if (!silent) setLoading(false); }
   }, [restaurantId]);
 
   // Guest room requests arrive while this page is open. Without a poll they
@@ -216,7 +223,10 @@ export default function RoomService() {
     try {
       await roomServiceApi.updateRequest(restaurantId, Number(id), { status: toApiStatus(status) });
       setRequests(r => r.map(req => req.id === id ? { ...req, status } : req));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Could not update the request", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   async function addRequest() {
@@ -233,7 +243,10 @@ export default function RoomService() {
       });
       setRequests(r => [mapRequest(created), ...r]);
       setSelectedRoom(""); setRequestNote(""); setShowNew(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Could not raise the request", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   function openCheckinNew() {
@@ -285,28 +298,40 @@ export default function RoomService() {
       setCheckinOpen(false);
       setEditingRoomId(null);
       await loadData();
-    } catch (e) { console.error(e); }
-    finally { setSavingCheckin(false); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: editingRoomId ? "Could not save the room" : "Check-in failed", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setSavingCheckin(false); }
   }
 
   async function openFolio(roomNumber: string) {
     if (!restaurantId) return;
     setFolioRoom(roomNumber); setFolioData(null); setFolioLoading(true);
     try { setFolioData(await roomServiceApi.folio(restaurantId, roomNumber)); }
-    catch (e) { console.error(e); }
-    finally { setFolioLoading(false); }
+    catch (e) {
+      console.error(e);
+      toast({ title: `Could not load the folio for Room ${roomNumber}`, description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setFolioLoading(false); }
   }
 
   async function doCheckout() {
     if (!restaurantId || !folioRoom || checkingOut) return;
-    if (!confirm(`Check-out Room ${folioRoom}? The bill will be settled and the room freed.`)) return;
+    const ok = await confirm({
+      title: `Check out Room ${folioRoom}?`,
+      description: "The folio is settled and the room is released for the next guest. Nothing further can be charged to it.",
+      confirmLabel: "Check out",
+    });
+    if (!ok) return;
     setCheckingOut(true);
     try {
       await roomServiceApi.checkout(restaurantId, folioRoom);
       setFolioRoom(null); setFolioData(null);
+      toast({ title: `Room ${folioRoom} checked out` });
       await loadData();
-    } catch (e) { console.error(e); }
-    finally { setCheckingOut(false); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Check-out failed", description: e instanceof Error ? e.message : "The room is still occupied.", variant: "destructive" });
+    } finally { setCheckingOut(false); }
   }
 
   // WIP: simulate an OTA (MakeMyTrip/OYO) online booking → auto-allot a vacant room.
@@ -320,10 +345,11 @@ export default function RoomService() {
         checkOut: new Date(Date.now() + 86400000).toISOString(),
         rate: 3500,
       });
-      alert(`✅ MakeMyTrip booking auto-allotted to Room ${res?.allottedRoom ?? "?"}.`);
+      toast({ title: `Booking allotted to Room ${res?.allottedRoom ?? "?"}` });
       await loadData();
-    } catch { alert("OTA ingest failed — no vacant room found or server error."); }
-    finally { setOtaBusy(false); }
+    } catch (e) {
+      toast({ title: "Booking could not be allotted", description: e instanceof Error ? e.message : "No vacant room of that type, or the server is unreachable.", variant: "destructive" });
+    } finally { setOtaBusy(false); }
   }
 
   const cartTotal = cart.reduce((s,c)=>s+c.item.price*c.qty,0);
@@ -353,7 +379,10 @@ export default function RoomService() {
       await roomServiceApi.updateRequest(restaurantId, created.id, { status: "completed" });
       setRequests(r => [mapRequest({ ...created, status: "completed", total: cartTotal }), ...r]);
       setCart([]); setPosRoom("");
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Could not post to the room bill", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
   }
 
   // ── Food ordering (reception → room bill) ───────────────────────────
@@ -394,8 +423,10 @@ export default function RoomService() {
       setRequests(r => [mapRequest(created), ...r]);
       setFoodCart([]); setFoodRoom("");
       setTab("requests");
-    } catch (e) { console.error(e); }
-    finally { setSendingFood(false); }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Could not send the order to the kitchen", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally { setSendingFood(false); }
   }
 
   if (loading && requests.length === 0 && rooms.length === 0) {
@@ -920,6 +951,7 @@ export default function RoomService() {
           </div>
         );
       })()}
+      {confirmDialog}
     </div>
   );
 }

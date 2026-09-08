@@ -13,6 +13,8 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable } from "@/components/shared/DataTable";
 import { KpiCard } from "@/components/shared/KpiCard";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart, Eye } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { FeatureControlPanel } from "@/components/features/FeatureControlPanel";
@@ -22,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function VendorProfile() {
+  const { confirm, confirmDialog } = useConfirm();
   const params = useParams();
   const id = parseInt(params.id || "0", 10);
   const qc = useQueryClient();
@@ -171,18 +174,30 @@ export default function VendorProfile() {
       await api.kyc.approve(String(vendorKyc?.id || vendor!.id));
       // Also mark each uploaded document verified so they don't stay "Pending" after
       // the overall KYC is approved.
-      await Promise.all(
+      const results = await Promise.allSettled(
         (vendorDocuments as any[])
           .filter(d => d?.id && d.status !== "Verified")
-          .map(d => api.kyc.verifyDocument(d.id, "verified").catch(() => {})),
+          .map(d => api.kyc.verifyDocument(d.id, "verified")),
       );
+      return results.filter(r => r.status === "rejected").length;
     },
-    onSuccess: () => {
+    onSuccess: (failed) => {
       qc.invalidateQueries({ queryKey: ["kyc"] });
       qc.invalidateQueries({ queryKey: ["vendor-documents", id] });
       qc.invalidateQueries({ queryKey: ["vendor", id] });
-      toast({ title: "KYC approved — documents verified" });
+      // The KYC record is approved either way, but a document left unverified
+      // is something the reviewer has to go back and finish by hand.
+      if (failed > 0) {
+        toast({
+          title: `KYC approved, but ${failed} document${failed === 1 ? "" : "s"} could not be verified`,
+          description: "Approve the remaining documents individually.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "KYC approved — documents verified" });
+      }
     },
+    onError: () => toast({ title: "KYC approval failed", variant: "destructive" }),
   });
 
   const kycRequestMutation = useMutation({
@@ -206,8 +221,12 @@ export default function VendorProfile() {
   const reuploadUnapprovedMutation = useMutation({
     mutationFn: async () => {
       const pending = (vendorDocuments as any[]).filter(d => d?.id && d.status !== "Verified");
-      await Promise.all(pending.map(d => api.kyc.verifyDocument(d.id, "rejected", "Re-upload requested").catch(() => {})));
-      return pending.length;
+      const results = await Promise.allSettled(
+        pending.map(d => api.kyc.verifyDocument(d.id, "rejected", "Re-upload requested")),
+      );
+      const failed = results.filter(r => r.status === "rejected").length;
+      if (failed === pending.length && pending.length > 0) throw new Error("No re-upload request could be sent.");
+      return pending.length - failed;
     },
     onSuccess: (n) => {
       qc.invalidateQueries({ queryKey: ["vendor-documents", id] });
@@ -288,6 +307,7 @@ export default function VendorProfile() {
   const deleteVendorMutation = useMutation({
     mutationFn: () => api.vendors.delete(id),
     onSuccess: () => { toast({ title: "Vendor deleted" }); window.location.href = "/vendors"; },
+    onError: () => toast({ title: "Failed to delete vendor", variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -357,7 +377,20 @@ export default function VendorProfile() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => forceLogoutMutation.mutate()} disabled={forceLogoutMutation.isPending}><LogOut className="mr-2 h-3.5 w-3.5" /> Force Logout</Button>
           <Button variant="outline" size="sm" disabled={resetPasswordMutation.isPending} onClick={() => resetPasswordMutation.mutate()}><Key className="mr-2 h-3.5 w-3.5" /> Reset Password</Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={() => { if (confirm("Soft-delete this vendor?")) deleteVendorMutation.mutate(); }}><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</Button>
+          <AsyncButton
+            variant="outline" size="sm" className="text-destructive"
+            errorMessage="Failed to delete vendor"
+            onClick={async () => {
+              const ok = await confirm({
+                title: `Delete ${vendor.name}?`,
+                description: "The vendor loses access immediately and their menu stops serving guests. Their records are retained, but restoring the account needs support.",
+                destructive: true,
+                confirmLabel: "Delete vendor",
+              });
+              if (!ok) return;
+              await deleteVendorMutation.mutateAsync();
+            }}
+          ><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</AsyncButton>
           <Button variant="outline" size="sm" className="text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/10"
             onClick={() => freezePayoutMutation.mutate()} disabled={freezePayoutMutation.isPending || (vendor as any).payoutsFrozen}>
             <PauseCircle className="mr-2 h-3.5 w-3.5" /> {(vendor as any).payoutsFrozen ? "Payouts Frozen" : "Freeze Payout"}
@@ -965,6 +998,7 @@ export default function VendorProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

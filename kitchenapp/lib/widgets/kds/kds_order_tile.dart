@@ -137,121 +137,121 @@ class _KdsOrderTileState extends State<KdsOrderTile>
                 ],
                 const SizedBox(height: 12),
                 Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            MiniChip(order.section),
-                            MiniChip(order.deliveryType),
-                            MiniChip(order.guestType),
-                            if (order.tableNumber != null)
-                              MiniChip('T${order.tableNumber}'),
-                            if (order.roomNumber != null)
-                              MiniChip('R${order.roomNumber}'),
-                            if (order.vip) const MiniChip('VIP'),
-                            if (order.reFireRequested) const MiniChip('Re-fire'),
-                          ],
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    MiniChip(order.section),
+                    MiniChip(order.deliveryType),
+                    MiniChip(order.guestType),
+                    if (order.tableNumber != null)
+                      MiniChip('T${order.tableNumber}'),
+                    if (order.roomNumber != null)
+                      MiniChip('R${order.roomNumber}'),
+                    if (order.vip) const MiniChip('VIP'),
+                    if (order.reFireRequested) const MiniChip('Re-fire'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${order.orderId} · ${order.assignedChef}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.secondaryText,
+                    fontWeight: AppFontWeights.label,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (!widget.dense || _expanded) ...[
+                  if (order.addOns.isNotEmpty)
+                    _LineBlock(
+                      title: 'Add-ons',
+                      lines: order.addOns,
+                    ),
+                  if (!order.allergy && order.modifiers.isNotEmpty)
+                    _LineBlock(
+                      title: 'Modifiers',
+                      lines: order.modifiers,
+                      highlight: true,
+                    ),
+                  if (!order.allergy && order.cookingNotes.isNotEmpty)
+                    _LineBlock(
+                      title: 'Notes',
+                      lines: order.cookingNotes,
+                    ),
+                ] else if (order.addOns.isNotEmpty ||
+                    (!order.allergy &&
+                        (order.modifiers.isNotEmpty ||
+                            order.cookingNotes.isNotEmpty)))
+                  TextButton(
+                    onPressed: () => setState(() => _expanded = true),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      minimumSize: const Size(0, 48),
+                      alignment: Alignment.centerLeft,
+                      foregroundColor: AppColors.primary,
+                    ),
+                    child: const Text(
+                      'Show add-ons & notes',
+                      style: TextStyle(
+                        fontWeight: AppFontWeights.strong,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: order.progress,
+                    color: order.statusColor,
+                    backgroundColor: order.statusColor.withAlpha(33),
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 16,
+                      color: order.statusColor,
+                    ),
+                    const SizedBox(width: 4),
+                    _LiveTimer(
+                      initialSeconds: order.timerSeconds,
+                      active: order.status.apiValue != 'ready' &&
+                          order.status.apiValue != 'served',
+                      style: TextStyle(
+                        color: order.statusColor,
+                        fontWeight: AppFontWeights.strong,
+                        fontSize: 17,
+                        // Proportional digits change width every tick,
+                        // so a board of tiles twitches continuously.
+                        fontFeatures: const [
+                          FontFeature.tabularFigures(),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        order.category,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          color: AppColors.secondaryText,
+                          fontWeight: AppFontWeights.label,
+                          fontSize: 13,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${order.orderId} · ${order.assignedChef}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.secondaryText,
-                            fontWeight: AppFontWeights.label,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (!widget.dense || _expanded) ...[
-                          if (order.addOns.isNotEmpty)
-                            _LineBlock(
-                              title: 'Add-ons',
-                              lines: order.addOns,
-                            ),
-                          if (!order.allergy && order.modifiers.isNotEmpty)
-                            _LineBlock(
-                              title: 'Modifiers',
-                              lines: order.modifiers,
-                              highlight: true,
-                            ),
-                          if (!order.allergy && order.cookingNotes.isNotEmpty)
-                            _LineBlock(
-                              title: 'Notes',
-                              lines: order.cookingNotes,
-                            ),
-                        ] else if (order.addOns.isNotEmpty ||
-                            (!order.allergy &&
-                                (order.modifiers.isNotEmpty ||
-                                    order.cookingNotes.isNotEmpty)))
-                          TextButton(
-                            onPressed: () => setState(() => _expanded = true),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              minimumSize: const Size(0, 48),
-                              alignment: Alignment.centerLeft,
-                              foregroundColor: AppColors.primary,
-                            ),
-                            child: const Text(
-                              'Show add-ons & notes',
-                              style: TextStyle(
-                                fontWeight: AppFontWeights.strong,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: order.progress,
-                            color: order.statusColor,
-                            backgroundColor: order.statusColor.withAlpha(33),
-                            minHeight: 6,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.timer_outlined,
-                              size: 16,
-                              color: order.statusColor,
-                            ),
-                            const SizedBox(width: 4),
-                            _LiveTimer(
-                              initialSeconds: order.timerSeconds,
-                              active: order.status.apiValue != 'ready' &&
-                                  order.status.apiValue != 'served',
-                              style: TextStyle(
-                                color: order.statusColor,
-                                fontWeight: AppFontWeights.strong,
-                                fontSize: 17,
-                                // Proportional digits change width every tick,
-                                // so a board of tiles twitches continuously.
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                            Flexible(
-                              child: Text(
-                                order.category,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.end,
-                                style: TextStyle(
-                                  color: AppColors.secondaryText,
-                                  fontWeight: AppFontWeights.label,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _actionsFor(order),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _actionsFor(order),
                       ],
                     ),
           ),

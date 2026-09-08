@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { buildScanUrl } from "@/lib/smartEntry";
 import { QrCode, Plus, Download, RefreshCw, Eye, Copy, Smartphone, Wifi, Trash2, Edit2, Check, Table2, BedDouble } from "lucide-react";
 import QRCode from "qrcode";
@@ -40,12 +41,14 @@ function QRCodeSVG({ value, size = 120 }: { value: string; size?: number }) {
 export default function QRManagement() {
   const { restaurantId, restaurant } = useRestaurant();
   const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const [qrcodes, setQrcodes] = useState<any[]>([]);
   const [totalScans, setTotalScans] = useState(0);
   const [tables, setTables] = useState<any[]>([]);
   const [rooms, setRooms] = useState<{ number: string }[]>([]);
   const [venueSlug, setVenueSlug] = useState("spice-garden");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<"table" | "room" | "general">("table");
   const [copied, setCopied] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -60,8 +63,9 @@ export default function QRManagement() {
     if (restaurant.slug) setVenueSlug(restaurant.slug);
   }, [restaurant.slug]);
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     if (!restaurantId) return;
+    setLoading(true);
     Promise.all([
       apiFetch(`/restaurants/${restaurantId}/qrcodes`),
       apiFetch(`/restaurants/${restaurantId}/tables`),
@@ -75,8 +79,13 @@ export default function QRManagement() {
       setTables(Array.isArray(tbl) ? tbl : []);
       setRooms(Array.isArray(rms) ? rms.map((r: any) => ({ number: r.number })) : []);
       if (meta?.slug) setVenueSlug(meta.slug);
-    }).catch(() => {}).finally(() => setLoading(false));
+      setLoadError(null);
+      // A failed fetch used to render as "no QR codes", which reads as data loss.
+    }).catch(e => setLoadError(e instanceof Error ? e.message : "Could not reach the server."))
+      .finally(() => setLoading(false));
   }, [restaurantId]);
+
+  useEffect(loadAll, [loadAll]);
 
   // Render the QR for a URL to a high-res PNG and trigger a real file download.
   async function handleDownload(value: string, filename: string) {
@@ -104,7 +113,7 @@ export default function QRManagement() {
     if (!restaurantId) return;
     const normalizedRoom = roomNumber?.trim();
     if ((newType === "room" || roomNumber !== undefined) && !normalizedRoom) {
-      window.alert("Please enter a room number before generating a room QR.");
+      toast({ title: "Room number required", description: "Enter a room number before generating a room QR.", variant: "destructive" });
       return;
     }
     const name = tableName || normalizedRoom || newName || "General QR";
@@ -132,8 +141,16 @@ export default function QRManagement() {
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: number, label: string) {
     if (!restaurantId) return;
+    // Printed codes are already on tables; deleting one takes a guest's menu offline.
+    const ok = await confirm({
+      title: `Delete the QR code for ${label}?`,
+      description: "Anyone scanning the printed code will no longer reach your menu. You will need to print a replacement.",
+      destructive: true,
+      confirmLabel: "Delete QR code",
+    });
+    if (!ok) return;
     try {
       await apiFetch(`/restaurants/${restaurantId}/qrcodes/${id}`, { method: "DELETE" });
       setQrcodes(prev => prev.filter(q => q.id !== id));
@@ -144,9 +161,15 @@ export default function QRManagement() {
     }
   }
 
-  function handleCopy(url: string, id: number) {
-    navigator.clipboard?.writeText(url).catch(() => {});
-    setCopied(id); setTimeout(() => setCopied(null), 2000);
+  async function handleCopy(url: string, id: number) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Clipboard access is blocked outside a secure context and in some browsers.
+      toast({ title: "Could not copy the link", description: url, variant: "destructive" });
+    }
   }
 
   const tableQRs = qrcodes.filter(q => q.tableId || q.type === "table");
@@ -169,6 +192,18 @@ export default function QRManagement() {
   ];
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" /></div>;
+
+  if (loadError) {
+    return (
+      <div className="p-6">
+        <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-5 text-center">
+          <p className="text-sm font-semibold text-red-200">We could not load your QR codes.</p>
+          <p className="mt-1 text-xs text-red-200/70">{loadError}</p>
+          <button onClick={loadAll} className="mt-4 px-4 py-2 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -310,7 +345,7 @@ export default function QRManagement() {
                 <button title="Download QR" onClick={() => handleDownload(qr.url || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
                   <Download className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => handleDelete(qr.id)} className="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors">
+                <button onClick={() => handleDelete(qr.id, qr.label || qr.name || "this code")} className="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -347,6 +382,7 @@ export default function QRManagement() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
