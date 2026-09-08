@@ -9,10 +9,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { api, type AppRelease, type AppCatalogEntry, type AppVisibilityRow } from "@/lib/apiClient";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { api, type AppRelease, type AppCatalogEntry, type AppVisibilityRow, type AppDownloadRow } from "@/lib/apiClient";
 import {
   Smartphone, Upload, Rocket, Trash2, Search, Link2, HardDriveDownload,
   ChefHat, ConciergeBell, BedDouble, CheckCircle2, Eye, EyeOff, Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -62,6 +64,7 @@ export default function AppReleases() {
 
   const releasesQuery = useQuery({ queryKey: ["app-releases"], queryFn: api.appReleases.list });
   const visibilityQuery = useQuery({ queryKey: ["app-releases-visibility"], queryFn: api.appReleases.visibility });
+  const downloadsQuery = useQuery({ queryKey: ["app-releases-downloads"], queryFn: api.appReleases.downloads });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<UploadForm>(EMPTY_FORM);
@@ -79,6 +82,65 @@ export default function AppReleases() {
     if (!q) return restaurants;
     return restaurants.filter(r => r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q));
   }, [restaurants, search]);
+
+  const downloads: AppDownloadRow[] = downloadsQuery.data?.downloads ?? [];
+
+  /** The version each app is meant to be on, so an out-of-date venue can be spotted. */
+  const liveVersionOf = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const app of catalog) {
+      const live = releases.find(r => r.id === app.liveReleaseId);
+      if (live) map[app.appKey] = live.version;
+    }
+    return map;
+  }, [catalog, releases]);
+
+  /**
+   * "Which venue is on which build" — the question a platform owner actually asks, and
+   * the one a chronological log of every tap cannot answer. Ordered by the venues that
+   * are behind, because those are the ones worth chasing.
+   */
+  const fleet = useMemo(() => {
+    const byVenue = downloadsQuery.data?.byVenue ?? {};
+    return Object.entries(byVenue)
+      .map(([key, venue]) => {
+        const stale = catalog.filter(app => {
+          const got = venue.apps[app.appKey]?.version;
+          return got && liveVersionOf[app.appKey] && got !== liveVersionOf[app.appKey];
+        }).map(app => app.appKey);
+        return { key, ...venue, stale };
+      })
+      .sort((a, b) => (b.stale.length - a.stale.length) || a.restaurant.localeCompare(b.restaurant));
+  }, [downloadsQuery.data, catalog, liveVersionOf]);
+
+  const downloadColumns: DataTableColumn<AppDownloadRow>[] = [
+    {
+      header: "When", sortable: true,
+      sortValue: r => new Date(r.downloadedAt),
+      searchValue: r => new Date(r.downloadedAt).toLocaleString(),
+      cell: r => <span className="text-xs text-muted-foreground">{new Date(r.downloadedAt).toLocaleString()}</span>,
+    },
+    {
+      header: "App", accessorKey: "appKey", sortable: true,
+      cell: r => <span className="capitalize text-sm">{r.appKey}</span>,
+    },
+    {
+      header: "Version", accessorKey: "version", sortable: true,
+      cell: r => <span className="font-mono text-xs">{r.version ? `v${r.version}` : "—"}</span>,
+    },
+    {
+      header: "Venue", sortable: true,
+      sortValue: r => r.restaurantName ?? "",
+      searchValue: r => r.restaurantName ?? "Direct link",
+      cell: r => <span className="text-sm">{r.restaurantName ?? <span className="text-muted-foreground">Direct link</span>}</span>,
+    },
+    {
+      header: "Staff", sortable: true,
+      sortValue: r => r.staffName ?? "",
+      searchValue: r => r.staffName ?? "",
+      cell: r => <span className="text-sm">{r.staffName ?? "—"}</span>,
+    },
+  ];
 
   function openUpload(appKey: string) {
     setForm({ ...EMPTY_FORM, appKey });
@@ -187,8 +249,8 @@ export default function AppReleases() {
       icon={<Smartphone className="h-6 w-6" />}
       accent="violet"
       loading={releasesQuery.isLoading}
-      onRefresh={() => { releasesQuery.refetch(); visibilityQuery.refetch(); }}
-      refreshing={releasesQuery.isFetching || visibilityQuery.isFetching}
+      onRefresh={() => { releasesQuery.refetch(); visibilityQuery.refetch(); downloadsQuery.refetch(); }}
+      refreshing={releasesQuery.isFetching || visibilityQuery.isFetching || downloadsQuery.isFetching}
     >
       {/* ── The three apps and what is live right now ── */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -241,6 +303,106 @@ export default function AppReleases() {
           );
         })}
       </div>
+
+      {/* ── Which venue is running which build ── */}
+      <PanelCard
+        title="Which venue is on which build"
+        description="Taken from what each venue actually downloaded. A version in red is behind the build that is live."
+        action={
+          <Button size="sm" variant="outline" className="rounded-xl" disabled={downloadsQuery.isFetching}
+            onClick={() => downloadsQuery.refetch()}>
+            {downloadsQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDriveDownload className="h-4 w-4" />}
+            <span className="ml-1.5 hidden sm:inline">Refresh</span>
+          </Button>
+        }
+      >
+        {downloadsQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : downloadsQuery.isError ? (
+          <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm">
+              We could not read the download history.{" "}
+              <span className="text-muted-foreground">
+                {downloadsQuery.error instanceof Error ? downloadsQuery.error.message : ""}
+              </span>
+            </p>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => downloadsQuery.refetch()}>Try again</Button>
+          </div>
+        ) : fleet.length === 0 ? (
+          <EmptyState icon={<Smartphone className="h-8 w-8" />} title="No venue has installed an app yet"
+            description="Once a restaurant downloads a build from its Staff Apps page, its version shows here." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="py-2 pr-3 text-left font-medium">Venue</th>
+                  {catalog.map(app => (
+                    <th key={app.appKey} className="px-3 py-2 text-left font-medium capitalize">
+                      {app.appKey}
+                      {liveVersionOf[app.appKey] && (
+                        <span className="ml-1.5 font-normal opacity-60">live v{liveVersionOf[app.appKey]}</span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {fleet.map(venue => (
+                  <tr key={venue.key}>
+                    <td className="py-2.5 pr-3">
+                      <span className="font-medium">{venue.restaurant}</span>
+                      {venue.stale.length > 0 && (
+                        <Badge variant="outline" className="ml-2 gap-1 border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600">
+                          <AlertTriangle className="h-3 w-3" /> behind
+                        </Badge>
+                      )}
+                    </td>
+                    {catalog.map(app => {
+                      const got = venue.apps[app.appKey];
+                      const behind = got?.version && liveVersionOf[app.appKey] && got.version !== liveVersionOf[app.appKey];
+                      return (
+                        <td key={app.appKey} className="px-3 py-2.5">
+                          {got ? (
+                            <>
+                              <span className={`font-mono text-xs font-semibold ${behind ? "text-destructive" : "text-emerald-600"}`}>
+                                v{got.version ?? "?"}
+                              </span>
+                              <span className="ml-2 text-[11px] text-muted-foreground">
+                                {new Date(got.last).toLocaleDateString()} · {got.count}×
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">not installed</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </PanelCard>
+
+      {/* ── The raw log, for when a specific install has to be traced ── */}
+      <PanelCard title="Download log" description="Every install, newest first — who took which build and when.">
+        <DataTable
+          columns={downloadColumns}
+          data={downloads}
+          keyExtractor={r => r.id}
+          loading={downloadsQuery.isLoading}
+          error={downloadsQuery.isError ? downloadsQuery.error : undefined}
+          onRetry={() => downloadsQuery.refetch()}
+          errorMessage="We couldn't load the download log."
+          emptyMessage="No downloads recorded yet"
+          emptyDescription="This fills in as staff install the apps from their venue's Staff Apps page."
+          searchable
+          searchPlaceholder="Search venue, staff or version…"
+          pageSize={15}
+        />
+      </PanelCard>
 
       {/* ── Every build ever uploaded ── */}
       <PanelCard title="Version history" description="The previous build is kept for rollback. A live build cannot be deleted.">

@@ -1,11 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
-import { orders as ordersApi, menu as menuApi } from "@/lib/api";
+import { orders as ordersApi, menu as menuApi, orderAdjustments, floorOps } from "@/lib/api";
 import { splitCustomizations } from "@/lib/orderItemExtras";
 import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PrintControls } from "@/components/restaurant/PrintControls";
+import {
+  AdjustedLineNote, AdjustmentHistory, LineAdjustControls, RefundControls,
+  type AdjustKind,
+} from "@/components/restaurant/BillAdjustments";
 import {
   Plus, Filter, Search, CheckCircle, XCircle, Clock, ChefHat,
-  Truck, RefreshCw, Eye, Printer, Phone, AlertCircle, X, Loader2
+  Truck, RefreshCw, Eye, Printer, Phone, AlertCircle, X, Loader2,
+  ArrowRightLeft, Split, Merge
 } from "lucide-react";
 
 const STATUS_CFG: Record<LiveOrder["status"], { label: string; color: string; bg: string; next?: LiveOrder["status"] }> = {
@@ -56,7 +63,8 @@ function getElapsed(date: Date) {
 const DEFAULT_STATUS = STATUS_CFG.new;
 
 export default function OrderManagement() {
-  const { liveOrders, updateOrderStatus, restaurantId, refreshOrders, currentStaff } = useRestaurant();
+  const { liveOrders, updateOrderStatus, restaurantId, refreshOrders, refreshTables, tables, currentStaff } = useRestaurant();
+  const { confirm, confirmDialog } = useConfirm();
   const [filter, setFilter] = useState<"all" | LiveOrder["status"]>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "dine-in" | "takeaway" | "room-service" | "delivery">("all");
   const [search, setSearch] = useState("");
@@ -185,6 +193,140 @@ export default function OrderManagement() {
   function cancelTab(tab: LiveOrder & { tabOrders?: LiveOrder[] }) {
     const orders = tab.tabOrders ?? [tab];
     orders.filter(o => o.status !== "cancelled").forEach(o => updateOrderStatus(o.id, "cancelled"));
+  }
+
+  // ── Bill adjustments and floor operations on the open order ────────────────
+  const [adjustSeq, setAdjustSeq] = useState(0);
+  const [splitPicks, setSplitPicks] = useState<number[]>([]);
+  const [moveTarget, setMoveTarget] = useState("");
+  const [mergeFrom, setMergeFrom] = useState("");
+  const [floorBusy, setFloorBusy] = useState(false);
+
+  // A tab built from several rounds shows a flattened item list, so a line's position
+  // here does not identify a line on any one order. Only offer line-level actions when
+  // the tab is a single order and the two line-ups genuinely match.
+  const singleRound = (selectedOrder?.roundCount ?? 1) === 1;
+  const selectedOrderId = selectedOrder ? parseInt(selectedOrder.id, 10) : NaN;
+
+  useEffect(() => {
+    setSplitPicks([]);
+    setMoveTarget("");
+    setMergeFrom("");
+  }, [selectedOrder?.id]);
+
+  /** Patch the panel from the order the server returned, so the change is visible at once. */
+  function applyServerOrder(updated: any) {
+    if (!updated || !Array.isArray(updated.items)) return;
+    setSelectedOrder(prev => prev && ({
+      ...prev,
+      total: parseFloat(String(updated.total ?? prev.total)) || 0,
+      paymentStatus: updated.paymentStatus ?? prev.paymentStatus,
+      items: updated.items.map((i: any) => ({
+        name: String(i.name ?? "Item"),
+        qty: Number(i.quantity ?? i.qty ?? 1) || 1,
+        price: Number(i.price ?? 0),
+        subtotal: Number(i.subtotal ?? 0),
+        status: "pending" as const,
+        variant: i.variant || undefined,
+        addons: Array.isArray(i.addons) ? i.addons.map((a: any) => ({ name: String(a?.name ?? a), price: Number(a?.price) || 0 })) : undefined,
+        customizations: Array.isArray(i.customizations) ? i.customizations.map(String) : undefined,
+        notes: i.notes || undefined,
+        voided: i.voided === true,
+        comped: i.comped === true,
+        adjustReason: i.voidReason || i.compReason || undefined,
+        adjustedBy: i.voidedBy || i.compedBy || undefined,
+      })),
+    }));
+    setAdjustSeq(s => s + 1);
+  }
+
+  async function adjustLine(itemIndex: number, name: string, kind: AdjustKind, reason: string) {
+    if (!restaurantId || Number.isNaN(selectedOrderId)) return;
+    try {
+      const call = kind === "void" ? orderAdjustments.voidItem : orderAdjustments.compItem;
+      applyServerOrder(await call(restaurantId, selectedOrderId, { itemIndex, reason }));
+      toast({ title: kind === "void" ? `${name} voided` : `${name} comped`, description: `Recorded against this bill: ${reason}` });
+      refreshOrders().catch(() => { /* the panel already shows the corrected bill */ });
+    } catch (e: any) {
+      toast({
+        title: kind === "void" ? "Could not void that line" : "Could not comp that line",
+        description: e?.message ?? "The server rejected it. Nothing was changed on the bill.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function refundOrder(reason: string, amount?: number) {
+    if (!restaurantId || Number.isNaN(selectedOrderId)) return;
+    try {
+      const res = await orderAdjustments.refund(restaurantId, selectedOrderId, { amount, reason });
+      applyServerOrder(res.order);
+      toast({ title: res.full ? "Bill refunded in full" : `₹${res.refunded.toFixed(2)} refunded`, description: `Reason recorded: ${reason}` });
+      refreshOrders().catch(() => { /* the refund itself already went through */ });
+    } catch (e: any) {
+      toast({ title: "Refund not processed", description: e?.message ?? "The server rejected it. No money has been returned.", variant: "destructive" });
+    }
+  }
+
+  async function moveTab() {
+    if (!restaurantId || Number.isNaN(selectedOrderId) || !moveTarget) return;
+    setFloorBusy(true);
+    try {
+      const res = await floorOps.moveTable(restaurantId, selectedOrderId, { tableName: moveTarget });
+      toast({ title: `Moved to ${res.movedTo}`, description: res.movedFrom ? `${res.movedFrom} is now free.` : undefined });
+      setMoveTarget("");
+      await Promise.all([refreshOrders(), refreshTables()]);
+      setSelectedOrder(null);
+    } catch (e: any) {
+      // A 409 names the table that is already taken — that message is the whole answer,
+      // so it goes to the user verbatim rather than being flattened into "failed".
+      toast({ title: "Could not move this tab", description: e?.message ?? "The server rejected the move.", variant: "destructive" });
+    } finally {
+      setFloorBusy(false);
+    }
+  }
+
+  async function splitTab() {
+    if (!restaurantId || Number.isNaN(selectedOrderId) || splitPicks.length === 0) return;
+    setFloorBusy(true);
+    try {
+      const res = await floorOps.split(restaurantId, selectedOrderId, splitPicks);
+      toast({
+        title: `Split into order ${res.split.id}`,
+        description: `${splitPicks.length} line${splitPicks.length > 1 ? "s" : ""} moved onto a separate bill at the same table.`,
+      });
+      setSplitPicks([]);
+      await refreshOrders();
+      setSelectedOrder(null);
+    } catch (e: any) {
+      toast({ title: "Could not split this bill", description: e?.message ?? "The server rejected the split.", variant: "destructive" });
+    } finally {
+      setFloorBusy(false);
+    }
+  }
+
+  async function mergeTab() {
+    if (!restaurantId || Number.isNaN(selectedOrderId) || !mergeFrom) return;
+    const source = liveOrders.find(o => o.id === mergeFrom);
+    const ok = await confirm({
+      title: `Merge ${source?.tableNo ?? `order ${mergeFrom}`} into this bill?`,
+      description: "Its items move onto this order and the original is cancelled so it cannot be billed twice. Its table is released.",
+      confirmLabel: "Merge tabs",
+      destructive: true,
+    });
+    if (!ok) return;
+    setFloorBusy(true);
+    try {
+      const res = await floorOps.merge(restaurantId, { intoOrderId: selectedOrderId, fromOrderIds: [parseInt(mergeFrom, 10)] });
+      toast({ title: "Tabs merged", description: `Order ${res.mergedFrom.join(", ")} is now part of this bill.` });
+      setMergeFrom("");
+      await Promise.all([refreshOrders(), refreshTables()]);
+      setSelectedOrder(null);
+    } catch (e: any) {
+      toast({ title: "Could not merge these tabs", description: e?.message ?? "The server rejected the merge.", variant: "destructive" });
+    } finally {
+      setFloorBusy(false);
+    }
   }
 
   const counts = {
@@ -405,32 +547,135 @@ export default function OrderManagement() {
             </div>
 
             <div>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Items</p>
-              {selectedOrder.items.map((item, i) => (
-                <div key={i} className="flex justify-between items-start gap-3 py-2 border-b border-white/5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium flex items-center gap-2 flex-wrap">
-                      {item.qty}× {item.name}
-                      {item.variant && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{item.variant}</span>}
-                    </p>
-                    {Array.isArray(item.addons) && item.addons.length > 0 && (
-                      <p className="text-xs text-emerald-300/90 mt-0.5">➕ Add: {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-white/40 uppercase tracking-wider">Items</p>
+                {singleRound && selectedOrder.items.length > 1 && (
+                  <span className="text-[10px] text-white/25">Tick lines to split them onto a separate bill</span>
+                )}
+              </div>
+              {selectedOrder.items.map((item, i) => {
+                const adjusted = item.voided || item.comped;
+                return (
+                <div key={i} className="py-2 border-b border-white/5">
+                  <div className="flex justify-between items-start gap-3">
+                    {singleRound && !adjusted && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Move ${item.name} to a separate bill`}
+                        checked={splitPicks.includes(i)}
+                        onChange={e => setSplitPicks(p => e.target.checked ? [...p, i] : p.filter(x => x !== i))}
+                        className="mt-1 h-3.5 w-3.5 shrink-0 accent-amber-500"
+                      />
                     )}
-                    {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
-                      {removes.length > 0 && <p className="text-xs text-rose-300/90 mt-0.5">➖ Remove: {removes.join(", ")}</p>}
-                      {prefs.length > 0 && <p className="text-xs text-cyan-300/80 mt-0.5">⚡ {prefs.join(" · ")}</p>}
-                    </>); })()}
-                    {item.notes && <p className="text-xs text-yellow-300/80 mt-0.5">📝 {item.notes}</p>}
-                    <span className={`text-xs ${item.status === "ready" ? "text-emerald-400" : item.status === "preparing" ? "text-blue-400" : "text-white/30"}`}>{item.status}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium flex items-center gap-2 flex-wrap ${adjusted ? "line-through text-white/35" : ""}`}>
+                        {item.qty}× {item.name}
+                        {item.variant && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">{item.variant}</span>}
+                      </p>
+                      <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
+                      {Array.isArray(item.addons) && item.addons.length > 0 && (
+                        <p className="text-xs text-emerald-300/90 mt-0.5">➕ Add: {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
+                      )}
+                      {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
+                        {removes.length > 0 && <p className="text-xs text-rose-300/90 mt-0.5">➖ Remove: {removes.join(", ")}</p>}
+                        {prefs.length > 0 && <p className="text-xs text-cyan-300/80 mt-0.5">⚡ {prefs.join(" · ")}</p>}
+                      </>); })()}
+                      {item.notes && <p className="text-xs text-yellow-300/80 mt-0.5">📝 {item.notes}</p>}
+                      <span className={`text-xs ${item.status === "ready" ? "text-emerald-400" : item.status === "preparing" ? "text-blue-400" : "text-white/30"}`}>{item.status}</span>
+                    </div>
+                    <span className={`font-semibold shrink-0 ${adjusted ? "line-through text-white/30" : "text-amber-400"}`}>₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
                   </div>
-                  <span className="text-amber-400 font-semibold shrink-0">₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
+                  <LineAdjustControls
+                    disabled={adjusted || !singleRound || selectedOrder.status === "cancelled"}
+                    disabledHint={!adjusted && !singleRound ? "Open a single round to void or comp its lines." : undefined}
+                    onAdjust={(kind, reason) => adjustLine(i, item.name, kind, reason)}
+                    className="mt-1.5"
+                  />
                 </div>
-              ))}
+                );
+              })}
               <div className="flex justify-between font-bold mt-2 pt-2">
                 <span>Total</span>
                 <span className="text-amber-400">₹{selectedOrder.total}</span>
               </div>
             </div>
+
+            {singleRound && (
+              <AdjustmentHistory restaurantId={restaurantId} orderId={selectedOrderId} refreshKey={adjustSeq} />
+            )}
+
+            {/* A multi-round tab still gets a ticket and a bill — only per-line adjusting
+                is ambiguous there, not printing. */}
+            <PrintControls restaurantId={restaurantId} orderId={selectedOrderId} />
+
+            {/* ── Floor operations: move the tab, split the bill, merge two tabs ── */}
+            {singleRound && !["billed", "cancelled"].includes(selectedOrder.status) && (
+              <div className="space-y-2.5 rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                <p className="text-xs uppercase tracking-wider text-white/40">Floor</p>
+
+                <div className="flex gap-2">
+                  <select
+                    value={moveTarget}
+                    onChange={e => setMoveTarget(e.target.value)}
+                    aria-label="Move this tab to another table"
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
+                  >
+                    <option value="">Move tab to…</option>
+                    {tables
+                      .filter(t => t.number !== selectedOrder.tableNo)
+                      .map(t => <option key={t.id} value={t.number}>{t.number} · {t.status}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={moveTab}
+                    disabled={!moveTarget || floorBusy}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold hover:bg-white/10 disabled:opacity-40"
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" /> Move
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={splitTab}
+                  disabled={splitPicks.length === 0 || splitPicks.length === selectedOrder.items.length || floorBusy}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-semibold hover:bg-white/10 disabled:opacity-40"
+                >
+                  <Split className="h-3.5 w-3.5" />
+                  {splitPicks.length === 0
+                    ? "Split — tick lines above first"
+                    : splitPicks.length === selectedOrder.items.length
+                      ? "Leave at least one line on this bill"
+                      : `Split ${splitPicks.length} line${splitPicks.length > 1 ? "s" : ""} onto a new bill`}
+                </button>
+
+                <div className="flex gap-2">
+                  <select
+                    value={mergeFrom}
+                    onChange={e => setMergeFrom(e.target.value)}
+                    aria-label="Merge another open tab into this one"
+                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
+                  >
+                    <option value="">Merge another tab in…</option>
+                    {liveOrders
+                      .filter(o => o.id !== selectedOrder.id && !["billed", "cancelled"].includes(o.status) && o.paymentStatus !== "paid")
+                      .map(o => <option key={o.id} value={o.id}>{o.tableNo} · #{o.id} · ₹{o.total}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={mergeTab}
+                    disabled={!mergeFrom || floorBusy}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold hover:bg-white/10 disabled:opacity-40"
+                  >
+                    <Merge className="h-3.5 w-3.5" /> Merge
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {singleRound && (selectedOrder.paymentStatus === "paid" || selectedOrder.status === "billed") && (
+              <RefundControls outstanding={selectedOrder.total} onRefund={refundOrder} />
+            )}
 
             {selectedOrder.specialReq && (
               <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3 text-xs text-yellow-300">
@@ -535,6 +780,7 @@ export default function OrderManagement() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

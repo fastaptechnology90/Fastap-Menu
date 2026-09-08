@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import {
   Smartphone, Download, ChefHat, ConciergeBell, BedDouble, Copy, Check,
-  ShieldCheck, RefreshCw, Info, PackageOpen,
+  ShieldCheck, RefreshCw, Info, PackageOpen, History,
 } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { staffAppsApi, type StaffAppEntry } from "@/lib/api";
+import { staffAppsApi, type StaffAppEntry, type StaffAppDownload } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 
 const APP_ICON: Record<string, typeof ChefHat> = {
@@ -55,6 +55,21 @@ export default function StaffApps() {
   const [qr, setQr] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloads, setDownloads] = useState<StaffAppDownload[]>([]);
+  const [downloadsError, setDownloadsError] = useState<string | null>(null);
+
+  const loadDownloads = useCallback(async () => {
+    if (!restaurantId) return;
+    try {
+      const res = await staffAppsApi.downloads(restaurantId);
+      setDownloads(res.downloads ?? []);
+      setDownloadsError(null);
+    } catch (e) {
+      // Nobody having installed anything and the log being unreachable are different
+      // answers, and only one of them means "chase your team".
+      setDownloadsError(e instanceof Error ? e.message : "Could not reach the server.");
+    }
+  }, [restaurantId]);
 
   const load = useCallback(async (silent = false) => {
     if (!restaurantId) return;
@@ -67,9 +82,16 @@ export default function StaffApps() {
     } finally {
       setLoading(false);
     }
-  }, [restaurantId]);
+    loadDownloads();
+  }, [restaurantId, loadDownloads]);
 
   useEffect(() => { load(); }, [load]);
+
+  /** Which build each app is on here, so an owner can see who is still behind. */
+  const latestPerApp = downloads.reduce<Record<string, StaffAppDownload>>((acc, d) => {
+    if (!acc[d.appKey]) acc[d.appKey] = d;
+    return acc;
+  }, {});
 
   // The QR has to carry the full public URL — a staff phone is not on this page's origin.
   useEffect(() => {
@@ -204,6 +226,63 @@ export default function StaffApps() {
           })}
         </div>
       )}
+
+      {/* ── Who on this team is actually running the apps ── */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-bold">Installed by your team</h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {Object.entries(latestPerApp).map(([appKey, d]) => (
+              <span key={appKey} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
+                <span className="capitalize">{appKey}</span> on <span className="font-semibold text-white/85">v{d.version ?? "?"}</span>
+              </span>
+            ))}
+            <button onClick={loadDownloads} className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] font-semibold hover:bg-white/5">
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {downloadsError ? (
+          <div role="alert" className="flex items-center justify-between gap-3 p-5">
+            <p className="text-sm text-red-200">
+              We could not read the install history. <span className="text-red-200/60">{downloadsError}</span>
+            </p>
+            <button onClick={loadDownloads} className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100">
+              Try again
+            </button>
+          </div>
+        ) : downloads.length === 0 ? (
+          <p className="p-5 text-sm text-white/45">
+            Nobody has installed an app yet. Send a staff member the link or QR above and this fills in.
+          </p>
+        ) : (
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-[#0e1520]">
+                <tr className="border-b border-white/5 text-xs text-white/40">
+                  {["App", "Version", "Staff member", "When"].map(h => (
+                    <th key={h} className="px-5 py-2.5 text-left font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {downloads.map(d => (
+                  <tr key={d.id} className="hover:bg-white/[0.02]">
+                    <td className="px-5 py-2.5 capitalize">{d.appKey}</td>
+                    <td className="px-5 py-2.5 font-mono text-xs text-white/70">{d.version ? `v${d.version}` : "—"}</td>
+                    <td className="px-5 py-2.5">{d.staffName ?? <span className="text-white/35">Shared link</span>}</td>
+                    <td className="px-5 py-2.5 text-xs text-white/40">{new Date(d.downloadedAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
