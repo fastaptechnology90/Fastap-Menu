@@ -616,9 +616,39 @@ export const auditLogs = {
 };
 
 // ─── Notifications ────────────────────────────────────────────────
+export type KitchenDisplayPrefs = {
+  targetTimes: Record<string, number>;
+  soundOn: boolean;
+  autoAccept: boolean;
+  priorityMode: boolean;
+};
+
+/** Kitchen display setup belongs to the venue, not to one browser tab on one screen. */
+export const kitchenDisplayApi = {
+  prefs: (rid: number) => get<KitchenDisplayPrefs>(`/restaurants/${rid}/settings/kitchen-display`),
+  savePrefs: (rid: number, body: Partial<KitchenDisplayPrefs>) =>
+    put<KitchenDisplayPrefs>(`/restaurants/${rid}/settings/kitchen-display`, body),
+};
+
+export type NotificationPrefs = {
+  orderAlerts: boolean; stockAlerts: boolean; paymentAlerts: boolean; staffAlerts: boolean;
+  reservationAlerts: boolean; reviewAlerts: boolean; financeAlerts: boolean; systemAlerts: boolean;
+  soundEnabled: boolean; pushEnabled: boolean; emailEnabled: boolean; smsEnabled: boolean;
+  orderThreshold: number; stockThreshold: number;
+};
+
+/** Which channels the platform can actually deliver on, so the screen cannot offer one it cannot use. */
+export type NotificationChannels = { sound: boolean; push: boolean; email: boolean; sms: boolean };
+
 export const notificationsApi = {
   list: (rid: number) => get<any[]>(`/restaurants/${rid}/notifications-log`),
   send: (rid: number, body: any) => post<any>(`/restaurants/${rid}/notifications-log`, body),
+  prefs: (rid: number) =>
+    get<{ preferences: NotificationPrefs; channelsAvailable: NotificationChannels }>(
+      `/restaurants/${rid}/settings/notifications`),
+  savePrefs: (rid: number, body: Partial<NotificationPrefs>) =>
+    put<{ preferences: NotificationPrefs; channelsAvailable: NotificationChannels }>(
+      `/restaurants/${rid}/settings/notifications`, body),
 };
 
 // ─── Documents ────────────────────────────────────────────────────

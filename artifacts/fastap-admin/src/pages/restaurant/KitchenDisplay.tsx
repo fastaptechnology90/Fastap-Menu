@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
 import { splitCustomizations } from "@/lib/orderItemExtras";
+import { kitchenDisplayApi, printing, openPrintWindow } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 import { ChefHat, Volume2, VolumeX, Flame, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play } from "lucide-react";
 
 function Timer({ start, targetMins = 20 }: { start: Date; targetMins?: number }) {
@@ -78,7 +80,7 @@ function beep(ctx: AudioContext, freq: number, startAt: number, dur: number, vol
 }
 
 export default function KitchenDisplay() {
-  const { liveOrders, updateOrderStatus } = useRestaurant();
+  const { liveOrders, updateOrderStatus, restaurantId } = useRestaurant();
   const [station, setStation] = useState("all");
   const [view, setView] = useState<"kanban"|"list"|"grid">("kanban");
   const [soundOn, setSoundOn] = useState(true);
@@ -91,6 +93,61 @@ export default function KitchenDisplay() {
   const [flash, setFlash] = useState(false);
   const prevCount = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  // Everything above lived in this browser tab. A kitchen that set its grill target to
+  // 25 minutes lost it on the next refresh, and a venue running two KDS screens had two
+  // different sets of targets, so the same ticket went red on one and green on the other.
+  const loadedPrefs = useRef(false);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    let live = true;
+    kitchenDisplayApi.prefs(restaurantId)
+      .then(p => {
+        if (!live) return;
+        setTargetTimes({ ...DEFAULT_TARGETS, ...p.targetTimes });
+        setSoundOn(p.soundOn);
+        setAutoAccept(p.autoAccept);
+        setPriorityMode(p.priorityMode);
+        loadedPrefs.current = true;
+      })
+      .catch(() => { loadedPrefs.current = true; });
+    return () => { live = false; };
+  }, [restaurantId]);
+
+  /**
+   * Print the ticket for one order. This button called `window.print()`, which prints
+   * the kitchen display itself — the dark screen, every column, every other table's
+   * order — and never a ticket for this dish.
+   */
+  async function printKot(order: LiveOrder) {
+    if (!restaurantId) return;
+    const id = parseInt(String(order.id), 10);
+    if (!Number.isInteger(id)) return;
+    try {
+      const r = await printing.reprint(restaurantId, id, "kot");
+      if (!openPrintWindow(r.html, printing.kotUrl(restaurantId, id))) {
+        toast({ title: "Your browser blocked the print window", description: "Allow pop-ups for this site to print tickets." });
+      }
+    } catch (e) {
+      toast({
+        title: "Could not print the kitchen ticket",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  /** Persist one setting, and say so if it did not stick rather than looking saved. */
+  function savePref(patch: Partial<{ targetTimes: Record<string, number>; soundOn: boolean; autoAccept: boolean; priorityMode: boolean }>) {
+    if (!restaurantId || !loadedPrefs.current) return;
+    kitchenDisplayApi.savePrefs(restaurantId, patch).catch(e => {
+      toast({
+        title: "Could not save that kitchen setting",
+        description: e instanceof Error ? e.message : "It will apply on this screen only until saved.",
+        variant: "destructive",
+      });
+    });
+  }
 
   const active = liveOrders.filter(isKitchenActive);
 
@@ -207,10 +264,10 @@ export default function KitchenDisplay() {
 
         {/* Controls */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={()=>setPriorityMode(!priorityMode)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${priorityMode?"bg-red-500/20 border-red-500/40 text-red-300":"border-white/10 bg-white/5 text-white/40"}`}>
+          <button onClick={()=>{const v=!priorityMode;setPriorityMode(v);savePref({priorityMode:v});}} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${priorityMode?"bg-red-500/20 border-red-500/40 text-red-300":"border-white/10 bg-white/5 text-white/40"}`}>
             <Flame className="h-3.5 w-3.5"/>Rush
           </button>
-          <button onClick={()=>setSoundOn(!soundOn)} className={`h-8 w-8 rounded-lg flex items-center justify-center border transition-all ${soundOn?"bg-amber-500/20 border-amber-500/40 text-amber-400":"bg-white/5 border-white/10 text-white/30"}`}>
+          <button onClick={()=>{const v=!soundOn;setSoundOn(v);savePref({soundOn:v});}} className={`h-8 w-8 rounded-lg flex items-center justify-center border transition-all ${soundOn?"bg-amber-500/20 border-amber-500/40 text-amber-400":"bg-white/5 border-white/10 text-white/30"}`}>
             {soundOn ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}
           </button>
           <div className="flex gap-0.5 bg-white/5 p-0.5 rounded-lg">
@@ -336,7 +393,7 @@ export default function KitchenDisplay() {
                               <button onClick={()=>bump(order,"preparing")} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/30 transition-all flex items-center justify-center gap-1">
                                 <Play className="h-3 w-3"/>Start Cooking
                               </button>
-                              <button onClick={() => window.print()} title="Print KOT" className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"><Printer className="h-3.5 w-3.5"/></button>
+                              <button onClick={()=>printKot(order)} title="Print kitchen ticket" className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"><Printer className="h-3.5 w-3.5"/></button>
                             </>
                           )}
                           {col.key==="preparing"&&(
@@ -456,9 +513,9 @@ export default function KitchenDisplay() {
                     <div key={st} className="flex items-center justify-between">
                       <span className="text-sm capitalize text-white/70">{st==="hot"?"Hot Line":st==="cold"?"Cold Station":st.charAt(0).toUpperCase()+st.slice(1)}</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={()=>setTargetTimes(t=>({...t,[st]:Math.max(3,mins-1)}))} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">−</button>
+                        <button onClick={()=>{const v=Math.max(3,mins-1);setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">−</button>
                         <span className="w-8 text-center text-sm font-bold text-amber-400">{mins}</span>
-                        <button onClick={()=>setTargetTimes(t=>({...t,[st]:mins+1}))} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">+</button>
+                        <button onClick={()=>{const v=mins+1;setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">+</button>
                       </div>
                     </div>
                   ))}
@@ -467,20 +524,23 @@ export default function KitchenDisplay() {
               <div>
                 <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Options</p>
                 <div className="space-y-3">
-                  {[
-                    {label:"Sound Alerts",val:soundOn,set:setSoundOn},
-                    {label:"Auto-accept Orders",val:autoAccept,set:setAutoAccept},
-                  ].map(({label,val,set})=>(
+                  {([
+                    {key:"soundOn" as const,label:"Sound Alerts",val:soundOn,set:setSoundOn},
+                    {key:"autoAccept" as const,label:"Auto-accept Orders",val:autoAccept,set:setAutoAccept},
+                  ]).map(({key,label,val,set})=>(
                     <div key={label} className="flex items-center justify-between">
                       <span className="text-sm text-white/70">{label}</span>
-                      <button onClick={()=>set(!val)} className={`h-6 w-11 rounded-full transition-all relative ${val?"bg-amber-500":"bg-white/10"}`}>
+                      <button onClick={()=>{const v=!val;set(v);savePref({[key]:v});}} className={`h-6 w-11 rounded-full transition-all relative ${val?"bg-amber-500":"bg-white/10"}`}>
                         <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${val?"left-[22px]":"left-0.5"}`}/>
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
-              <button onClick={()=>setShowSettings(false)} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm">Save Settings</button>
+              {/* Each control saves as it is changed, so this only closes the panel —
+                  calling it "Save Settings" implied nothing had been saved until now. */}
+              <button onClick={()=>setShowSettings(false)} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm">Done</button>
+              <p className="text-center text-xs text-white/30">Saved for this venue — every kitchen screen sees the same targets.</p>
             </div>
           </div>
         </div>

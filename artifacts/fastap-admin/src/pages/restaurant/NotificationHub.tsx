@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Bell, Send, Megaphone, Settings, CheckCircle, Clock, Users, Zap, X, Plus, Monitor, Smartphone, MessageSquare, AlertTriangle, Volume2, VolumeX, Filter, Eye, Loader } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { notificationsApi } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "center"|"broadcast"|"settings";
 
@@ -77,6 +78,10 @@ export default function NotificationHub() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  // Which channels the platform can actually deliver on. A venue switching on SMS with
+  // no provider configured is being sold a switch that does nothing.
+  const [channels, setChannels] = useState({ sound: true, push: true, email: true, sms: true });
+  const [savingSetting, setSavingSetting] = useState<string | null>(null);
   const [broadcast, setBroadcast] = useState({ title:"", body:"", channel:"internal", priority:"normal", audience:"all-staff" });
   const [sent, setSent] = useState(false);
 
@@ -106,6 +111,21 @@ export default function NotificationHub() {
     } finally {
       setLoading(false);
     }
+  }, [restaurantId]);
+
+  // These twelve toggles and two thresholds lived only in React state: nothing saved
+  // them, nothing read them, and a refresh put them all back.
+  useEffect(() => {
+    if (!restaurantId) return;
+    let live = true;
+    notificationsApi.prefs(restaurantId)
+      .then(r => {
+        if (!live) return;
+        setSettings({ ...DEFAULT_SETTINGS, ...r.preferences });
+        setChannels(r.channelsAvailable);
+      })
+      .catch(() => {});
+    return () => { live = false; };
   }, [restaurantId]);
 
   // This page used to fetch once and never again, so a notification raised while it was
@@ -140,8 +160,28 @@ export default function NotificationHub() {
   }
   function dismiss(id:string) { setNotifications(n=>n.filter(x=>x.id!==id)); }
 
-  function toggleSetting(key:keyof typeof settings) {
-    setSettings(s=>({...s,[key]:!s[key]}));
+  async function toggleSetting(key:keyof typeof settings) {
+    if (!restaurantId) return;
+    const before = settings;
+    const next = { ...settings, [key]: !settings[key] };
+    setSettings(next);
+    setSavingSetting(key);
+    try {
+      const saved = await notificationsApi.savePrefs(restaurantId, { [key]: next[key] } as any);
+      setSettings({ ...DEFAULT_SETTINGS, ...saved.preferences });
+      setChannels(saved.channelsAvailable);
+    } catch (e) {
+      // Put the switch back where it was rather than leaving it showing a preference
+      // the server never accepted.
+      setSettings(before);
+      toast({
+        title: "Could not save that preference",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSetting(null);
+    }
   }
 
   async function sendBroadcast() {
@@ -322,12 +362,13 @@ export default function NotificationHub() {
               ].map(({key,label,desc})=>(
                 <div key={key} className="flex items-center justify-between">
                   <div><p className="text-sm font-semibold">{label}</p><p className="text-xs text-white/40">{desc}</p></div>
-                  <button onClick={()=>toggleSetting(key as keyof typeof settings)} className={`h-6 w-11 rounded-full transition-all relative shrink-0 ${(settings as any)[key]?"bg-amber-500":"bg-white/10"}`}>
+                  <button onClick={()=>toggleSetting(key as keyof typeof settings)} disabled={savingSetting!==null} className={`h-6 w-11 rounded-full transition-all relative shrink-0 disabled:opacity-50 ${(settings as any)[key]?"bg-amber-500":"bg-white/10"}`}>
                     <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${(settings as any)[key]?"left-[22px]":"left-0.5"}`}/>
                   </button>
                 </div>
               ))}
             </div>
+            <p className="mt-4 text-xs text-white/30">Saved as you change them — these apply to everyone at this venue.</p>
           </div>
 
           <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
@@ -338,17 +379,31 @@ export default function NotificationHub() {
                 {key:"pushEnabled",label:"Push Notifications",desc:"Browser/app push alerts",icon:Smartphone},
                 {key:"emailEnabled",label:"Email Notifications",desc:"Summary emails",icon:MessageSquare},
                 {key:"smsEnabled",label:"SMS Alerts",desc:"Critical alerts via SMS",icon:Megaphone},
-              ].map(({key,label,desc,icon:ChannelIcon})=>(
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/8">
+              ].map(({key,label,desc,icon:ChannelIcon})=>{
+                const channelKey = key.replace("Enabled","") as keyof typeof channels;
+                const available = channels[channelKey] !== false;
+                return (
+                <div key={key} className={`flex items-center justify-between p-3 rounded-xl border ${available?"bg-white/5 border-white/8":"bg-white/[0.02] border-white/5"}`}>
                   <div className="flex items-center gap-3">
-                    <ChannelIcon className="h-4 w-4 text-white/40"/>
-                    <div><p className="text-sm font-semibold">{label}</p><p className="text-xs text-white/40">{desc}</p></div>
+                    <ChannelIcon className={`h-4 w-4 ${available?"text-white/40":"text-white/20"}`}/>
+                    <div>
+                      <p className={`text-sm font-semibold ${available?"":"text-white/40"}`}>{label}</p>
+                      <p className="text-xs text-white/40">
+                        {available ? desc : "No provider is configured for this channel yet, so nothing would be delivered."}
+                      </p>
+                    </div>
                   </div>
-                  <button onClick={()=>toggleSetting(key as keyof typeof settings)} className={`h-6 w-11 rounded-full transition-all relative shrink-0 ${(settings as any)[key]?"bg-amber-500":"bg-white/10"}`}>
-                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${(settings as any)[key]?"left-[22px]":"left-0.5"}`}/>
+                  <button
+                    onClick={()=>toggleSetting(key as keyof typeof settings)}
+                    disabled={!available||savingSetting!==null}
+                    title={available?undefined:"Ask your platform administrator to connect a provider first"}
+                    className={`h-6 w-11 rounded-full transition-all relative shrink-0 disabled:opacity-30 disabled:cursor-not-allowed ${(settings as any)[key]&&available?"bg-amber-500":"bg-white/10"}`}
+                  >
+                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${(settings as any)[key]&&available?"left-[22px]":"left-0.5"}`}/>
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
