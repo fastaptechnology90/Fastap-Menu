@@ -216,13 +216,14 @@ async function main() {
 
   // Everyday actions
   const everyday = {
-    "move a tab to another table": ["PUT", `/restaurants/${RID}/orders/${orderId}/move`],
-    "merge two tables": ["POST", `/restaurants/${RID}/tables/merge`],
+    "move a tab to another table": ["POST", `/restaurants/${RID}/orders/${orderId}/move-table`],
+    "merge two tabs": ["POST", `/restaurants/${RID}/orders/merge`],
     "split a bill": ["POST", `/restaurants/${RID}/orders/${orderId}/split`],
     "void a billed item": ["POST", `/restaurants/${RID}/orders/${orderId}/void-item`],
     "comp an item": ["POST", `/restaurants/${RID}/orders/${orderId}/comp-item`],
     "reprint a bill": ["POST", `/restaurants/${RID}/orders/${orderId}/reprint`],
     "refund an order": ["POST", `/restaurants/${RID}/orders/${orderId}/refund`],
+    "X reading (mid-service)": ["GET", `/restaurants/${RID}/reports/x`],
     "day-end Z report": ["GET", `/restaurants/${RID}/reports/z`],
     "clock in / attendance": ["POST", `/restaurants/${RID}/attendance`],
   };
