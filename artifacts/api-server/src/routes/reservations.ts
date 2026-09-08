@@ -7,7 +7,7 @@ import { getAccessibleRestaurant } from "../lib/restaurant-access.js";
 const router: IRouter = Router();
 
 router.get("/restaurants/:restaurantId/reservations", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.restaurantId, 10);
+  const id = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, id))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const { status, date } = req.query;
   let reservations = await db.select().from(reservationsTable).where(eq(reservationsTable.restaurantId, id));
@@ -17,7 +17,7 @@ router.get("/restaurants/:restaurantId/reservations", requireAuth, async (req, r
 });
 
 router.post("/restaurants/:restaurantId/reservations", requireAuth, async (req, res): Promise<void> => {
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const { customerName, customerPhone, customerEmail, date, time, guestCount, status, reservationType, zone, roomNumber, notes, specialRequest, depositAmount, depositStatus } = req.body;
   if (!customerName || !date || !time) { res.status(400).json({ error: "customerName, date and time required" }); return; }
@@ -46,9 +46,15 @@ router.post("/restaurants/:restaurantId/reservations", requireAuth, async (req, 
 
 router.put("/restaurants/:restaurantId/reservations/:reservationId", requireAuth, async (req, res): Promise<void> => {
   const reservationId = parseInt(req.params.reservationId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
-  const { status, tableId, roomNumber, date, time, guestCount, notes, depositAmount, depositStatus } = req.body;
+  // Every field the booking form offers has to be accepted here. The guest's name, phone,
+  // email, request, zone and type were all missing, so editing any of them returned 200
+  // with the row unchanged — the edit looked saved and was not.
+  const {
+    status, tableId, roomNumber, date, time, guestCount, notes, depositAmount, depositStatus,
+    customerName, customerPhone, customerEmail, specialRequest, zone, reservationType,
+  } = req.body;
   const [reservation] = await db.update(reservationsTable).set({
     ...(status !== undefined && { status }),
     ...(tableId !== undefined && { tableId }),
@@ -57,6 +63,12 @@ router.put("/restaurants/:restaurantId/reservations/:reservationId", requireAuth
     ...(time !== undefined && { time }),
     ...(guestCount !== undefined && { guestCount }),
     ...(notes !== undefined && { notes }),
+    ...(customerName !== undefined && { customerName }),
+    ...(customerPhone !== undefined && { customerPhone }),
+    ...(customerEmail !== undefined && { customerEmail }),
+    ...(specialRequest !== undefined && { specialRequest }),
+    ...(zone !== undefined && { zone }),
+    ...(reservationType !== undefined && { reservationType }),
     ...(depositAmount !== undefined && { depositAmount: (Number(depositAmount) || 0).toFixed(2) }),
     ...(depositStatus !== undefined && { depositStatus }),
   }).where(and(eq(reservationsTable.id, reservationId), eq(reservationsTable.restaurantId, restaurantId))).returning();
@@ -66,7 +78,7 @@ router.put("/restaurants/:restaurantId/reservations/:reservationId", requireAuth
 
 router.delete("/restaurants/:restaurantId/reservations/:reservationId", requireAuth, async (req, res): Promise<void> => {
   const reservationId = parseInt(req.params.reservationId, 10);
-  const restaurantId = parseInt(req.params.restaurantId, 10);
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const [deleted] = await db.delete(reservationsTable).where(
     and(eq(reservationsTable.id, reservationId), eq(reservationsTable.restaurantId, restaurantId)),

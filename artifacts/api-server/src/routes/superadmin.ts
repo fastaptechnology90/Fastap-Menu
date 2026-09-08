@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { requireSuperAdmin } from "../middlewares/superadmin-auth";
+import { requireSuperAdmin, type AdminRequest } from "../middlewares/superadmin-auth";
 import {
   ensurePlatformDefaults, getEnhancedStats, getRevenueTimeSeries, getExtendedAnalytics, getTaxReports,
   listPayments, listSettlements, syncPendingSettlements, listKycRecords, updateKycStatus, detectFraudAlerts, listQrCodes,
@@ -40,6 +40,18 @@ import { registerSuperAdminFeatureRoutes } from "./feature-modules.js";
 
 const router: IRouter = Router();
 const admin = [requireSuperAdmin] as const;
+
+/**
+ * The only roles a platform account may hold. These are the platform owner's own
+ * staff — deliberately none of the restaurant-side roles (restaurant_owner, manager,
+ * cashier, waiter…), which belong to a venue's own team and are issued per restaurant
+ * by the restaurant panel, never from here. A restaurant is a customer of the
+ * platform, not a member of its team, so the two sets must never mix.
+ */
+const PLATFORM_ADMIN_ROLES = [
+  "super_admin", "finance_admin", "support_admin",
+  "compliance_admin", "sales_admin", "operations_admin",
+] as const;
 
 router.post("/superadmin/setup", async (req, res): Promise<void> => {
   try {
@@ -176,7 +188,12 @@ router.post("/superadmin/subscriptions/:vendorId/action", ...admin, async (req, 
     await db.update(restaurantsTable).set({ isActive: true }).where(eq(restaurantsTable.id, vendorId));
   }
   invalidateRestaurantAnalyticsCache(vendorId);
-  if (plan && ["free", "starter", "pro", "enterprise"].includes(plan)) {
+  if (plan) {
+    // Validate against the plans that actually exist, not a hardcoded list — otherwise a
+    // plan built in the Plan Builder could never be assigned: the call returned success
+    // and the vendor silently stayed on the old plan.
+    const [target] = await db.select().from(platformPlansTable).where(eq(platformPlansTable.id, plan));
+    if (!target) { res.status(400).json({ error: `Unknown plan "${plan}"` }); return; }
     await db.update(restaurantsTable).set({ plan }).where(eq(restaurantsTable.id, vendorId));
   }
   await logPlatformAudit(req, `Subscription ${action}`, "Subscriptions", String(vendorId), { plan });
@@ -564,10 +581,16 @@ router.get("/superadmin/plans", ...admin, async (_req, res) => {
 });
 
 router.post("/superadmin/plans", ...admin, async (req, res) => {
-  const { id, name, price, currency, features, maxBranches, maxItems, maxStaff, featureToggles } = req.body;
+  const { id, name, price, features, maxBranches, maxItems, maxStaff, maxTables,
+    maxOrdersPerMonth, trialDays, isPublished, featureToggles } = req.body;
+  // Every field the plan builder sends has to be persisted here. Dropping maxTables /
+  // trialDays / isPublished meant a plan created with a 14-day trial silently came back
+  // with none, and the admin got a success toast either way.
   const [plan] = await db.insert(platformPlansTable).values({
     id: id || `plan_${Date.now()}`, name, price: String(price ?? 0), currency: PLATFORM_CURRENCY,
     features: features ?? [], maxBranches: maxBranches ?? 1, maxItems: maxItems ?? 50, maxStaff: maxStaff ?? 5,
+    maxTables: maxTables ?? 20, maxOrdersPerMonth: maxOrdersPerMonth ?? null, trialDays: trialDays ?? 0,
+    isPublished: isPublished !== false,
     featureToggles: featureToggles ?? {},
   }).returning();
   res.status(201).json(plan);
@@ -1815,8 +1838,7 @@ router.post("/superadmin/users", ...admin, async (req, res) => {
     res.status(400).json({ error: "Name, email, and password (min 8 chars) required" });
     return;
   }
-  const allowed = ["super_admin", "finance_admin", "support_admin", "compliance_admin", "sales_admin", "operations_admin"];
-  if (!allowed.includes(role)) { res.status(400).json({ error: "Invalid role" }); return; }
+  if (!PLATFORM_ADMIN_ROLES.includes(role)) { res.status(400).json({ error: "Invalid role" }); return; }
   const passwordHash = await bcrypt.hash(password, 12);
   const [user] = await db.insert(usersTable).values({ name, email, passwordHash, role }).returning();
   await logPlatformAudit(req, "Admin User Created", "Users", String(user.id));
@@ -1827,7 +1849,24 @@ router.patch("/superadmin/users/:id", ...admin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const patch: Record<string, unknown> = {};
   if (req.body.name) patch.name = req.body.name;
-  if (req.body.role) patch.role = req.body.role;
+  if (req.body.role) {
+    // The create path has always checked this list; the edit path did not, so a role
+    // could be changed to anything at all — including a restaurant-side role, which
+    // would hand a venue's role to a platform account, and including free-text that
+    // resolves to no permissions and quietly bricks the account.
+    if (!PLATFORM_ADMIN_ROLES.includes(req.body.role)) {
+      res.status(400).json({ error: "Invalid role" });
+      return;
+    }
+    // Editing a user must not be a way around the role you hold yourself: only a
+    // super admin may mint another super admin.
+    const actor = (req as AdminRequest).adminUser;
+    if (req.body.role === "super_admin" && actor?.role !== "super_admin") {
+      res.status(403).json({ error: "Only a super admin can grant the super admin role" });
+      return;
+    }
+    patch.role = req.body.role;
+  }
   if (req.body.password && req.body.password.length >= 8) {
     patch.passwordHash = await bcrypt.hash(req.body.password, 12);
   }

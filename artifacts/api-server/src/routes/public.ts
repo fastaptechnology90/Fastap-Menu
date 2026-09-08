@@ -46,10 +46,14 @@ router.get("/public/menu/:slug", async (req, res): Promise<void> => {
     const campaigns = await db.select().from(campaignsTable).where(eq(campaignsTable.restaurantId, restaurant.id)).catch(() => []);
 
     const activeCategories = categories.filter(c => c.isAvailable).sort((a, b) => a.sortOrder - b.sortOrder);
-    const categoriesWithItems = activeCategories.map(cat => ({
-      ...cat,
-      items: items.filter(i => i.categoryId === cat.id && i.isAvailable).map(formatMenuItem),
-    }));
+    const categoriesWithItems = activeCategories
+      .map(cat => ({
+        ...cat,
+        items: items.filter(i => i.categoryId === cat.id && i.isAvailable).map(formatMenuItem),
+      }))
+      // A section with nothing in it is only noise to a diner — and it happens the moment
+      // every dish in a category is marked unavailable for the day, which is routine.
+      .filter(cat => cat.items.length > 0);
 
     const featuredItems = items.filter(i => i.isFeatured && i.isAvailable).map(formatMenuItem);
 
