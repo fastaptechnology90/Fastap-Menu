@@ -7,6 +7,7 @@ import { initialTrackingMetadata } from "../lib/orderTracking.js";
 import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic.js";
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
+import { priceMenuItem, resolveDiscount, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
 
 const router: IRouter = Router();
 
@@ -117,14 +118,45 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
   if (tipAmount !== undefined) orderPatch.tipAmount = String(tipAmount);
   // Persist the exact amount collected at the POS (incl. any discount/tip) so the order
   // total = what was collected = what every revenue view shows. Keeps subtotal+tax+tip = total.
+  //
+  // This is a staff route, so a cashier reducing the bill is legitimate — that is how a
+  // manager's discount is applied. Two rules make it safe: the figure can only go down
+  // (a POS must never quietly inflate a customer's bill), and the reduction is recorded
+  // with who applied it, because an unexplained discount is indistinguishable from theft.
   if (finalTotal !== undefined && finalTotal !== null && Number.isFinite(Number(finalTotal))) {
-    const ft = Number(finalTotal);
+    const originalTotal = parseFloat(String(existing.total ?? 0)) || 0;
+    const requested = Number(finalTotal);
+    if (requested < 0) {
+      res.status(400).json({ error: "Collected amount cannot be negative" });
+      return;
+    }
+    if (requested > originalTotal + 0.01) {
+      res.status(400).json({ error: "Collected amount cannot exceed the order total" });
+      return;
+    }
+
     const tip = tipAmount !== undefined ? Number(tipAmount) : parseFloat(String(existing.tipAmount ?? 0)) || 0;
-    const taxable = Math.max(0, ft - tip);
-    const newSubtotal = taxable / 1.05;
-    orderPatch.total = ft.toFixed(2);
+    const taxable = Math.max(0, requested - tip);
+    const rate = await taxRateFor(restaurantId);
+    const newSubtotal = round2(taxable / (1 + rate));
+    orderPatch.total = requested.toFixed(2);
     orderPatch.subtotal = newSubtotal.toFixed(2);
-    orderPatch.tax = (taxable - newSubtotal).toFixed(2);
+    orderPatch.tax = round2(taxable - newSubtotal).toFixed(2);
+
+    const reduction = round2(originalTotal - requested);
+    if (reduction > 0) {
+      const staffName = req.session.staffSession?.name ?? collectedBy ?? "staff";
+      orderPatch.metadata = {
+        ...(orderPatch.metadata as Record<string, unknown>),
+        discount: {
+          amount: reduction,
+          originalTotal: round2(originalTotal),
+          reason: typeof req.body?.discountReason === "string" ? req.body.discountReason.trim() : "",
+          appliedBy: staffName,
+          appliedAt: new Date().toISOString(),
+        },
+      };
+    }
   }
 
   let [order] = await db.update(ordersTable).set(orderPatch).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
@@ -183,28 +215,54 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
 
+  // Every rupee below is derived from the menu and coupon tables. Nothing the client
+  // sends about money is used: it previously supplied unitPrice, add-on prices and the
+  // discount, so a guest could order a 500-rupee dish for 1 — or push the total below
+  // zero with a large enough discount.
   let subtotal = 0;
   const orderItems: any[] = [];
   for (const item of items) {
     const mi = menuMap.get(item.menuItemId);
     if (!mi) { res.status(400).json({ error: `Menu item ${item.menuItemId} not found` }); return; }
-    const price = item.unitPrice != null ? parseFloat(String(item.unitPrice)) : parseFloat(String(mi.discountedPrice || mi.price));
-    const addonTotal = Array.isArray(item.addons) ? item.addons.reduce((s: number, a: any) => s + parseFloat(String(a.price ?? 0)), 0) : 0;
-    const lineTotal = (price + addonTotal) * item.quantity;
-    subtotal += lineTotal;
-    orderItems.push({ id: mi.id, menuItemId: mi.id, name: mi.name, price, quantity: item.quantity, variant: item.variant, addons: item.addons, notes: item.notes, customizations: item.customizations, course: item.course, subtotal: lineTotal });
-  }
+    if (!mi.isAvailable) { res.status(409).json({ error: `${mi.name} is not available right now` }); return; }
 
-  const discount = parseFloat(String(discountAmount ?? 0));
-  const tax = parseFloat(((subtotal - discount) * 0.05).toFixed(2));
-  const tip = parseFloat(String(tipAmount ?? 0));
-  const total = subtotal - discount + tax + tip;
+    const quantity = Math.floor(Number(item.quantity));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+      res.status(400).json({ error: `Invalid quantity for ${mi.name}` });
+      return;
+    }
+
+    const { unitPrice, addons, variant } = priceMenuItem(mi, item);
+    const lineTotal = round2(unitPrice * quantity);
+    subtotal += lineTotal;
+    orderItems.push({
+      id: mi.id, menuItemId: mi.id, name: mi.name, price: unitPrice, quantity,
+      variant, addons, notes: item.notes, customizations: item.customizations,
+      course: item.course, subtotal: lineTotal,
+    });
+  }
+  subtotal = round2(subtotal);
+
+  // A coupon code is honoured only if it really exists, is live and the order qualifies.
+  // The raw discountAmount the client used to send is ignored entirely.
+  const { discount, appliedCoupon } = await resolveDiscount(restaurantId, couponCode, subtotal);
+  const taxable = Math.max(0, round2(subtotal - discount));
+  const tax = round2(taxable * (await taxRateFor(restaurantId)));
+  // A tip is the one figure the guest legitimately chooses, but it still cannot be
+  // negative and is capped so a typo cannot create an absurd bill.
+  const tip = clampTip(tipAmount, taxable);
+  const total = round2(taxable + tax + tip);
 
   const prepMinutes = Math.min(45, Math.max(15, orderItems.reduce((s, i) => s + (i.quantity ?? 1) * 5, 10)));
   const baseMeta = typeof metadata === "object" && metadata !== null ? metadata : {};
   const roomFromTable = tableName?.match(/room\s+(\S+)/i)?.[1];
   const enrichedMeta = {
     ...baseMeta,
+    // Stamp the browser session that placed this order. It is what later proves the
+    // person asking to pay or track it is the one who ordered, rather than someone
+    // walking the sequential order ids.
+    ...(req.session.guestSessionId ? { guestSessionId: req.session.guestSessionId } : {}),
+    ...(appliedCoupon ? { couponCode: appliedCoupon, couponDiscount: discount } : {}),
     ...(roomFromTable ? { roomNumber: roomFromTable } : {}),
     ...((type === "room_service" || roomFromTable) && !baseMeta.roomNumber && roomFromTable
       ? { roomNumber: roomFromTable }

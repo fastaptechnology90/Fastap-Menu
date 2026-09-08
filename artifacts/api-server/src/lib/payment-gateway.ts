@@ -25,6 +25,19 @@ export function resolveActiveGateway(integrations: IntegrationsConfig): string |
   return enabled[0] ?? null;
 }
 
+/**
+ * True only when a gateway is both switched on *and* holds real credentials.
+ *
+ * "Enabled" alone is not enough: a gateway can be ticked in settings with no keys, and
+ * every call then falls through to `demoResult()`, which reports success without any
+ * money moving. Anything that takes or creates money — settling an order, crediting a
+ * wallet, holding a deposit — must gate on this, not on `resolveActiveGateway`.
+ */
+export function hasLivePaymentGateway(integrations: IntegrationsConfig): boolean {
+  const gatewayId = resolveActiveGateway(integrations);
+  return gatewayId !== null && gatewayHasCredentials(integrations, gatewayId);
+}
+
 export type GatewayProcessInput = {
   gatewayId: string;
   integrations: IntegrationsConfig;
@@ -52,7 +65,7 @@ export type GatewayProcessResult = {
   clientConfig?: Record<string, unknown>;
 };
 
-function gatewayHasCredentials(integrations: IntegrationsConfig, gatewayId: string): boolean {
+export function gatewayHasCredentials(integrations: IntegrationsConfig, gatewayId: string): boolean {
   switch (gatewayId) {
     case "razorpay":
       return Boolean(
@@ -84,15 +97,21 @@ function gatewayHasCredentials(integrations: IntegrationsConfig, gatewayId: stri
   }
 }
 
-function demoResult(gatewayId: string, orderId: number): GatewayProcessResult {
-  const ts = Date.now();
+/**
+ * A gateway with no credentials cannot take money, so it must not claim to have.
+ *
+ * This used to return `success: true` with an invented transaction id and UTR. The
+ * order was then marked paid, the guest saw "Payment Successful", and nothing had been
+ * charged — the single most damaging behaviour in the product. It now fails, clearly,
+ * and the caller falls back to collecting at the counter.
+ */
+function unconfiguredGateway(gatewayId: string): GatewayProcessResult {
   return {
-    success: true,
+    success: false,
     mode: "demo",
     gatewayId,
-    gatewayTxnId: `demo_${gatewayId}_${orderId}_${ts}`,
-    gatewayOrderId: `order_${orderId}`,
-    utr: `DEMO${orderId}${String(ts).slice(-6)}`,
+    gatewayTxnId: "",
+    error: "Online payment is not set up yet. Please pay at the counter.",
   };
 }
 
@@ -101,7 +120,7 @@ async function createRazorpayOrder(input: GatewayProcessInput): Promise<GatewayP
   const keyId = resolveIntegrationValue(integrations, "razorpay", "keyId", process.env.RAZORPAY_KEY_ID);
   const keySecret = resolveIntegrationValue(integrations, "razorpay", "keySecret", process.env.RAZORPAY_KEY_SECRET);
 
-  if (!keyId || !keySecret) return demoResult("razorpay", orderId);
+  if (!keyId || !keySecret) return unconfiguredGateway("razorpay");
 
   const amountPaise = Math.max(100, Math.round(amount * 100));
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
@@ -146,13 +165,7 @@ async function captureRazorpayPayment(input: GatewayProcessInput): Promise<Gatew
   const keyId = resolveIntegrationValue(integrations, "razorpay", "keyId", process.env.RAZORPAY_KEY_ID);
   const keySecret = resolveIntegrationValue(integrations, "razorpay", "keySecret", process.env.RAZORPAY_KEY_SECRET);
 
-  if (!keyId || !keySecret) {
-    return {
-      ...demoResult("razorpay", orderId),
-      gatewayOrderId: input.razorpayOrderId,
-      gatewayTxnId: input.razorpayPaymentId ?? `demo_rzp_pay_${orderId}`,
-    };
-  }
+  if (!keyId || !keySecret) return unconfiguredGateway("razorpay");
 
   if (input.razorpayPaymentId && input.razorpayOrderId && input.razorpaySignature) {
     const crypto = await import("node:crypto");
@@ -171,7 +184,16 @@ async function captureRazorpayPayment(input: GatewayProcessInput): Promise<Gatew
     };
   }
 
-  return createRazorpayOrder(input);
+  // Without a signed result from Razorpay there is nothing to capture. This used to
+  // fall through to createRazorpayOrder, whose success means "an order was created" —
+  // not "the customer paid" — and the caller then marked the bill settled.
+  return {
+    success: false,
+    mode: "live",
+    gatewayId: "razorpay",
+    gatewayTxnId: "",
+    error: "Payment was not confirmed by the gateway.",
+  };
 }
 
 async function createStripePaymentIntent(input: GatewayProcessInput): Promise<GatewayProcessResult> {
@@ -179,7 +201,7 @@ async function createStripePaymentIntent(input: GatewayProcessInput): Promise<Ga
   const secretKey = resolveIntegrationValue(integrations, "stripe", "secretKey", process.env.STRIPE_SECRET_KEY);
   const publishableKey = resolveIntegrationValue(integrations, "stripe", "publishableKey", process.env.STRIPE_PUBLISHABLE_KEY);
 
-  if (!secretKey) return demoResult("stripe", orderId);
+  if (!secretKey) return unconfiguredGateway("stripe");
 
   const amountMinor = Math.max(50, Math.round(amount * 100));
 
@@ -223,7 +245,7 @@ async function createStripePaymentIntent(input: GatewayProcessInput): Promise<Ga
 async function processRegionalGateway(input: GatewayProcessInput): Promise<GatewayProcessResult> {
   const { gatewayId, orderId } = input;
   if (!gatewayHasCredentials(input.integrations, gatewayId)) {
-    return demoResult(gatewayId, orderId);
+    return unconfiguredGateway(gatewayId);
   }
   const ts = Date.now();
   return {

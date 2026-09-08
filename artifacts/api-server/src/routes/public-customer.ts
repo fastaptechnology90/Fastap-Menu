@@ -871,13 +871,21 @@ router.get("/public/me/orders", async (req, res): Promise<void> => {
   const guest = await getGuestUser(req);
   if (!guest) { res.status(401).json({ error: "Not authenticated" }); return; }
   const restaurantId = req.session.restaurantId;
-  const conditions = [];
-  if (restaurantId) conditions.push(eq(ordersTable.restaurantId, restaurantId));
-  if (guest.phone) conditions.push(eq(ordersTable.customerPhone, guest.phone));
-  if (guest.email) conditions.push(eq(ordersTable.customerEmail, guest.email));
-  if (conditions.length === 0) { res.json([]); return; }
 
-  const list = await db.select().from(ordersTable).where(or(...conditions)).orderBy(desc(ordersTable.createdAt)).limit(50);
+  // Identify the guest by phone OR email — either may be missing — but always AND that
+  // with the restaurant. Joining all three with or() meant the restaurant clause alone
+  // matched, so every guest was handed every order in the venue: names, phone numbers,
+  // email addresses and totals belonging to other diners.
+  const identity = [];
+  if (guest.phone) identity.push(eq(ordersTable.customerPhone, guest.phone));
+  if (guest.email) identity.push(eq(ordersTable.customerEmail, guest.email));
+  if (identity.length === 0) { res.json([]); return; }
+
+  const scoped = restaurantId
+    ? and(eq(ordersTable.restaurantId, restaurantId), or(...identity))
+    : or(...identity);
+
+  const list = await db.select().from(ordersTable).where(scoped).orderBy(desc(ordersTable.createdAt)).limit(50);
   res.json(list.map(o => ({
     ...o,
     subtotal: parseNum(o.subtotal),

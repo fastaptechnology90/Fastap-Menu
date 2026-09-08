@@ -141,31 +141,56 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
   });
 });
 
+/**
+ * Load a reservation only if the caller made it.
+ *
+ * These three routes previously took the integer id and acted on it — so anyone could
+ * count upward and confirm, edit, or cancel other people's bookings, and mark deposits
+ * as paid without paying. The stored `bookingToken` is no help on its own because it is
+ * derived from the id (`#REV0007`), so the check is against the contact details the
+ * guest supplied when booking, or the signed-in guest account.
+ */
+async function loadOwnedReservation(req: Request, id: number) {
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const [reservation] = await db.select().from(reservationsTable).where(eq(reservationsTable.id, id));
+  if (!reservation) return null;
+
+  const claimedPhone = String(req.body?.phone ?? req.query?.phone ?? "").replace(/\D/g, "");
+  const bookedPhone = String(reservation.customerPhone ?? "").replace(/\D/g, "");
+  if (claimedPhone && bookedPhone && claimedPhone === bookedPhone) return reservation;
+
+  const guestUserId = req.session.guestUserId;
+  if (guestUserId) {
+    const [guest] = await db.select().from(guestUsersTable).where(eq(guestUsersTable.id, guestUserId)).limit(1);
+    if (guest) {
+      const guestPhone = String(guest.phone ?? "").replace(/\D/g, "");
+      if (guestPhone && bookedPhone && guestPhone === bookedPhone) return reservation;
+      if (guest.email && reservation.customerEmail && guest.email === reservation.customerEmail) return reservation;
+    }
+  }
+
+  return null;
+}
+
 router.post("/public/reservations/:id/deposit", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const { paymentMethod } = req.body;
-  const [reservation] = await db.select().from(reservationsTable).where(eq(reservationsTable.id, id));
+  const reservation = await loadOwnedReservation(req, id);
   if (!reservation) { res.status(404).json({ error: "Reservation not found" }); return; }
 
-  const [updated] = await db.update(reservationsTable).set({
-    depositStatus: "paid",
-    status: "confirmed",
-  }).where(eq(reservationsTable.id, id)).returning();
-
-  res.json({
-    success: true,
-    reservation: updated,
-    payment: {
-      method: paymentMethod ?? "upi",
-      amount: parseNum(reservation.depositAmount),
-      status: "paid",
-      transactionId: `TXN${Date.now()}`,
-    },
+  // The deposit used to be marked paid on the spot with a made-up transaction id and no
+  // money involved. Until a gateway is connected there is no way to take a deposit
+  // online, so the booking is held and the amount is collected at the venue.
+  res.status(503).json({
+    error: "Online deposit is not available yet. Your booking is held — the deposit is collected at the venue.",
+    reservation,
   });
 });
 
 router.put("/public/reservations/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
+  const owned = await loadOwnedReservation(req, id);
+  if (!owned) { res.status(404).json({ error: "Reservation not found" }); return; }
+
   const { date, time, guestCount, notes, specialRequest, zone, reservationType } = req.body;
   const [reservation] = await db.update(reservationsTable).set({
     date,
@@ -183,7 +208,7 @@ router.put("/public/reservations/:id", async (req, res): Promise<void> => {
 
 router.patch("/public/reservations/:id/cancel", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const [reservation] = await db.select().from(reservationsTable).where(eq(reservationsTable.id, id));
+  const reservation = await loadOwnedReservation(req, id);
   if (!reservation) { res.status(404).json({ error: "Reservation not found" }); return; }
 
   const depositStatus = reservation.depositStatus === "paid" ? "refunded" : reservation.depositStatus;

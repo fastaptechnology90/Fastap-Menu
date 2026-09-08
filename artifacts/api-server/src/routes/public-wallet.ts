@@ -1,6 +1,8 @@
 import { Router, type IRouter, type Request } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, guestUsersTable, walletTransactionsTable } from "@workspace/db";
+import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
+import { hasLivePaymentGateway } from "../lib/payment-gateway.js";
 import {
   normalizeBuckets, bucketsToStorage, getWalletCatalog, buildCashbackSummary,
   applyRecharge, applyTransfer, totalBalance, canTransfer,
@@ -142,6 +144,18 @@ router.post("/public/me/wallet/recharge", async (req, res): Promise<void> => {
 
   const amount = parseNum(req.body.amount);
   if (amount <= 0) { res.status(400).json({ error: "Invalid amount" }); return; }
+
+  // This endpoint used to credit whatever amount was posted, with no payment of any
+  // kind — a guest could type ten lakh and spend it. Wallet money may only be created
+  // against a payment this server has confirmed, so until a gateway is connected there
+  // is no legitimate way to top up online and the endpoint refuses.
+  const settings = await getPlatformSettingsRaw();
+  if (!hasLivePaymentGateway(settings.integrations)) {
+    res.status(503).json({
+      error: "Online wallet top-up is not available yet. Please add money at the counter.",
+    });
+    return;
+  }
 
   const balances = applyRecharge(normalizeBuckets(guest), amount);
   await persistBalances(guest.id, balances);

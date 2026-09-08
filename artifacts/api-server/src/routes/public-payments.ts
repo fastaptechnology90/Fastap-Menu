@@ -7,6 +7,7 @@ import {
 } from "../lib/paymentLogic.js";
 import { buildInvoicePdfBuffer } from "../lib/invoicePdf.js";
 import { billingFromSettings } from "../lib/restaurant-catalogs.js";
+import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPaymentsPublicConfig, isOnlinePaymentMethod, isCashPaymentMethod, processGatewayPayment } from "../lib/payment-gateway.js";
 
@@ -17,10 +18,19 @@ function parseNum(v: unknown, fallback = 0): number {
   return Number.isNaN(n) ? fallback : n;
 }
 
+/**
+ * How much to charge now. A guest may legitimately pay part of the bill, but the
+ * figure is clamped to the order's own total: it used to be taken from the request
+ * body as-is, so the amount charged had no relationship to what was owed.
+ */
 function payAmountForOrder(grandTotal: number, body: Record<string, unknown>): number {
-  if (body.partialPayNow != null) return parseNum(body.partialPayNow);
-  if (body.advanceAmount != null) return parseNum(body.advanceAmount);
-  return grandTotal;
+  const requested = body.partialPayNow != null
+    ? parseNum(body.partialPayNow)
+    : body.advanceAmount != null
+      ? parseNum(body.advanceAmount)
+      : grandTotal;
+  if (!Number.isFinite(requested) || requested <= 0) return grandTotal;
+  return Math.min(requested, grandTotal);
 }
 
 router.get("/public/payments/catalog", async (_req, res) => {
@@ -47,7 +57,7 @@ router.post("/public/payments/quote", (req, res) => {
 
 router.post("/public/payments/intent/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const settings = await getPlatformSettingsRaw();
@@ -88,7 +98,10 @@ router.post("/public/payments/intent/:orderId", async (req, res): Promise<void> 
 
 router.post("/public/payments/process/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.orderId, 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // The order used to be fetched by id alone, with no check that the caller had
+  // anything to do with it — so walking the sequential ids let anyone mark strangers'
+  // orders as settled.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const {
@@ -169,12 +182,15 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
     billing.gateway = gatewayResult.gatewayId;
     billing.gatewayMode = gatewayResult.mode;
   } else if (!isCashPaymentMethod(method)) {
-    // Wallet and other in-app methods — mark paid when not cash
-    paymentStatus = resolvePaymentStatus(method, {
-      partialPayNow: partialPayNow != null ? parseNum(partialPayNow) : undefined,
-      advanceAmount: advanceAmount != null ? parseNum(advanceAmount) : undefined,
-      grandTotal,
+    // Anything that is neither cash nor a confirmed gateway charge — "wallet", "nfc",
+    // an unrecognised string — used to be marked paid simply for not being cash. That
+    // meant any method name at all settled the bill. Money only moves through a
+    // confirmed gateway or over the counter.
+    res.status(402).json({
+      error: "This payment method is not available yet. Please pay at the counter.",
+      paymentStatus: "pending",
     });
+    return;
   }
 
   const [updated] = await db.update(ordersTable).set({
