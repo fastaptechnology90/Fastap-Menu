@@ -31,9 +31,9 @@ export default function DisasterRecovery() {
       refreshing={isFetching}
       actions={<Button onClick={() => testMutation.mutate()} disabled={testMutation.isPending} className="rounded-xl"><Play className="mr-2 h-4 w-4" /> Record Failover Test</Button>}
     >
-      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-        <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-        <p className="text-xs text-amber-600 dark:text-amber-400">
+      <div className="flex items-start gap-2 rounded-xl border border-warning-border bg-warning-subtle p-3">
+        <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+        <p className="text-xs text-warning dark:text-warning">
           <span className="font-semibold">Plan of record, not live status.</span> These values are
           the DR targets stored in platform settings. Nothing here probes a standby region or
           verifies backup integrity, and no failover is performed from this page.

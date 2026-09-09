@@ -16,6 +16,7 @@ import { Plus, Copy, Trash2, Key, Loader2, Webhook, BarChart3, RotateCcw, AlertT
 import { api, type ApiKey } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
+import { PageHeader } from "@/components/shared/Page";
 
 const defaultForm = { name: "", environment: "Production" };
 
@@ -72,10 +73,11 @@ export default function ApiControl() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">API & Integration Control</h2><p className="text-muted-foreground">API key issuing and webhook registration.</p></div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="API & Integration Control"
+        description="API key issuing and webhook registration."
+      />
 
       <Tabs defaultValue="keys">
         <TabsList>
@@ -87,7 +89,7 @@ export default function ApiControl() {
         <TabsContent value="keys" className="mt-4 space-y-4">
           <div className="flex justify-between items-center">
             <div className="grid gap-4 md:grid-cols-3 flex-1 mr-4">
-              <KpiCard title="Active Keys" value={keys.filter(k => k.status === "Active").length} icon={<Key className="h-4 w-4 text-green-500" />} />
+              <KpiCard title="Active Keys" value={keys.filter(k => k.status === "Active").length} icon={<Key className="h-4 w-4 text-success" />} />
               <KpiCard title="Production" value={keys.filter(k => k.environment === "Production").length} icon={<Key className="h-4 w-4 text-primary" />} />
               <KpiCard title="Sandbox" value={keys.filter(k => k.environment === "Sandbox").length} icon={<Key className="h-4 w-4 text-muted-foreground" />} />
             </div>
@@ -96,7 +98,11 @@ export default function ApiControl() {
           <Card>
             <CardContent className="pt-6">
               {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : (
-                <DataTable data={keys} columns={[
+                <DataTable
+                  data={keys}
+                  emptyMessage="No API keys issued"
+                  emptyDescription="Issue a key above to let a vendor integrate with the platform API."
+                  columns={[
                   { header: "Name", cell: (row: ApiKey) => <span className="font-medium">{row.name}</span> },
                   { header: "Environment", cell: (row: ApiKey) => <Badge variant={row.environment === "Production" ? "default" : "secondary"} className="text-xs">{row.environment}</Badge> },
                   { header: "Prefix", cell: (row: ApiKey) => <span className="font-mono text-xs">{row.prefix}...</span> },
@@ -135,10 +141,14 @@ export default function ApiControl() {
               {whLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : webhooks.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No webhooks configured.</p>
               ) : (
-                <DataTable data={webhooks} columns={[
+                <DataTable
+                  data={webhooks}
+                  emptyMessage="No webhooks registered"
+                  emptyDescription="Register an endpoint above and the platform will post events to it."
+                  columns={[
                   { header: "URL", cell: (row: any) => <span className="font-mono text-xs truncate max-w-[200px] block">{row.url}</span> },
                   { header: "Events", cell: (row: any) => <span className="text-xs">{(row.events || []).join(", ")}</span> },
-                  { header: "Failures", cell: (row: any) => <span className={row.failures > 0 ? "text-red-500" : ""}>{row.failures ?? 0}</span> },
+                  { header: "Failures", cell: (row: any) => <span className={row.failures > 0 ? "text-danger" : ""}>{row.failures ?? 0}</span> },
                   { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
                   { header: "", cell: (row: any) => (
                     <div className="flex gap-1">
@@ -158,9 +168,9 @@ export default function ApiControl() {
               per-endpoint table off those same numbers by fixed percentages. Charting that as
               traffic would be inventing telemetry, so only the figures that are real counts
               are shown, and the rest is described rather than drawn. */}
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+          <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle p-3">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+            <p className="text-xs text-warning dark:text-warning">
               <span className="font-semibold">No request metering yet.</span> The platform does not
               record API traffic, so call volume, latency, per-hour breakdown, and top endpoints
               cannot be reported. The counts below are real; traffic analytics needs a metrics
@@ -169,9 +179,9 @@ export default function ApiControl() {
           </div>
           <div className="grid gap-4 md:grid-cols-4">
             <KpiCard title="Total Keys" value={String(usage?.totalKeys ?? keys.length)} icon={<Key className="h-4 w-4" />} />
-            <KpiCard title="Active Keys" value={String(usage?.activeKeys ?? 0)} icon={<Key className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="Active Webhooks" value={String(usage?.activeWebhooks ?? 0)} icon={<Webhook className="h-4 w-4 text-blue-500" />} />
-            <KpiCard title="Logged Errors" value={String(usage?.failedCalls ?? 0)} icon={<BarChart3 className="h-4 w-4 text-red-500" />} />
+            <KpiCard title="Active Keys" value={String(usage?.activeKeys ?? 0)} icon={<Key className="h-4 w-4 text-success" />} />
+            <KpiCard title="Active Webhooks" value={String(usage?.activeWebhooks ?? 0)} icon={<Webhook className="h-4 w-4 text-info" />} />
+            <KpiCard title="Logged Errors" value={String(usage?.failedCalls ?? 0)} icon={<BarChart3 className="h-4 w-4 text-danger" />} />
           </div>
           <Card>
             <CardHeader><CardTitle className="text-sm">Traffic Analytics</CardTitle></CardHeader>

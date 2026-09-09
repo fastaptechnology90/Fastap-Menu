@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Download, Plus, Loader2 } from "lucide-react";
 import { api, type Tax } from "@/lib/apiClient";
+import { downloadCsv } from "@/lib/download";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/Page";
 
 const defaultForm = { name: "", rate: "", type: "Sales Tax", region: "India" };
 
@@ -34,12 +36,32 @@ export default function Taxes() {
     onError: () => toast.error("Failed to create tax"),
   });
 
+  // This used to request an "taxes" export from the export API, which has no exporter for
+  // that module and falls through to a generic vendor-name list — so the file the button
+  // produced held no tax data at all while still reporting "Tax report exported". Build
+  // the file from the rows on screen instead, the way the Reconciliation report does.
+  const exportReports = () => {
+    if (!reports.length) { toast.error("No tax report rows to export"); return; }
+    downloadCsv(reports.map(r => ({
+      Month: r.month,
+      "Total Sales": r.totalSales,
+      "Tax Collected": r.taxCollected,
+      "Filing Status": r.status,
+    })), `tax-reports-${new Date().toISOString().split("T")[0]}.csv`);
+    toast.success("Tax report exported");
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Tax Management</h2><p className="text-muted-foreground">Configure tax slabs and view compliance reports.</p></div>
-        <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Add Tax Rule</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Tax Management"
+        description="Configure tax slabs and view compliance reports."
+        actions={
+          <>
+            <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Add Tax Rule</Button>
+          </>
+        }
+      />
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Tax Slabs & Rules</CardTitle></CardHeader>
@@ -60,7 +82,7 @@ export default function Taxes() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0"><CardTitle>Monthly Tax Reports</CardTitle><Button variant="outline" size="sm" onClick={() => api.exportCenter.create({ module: "taxes", format: "csv" }).then(r => api.exportCenter.download(r.id)).then(() => toast.success("Tax report exported")).catch(() => toast.error("Export failed"))}><Download className="h-4 w-4 mr-2" /> Export</Button></CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0"><CardTitle>Monthly Tax Reports</CardTitle><Button variant="outline" size="sm" onClick={exportReports}><Download className="h-4 w-4 mr-2" /> Export</Button></CardHeader>
           <CardContent>
             <div className="space-y-3">
                 {(reports.length ? reports : []).map((r, i) => (
@@ -69,7 +91,9 @@ export default function Taxes() {
                     <p className="font-medium text-sm">{r.month}</p>
                     <p className="text-xs text-muted-foreground">Sales: ₹{r.totalSales.toLocaleString("en-IN")} — Tax: <span className="font-medium">₹{r.taxCollected.toLocaleString("en-IN")}</span></p>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.status === "Filed" ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"}`}>{r.status}</span>
+                  {/* Filing state is not recorded anywhere, so this stays neutral rather
+                      than painting a month green as though a return had been filed. */}
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{r.status}</span>
                 </div>
               ))}
             </div>

@@ -71,22 +71,88 @@ router.get("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, re
 router.post("/restaurants/:restaurantId/cash-shifts", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const { staffName, staffRole, openingBalance, denominations } = req.body;
-  await db.update(cashShiftsTable).set({ status: "closed", closedAt: new Date() }).where(and(eq(cashShiftsTable.restaurantId, id), eq(cashShiftsTable.status, "open")));
-  const [shift] = await db.insert(cashShiftsTable).values({ restaurantId: id, staffName, staffRole, openingBalance: String(parseFloat(openingBalance) || 0), denominations }).returning();
+
+  // Opening a shift used to force-close whatever was already open, writing status "closed"
+  // with a null closing balance and no mismatch check. That is how a shift holding
+  // GBP-equivalent thousands of cash sales came to be marked closed with nothing counted:
+  // the outgoing cashier's drawer simply vanished from the books when the next one signed
+  // on. A drawer is handed over by counting it, so the open shift must be closed properly
+  // first and this now says so instead of doing it silently.
+  const [open] = await db.select().from(cashShiftsTable)
+    .where(and(eq(cashShiftsTable.restaurantId, id), eq(cashShiftsTable.status, "open")))
+    .orderBy(desc(cashShiftsTable.openedAt));
+  if (open) {
+    res.status(409).json({
+      error: `${open.staffName}'s shift is still open. Count and close that drawer before opening a new one.`,
+      openShift: { id: open.id, staffName: open.staffName, openedAt: open.openedAt, cashSales: parseFloat(String(open.cashSales)) },
+    });
+    return;
+  }
+
+  const opening = parseFloat(String(openingBalance));
+  if (!Number.isFinite(opening) || opening < 0) {
+    res.status(400).json({ error: "Opening float must be a number of at least 0." });
+    return;
+  }
+  if (!staffName || !staffRole) {
+    res.status(400).json({ error: "A shift belongs to a member of staff — staffName and staffRole are required." });
+    return;
+  }
+
+  const [shift] = await db.insert(cashShiftsTable).values({
+    restaurantId: id,
+    staffName: String(staffName),
+    staffRole: String(staffRole),
+    openingBalance: opening.toFixed(2),
+    denominations: denominations ? String(denominations) : null,
+  }).returning();
   res.status(201).json(shift);
 });
 
 router.put("/restaurants/:restaurantId/cash-shifts/:shiftId/close", requireAuth, async (req, res): Promise<void> => {
   const shiftId = parseInt(String(req.params.shiftId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
-  const { closingBalance, notes } = req.body;
+  const { closingBalance, notes, denominations } = req.body;
   const [shift] = await db.select().from(cashShiftsTable).where(and(eq(cashShiftsTable.id, shiftId), eq(cashShiftsTable.restaurantId, restaurantId)));
   if (!shift) { res.status(404).json({ error: "Shift not found" }); return; }
+  if (shift.closedAt) {
+    res.status(409).json({ error: "That shift is already closed.", closedAt: shift.closedAt });
+    return;
+  }
+
+  // `parseFloat(undefined)` is NaN, and the old code wrote that straight into a money column
+  // — the drawer ended up holding the literal value NaN — while `Math.abs(expected - NaN) > 1`
+  // is false, so the mismatch alarm stayed silent on the one case it exists to catch.
+  // Closing a drawer means declaring what is in it; without a number there is nothing to
+  // reconcile, so this is refused rather than recorded as a count of nothing.
+  const closing = parseFloat(String(closingBalance));
+  if (!Number.isFinite(closing) || closing < 0) {
+    res.status(400).json({ error: "Count the drawer: closingBalance must be the amount declared, as a number of at least 0." });
+    return;
+  }
+
   const expected = parseFloat(String(shift.openingBalance)) + parseFloat(String(shift.cashSales)) - parseFloat(String(shift.cashExpenses));
-  const closing = parseFloat(closingBalance);
-  const mismatch = Math.abs(expected - closing) > 1;
-  const [updated] = await db.update(cashShiftsTable).set({ status: "closed", closedAt: new Date(), closingBalance: String(closing), expectedBalance: String(expected), notes, mismatchAlert: mismatch }).where(eq(cashShiftsTable.id, shiftId)).returning();
-  res.json(updated);
+  const difference = Math.round((closing - expected) * 100) / 100;
+  const mismatch = Math.abs(difference) > 1;
+
+  // A shift cannot close before it opened. Two records in this database close the day
+  // before they open, because nothing ever compared the two timestamps.
+  const openedAt = new Date(shift.openedAt);
+  const now = new Date();
+  const closedAt = now >= openedAt ? now : openedAt;
+
+  const [updated] = await db.update(cashShiftsTable).set({
+    status: "closed",
+    closedAt,
+    closingBalance: closing.toFixed(2),
+    expectedBalance: expected.toFixed(2),
+    // The note-by-note count a cashier actually performs had a column and nothing wrote it.
+    denominations: denominations ? (typeof denominations === "string" ? denominations : JSON.stringify(denominations)) : shift.denominations,
+    notes,
+    mismatchAlert: mismatch,
+  }).where(eq(cashShiftsTable.id, shiftId)).returning();
+
+  res.json({ ...updated, expected, declared: closing, difference, mismatchAlert: mismatch });
 });
 
 router.get("/restaurants/:restaurantId/cash-shifts/active", requireAuth, async (req, res): Promise<void> => {

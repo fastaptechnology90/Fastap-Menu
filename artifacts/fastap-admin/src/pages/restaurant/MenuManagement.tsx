@@ -3,8 +3,9 @@ import { useRestaurant } from "@/contexts/RestaurantContext";
 import { menu as menuApi, foodCosting as foodCostingApi, planLimitMessage } from "@/lib/api";
 import { PermissionGate } from "@/components/restaurant/PermissionGate";
 type MenuItem = any;
-import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, Filter } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Eye, EyeOff, Star, Clock, Flame, X, Save, Filter, CakeSlice, CupSoda, Soup, UtensilsCrossed } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 // Backend stores diet as a `dietaryTags` array (not an `isVeg` flag) and category as a
@@ -47,12 +48,12 @@ function VariantEditor({ label, hint, rows, onChange }: {
 }) {
   return (
     <div>
-      <label className="block text-xs text-white/40 mb-1.5">{label}</label>
+      <label className="block text-xs text-muted-foreground mb-1.5">{label}</label>
       <div className="space-y-2">
         {rows.map((row, idx) => (
           <div key={idx} className="flex gap-2">
             <input
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm placeholder:text-white/30"
+              className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground"
               placeholder="Name"
               value={row.name}
               onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
@@ -60,7 +61,7 @@ function VariantEditor({ label, hint, rows, onChange }: {
             <input
               type="number"
               min={0}
-              className="w-28 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm placeholder:text-white/30"
+              className="w-28 bg-muted border border-border rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground"
               placeholder="₹"
               value={row.price}
               onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, price: Number(e.target.value) || 0 } : r))}
@@ -68,7 +69,7 @@ function VariantEditor({ label, hint, rows, onChange }: {
             <button
               type="button"
               onClick={() => onChange(rows.filter((_, i) => i !== idx))}
-              className="px-3 rounded-xl border border-white/10 hover:bg-white/5 text-white/40"
+              className="px-3 rounded-lg border border-border hover:bg-muted text-muted-foreground"
               aria-label={`Remove ${label.toLowerCase()} row`}
             >
               ×
@@ -78,11 +79,11 @@ function VariantEditor({ label, hint, rows, onChange }: {
         <button
           type="button"
           onClick={() => onChange([...rows, { name: "", price: 0 }])}
-          className="text-xs text-amber-400 hover:text-amber-300"
+          className="text-xs text-primary hover:text-primary"
         >
           + Add {label.toLowerCase().replace(/s$/, "")}
         </button>
-        <p className="text-[11px] text-white/30">{hint}</p>
+        <p className="text-2xs text-muted-foreground">{hint}</p>
       </div>
     </div>
   );
@@ -268,12 +269,12 @@ export default function MenuManagement() {
   return (
     <div className="p-4 lg:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Menu Management</h1>
-          <p className="text-xs text-white/40">{items.filter(i => i.available).length} available · {items.filter(i => !i.available).length} hidden</p>
+          <h1 className="text-xl font-semibold">Menu Management</h1>
+          <p className="text-xs text-muted-foreground">{items.filter(i => i.available).length} available · {items.filter(i => !i.available).length} hidden</p>
         </div>
-        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors">
           <Plus className="h-4 w-4" /> Add Item
         </button>
       </div>
@@ -281,9 +282,9 @@ export default function MenuManagement() {
       {/* Filters */}
       <div className="flex flex-col gap-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+            className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
             placeholder="Search menu items..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -291,84 +292,95 @@ export default function MenuManagement() {
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {categoryNames.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${category === cat ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
+            <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${category === cat ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
               {cat}
             </button>
           ))}
         </div>
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {(["all", "veg", "non-veg"] as const).map(f => (
-            <button key={f} onClick={() => setFilterDiet(f)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${filterDiet === f ? "bg-green-500/20 border-green-500/40 text-green-300" : "border-white/10 bg-white/5 text-white/30"}`}>
+            <button key={f} onClick={() => setFilterDiet(f)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterDiet === f ? "bg-success-subtle border-success-border text-success" : "border-border bg-muted text-muted-foreground"}`}>
               {f === "all" ? "All Diets" : f === "veg" ? "Veg" : "Non-veg"}
             </button>
           ))}
           <div className="h-px w-px shrink-0" />
           {(["all", "available", "unavailable"] as const).map(f => (
-            <button key={f} onClick={() => setFilterAvail(f)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${filterAvail === f ? "bg-white/20 border-white/30 text-white" : "border-white/10 bg-white/5 text-white/30"}`}>
-              {f === "all" ? "All Status" : f === "available" ? "✓ Available" : "✗ Hidden"}
+            <button key={f} onClick={() => setFilterAvail(f)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterAvail === f ? "bg-muted border-border text-foreground" : "border-border bg-muted text-muted-foreground"}`}>
+              {f === "all" ? "All Status" : f === "available" ? "Available" : "Hidden"}
             </button>
           ))}
         </div>
-        <p className="text-xs text-white/30">Showing {filtered.length} of {items.length} items</p>
+        <p className="text-xs text-muted-foreground">Showing {filtered.length} of {items.length} items</p>
       </div>
 
       {/* Menu Items Table */}
-      <div className="rounded-2xl border border-white/8 overflow-hidden">
+      <div className="rounded-lg border border-border">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.02]">
+              <tr className="border-b border-border bg-card">
                 {["Item", "Category", "Price", "Cost", "Margin", "Type", "Spice", "Status", "Actions"].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs text-white/40 font-medium whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs text-muted-foreground font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-0">
+                    <EmptyState
+                      tone={items.length ? "search" : "empty"}
+                      title={items.length ? "No dishes match this filter" : "No dishes on the menu yet"}
+                      description={items.length ? "Clear the search or pick another category." : "Add your first dish and it appears on the guest menu straight away."}
+                    />
+                  </td>
+                </tr>
+              )}
               {filtered.map(item => {
                 const margin = item.cost > 0 ? Math.round(((item.price - item.cost) / item.price) * 100) : null;
                 return (
-                  <tr key={item.id} className={`hover:bg-white/3 transition-all ${!item.available ? "opacity-50" : ""}`}>
+                  <tr key={item.id} className={`hover:bg-muted transition-colors ${!item.available ? "opacity-50" : ""}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-base ${item.dietary === "veg" ? "bg-green-500/10" : item.dietary === "vegan" ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                          {item.category === "Starters" ? "🍢" : item.category === "Main Course" ? "🍛" : item.category === "Desserts" ? "🍮" : item.category === "Beverages" ? "🥤" : "🍽️"}
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-base ${item.dietary === "veg" ? "bg-success-subtle" : item.dietary === "vegan" ? "bg-success-subtle" : "bg-danger-subtle"}`}>
+                          {(() => { const CatIcon = item.category === "Starters" ? Soup : item.category === "Desserts" ? CakeSlice : item.category === "Beverages" ? CupSoda : UtensilsCrossed; return <CatIcon className="h-5 w-5 text-muted-foreground" />; })()}
                         </div>
                         <div>
                           <p className="font-semibold text-sm">{item.name}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            {item.featured && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />}
-                            <span className="text-xs text-white/30 flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{item.prepTime}m</span>
-                            {item.calories > 0 && <span className="text-xs text-white/30">{item.calories}cal</span>}
+                            {item.featured && <Star className="h-3 w-3 fill-warning text-warning" />}
+                            <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{item.prepTime}m</span>
+                            {item.calories > 0 && <span className="text-xs text-muted-foreground">{item.calories}cal</span>}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-white/50">{item.category}</td>
-                    <td className="px-4 py-3 font-bold text-amber-400">₹{item.price}</td>
-                    <td className="px-4 py-3 text-white/50">₹{item.cost}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{item.category}</td>
+                    <td className="px-4 py-3 font-semibold text-primary">₹{item.price}</td>
+                    <td className="px-4 py-3 text-muted-foreground">₹{item.cost}</td>
                     <td className="px-4 py-3">
                       {margin !== null && (
-                        <span className={`text-xs font-semibold ${margin >= 60 ? "text-emerald-400" : margin >= 40 ? "text-yellow-400" : "text-red-400"}`}>
+                        <span className={`text-xs font-semibold ${margin >= 60 ? "text-success" : margin >= 40 ? "text-warning" : "text-danger"}`}>
                           {margin}%
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${item.dietary === "veg" ? "bg-green-500/20 text-green-400" : item.dietary === "vegan" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${item.dietary === "veg" || item.dietary === "vegan" ? "bg-green-400" : "bg-red-400"}`} />
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${item.dietary === "veg" ? "bg-success-subtle text-success" : item.dietary === "vegan" ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${item.dietary === "veg" || item.dietary === "vegan" ? "bg-success" : "bg-danger"}`} />
                         {item.dietary}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-0.5">
                         {[1, 2, 3].map(l => (
-                          <div key={l} className={`h-2 w-3 rounded-sm ${l <= item.spiceLevel ? "bg-red-500" : "bg-white/10"}`} />
+                          <div key={l} className={`h-2 w-3 rounded-sm ${l <= item.spiceLevel ? "bg-danger" : "bg-muted"}`} />
                         ))}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <PermissionGate permission="hide_menu">
-                      <button onClick={() => handleToggle(item.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${item.available ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" : "bg-white/10 text-white/40 hover:bg-white/15"}`}>
+                      <button onClick={() => handleToggle(item.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${item.available ? "bg-success-subtle text-success hover-elevate" : "bg-muted text-muted-foreground hover-elevate"}`}>
                         {item.available ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                         {item.available ? "Visible" : "Hidden"}
                       </button>
@@ -377,12 +389,12 @@ export default function MenuManagement() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <PermissionGate permission="edit_pricing">
-                        <button onClick={() => setEditItem({ ...item })} className="h-7 w-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center hover:bg-blue-500/30 transition-all">
+                        <button onClick={() => setEditItem({ ...item })} className="h-7 w-7 rounded-lg bg-info-subtle text-info flex items-center justify-center hover-elevate transition-colors">
                           <Edit2 className="h-3 w-3" />
                         </button>
                         </PermissionGate>
                         <PermissionGate permission="add_menu">
-                        <button onClick={() => handleDelete(item.id)} className="h-7 w-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all">
+                        <button onClick={() => handleDelete(item.id)} className="h-7 w-7 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate transition-colors">
                           <Trash2 className="h-3 w-3" />
                         </button>
                         </PermissionGate>
@@ -398,11 +410,11 @@ export default function MenuManagement() {
 
       {/* Edit Modal */}
       {(editItem || addMode) && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#111827] rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <h3 className="font-bold">{addMode ? "Add New Item" : "Edit Item"}</h3>
-              <button onClick={() => { setEditItem(null); setAddMode(false); }}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-card rounded-lg border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold">{addMode ? "Add New Item" : "Edit Item"}</h3>
+              <button onClick={() => { setEditItem(null); setAddMode(false); }}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-4">
               {[
@@ -417,10 +429,10 @@ export default function MenuManagement() {
                 { label: "Calories", field: "calories", type: "number", placeholder: "e.g. 280" },
               ].map(({ label, field, type, placeholder, options }) => (
                 <div key={field}>
-                  <label className="block text-xs text-white/40 mb-1.5">{label}</label>
+                  <label className="block text-xs text-muted-foreground mb-1.5">{label}</label>
                   {type === "textarea" ? (
                     <textarea
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 resize-none placeholder:text-white/30"
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 resize-none placeholder:text-muted-foreground"
                       rows={2}
                       placeholder={placeholder}
                       value={(editItem || newItem)[field as keyof MenuItem] as string || ""}
@@ -428,7 +440,7 @@ export default function MenuManagement() {
                     />
                   ) : type === "select" ? (
                     <select
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white"
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 text-foreground"
                       value={(editItem || newItem)[field as keyof MenuItem] as string || ""}
                       onChange={e => editItem ? setEditItem({ ...editItem, [field]: e.target.value }) : setNewItem({ ...newItem, [field]: e.target.value })}
                     >
@@ -440,7 +452,7 @@ export default function MenuManagement() {
                   ) : (
                     <input
                       type={type}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
                       placeholder={placeholder}
                       value={(editItem || newItem)[field as keyof MenuItem] as string | number || ""}
                       onChange={e => editItem ? setEditItem({ ...editItem, [field]: type === "number" ? Number(e.target.value) : e.target.value }) : setNewItem({ ...newItem, [field]: type === "number" ? Number(e.target.value) : e.target.value })}
@@ -452,14 +464,14 @@ export default function MenuManagement() {
               {/* Plate cost is not stored on the item — it is the sum of the recipe's
                   ingredients. Typing a number here wrote to nothing, so show what Food
                   Costing worked out and send the owner there to change it. */}
-              <div className="rounded-xl bg-white/5 border border-white/10 px-3 py-2.5">
+              <div className="rounded-lg bg-muted border border-border px-3 py-2.5">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-white/40 text-xs">Plate cost (from recipe)</span>
-                  <span className="font-semibold text-white/80">
+                  <span className="text-muted-foreground text-xs">Plate cost (from recipe)</span>
+                  <span className="font-semibold text-foreground">
                     {(editItem || newItem).cost > 0 ? `₹${(editItem || newItem).cost}` : "No recipe yet"}
                   </span>
                 </div>
-                <p className="text-[11px] text-white/30 mt-1">
+                <p className="text-2xs text-muted-foreground mt-1">
                   Set on Food Costing, matched to this dish by name. Margin on the list is calculated from it.
                 </p>
               </div>
@@ -468,10 +480,10 @@ export default function MenuManagement() {
                   renders it — there was simply no way to set one, so every dish showed a
                   placeholder icon. A guest choosing food needs to see the food. */}
               <div>
-                <label className="block text-xs text-white/40 mb-1.5">Photo URL</label>
+                <label className="block text-xs text-muted-foreground mb-1.5">Photo URL</label>
                 <input
                   type="url"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                  className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
                   placeholder="https://…"
                   value={(editItem || newItem).imageUrl || ""}
                   onChange={e => editItem ? setEditItem({ ...editItem, imageUrl: e.target.value }) : setNewItem({ ...newItem, imageUrl: e.target.value })}
@@ -480,7 +492,7 @@ export default function MenuManagement() {
                   <img
                     src={(editItem || newItem).imageUrl}
                     alt=""
-                    className="mt-2 h-24 w-24 rounded-lg object-cover border border-white/10"
+                    className="mt-2 h-24 w-24 rounded-lg object-cover border border-border"
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
                 )}
@@ -503,10 +515,10 @@ export default function MenuManagement() {
 
               {/* Spice Level */}
               <div>
-                <label className="block text-xs text-white/40 mb-2">Spice Level</label>
+                <label className="block text-xs text-muted-foreground mb-2">Spice Level</label>
                 <div className="flex gap-2">
                   {[0, 1, 2, 3].map(l => (
-                    <button key={l} onClick={() => editItem ? setEditItem({ ...editItem, spiceLevel: l }) : setNewItem({ ...newItem, spiceLevel: l })} className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${(editItem?.spiceLevel || newItem.spiceLevel || 0) === l ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/40"}`}>
+                    <button key={l} onClick={() => editItem ? setEditItem({ ...editItem, spiceLevel: l }) : setNewItem({ ...newItem, spiceLevel: l })} className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${(editItem?.spiceLevel || newItem.spiceLevel || 0) === l ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
                       {l === 0 ? "None" : l === 1 ? "Mild" : l === 2 ? "Medium" : "Hot"}
                     </button>
                   ))}
@@ -516,16 +528,16 @@ export default function MenuManagement() {
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={editItem?.featured || newItem.featured || false} onChange={e => editItem ? setEditItem({ ...editItem, featured: e.target.checked }) : setNewItem({ ...newItem, featured: e.target.checked })} />
-                  <span className="text-white/60">Mark as Featured</span>
+                  <span className="text-muted-foreground">Mark as Featured</span>
                 </label>
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => { setEditItem(null); setAddMode(false); }} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 font-semibold text-sm">
+                <button onClick={() => { setEditItem(null); setAddMode(false); }} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted font-semibold text-sm">
                   Cancel
                 </button>
                 <PermissionGate permission={addMode ? "add_menu" : "edit_pricing"}>
-                <button onClick={editItem ? handleSaveEdit : handleAddItem} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm flex items-center justify-center gap-2">
+                <button onClick={editItem ? handleSaveEdit : handleAddItem} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
                   <Save className="h-4 w-4" /> {addMode ? "Add Item" : "Save Changes"}
                 </button>
                 </PermissionGate>

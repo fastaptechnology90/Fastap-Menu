@@ -5,6 +5,25 @@ import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
+/**
+ * A price has to be a real, non-negative amount.
+ *
+ * Nothing checked this. `price` went straight to `String(price)`, so a menu item could be
+ * saved at -50 — and because the ordering route (rightly) prices every line from the menu
+ * rather than from the client, that negative line then reduced the guest's bill. An order
+ * placed against one came out with a negative subtotal and a total of zero: free food, and
+ * a row whose own figures no longer add up.
+ *
+ * Returns null when the value is acceptable, or the message to refuse with.
+ */
+function priceProblem(value: unknown, label: string): string | null {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return `${label} must be a number.`;
+  if (n < 0) return `${label} cannot be negative.`;
+  if (n > 10_000_000) return `${label} is too large.`;
+  return null;
+}
+
 async function ownsRestaurant(userId: number, restaurantId: number): Promise<boolean> {
   const [r] = await db.select({ id: restaurantsTable.id }).from(restaurantsTable)
     .where(and(eq(restaurantsTable.id, restaurantId), eq(restaurantsTable.userId, userId)));
@@ -77,6 +96,10 @@ router.get("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, 
 router.post("/restaurants/:restaurantId/items", requireAuth, async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const { name, description, price, discountedPrice, imageUrl, videoUrl, ingredients, allergens, calories, prepTime, spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons, categoryId } = req.body;
+  if (typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "An item needs a name." }); return; }
+  const badPrice = priceProblem(price, "Price")
+    ?? (discountedPrice != null ? priceProblem(discountedPrice, "Offer price") : null);
+  if (badPrice) { res.status(400).json({ error: badPrice }); return; }
   const [item] = await db.insert(menuItemsTable).values({
     restaurantId, categoryId, name, description, imageUrl, videoUrl, ingredients, allergens, calories, prepTime,
     price: String(price), discountedPrice: discountedPrice != null ? String(discountedPrice) : null,
@@ -90,9 +113,18 @@ router.put("/restaurants/:restaurantId/items/:itemId", requireAuth, async (req, 
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const itemId = parseInt(String(req.params.itemId), 10);
   const { name, description, price, discountedPrice, imageUrl, videoUrl, ingredients, allergens, calories, prepTime, spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons, categoryId } = req.body;
+  const badPrice = (price != null ? priceProblem(price, "Price") : null)
+    ?? (discountedPrice != null ? priceProblem(discountedPrice, "Offer price") : null);
+  if (badPrice) { res.status(400).json({ error: badPrice }); return; }
+  // `discountedPrice` used to be forced to null whenever it was absent from the body, while
+  // every other field was left alone when omitted. So an edit that only flipped "available"
+  // silently cleared the item's offer price. It now clears only when explicitly sent as null.
+  const nextDiscounted = discountedPrice === undefined
+    ? undefined
+    : discountedPrice === null ? null : String(discountedPrice);
   const [item] = await db.update(menuItemsTable).set({
     categoryId, name, description, imageUrl, videoUrl, ingredients, allergens, calories, prepTime,
-    price: price != null ? String(price) : undefined, discountedPrice: discountedPrice != null ? String(discountedPrice) : null,
+    price: price != null ? String(price) : undefined, discountedPrice: nextDiscounted,
     spiceLevel, dietaryTags, isAvailable, isFeatured, sortOrder, variants, addons,
   }).where(and(eq(menuItemsTable.id, itemId), eq(menuItemsTable.restaurantId, restaurantId))).returning();
   if (!item) { res.status(404).json({ error: "Item not found" }); return; }

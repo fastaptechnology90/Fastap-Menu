@@ -43,6 +43,18 @@ export interface CartItem {
   variant?: string;
   specialInstructions?: string;
   course: "starter" | "main" | "dessert" | "beverage";
+  /**
+   * What the dish contains, and roughly how long it takes.
+   *
+   * Both are on `menu_items` and neither reached the cart, so the last screen before
+   * an order was placed — the one carrying the "list all allergens and severity" box —
+   * could not say what was already in the basket, and nothing told the guest whether
+   * their round was five minutes away or twenty-five. Carried on the line so the cart
+   * does not have to fetch the menu again. Nothing is sent to the server from here:
+   * the order route prices and reads every line from `menuItemId`.
+   */
+  allergens?: string[];
+  prepTime?: number;
 }
 
 export interface Order {
@@ -106,7 +118,32 @@ export interface VenueContext {
   branchName: string | null;
   areas: { id: number; name: string; areaType: string }[];
   areaGroups: SmartEntryState["areaGroups"];
+  /**
+   * Whether the venue is open right now, in its own timezone.
+   *
+   * `open_time` and `close_time` have always been on the restaurant row and nothing
+   * read them, so a guest could place a 4 a.m. order and no screen ever said the place
+   * was shut. `hoursPublished: false` means the venue has not set hours — then
+   * `isOpen` stays true and no screen claims to know.
+   */
+  hours: VenueHours;
 }
+
+export interface VenueHours {
+  isOpen: boolean;
+  hoursPublished: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  timezone: string;
+  localTime: string;
+  overnight: boolean;
+  message: string;
+}
+
+const OPEN_UNTIL_TOLD_OTHERWISE: VenueHours = {
+  isOpen: true, hoursPublished: false, openTime: null, closeTime: null,
+  timezone: "Asia/Kolkata", localTime: "", overnight: false, message: "",
+};
 
 interface UserContextValue {
   cart: CartItem[];
@@ -198,6 +235,7 @@ const defaultVenue: VenueContext = {
   branchName: null,
   areas: [],
   areaGroups: [],
+  hours: OPEN_UNTIL_TOLD_OTHERWISE,
 };
 
 const UserContext = createContext<UserContextValue | null>(null);
@@ -300,6 +338,9 @@ function applyVenueFromApi(data: any, slug: string, params?: VenueLoadParams): {
       branchName: detection.branchName ?? data.branch?.name ?? null,
       areas: (data.areas ?? []).map((a: any) => ({ id: a.id, name: a.name, areaType: a.areaType })),
       areaGroups: data.areaGroups ?? [],
+      hours: data.hours && typeof data.hours === "object"
+        ? { ...OPEN_UNTIL_TOLD_OTHERWISE, ...data.hours }
+        : OPEN_UNTIL_TOLD_OTHERWISE,
     },
     smartEntry,
   };

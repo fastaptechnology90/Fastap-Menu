@@ -13,6 +13,8 @@ import IntegrationsSettings from "@/components/admin/IntegrationsSettings";
 import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_CURRENCY, currencyDisplayLabel } from "@/lib/currency";
 import { useState, useEffect } from "react";
+import { PageHeader } from "@/components/shared/Page";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -122,18 +124,23 @@ export default function Settings() {
   const flagGroups = [...new Set(flags.map(f => f.group))];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">System Configuration</h2><p className="text-muted-foreground">Global platform settings, feature flags, and regional controls.</p></div>
-        <Button onClick={() => saveMutation.mutate({
-          ...form,
-          currency: PLATFORM_CURRENCY,
-          featureFlags: flags,
-          geoSettings: geo.map((region) => ({ ...region, currency: PLATFORM_CURRENCY })),
-        })} disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Configuration
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="System Configuration"
+        description="Global platform settings, feature flags, and regional controls."
+        actions={
+          <>
+            <Button onClick={() => saveMutation.mutate({
+            ...form,
+            currency: PLATFORM_CURRENCY,
+            featureFlags: flags,
+            geoSettings: geo.map((region) => ({ ...region, currency: PLATFORM_CURRENCY })),
+            })} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Configuration
+            </Button>
+          </>
+        }
+      />
 
       <Tabs defaultValue="general">
         <TabsList className="flex-wrap h-auto gap-1">
@@ -296,7 +303,7 @@ export default function Settings() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{flag.name}</span>
-                            {flag.beta && <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">Beta</Badge>}
+                            {flag.beta && <Badge variant="outline" className="text-xs bg-warning text-warning border-warning-border">Beta</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">{flag.description}</p>
                         </div>
@@ -331,7 +338,7 @@ export default function Settings() {
                       <p className="text-xs text-muted-foreground">{region.timezone} · INR (₹) · GST/VAT: {region.taxRate}</p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Badge variant={region.active ? "outline" : "secondary"} className={region.active ? "text-green-600" : ""}>{region.active ? "Active" : "Inactive"}</Badge>
+                      <Badge variant={region.active ? "outline" : "secondary"} className={region.active ? "text-success" : ""}>{region.active ? "Active" : "Inactive"}</Badge>
                       <Switch checked={region.active} onCheckedChange={() => toggleGeo(region.country)} />
                     </div>
                   </div>
@@ -349,7 +356,7 @@ export default function Settings() {
                 <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />Admin Security</CardTitle>
                 {/* Same store as the Security Center page. Recorded as policy; the API does
                     not act on any of it at login yet, so it must not read as protection. */}
-                <CardDescription className="text-amber-600 dark:text-amber-400">
+                <CardDescription className="text-warning dark:text-warning">
                   Saved as policy only — not enforced at login yet.
                 </CardDescription>
               </CardHeader>
@@ -410,25 +417,23 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
 
-      {addRegionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader><CardTitle>Add Region</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2"><Label>Country</Label><Input value={newRegion.country} onChange={e => setNewRegion(r => ({ ...r, country: e.target.value }))} placeholder="India" /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Currency</Label><Input value={currencyDisplayLabel()} readOnly disabled /></div>
-                <div className="space-y-2"><Label>Tax Rate</Label><Input value={newRegion.taxRate} onChange={e => setNewRegion(r => ({ ...r, taxRate: e.target.value }))} /></div>
-              </div>
-              <div className="space-y-2"><Label>Timezone</Label><Input value={newRegion.timezone} onChange={e => setNewRegion(r => ({ ...r, timezone: e.target.value }))} /></div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setAddRegionOpen(false)}>Cancel</Button>
-                <Button onClick={addRegion}>Add Region</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <Dialog open={addRegionOpen} onOpenChange={setAddRegionOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Add region</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="region-country">Country</Label><Input id="region-country" value={newRegion.country} onChange={e => setNewRegion(r => ({ ...r, country: e.target.value }))} placeholder="India" /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2"><Label htmlFor="region-currency">Currency</Label><Input id="region-currency" value={currencyDisplayLabel()} readOnly disabled /></div>
+              <div className="space-y-2"><Label htmlFor="region-tax">Tax rate</Label><Input id="region-tax" value={newRegion.taxRate} onChange={e => setNewRegion(r => ({ ...r, taxRate: e.target.value }))} /></div>
+            </div>
+            <div className="space-y-2"><Label htmlFor="region-tz">Timezone</Label><Input id="region-tz" value={newRegion.timezone} onChange={e => setNewRegion(r => ({ ...r, timezone: e.target.value }))} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddRegionOpen(false)}>Cancel</Button>
+            <Button onClick={addRegion}>Add region</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

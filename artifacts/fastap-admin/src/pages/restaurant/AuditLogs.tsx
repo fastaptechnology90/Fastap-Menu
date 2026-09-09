@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-import { Shield, AlertTriangle, Search, Eye, Clock, User, Download, X, CheckCircle, Ban, Loader } from "lucide-react";
+import { Shield, AlertTriangle, Search, Eye, Clock, User, Download, X, CheckCircle, Ban, Loader, Monitor, Smartphone, Tv, Printer, Tablet, Nfc, HelpCircle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { auditLogs, hardwareApi } from "@/lib/api";
 
@@ -20,34 +21,34 @@ type DeviceRow = {
 };
 
 const RISK_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  critical: {label:"Critical",color:"text-red-400",   bg:"bg-red-500/20"},
-  high:     {label:"High",    color:"text-orange-400", bg:"bg-orange-500/20"},
-  medium:   {label:"Medium",  color:"text-yellow-400", bg:"bg-yellow-500/20"},
-  low:      {label:"Low",     color:"text-emerald-400",bg:"bg-emerald-500/20"},
-  info:     {label:"Info",    color:"text-white/50",   bg:"bg-white/10"},
+  critical: {label:"Critical",color:"text-danger",   bg:"bg-danger-subtle"},
+  high:     {label:"High",    color:"text-warning", bg:"bg-warning-subtle"},
+  medium:   {label:"Medium",  color:"text-warning", bg:"bg-warning-subtle"},
+  low:      {label:"Low",     color:"text-success",bg:"bg-success-subtle"},
+  info:     {label:"Info",    color:"text-muted-foreground",   bg:"bg-muted"},
 };
 
 const CATEGORY_CFG: Record<string,{color:string}> = {
-  billing:  {color:"text-amber-400"},
-  staff:    {color:"text-blue-400"},
-  menu:     {color:"text-violet-400"},
-  auth:     {color:"text-red-400"},
-  settings: {color:"text-orange-400"},
-  data:     {color:"text-teal-400"},
-  general:  {color:"text-white/50"},
+  billing:  {color:"text-primary"},
+  staff:    {color:"text-info"},
+  menu:     {color:"text-muted-foreground"},
+  auth:     {color:"text-danger"},
+  settings: {color:"text-warning"},
+  data:     {color:"text-success"},
+  general:  {color:"text-muted-foreground"},
 };
 
-const DEVICE_TYPE_CFG: Record<string,{icon:string;color:string}> = {
-  pos: {icon:"🖥️",color:"text-blue-400"},
-  tablet: {icon:"📱",color:"text-violet-400"},
-  phone: {icon:"📱",color:"text-emerald-400"},
-  kds: {icon:"📺",color:"text-amber-400"},
-  display: {icon:"📺",color:"text-amber-400"},
-  printer: {icon:"🖨️",color:"text-orange-400"},
-  handheld: {icon:"📟",color:"text-teal-400"},
-  nfc: {icon:"📡",color:"text-pink-400"},
-  kiosk: {icon:"🖥️",color:"text-blue-400"},
-  unknown: {icon:"❓",color:"text-red-400"},
+const DEVICE_TYPE_CFG: Record<string,{icon:LucideIcon;color:string}> = {
+  pos: {icon:Monitor,color:"text-info"},
+  tablet: {icon:Smartphone,color:"text-muted-foreground"},
+  phone: {icon:Smartphone,color:"text-success"},
+  kds: {icon:Tv,color:"text-primary"},
+  display: {icon:Tv,color:"text-primary"},
+  printer: {icon:Printer,color:"text-warning"},
+  handheld: {icon:Tablet,color:"text-success"},
+  nfc: {icon:Nfc,color:"text-muted-foreground"},
+  kiosk: {icon:Monitor,color:"text-info"},
+  unknown: {icon:HelpCircle,color:"text-danger"},
 };
 
 function formatTime(iso: string) {
@@ -171,40 +172,40 @@ export default function AuditLogs() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold">Audit & Security</h1>
+            <h1 className="text-xl font-semibold">Audit & Security</h1>
             {(criticalCount + highCount) > 0 && (
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-bold">
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-danger-subtle text-danger text-xs font-semibold">
                 <AlertTriangle className="h-3 w-3"/>{criticalCount + highCount} alerts
               </div>
             )}
           </div>
-          <p className="text-xs text-white/40">Complete action log, fraud detection and device management</p>
+          <p className="text-xs text-muted-foreground">Complete action log, fraud detection and device management</p>
         </div>
-        <button onClick={() => load()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-semibold transition-all">
-          <Download className="h-4 w-4 text-amber-400"/>Refresh
+        <button onClick={() => load()} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-muted hover-elevate text-sm font-semibold transition-colors">
+          <Download className="h-4 w-4 text-primary"/>Refresh
         </button>
       </div>
 
-      {apiError && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{apiError}</div>}
-      {loading && <div className="flex items-center gap-2 text-white/40 text-sm"><Loader className="h-4 w-4 animate-spin"/>Loading audit data...</div>}
+      {apiError && <div className="p-3 rounded-lg bg-danger-subtle border border-danger-border text-danger text-sm">{apiError}</div>}
+      {loading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader className="h-4 w-4 animate-spin"/>Loading audit data...</div>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Events", value: logs.length, color: "text-white", bg: "bg-white/5" },
-          { label: "High Risk", value: logs.filter(l => l.risk === "high").length, color: "text-orange-400", bg: "bg-orange-500/10" },
-          { label: "Fraud Alerts", value: alerts.filter(a => !a.action).length, color: "text-red-400", bg: "bg-red-500/10" },
-          { label: "Active Devices", value: devices.filter(d => d.status === "active").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "Events", value: logs.length, color: "text-foreground", bg: "bg-muted" },
+          { label: "High Risk", value: logs.filter(l => l.risk === "high").length, color: "text-warning", bg: "bg-warning-subtle" },
+          { label: "Fraud Alerts", value: alerts.filter(a => !a.action).length, color: "text-danger", bg: "bg-danger-subtle" },
+          { label: "Active Devices", value: devices.filter(d => d.status === "active").length, color: "text-success", bg: "bg-success-subtle" },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
+            <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["audit", "Audit Trail"], ["fraud", "Fraud Alerts"], ["devices", "Devices"]] as [Tab, string][]).map(([t, l]) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? "bg-amber-500 text-black" : "text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
@@ -212,12 +213,12 @@ export default function AuditLogs() {
         <>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30"/>
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder="Search actions, users..." value={search} onChange={e => setSearch(e.target.value)}/>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+              <input className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search actions, users..." value={search} onChange={e => setSearch(e.target.value)}/>
             </div>
             <div className="flex gap-1 flex-wrap">
               {["all", "high", "medium", "low"].map(r => (
-                <button key={r} onClick={() => setRiskFilter(r)} className={`px-3 py-2 rounded-xl text-xs font-semibold border capitalize transition-all ${riskFilter === r ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/40"}`}>{r === "all" ? "All Risk" : r}</button>
+                <button key={r} onClick={() => setRiskFilter(r)} className={`px-3 py-2 rounded-lg text-xs font-semibold border capitalize transition-colors ${riskFilter === r ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>{r === "all" ? "All Risk" : r}</button>
               ))}
             </div>
           </div>
@@ -227,7 +228,7 @@ export default function AuditLogs() {
               const rcfg = RISK_CFG[log.risk] || RISK_CFG.info;
               const ccfg = CATEGORY_CFG[log.category] || CATEGORY_CFG.general;
               return (
-                <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/3 border border-transparent hover:border-white/5 cursor-pointer transition-all" onClick={() => setSelected(log)}>
+                <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted border border-transparent hover:border-border cursor-pointer transition-colors" onClick={() => setSelected(log)}>
                   <div className={`h-8 w-8 rounded-lg ${rcfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                     <Shield className={`h-4 w-4 ${rcfg.color}`}/>
                   </div>
@@ -235,19 +236,19 @@ export default function AuditLogs() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold">{log.action}</p>
                       <span className={`text-xs px-1.5 py-0.5 rounded-md font-semibold ${rcfg.bg} ${rcfg.color}`}>{rcfg.label}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-md bg-white/10 ${ccfg.color}`}>{log.category}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-md bg-muted ${ccfg.color}`}>{log.category}</span>
                     </div>
-                    <p className="text-xs text-white/50 mt-0.5 truncate">{log.details}</p>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs text-white/30">
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.details}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><User className="h-3 w-3"/>{log.user}</span>
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{log.time}</span>
                     </div>
                   </div>
-                  <Eye className="h-4 w-4 text-white/20 shrink-0 mt-1"/>
+                  <Eye className="h-4 w-4 text-muted-foreground shrink-0 mt-1"/>
                 </div>
               );
             })}
-            {filteredLogs.length === 0 && !loading && <div className="text-center py-12 text-white/30"><Shield className="h-12 w-12 mx-auto mb-3 text-white/15"/><p>No audit logs yet</p></div>}
+            {filteredLogs.length === 0 && !loading && <div className="text-center py-12 text-muted-foreground"><Shield className="h-12 w-12 mx-auto mb-3 text-muted-foreground"/><p>No audit logs yet</p></div>}
           </div>
         </>
       )}
@@ -258,24 +259,24 @@ export default function AuditLogs() {
             const rcfg = RISK_CFG[alert.risk] || RISK_CFG.high;
             const reviewed = !!alert.action;
             return (
-              <div key={alert.id} className={`bg-[#0e1520] border rounded-2xl p-5 transition-all ${reviewed ? "border-white/5 opacity-60" : "border-orange-500/30"}`}>
+              <div key={alert.id} className={`bg-card border rounded-lg p-5 transition-colors ${reviewed ? "border-border opacity-60" : "border-warning-border"}`}>
                 <div className="flex items-start gap-4">
-                  <div className={`h-10 w-10 rounded-xl ${rcfg.bg} flex items-center justify-center shrink-0`}>
+                  <div className={`h-10 w-10 rounded-lg ${rcfg.bg} flex items-center justify-center shrink-0`}>
                     <AlertTriangle className={`h-5 w-5 ${rcfg.color}`}/>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold">{alert.type}</h3>
+                      <h3 className="font-semibold">{alert.type}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${rcfg.bg} ${rcfg.color}`}>{rcfg.label}</span>
                     </div>
-                    <p className="text-sm text-white/70">{alert.description}</p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-white/40">
+                    <p className="text-sm text-foreground">{alert.description}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><User className="h-3 w-3"/>{alert.user}</span>
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{alert.time}</span>
                     </div>
                   </div>
                   {!reviewed && (
-                    <button onClick={() => reviewAlert(alert.id)} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 shrink-0 flex items-center gap-1">
+                    <button onClick={() => reviewAlert(alert.id)} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate shrink-0 flex items-center gap-1">
                       <CheckCircle className="h-3 w-3"/>Mark Reviewed
                     </button>
                   )}
@@ -283,7 +284,7 @@ export default function AuditLogs() {
               </div>
             );
           })}
-          {alerts.length === 0 && !loading && <p className="text-center text-white/30 py-12">No fraud alerts — all clear</p>}
+          {alerts.length === 0 && !loading && <p className="text-center text-muted-foreground py-12">No fraud alerts — all clear</p>}
         </div>
       )}
 
@@ -292,15 +293,15 @@ export default function AuditLogs() {
           {devices.map(device => {
             const dcfg = DEVICE_TYPE_CFG[device.type] || DEVICE_TYPE_CFG.unknown;
             return (
-              <div key={device.id} className={`bg-[#0e1520] border rounded-2xl p-4 ${device.status === "blocked" ? "border-red-500/15 opacity-50" : "border-white/5"}`}>
+              <div key={device.id} className={`bg-card border rounded-lg p-4 ${device.status === "blocked" ? "border-danger-border opacity-50" : "border-border"}`}>
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-xl shrink-0">{dcfg.icon}</div>
+                  <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 ${dcfg.color}`}><dcfg.icon className="h-5 w-5" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <p className="text-sm font-bold">{device.name}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${device.status === "active" ? "bg-emerald-500/15 text-emerald-400" : "bg-white/10 text-white/30"}`}>{device.status}</span>
+                      <p className="text-sm font-semibold">{device.name}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${device.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground"}`}>{device.status}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-white/40 flex-wrap">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                       <span>{device.user}</span>
                       <span>IP: {device.ip}</span>
                       <span>{device.os}</span>
@@ -308,7 +309,7 @@ export default function AuditLogs() {
                     </div>
                   </div>
                   {device.status !== "blocked" && (
-                    <button onClick={() => blockDevice(device.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-semibold hover:bg-red-500/20">
+                    <button onClick={() => blockDevice(device.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-danger-border bg-danger-subtle text-danger text-xs font-semibold hover-elevate">
                       <Ban className="h-3 w-3"/>Block
                     </button>
                   )}
@@ -316,20 +317,20 @@ export default function AuditLogs() {
               </div>
             );
           })}
-          {devices.length === 0 && !loading && <p className="text-center text-white/30 py-12">No hardware devices registered</p>}
+          {devices.length === 0 && !loading && <p className="text-center text-muted-foreground py-12">No hardware devices registered</p>}
         </div>
       )}
 
       {selected && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Audit Log Detail</h2>
-              <button onClick={() => setSelected(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">Audit Log Detail</h2>
+              <button onClick={() => setSelected(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-3">
-              <div className={`p-3 rounded-xl ${(RISK_CFG[selected.risk] || RISK_CFG.info).bg}`}>
-                <p className={`font-extrabold ${(RISK_CFG[selected.risk] || RISK_CFG.info).color}`}>{selected.action}</p>
+              <div className={`p-3 rounded-lg ${(RISK_CFG[selected.risk] || RISK_CFG.info).bg}`}>
+                <p className={`font-semibold ${(RISK_CFG[selected.risk] || RISK_CFG.info).color}`}>{selected.action}</p>
               </div>
               {[
                 { label: "Details", value: selected.details },
@@ -338,13 +339,13 @@ export default function AuditLogs() {
                 { label: "IP Address", value: selected.ip },
                 { label: "Time", value: selected.time },
               ].map(r => (
-                <div key={r.label} className="flex justify-between py-2 border-b border-white/5 last:border-0 text-sm">
-                  <span className="text-white/40">{r.label}</span>
+                <div key={r.label} className="flex justify-between py-2 border-b border-border last:border-0 text-sm">
+                  <span className="text-muted-foreground">{r.label}</span>
                   <span className="font-semibold text-right max-w-56 truncate">{r.value}</span>
                 </div>
               ))}
             </div>
-            <button onClick={() => setSelected(null)} className="mt-5 w-full py-2.5 rounded-xl bg-white/5 border border-white/10 font-semibold text-sm hover:bg-white/10">Close</button>
+            <button onClick={() => setSelected(null)} className="mt-5 w-full py-2.5 rounded-lg bg-muted border border-border font-semibold text-sm hover-elevate">Close</button>
           </div>
         </div>
       )}

@@ -63,7 +63,7 @@ export default function ReservationsControl() {
             { header: "Actions", cell: (row: any) => (
               <div className="flex gap-1">
                 {row.status !== "confirmed" && <Button size="sm" className="h-7 text-xs" onClick={() => updateMutation.mutate({ id: row.id, status: "confirmed" })}>Confirm</Button>}
-                {row.status !== "cancelled" && <Button size="sm" variant="ghost" className="h-7 text-xs text-rose-500" onClick={() => updateMutation.mutate({ id: row.id, status: "cancelled" })}>Cancel</Button>}
+                {row.status !== "cancelled" && <Button size="sm" variant="ghost" className="h-7 text-xs text-danger" onClick={() => updateMutation.mutate({ id: row.id, status: "cancelled" })}>Cancel</Button>}
               </div>
             )},
           ]} />

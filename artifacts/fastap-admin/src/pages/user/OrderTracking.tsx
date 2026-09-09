@@ -13,6 +13,7 @@ import {
 import {
   ChevronLeft, RefreshCw, Phone, Star, MessageSquare,
   CheckCircle, ChefHat, User2, Truck, AlertCircle, RotateCcw, Share2, Download, Timer, Radio, FileText, Plus,
+  XCircle, HeartHandshake, PartyPopper, BellRing,
 } from "lucide-react";
 
 function formatCountdown(seconds: number): string {
@@ -304,7 +305,7 @@ export default function OrderTracking() {
 
   if (loading) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white">
+      <div className="guest-page thin-scroll min-h-screen text-foreground">
         <GuestLoading label="Loading order…" />
       </div>
     );
@@ -312,7 +313,7 @@ export default function OrderTracking() {
 
   if (apiError || !displayOrder || !displayTracking) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white">
+      <div className="guest-page thin-scroll min-h-screen text-foreground">
         <div className="guest-header px-4 py-3">
           <GuestBackButton />
         </div>
@@ -339,12 +340,12 @@ export default function OrderTracking() {
 
   if (isCancelled) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center gap-4 px-8 text-center">
+      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center gap-4 px-8 text-center">
         <GuestBackButton className="absolute top-4 left-4" />
-        <div className="text-6xl">❌</div>
-        <h2 className="text-xl font-bold text-red-400">Order Cancelled</h2>
-        <p className="text-white/40 text-sm">This order was cancelled. Contact staff if this was unexpected.</p>
-        <button onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))} className="mt-2 px-6 py-3 rounded-xl bg-orange-500 font-semibold text-sm">Order Again</button>
+        <XCircle className="h-16 w-16 text-danger" strokeWidth={1.5} />
+        <h2 className="text-xl font-semibold text-danger">Order Cancelled</h2>
+        <p className="text-muted-foreground text-sm">This order was cancelled. Contact staff if this was unexpected.</p>
+        <button onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))} className="mt-2 px-6 py-3 rounded-xl bg-primary font-semibold text-sm">Order Again</button>
       </div>
     );
   }
@@ -353,16 +354,16 @@ export default function OrderTracking() {
   // order and the guest thinks something is still coming.
   if (live.tableCleared) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center gap-4 px-8 text-center">
-        <div className="text-6xl">🙏</div>
-        <h2 className="text-xl font-bold text-emerald-400">Thank you for visiting!</h2>
-        <p className="text-white/50 text-sm">
+      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <HeartHandshake className="h-16 w-16 text-success" strokeWidth={1.5} />
+        <h2 className="text-xl font-semibold text-success">Thank you for visiting!</h2>
+        <p className="text-muted-foreground text-sm">
           Your table has been closed{live.paymentStatus === "paid" ? " and the bill is settled" : ""}.
           We hope to see you again soon.
         </p>
         <button
           onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))}
-          className="mt-2 px-6 py-3 rounded-xl bg-orange-500 font-semibold text-sm"
+          className="mt-2 px-6 py-3 rounded-xl bg-primary font-semibold text-sm"
         >
           Start a new order
         </button>
@@ -371,21 +372,21 @@ export default function OrderTracking() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-8">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-8">
       <div className="guest-header px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <GuestBackButton />
           <div>
-            <h1 className="font-bold text-sm">Live Order Tracking</h1>
-            <p className="text-xs text-white/40">#{displayOrder.id}</p>
+            <h1 className="font-semibold text-sm">Live Order Tracking</h1>
+            <p className="text-xs text-muted-foreground">#{displayOrder.id}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full ${liveConnected ? "text-emerald-400 bg-emerald-400/10" : "text-white/40 bg-white/5"}`}>
+          <div className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-full ${liveConnected ? "text-success bg-success-subtle" : "text-muted-foreground bg-muted"}`}>
             <Radio className={`h-3 w-3 ${liveConnected ? "animate-pulse" : ""}`} />
             {liveConnected ? "Live" : "Polling"}
           </div>
-          <button onClick={fetchOrder} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center">
+          <button onClick={fetchOrder} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -393,112 +394,112 @@ export default function OrderTracking() {
 
       <div className="px-4 py-5 space-y-5">
         {actionToast && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 text-center">
+          <div className="rounded-xl border border-success-border bg-success-subtle px-4 py-2.5 text-sm text-success text-center">
             {actionToast}
           </div>
         )}
 
         {/* Estimated serving time + prep timer */}
         {!isDelivered && (
-          <div className="rounded-2xl bg-gradient-to-br from-orange-600/20 to-pink-600/10 border border-orange-500/30 p-5">
+          <div className="rounded-2xl border border-primary p-5">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="text-xs text-white/50 mb-1">Estimated Serving Time</div>
-                <div className="text-3xl font-extrabold">{displayTracking.estimatedServingMinutes} <span className="text-lg font-semibold text-white/50">min</span></div>
+                <div className="text-xs text-muted-foreground mb-1">Estimated Serving Time</div>
+                <div className="text-3xl font-semibold">{displayTracking.estimatedServingMinutes} <span className="text-lg font-semibold text-muted-foreground">min</span></div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-white/50 mb-1 flex items-center gap-1 justify-end"><Timer className="h-3 w-3" /> Prep Timer</div>
-                <div className="text-3xl font-extrabold text-orange-300 font-mono">{formatCountdown(countdownSec)}</div>
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1 justify-end"><Timer className="h-3 w-3" /> Prep Timer</div>
+                <div className="text-3xl font-semibold text-primary font-mono">{formatCountdown(countdownSec)}</div>
               </div>
             </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all duration-1000"
+                className="h-full transition-all duration-1000"
                 style={{ width: `${Math.min(100, (displayTracking.preparationElapsedSeconds / (displayTracking.estimatedServingMinutes * 60)) * 100)}%` }}
               />
             </div>
-            <p className="text-xs text-white/40 mt-2 text-center">
+            <p className="text-xs text-muted-foreground mt-2 text-center">
               Ordered {elapsedMin} min ago · Table {displayOrder.tableNo}
               {displayTracking.chefName && ` · ${displayTracking.chefName}`}
             </p>
             {placedAtLabel && (
-              <p className="text-[11px] text-white/30 mt-1 text-center">Placed on {placedAtLabel}</p>
+              <p className="text-2xs text-muted-foreground mt-1 text-center">Placed on {placedAtLabel}</p>
             )}
           </div>
         )}
 
         {isDelivered && (
-          <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-5 text-center">
-            <div className="text-4xl mb-2">🎉</div>
-            <h2 className="text-xl font-bold text-emerald-400">Delivered!</h2>
-            <p className="text-white/50 text-sm mt-1">Your order has been served</p>
+          <div className="rounded-2xl bg-success-subtle border border-success-border p-5 text-center">
+            <PartyPopper className="h-10 w-10 text-success mx-auto mb-2" strokeWidth={1.5} />
+            <h2 className="text-xl font-semibold text-success">Delivered!</h2>
+            <p className="text-muted-foreground text-sm mt-1">Your order has been served</p>
           </div>
         )}
 
         {/* Delay alert */}
         {displayTracking.isDelayed && !isDelivered && (
-          <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/30 p-4 flex items-start gap-3 animate-pulse">
-            <AlertCircle className="h-5 w-5 text-yellow-400 shrink-0 mt-0.5" />
+          <div className="rounded-2xl bg-warning-subtle border border-warning-border p-4 flex items-start gap-3 animate-pulse">
+            <AlertCircle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-yellow-300">Order Delayed · +{displayTracking.delayMinutes} min</p>
-              <p className="text-xs text-white/50 mt-0.5">{displayTracking.delayReason}</p>
+              <p className="text-sm font-semibold text-warning">Order Delayed · +{displayTracking.delayMinutes} min</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{displayTracking.delayReason}</p>
             </div>
           </div>
         )}
 
         {/* Waiter live status */}
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+        <div className="rounded-2xl bg-card border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500/30 to-violet-500/30 border border-white/10 flex items-center justify-center">
-              <User2 className="h-6 w-6 text-white/60" />
+            <div className="h-12 w-12 rounded-full border border-border flex items-center justify-center">
+              <User2 className="h-6 w-6 text-muted-foreground" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold">{displayTracking.waiterName ?? "Assigning waiter…"}</p>
-              <p className="text-xs text-emerald-400 font-medium mt-0.5">
+              <p className="text-xs text-success font-medium mt-0.5">
                 {WAITER_STATUS_LABELS[displayTracking.waiterStatus]}
               </p>
             </div>
             {displayTracking.waiterStatus === "on_the_way" && (
-              <div className="flex items-center gap-1 text-xs text-orange-400 bg-orange-500/10 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1 text-xs text-primary bg-muted px-2 py-1 rounded-full">
                 <Truck className="h-3 w-3 animate-bounce" /> En route
               </div>
             )}
             <button
               type="button"
               onClick={handleCallWaiter}
-              className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center hover:bg-emerald-500/30 transition-all"
+              className="h-9 w-9 rounded-xl bg-success-subtle border border-success-border flex items-center justify-center hover:bg-success-subtle transition-all"
               aria-label="Call waiter"
             >
-              <Phone className="h-4 w-4 text-emerald-400" />
+              <Phone className="h-4 w-4 text-success" />
             </button>
             <button
               type="button"
               onClick={() => setShowMessageModal(true)}
-              className="h-9 w-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center hover:bg-blue-500/30 transition-all"
+              className="h-9 w-9 rounded-xl bg-info-subtle border border-info-border flex items-center justify-center hover:bg-info-subtle transition-all"
               aria-label="Message waiter"
             >
-              <MessageSquare className="h-4 w-4 text-blue-400" />
+              <MessageSquare className="h-4 w-4 text-info" />
             </button>
           </div>
         </div>
 
         {/* Real-time kitchen updates */}
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+        <div className="rounded-2xl bg-card border border-border p-4">
           <p className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <ChefHat className="h-4 w-4 text-orange-400" /> Kitchen Live Updates
+            <ChefHat className="h-4 w-4 text-primary" /> Kitchen Live Updates
           </p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {displayTracking.kitchenUpdates.map((u, i) => (
-              <div key={`${u.at}-${i}`} className={`flex gap-2 text-xs p-2 rounded-lg ${u.type === "delay" ? "bg-yellow-500/10 border border-yellow-500/20" : u.type === "chef" ? "bg-violet-500/10 border border-violet-500/20" : u.type === "ready" ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-white/5"}`}>
-                <span className="text-white/30 shrink-0">{fmtOrderTime(u.at, tz)}</span>
-                <span className="text-white/70">{u.message}</span>
+              <div key={`${u.at}-${i}`} className={`flex gap-2 text-xs p-2 rounded-lg ${u.type === "delay" ? "bg-warning-subtle border border-warning-border" : u.type === "chef" ? "bg-muted border border-primary" : u.type === "ready" ? "bg-success-subtle border border-success-border" : "bg-muted"}`}>
+                <span className="text-muted-foreground shrink-0">{fmtOrderTime(u.at, tz)}</span>
+                <span className="text-muted-foreground">{u.message}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Full lifecycle timeline — 7 steps */}
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+        <div className="rounded-2xl bg-card border border-border p-4">
           <p className="text-sm font-semibold mb-4">Order Lifecycle</p>
           <div className="space-y-0">
             {ORDER_LIFECYCLE.map((step, idx) => {
@@ -510,22 +511,22 @@ export default function OrderTracking() {
               return (
                 <div key={step.key} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 text-sm ${isDone ? "bg-emerald-500 border-emerald-500" : isCurrent ? (showDelayed ? "bg-yellow-500 border-yellow-500" : "bg-orange-500 border-orange-500") : "bg-white/5 border-white/15"}`}>
-                      {isDone ? <CheckCircle className="h-4 w-4 text-white" /> : isCurrent ? <span className="animate-pulse">{step.icon}</span> : <span className="opacity-30">{step.icon}</span>}
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 text-sm ${isDone ? "bg-primary border-success-border" : isCurrent ? (showDelayed ? "bg-primary border-warning-border" : "bg-primary border-primary") : "bg-muted border-border"}`}>
+                      {isDone ? <CheckCircle className="h-4 w-4 text-foreground" /> : isCurrent ? <span className="animate-pulse">{step.icon}</span> : <span className="opacity-30">{step.icon}</span>}
                     </div>
                     {idx < ORDER_LIFECYCLE.length - 1 && (
-                      <div className={`w-0.5 h-8 mt-0.5 ${idx < activeIdx ? "bg-emerald-500/40" : "bg-white/10"}`} />
+                      <div className={`w-0.5 h-8 mt-0.5 ${idx < activeIdx ? "bg-success-subtle" : "bg-muted"}`} />
                     )}
                   </div>
                   <div className="pb-4 flex-1">
-                    <p className={`text-sm font-semibold ${isDone ? "text-emerald-400" : isCurrent ? (showDelayed ? "text-yellow-400" : "text-orange-400") : "text-white/30"}`}>
+                    <p className={`text-sm font-semibold ${isDone ? "text-success" : isCurrent ? (showDelayed ? "text-warning" : "text-primary") : "text-muted-foreground"}`}>
                       {step.label}
-                      {showDelayed && <span className="ml-2 text-xs text-yellow-300/80 font-normal">Delayed</span>}
-                      {isCurrent && !showDelayed && <span className="ml-2 text-xs text-orange-300/70 font-normal">In progress…</span>}
+                      {showDelayed && <span className="ml-2 text-xs text-warning font-normal">Delayed</span>}
+                      {isCurrent && !showDelayed && <span className="ml-2 text-xs text-primary font-normal">In progress…</span>}
                     </p>
-                    {(isDone || isCurrent) && <p className="text-xs text-white/40 mt-0.5">{step.desc}</p>}
+                    {(isDone || isCurrent) && <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>}
                     {step.key === "chef_assigned" && isCurrent && displayTracking.chefName && (
-                      <p className="text-xs text-violet-400 mt-1">👨‍🍳 {displayTracking.chefName}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5"><ChefHat className="h-3.5 w-3.5 text-primary shrink-0" />{displayTracking.chefName}</p>
                     )}
                   </div>
                 </div>
@@ -533,32 +534,32 @@ export default function OrderTracking() {
             })}
           </div>
           {/* Cancelled / Delayed legend */}
-          <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap gap-2 text-[10px] text-white/40">
-            <span>⚠️ Delayed = overlay when kitchen runs late</span>
-            <span>❌ Cancelled = order voided</span>
+          <div className="mt-3 pt-3 border-t border-border flex flex-wrap gap-2 text-2xs text-muted-foreground">
+            <span>Delayed — the kitchen is running late</span>
+            <span>Cancelled — the order was voided</span>
           </div>
         </div>
 
         {/* Order items */}
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+        <div className="rounded-2xl bg-card border border-border p-4">
           <p className="text-sm font-semibold mb-3">Your Order</p>
           <div className="space-y-3">
             {displayOrder.items.map(item => (
               <div key={item.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="h-6 w-6 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold flex items-center justify-center">{item.quantity}×</span>
+                  <span className="h-6 w-6 rounded-full bg-muted text-primary text-xs font-semibold flex items-center justify-center">{item.quantity}×</span>
                   <div>
                     <p className="text-sm">{item.name}</p>
-                    <p className="text-[10px] text-white/30 capitalize">{item.course}</p>
+                    <p className="text-2xs text-muted-foreground capitalize">{item.course}</p>
                   </div>
                 </div>
-                <span className="text-sm text-orange-400 font-semibold">₹{item.price * item.quantity}</span>
+                <span className="text-sm text-primary font-semibold">₹{item.price * item.quantity}</span>
               </div>
             ))}
           </div>
-          <div className="border-t border-white/10 mt-3 pt-3 space-y-2">
+          <div className="border-t border-border mt-3 pt-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-base font-bold text-orange-400">₹{displayOrder.total}</span>
+              <span className="text-base font-semibold text-primary">₹{displayOrder.total}</span>
             </div>
             <div className="flex gap-2">
               <button
@@ -575,7 +576,7 @@ export default function OrderTracking() {
                     a.click();
                   } catch { /* demo */ }
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold hover:bg-white/10"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-muted border border-border text-xs font-semibold hover:bg-muted"
               >
                 <FileText className="h-3.5 w-3.5" /> GST Invoice
               </button>
@@ -590,7 +591,7 @@ export default function OrderTracking() {
                     w?.document.close();
                   } catch { /* demo */ }
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs font-semibold hover:bg-orange-500/20"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-muted border border-primary text-primary text-xs font-semibold hover:bg-muted"
               >
                 <Download className="h-3.5 w-3.5" /> PDF Invoice
               </button>
@@ -600,15 +601,15 @@ export default function OrderTracking() {
                 order fetched on mount — the order object is never re-fetched, so reading it
                 here meant the guest only saw "bill is ready" / "Paid" after a page reload. */}
             {(live.paymentStatus ?? displayOrder.paymentStatus) === "paid" ? (
-              <div className="flex items-center gap-2 justify-center py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-bold">
+              <div className="flex items-center gap-2 justify-center py-2.5 rounded-xl bg-success-subtle border border-success-border text-success text-sm font-semibold">
                 <CheckCircle className="h-4 w-4" /> Paid · ₹{displayOrder.total}
               </div>
             ) : (
               <div>
                 {(live.billRequested ?? displayOrder.billRequested) ? (
-                  <p className="text-xs text-amber-300 font-semibold mb-2">🔔 Your bill is ready — please pay</p>
+                  <p className="text-xs text-warning font-semibold mb-2 flex items-center gap-1.5"><BellRing className="h-3.5 w-3.5 shrink-0" />Your bill is ready — please pay</p>
                 ) : (
-                  <p className="text-xs text-white/50 mb-2">Pay your bill — a waiter will collect at your table</p>
+                  <p className="text-xs text-muted-foreground mb-2">Pay your bill — a waiter will collect at your table</p>
                 )}
                 <div className="grid grid-cols-3 gap-2">
                   {["Cash", "UPI", "Card"].map(m => (
@@ -620,7 +621,7 @@ export default function OrderTracking() {
                           showToast(`Waiter notified — they will collect your ${m} payment`);
                         } catch { showToast("Could not notify waiter, please try again"); }
                       }}
-                      className="py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold hover:bg-orange-500/10 hover:border-orange-500/30 transition-colors"
+                      className="py-2.5 rounded-xl bg-muted border border-border text-xs font-semibold hover:bg-muted hover:border-primary transition-colors"
                     >
                       {m}
                     </button>
@@ -635,28 +636,28 @@ export default function OrderTracking() {
             order is being prepared; goes back to the menu keeping table + venue. */}
         <button
           onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))}
-          className="w-full flex items-center gap-2 justify-center py-3.5 rounded-xl bg-orange-500 text-white text-sm font-bold shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-transform"
+          className="w-full flex items-center gap-2 justify-center py-3.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-transform"
         >
           <Plus className="h-4 w-4" strokeWidth={2.5} /> Order More Items
         </button>
 
-        <button onClick={handleReorder} className="w-full flex items-center gap-2 justify-center py-3 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold">
-          <RotateCcw className="h-4 w-4 text-orange-400" /> Reorder same items
+        <button onClick={handleReorder} className="w-full flex items-center gap-2 justify-center py-3 rounded-xl border border-border bg-muted text-sm font-semibold">
+          <RotateCcw className="h-4 w-4 text-primary" /> Reorder same items
         </button>
 
         {isDelivered && !reviewSubmitted && (
-          <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5">
-            <h3 className="text-sm font-bold mb-4 text-center">Rate your experience 🌟</h3>
+          <div className="rounded-2xl bg-card border border-border p-5">
+            <h3 className="text-sm font-semibold mb-4 text-center">Rate your experience</h3>
             <div className="flex justify-center gap-2 mb-4">
               {[1, 2, 3, 4, 5].map(star => (
                 <button key={star} onClick={() => setRating(star)}>
-                  <Star className={`h-8 w-8 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-white/20"}`} />
+                  <Star className={`h-8 w-8 ${star <= rating ? "fill-warning text-warning" : "text-muted-foreground"}`} />
                 </button>
               ))}
             </div>
             {rating > 0 && (
               <>
-                <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm mb-3 resize-none" rows={2} placeholder="Share feedback..." value={review} onChange={e => setReview(e.target.value)} />
+                <textarea className="w-full bg-muted border border-border rounded-xl p-3 text-sm mb-3 resize-none" rows={2} placeholder="Share feedback..." value={review} onChange={e => setReview(e.target.value)} />
                 <button
                   disabled={submittingReview}
                   onClick={async () => {
@@ -672,32 +673,32 @@ export default function OrderTracking() {
                       setSubmittingReview(false);
                     }
                   }}
-                  className="w-full py-2.5 rounded-xl bg-orange-500 font-semibold text-sm disabled:opacity-60"
+                  className="w-full py-2.5 rounded-xl bg-primary font-semibold text-sm disabled:opacity-60"
                 >{submittingReview ? "Sending…" : "Submit Review"}</button>
               </>
             )}
           </div>
         )}
         {reviewSubmitted && (
-          <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-center">
-            <CheckCircle className="h-6 w-6 text-emerald-400 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-emerald-400">Thanks for your review!</p>
+          <div className="rounded-2xl bg-success-subtle border border-success-border p-4 text-center">
+            <CheckCircle className="h-6 w-6 text-success mx-auto mb-2" />
+            <p className="text-sm font-semibold text-success">Thanks for your review!</p>
           </div>
         )}
       </div>
 
       {showMessageModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={() => !sendingMessage && setShowMessageModal(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-[#0f172a] border border-white/10 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 p-4" onClick={() => !sendingMessage && setShowMessageModal(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-[#0f172a] border border-border p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-sm">Message your waiter</h3>
-                <p className="text-xs text-white/40 mt-0.5">
+                <h3 className="font-semibold text-sm">Message your waiter</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Order #{displayOrder.id} · Table {displayOrder.tableNo}
                   {displayTracking.waiterName ? ` · ${displayTracking.waiterName}` : ""}
                 </p>
               </div>
-              <button type="button" onClick={() => setShowMessageModal(false)} className="text-white/40 hover:text-white text-lg leading-none">×</button>
+              <button type="button" onClick={() => setShowMessageModal(false)} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -707,7 +708,7 @@ export default function OrderTracking() {
                   type="button"
                   onClick={() => handleSendMessage(msg)}
                   disabled={sendingMessage}
-                  className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-blue-500/40 hover:bg-blue-500/10 disabled:opacity-50"
+                  className="text-xs px-3 py-1.5 rounded-full bg-muted border border-border hover:border-info-border hover:bg-info-subtle disabled:opacity-50"
                 >
                   {msg}
                 </button>
@@ -719,14 +720,14 @@ export default function OrderTracking() {
               onChange={e => setMessageText(e.target.value)}
               placeholder="Type your message…"
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-blue-500/40"
+              className="w-full bg-muted border border-border rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-info-border"
             />
 
             <button
               type="button"
               onClick={() => handleSendMessage()}
               disabled={sendingMessage || !messageText.trim()}
-              className="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-400 font-semibold text-sm disabled:opacity-40 transition-all"
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-40 transition-all"
             >
               {sendingMessage ? "Sending…" : "Send Message"}
             </button>

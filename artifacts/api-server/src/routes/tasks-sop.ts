@@ -6,14 +6,36 @@ import { getSettingsSection, setSettingsSection } from "../lib/restaurant-settin
 
 const router: IRouter = Router();
 
+/**
+ * The training curriculum a venue starts with — titles only.
+ *
+ * Every one of these shipped with a videoUrl pointing at the same YouTube joke video,
+ * including the one titled "Fire Extinguisher & Emergency Procedures", and each carried
+ * invented view and completion counts ("18 views, 18 completions") so a manager checking
+ * whether their staff had done the mandatory safety training was reading a number nobody
+ * had measured, against a link that was a prank.
+ *
+ * A platform cannot supply a restaurant's safety training. What it can do is offer the
+ * list of subjects worth covering and let the venue attach its own video to each. Until
+ * it does, the row says so and nothing pretends anyone has watched it.
+ */
 const DEFAULT_TRAINING_VIDEOS = [
-  { id: "V01", title: "POS System Training — Complete Guide", duration: "18 min", category: "operations", views: 12, completions: 8, level: "required", thumbnail: "POS", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: "V02", title: "Food Safety: Handling Raw & Cooked Items", duration: "12 min", category: "safety", views: 16, completions: 15, level: "required", thumbnail: "FOOD", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: "V03", title: "Customer Greeting & Table Etiquette", duration: "8 min", category: "service", views: 14, completions: 11, level: "required", thumbnail: "SVC", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: "V04", title: "How to Handle Customer Complaints", duration: "10 min", category: "service", views: 10, completions: 7, level: "recommended", thumbnail: "CHAT", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: "V05", title: "Fire Extinguisher & Emergency Procedures", duration: "6 min", category: "safety", views: 18, completions: 18, level: "required", thumbnail: "SAFE", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: "V06", title: "Upselling & Revenue-Building Techniques", duration: "15 min", category: "sales", views: 8, completions: 4, level: "recommended", thumbnail: "SALE", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-];
+  { id: "V01", title: "POS System Training — Complete Guide", category: "operations", level: "required", thumbnail: "POS" },
+  { id: "V02", title: "Food Safety: Handling Raw & Cooked Items", category: "safety", level: "required", thumbnail: "FOOD" },
+  { id: "V03", title: "Customer Greeting & Table Etiquette", category: "service", level: "required", thumbnail: "SVC" },
+  { id: "V04", title: "How to Handle Customer Complaints", category: "service", level: "recommended", thumbnail: "CHAT" },
+  { id: "V05", title: "Fire Extinguisher & Emergency Procedures", category: "safety", level: "required", thumbnail: "SAFE" },
+  { id: "V06", title: "Upselling & Revenue-Building Techniques", category: "sales", level: "recommended", thumbnail: "SALE" },
+].map(v => ({
+  ...v,
+  // Null, not a placeholder: the screen shows "no video attached yet" and an upload,
+  // rather than sending staff to somebody else's video.
+  videoUrl: null as string | null,
+  duration: null as string | null,
+  views: 0,
+  completions: 0,
+  needsUpload: true,
+}));
 
 const DEFAULT_CHECKLISTS = {
   opening: [

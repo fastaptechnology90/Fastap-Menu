@@ -13,6 +13,7 @@ import {
   ChevronLeft, Globe, Accessibility, Volume2, Type, Contrast, Eye,
   CheckCircle, Play, Square, Languages,
 } from "lucide-react";
+import { GuestIcon } from "@/components/user/GuestIcon";
 
 type Tab = "languages" | "accessibility" | "voice";
 
@@ -105,20 +106,20 @@ export default function LanguageAccessibilityPage() {
   const regionalLangs = LANGUAGES.filter(l => l.region === "Regional");
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-24">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-24">
       <div className="guest-header">
         <div className="px-4 py-3 flex items-center gap-3">
           <GuestBackButton />
           <div className="flex-1">
-            <p className="text-xs text-white/40">{t("language")} & {t("accessibility")}</p>
-            <h1 className="text-base font-bold flex items-center gap-2">
-              <Languages className="h-4 w-4 text-indigo-400" /> Multi Language & Accessibility
+            <p className="text-xs text-muted-foreground">{t("language")} & {t("accessibility")}</p>
+            <h1 className="text-base font-semibold flex items-center gap-2">
+              <Languages className="h-4 w-4 text-info" /> Multi Language & Accessibility
             </h1>
           </div>
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2" role="alert">
+          <div className="mx-4 mb-2 rounded-lg border border-success-border bg-success-subtle px-3 py-2 text-xs text-success flex items-center gap-2" role="alert">
             <CheckCircle className="h-4 w-4" /> {toast}
           </div>
         )}
@@ -131,7 +132,7 @@ export default function LanguageAccessibilityPage() {
           ]).map(item => (
             <button key={item.id} onClick={() => setTab(item.id)}
               className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-xs font-medium ${
-                tab === item.id ? "bg-indigo-500/25 border border-indigo-500/40 text-indigo-200" : "bg-white/5 border border-white/10 text-white/60"
+                tab === item.id ? "bg-info-subtle border border-info-border text-info" : "bg-muted border border-border text-muted-foreground"
               }`}>
               <item.icon className="h-3 w-3" /> {item.label}
             </button>
@@ -141,8 +142,8 @@ export default function LanguageAccessibilityPage() {
 
       <div className="px-4 pt-2 space-y-4">
         {/* Preview strip */}
-        <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/25 p-4">
-          <p className="text-sm text-indigo-200">
+        <div className="rounded-xl bg-info-subtle border border-info-border p-4">
+          <p className="text-sm text-info">
             {user?.name ? `${user.name.split(" ")[0]} · ` : ""}
             {LANGUAGES.find(l => l.id === language)?.native}
             {(accessibility.largeText || accessibility.highContrast || accessibility.voiceMenu || accessibility.screenReader) && " · "}
@@ -151,52 +152,52 @@ export default function LanguageAccessibilityPage() {
             {accessibility.voiceMenu && "Voice menu · "}
             {accessibility.screenReader && "Screen reader"}
           </p>
-          <p className="text-xs text-white/40 mt-1">{t("welcome")} — {t("menu")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("welcome")} — {t("menu")}</p>
         </div>
 
         {/* Languages */}
         {tab === "languages" && (
           <>
             <div>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">National Languages</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">National Languages</p>
               <div className="space-y-2">
                 {nationalLangs.map(lang => (
                   <button key={lang.id} onClick={() => selectLanguage(lang.id)}
                     className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                      language === lang.id ? "border-indigo-500/50 bg-indigo-500/10" : "border-white/10 bg-white/5"
+                      language === lang.id ? "border-info-border bg-info-subtle" : "border-border bg-muted"
                     }`}
                     aria-pressed={language === lang.id}>
                     <span className="text-2xl">{lang.flag}</span>
                     <div className="flex-1 text-left">
                       <p className="font-semibold">{lang.label}</p>
-                      <p className="text-sm text-white/50">{lang.native}</p>
+                      <p className="text-sm text-muted-foreground">{lang.native}</p>
                     </div>
-                    {language === lang.id && <CheckCircle className="h-5 w-5 text-indigo-400" />}
+                    {language === lang.id && <CheckCircle className="h-5 w-5 text-info" />}
                   </button>
                 ))}
               </div>
             </div>
 
             <div>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Regional Languages</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Regional Languages</p>
               <div className="grid grid-cols-2 gap-2">
                 {regionalLangs.map(lang => (
                   <button key={lang.id} onClick={() => selectLanguage(lang.id)}
                     className={`p-3 rounded-xl border text-left ${
-                      language === lang.id ? "border-indigo-500/50 bg-indigo-500/10" : "border-white/10 bg-white/5"
+                      language === lang.id ? "border-info-border bg-info-subtle" : "border-border bg-muted"
                     }`}
                     aria-pressed={language === lang.id}>
                     <span className="text-lg">{lang.flag}</span>
                     <p className="text-xs font-semibold mt-1">{lang.native}</p>
-                    <p className="text-[10px] text-white/40">{lang.label}</p>
+                    <p className="text-2xs text-muted-foreground">{lang.label}</p>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div className="rounded-xl bg-muted border border-border p-4">
               <p className="text-sm font-semibold mb-2">Live preview</p>
-              <div className="space-y-1 text-sm text-white/70">
+              <div className="space-y-1 text-sm text-muted-foreground">
                 <p>{t("search")}</p>
                 <p>{t("addToOrder")} · {t("cart")}</p>
                 <p>{t("forYou")} · {t("allMenus")}</p>
@@ -208,7 +209,7 @@ export default function LanguageAccessibilityPage() {
         {/* Accessibility */}
         {tab === "accessibility" && (
           <>
-            <p className="text-sm text-white/50">4 accessibility features for inclusive dining</p>
+            <p className="text-sm text-muted-foreground">4 accessibility features for inclusive dining</p>
             <div className="space-y-3">
               {ACCESSIBILITY_FEATURES.map(f => {
                 const key = A11Y_KEYS[f.id];
@@ -217,31 +218,31 @@ export default function LanguageAccessibilityPage() {
                 return (
                   <button key={f.id} onClick={() => toggleFeature(f.id)}
                     className={`w-full flex items-center gap-4 p-4 rounded-xl border text-left ${
-                      enabled ? "border-indigo-500/40 bg-indigo-500/10" : "border-white/10 bg-white/5"
+                      enabled ? "border-info-border bg-info-subtle" : "border-border bg-muted"
                     }`}
                     aria-pressed={enabled}>
-                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-xl ${enabled ? "bg-indigo-500/20" : "bg-white/5"}`}>
-                      {f.icon}
+                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-xl ${enabled ? "bg-info-subtle" : "bg-muted"}`}>
+                      <GuestIcon id={f.id} className="h-4 w-4 text-primary" />
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-indigo-400" /> {f.label}
+                        <Icon className="h-4 w-4 text-info" /> {f.label}
                       </p>
-                      <p className="text-xs text-white/40 mt-0.5">{f.desc}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{f.desc}</p>
                     </div>
-                    <div className={`w-11 h-6 rounded-full relative transition-all ${enabled ? "bg-indigo-500" : "bg-white/20"}`}>
-                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${enabled ? "left-5" : "left-0.5"}`} />
+                    <div className={`w-11 h-6 rounded-full relative transition-all ${enabled ? "bg-primary" : "bg-muted"}`}>
+                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card transition-all ${enabled ? "left-5" : "left-0.5"}`} />
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            <div className={`rounded-xl border p-4 ${accessibility.highContrast ? "border-yellow-400 bg-black text-yellow-100" : "border-white/10 bg-white/5"}`}>
+            <div className={`rounded-xl border p-4 ${accessibility.highContrast ? "border-warning-border bg-black text-warning" : "border-border bg-muted"}`}>
               <p className={`font-semibold ${accessibility.largeText ? "text-lg" : "text-sm"}`}>
                 Accessibility preview
               </p>
-              <p className={`text-white/60 mt-1 ${accessibility.largeText ? "text-base" : "text-xs"}`}>
+              <p className={`text-muted-foreground mt-1 ${accessibility.largeText ? "text-base" : "text-xs"}`}>
                 Menu items, prices, and buttons scale when large text and high contrast are enabled.
               </p>
             </div>
@@ -257,29 +258,29 @@ export default function LanguageAccessibilityPage() {
             )}
             {!voiceLoading && !voiceError && (
             <>
-            <div className="rounded-xl bg-violet-500/10 border border-violet-500/25 p-4">
-              <p className="text-sm font-semibold text-violet-200">{t("voiceMenu")}</p>
-              <p className="text-xs text-white/50 mt-1">
-                Enable voice menu in Accessibility tab, then tap 🔊 on any dish. Or play the full menu below.
+            <div className="rounded-xl bg-muted border border-primary p-4">
+              <p className="text-sm font-semibold text-primary">{t("voiceMenu")}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Enable voice menu in Accessibility tab, then tap the speaker on any dish. Or play the full menu below.
               </p>
             </div>
 
             <div className="flex gap-2">
               <button onClick={playVoiceMenu} disabled={speaking}
-                className="flex-1 py-3 rounded-xl bg-violet-600 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                className="flex-1 py-3 rounded-xl bg-primary font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 <Play className="h-4 w-4" /> Play Menu ({language.toUpperCase()})
               </button>
               {speaking && (
-                <button onClick={stopVoice} className="px-4 py-3 rounded-xl bg-white/10 border border-white/10">
+                <button onClick={stopVoice} className="px-4 py-3 rounded-xl bg-muted border border-border">
                   <Square className="h-4 w-4" />
                 </button>
               )}
             </div>
 
             {voiceScript && (
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                <p className="text-xs text-white/40 mb-2">Voice script</p>
-                <pre className="text-xs text-white/70 whitespace-pre-wrap font-sans">{voiceScript}</pre>
+              <div className="rounded-xl bg-muted border border-border p-4">
+                <p className="text-xs text-muted-foreground mb-2">Voice script</p>
+                <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans">{voiceScript}</pre>
               </div>
             )}
 
@@ -292,9 +293,9 @@ export default function LanguageAccessibilityPage() {
                 {voiceItems.map(item => (
                   <button key={item.name}
                     onClick={() => speak(`${language === "hi" && item.nameHi ? item.nameHi : item.name}. ${t("price")} ${item.price} rupees`)}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:border-violet-500/30">
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted border border-border hover:border-primary">
                     <span>{language === "hi" && item.nameHi ? item.nameHi : item.name}</span>
-                    <span className="flex items-center gap-2 text-orange-400 text-sm">
+                    <span className="flex items-center gap-2 text-primary text-sm">
                       ₹{item.price} <Volume2 className="h-4 w-4" />
                     </span>
                   </button>
@@ -308,7 +309,7 @@ export default function LanguageAccessibilityPage() {
       </div>
 
       <div className="guest-bottom-bar">
-        <button onClick={() => navigate("/user/menu")} className="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 font-semibold">
+        <button onClick={() => navigate("/user/menu")} className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold">
           {t("menu")} — {LANGUAGES.find(l => l.id === language)?.native}
         </button>
       </div>

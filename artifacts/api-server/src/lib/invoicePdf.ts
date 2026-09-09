@@ -1,6 +1,10 @@
 /** Minimal PDF 1.4 generator for GST invoices (no external deps). */
 type Invoice = {
-  invoiceNumber: string;
+  orderId: number;
+  /** Null until the bill is settled: an unpaid order gets a proforma, not a tax invoice. */
+  invoiceNumber: string | null;
+  isTaxInvoice: boolean;
+  documentTitle: string;
   invoiceDate: string;
   restaurantName: string;
   restaurantGstin: string | null;
@@ -11,8 +15,13 @@ type Invoice = {
   discount: number;
   cgst: number;
   sgst: number;
+  gstRoundingAdjustment?: number;
   cgstRatePercent?: number;
   sgstRatePercent?: number;
+  /** Alcohol sits outside GST and carries state excise/VAT on its own line. */
+  liquorTaxableAmount?: number;
+  liquorTax?: number;
+  liquorRatePercent?: number;
   grandTotal: number;
   paymentMethod?: string | null;
 };
@@ -23,9 +32,11 @@ function esc(s: string) {
 
 export function buildInvoicePdfBuffer(invoice: Invoice): Buffer {
   const lines: string[] = [
-    `TAX INVOICE — ${invoice.restaurantName}`,
+    `${invoice.documentTitle} — ${invoice.restaurantName}`,
     invoice.restaurantGstin ? `GSTIN: ${invoice.restaurantGstin}` : "Not registered for GST",
-    `Invoice: ${invoice.invoiceNumber}`,
+    invoice.isTaxInvoice
+      ? `Invoice: ${invoice.invoiceNumber}`
+      : `Order #${invoice.orderId} — no invoice number until the bill is settled`,
     `Date: ${new Date(invoice.invoiceDate).toLocaleString()}`,
     `Customer: ${invoice.customerName}${invoice.tableName ? ` · Table ${invoice.tableName}` : ""}`,
     "",
@@ -38,10 +49,19 @@ export function buildInvoicePdfBuffer(invoice: Invoice): Buffer {
     invoice.discount > 0 ? `Discount: -INR ${invoice.discount.toFixed(2)}` : "",
     `CGST (${invoice.cgstRatePercent ?? 2.5}%): INR ${invoice.cgst.toFixed(2)}`,
     `SGST (${invoice.sgstRatePercent ?? 2.5}%): INR ${invoice.sgst.toFixed(2)}`,
+    invoice.gstRoundingAdjustment ? `Round off: INR ${invoice.gstRoundingAdjustment.toFixed(2)}` : "",
+    (invoice.liquorTaxableAmount ?? 0) > 0
+      ? `Alcoholic beverages (outside GST): INR ${(invoice.liquorTaxableAmount ?? 0).toFixed(2)}`
+      : "",
+    (invoice.liquorTaxableAmount ?? 0) > 0
+      ? `Excise / VAT on liquor (${invoice.liquorRatePercent ?? 0}%): INR ${(invoice.liquorTax ?? 0).toFixed(2)}`
+      : "",
     `Grand Total: INR ${invoice.grandTotal.toFixed(2)}`,
     invoice.paymentMethod ? `Payment: ${invoice.paymentMethod}` : "",
     "",
-    "Computer-generated GST invoice — FastMenu",
+    invoice.isTaxInvoice
+      ? "Computer-generated GST invoice"
+      : "Proforma bill — not a tax invoice; a number is issued when the bill is settled",
   ].filter(Boolean);
 
   let y = 800;

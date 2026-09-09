@@ -8,6 +8,7 @@ import {
   waiterCallsTable,
   tasksTable,
   inventoryItemsTable,
+  hotelRoomsTable,
 } from "@workspace/db";
 import type { MobileSession } from "./session.js";
 import {
@@ -15,7 +16,8 @@ import {
   autoAssignRoomServiceRequest,
   autoAssignWaiterToOrder,
 } from "../staff-auto-assignment.js";
-import { fetchKitchenOrders } from "./kitchen-orders.js";
+import { fetchKitchenOrders, withGuestTracking } from "./kitchen-orders.js";
+import { canTransition } from "../order-status.js";
 
 function parseTaskId(raw: string): { kind: "hk" | "mt" | "order" | "rs" | "call"; id: number } | null {
   const hk = raw.match(/^HK-(\d+)$/i);
@@ -69,7 +71,32 @@ async function updateHousekeepingTask(
   }
 
   await db.update(housekeepingTasksTable).set(patch).where(eq(housekeepingTasksTable.id, taskId));
-  return { success: true, message: `${action.replace(/_/g, " ")} recorded · ${task.title}` };
+
+  // Finishing the clean has to release the room, or nobody outside the housekeeping app
+  // ever learns it happened. hotel_rooms.status carries a documented "cleaning" state and
+  // Reception only offers rooms whose status is "vacant", so a room parked in "cleaning"
+  // could not be sold again — there was nothing anywhere that moved it back.
+  // Deliberately narrow: only a room that is actually mid-clean is touched, so an
+  // occupied, reserved or out-of-service room is never freed under a guest.
+  let roomReleased: string | undefined;
+  if (patch.status === "completed" && task.roomNumber) {
+    const [room] = await db.update(hotelRoomsTable)
+      .set({ status: "vacant" })
+      .where(and(
+        eq(hotelRoomsTable.restaurantId, restaurantId),
+        eq(hotelRoomsTable.number, task.roomNumber),
+        eq(hotelRoomsTable.status, "cleaning"),
+      ))
+      .returning();
+    if (room) roomReleased = room.number;
+  }
+
+  return {
+    success: true,
+    message: roomReleased
+      ? `${action.replace(/_/g, " ")} recorded · ${task.title} · Room ${roomReleased} is ready`
+      : `${action.replace(/_/g, " ")} recorded · ${task.title}`,
+  };
 }
 
 async function updateMaintenanceRequest(
@@ -143,6 +170,7 @@ async function updateWaiterOrder(
   orderId: number,
   action: string,
   staffName: string,
+  staffId: number,
 ) {
   const [order] = await db.select().from(ordersTable).where(
     and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)),
@@ -157,43 +185,74 @@ async function updateWaiterOrder(
     : {}) as Record<string, unknown>;
 
   const patch: Record<string, unknown> = {};
+  const now = new Date().toISOString();
 
   switch (action) {
     case "assign":
       patch.waiterName = staffName;
-      patch.waiterId = null;
+      // The staff row id, not null. The guest's tracker resolves the waiter's phone
+      // number through orders.waiter_id, so nulling it here took the "call your waiter"
+      // number off the guest's screen the instant a waiter claimed the table — and cut
+      // the order out of anything that joins waiter work to a staff member.
+      patch.waiterId = staffId;
       patch.metadata = {
         ...meta,
-        tracking: { ...tracking, waiterStatus: "assigned", waiterAssignedAt: new Date().toISOString() },
+        tracking: { ...tracking, waiterStatus: "assigned", waiterAssignedAt: now, waiterName: staffName },
       };
       break;
     case "start_delivery":
       patch.status = "serving";
       patch.waiterName = staffName;
+      patch.waiterId = order.waiterId ?? staffId;
       patch.metadata = {
-        ...meta,
-        tracking: { ...tracking, waiterStatus: "on_the_way", deliveryStartedAt: new Date().toISOString() },
+        ...withGuestTracking(meta, order.status, "serving", { waiterName: staffName }),
+      };
+      (patch.metadata as Record<string, unknown>).tracking = {
+        ...((patch.metadata as Record<string, unknown>).tracking as Record<string, unknown>),
+        deliveryStartedAt: now,
       };
       break;
     case "confirm_delivery":
       patch.status = "completed";
-      patch.metadata = {
-        ...meta,
-        tracking: { ...tracking, waiterStatus: "delivered", deliveredAt: new Date().toISOString() },
-      };
+      patch.metadata = withGuestTracking(meta, order.status, "completed", { waiterName: staffName });
       break;
     case "acknowledge":
       patch.metadata = {
         ...meta,
-        tracking: { ...tracking, waiterAcknowledgedAt: new Date().toISOString() },
+        tracking: { ...tracking, waiterAcknowledgedAt: now },
       };
       break;
     default:
       throw new Error("UNKNOWN_ACTION");
   }
 
+  // Same guard the browser panel uses, so the waiter app cannot walk a settled or
+  // cancelled order back onto the floor.
+  if (typeof patch.status === "string" && patch.status !== order.status) {
+    const allowed = canTransition(order.status, patch.status);
+    if (!allowed.ok) throw new Error(`INVALID_TRANSITION: ${allowed.reason}`);
+  }
+
   await db.update(ordersTable).set(patch).where(eq(ordersTable.id, orderId));
   return { success: true, message: `Order ${order.id} · ${action.replace(/_/g, " ")}` };
+}
+
+/**
+ * The room-service board speaks in trays; a kitchen order placed from a room moves
+ * through the same delivery states as any other order.
+ */
+function roomActionToOrderAction(action: string): string {
+  switch (action) {
+    case "assign_tray":
+    case "start_preparation":
+      return "start_delivery";
+    case "mark_delivered":
+      return "confirm_delivery";
+    case "acknowledge_vip":
+      return "acknowledge";
+    default:
+      return action;
+  }
 }
 
 async function resolveWaiterCall(restaurantId: number, callId: number, staffName: string) {
@@ -269,6 +328,7 @@ export async function handleMobilePost(
   const action = String(body.action ?? "");
   const restaurantId = session.restaurantId;
   const staffName = session.user.name;
+  const staffId = session.staffId;
 
   if (path === "/waiter-auto-assignment/auto-allocate") {
     const orders = await fetchKitchenOrders(restaurantId);
@@ -297,7 +357,7 @@ export async function handleMobilePost(
     const taskId = path.split("/")[3];
     const parsed = parseTaskId(taskId);
     if (!parsed || parsed.kind !== "order") throw new Error("ORDER_NOT_FOUND");
-    return updateWaiterOrder(restaurantId, parsed.id, action, staffName);
+    return updateWaiterOrder(restaurantId, parsed.id, action, staffName, staffId);
   }
 
   if (path.startsWith("/waiter-auto-assignment/notifications/") && path.endsWith("/action")) {
@@ -310,7 +370,7 @@ export async function handleMobilePost(
       }
     }
     if (parsed.kind === "order") {
-      return updateWaiterOrder(restaurantId, parsed.id, action, staffName);
+      return updateWaiterOrder(restaurantId, parsed.id, action, staffName, staffId);
     }
     throw new Error("UNKNOWN_ACTION");
   }
@@ -372,8 +432,16 @@ export async function handleMobilePost(
   }
 
   if (path.startsWith("/room-service/orders/") && path.endsWith("/action")) {
-    const orderId = path.split("/")[3];
-    const parsed = parseTaskId(orderId.startsWith("RS-") ? orderId : `RS-${orderId}`);
+    const rawId = path.split("/")[3];
+    // Two kinds of card share this board: a room_service_requests row ("RS-12") and a
+    // kitchen order placed from a room ("RS-ORD-535"). The RS-ORD form fell through the
+    // RS-(\d+) match and every button on those cards answered 404, so a housekeeper
+    // could see a room's food order and act on none of it.
+    const orderMatch = rawId.match(/^RS-ORD-(?:ORD-)?(\d+)$/i);
+    if (orderMatch) {
+      return updateWaiterOrder(restaurantId, parseInt(orderMatch[1], 10), roomActionToOrderAction(action), staffName, staffId);
+    }
+    const parsed = parseTaskId(rawId.startsWith("RS-") ? rawId : `RS-${rawId}`);
     if (!parsed || parsed.kind !== "rs") throw new Error("ORDER_NOT_FOUND");
     return updateRoomServiceRequest(restaurantId, parsed.id, action, staffName);
   }
@@ -387,7 +455,7 @@ export async function handleMobilePost(
     }
     const orderParsed = parseTaskId(rawId.replace(/^RS-ORD-/, ""));
     if (orderParsed?.kind === "order") {
-      return updateWaiterOrder(restaurantId, orderParsed.id, action, staffName);
+      return updateWaiterOrder(restaurantId, orderParsed.id, action, staffName, staffId);
     }
   }
 

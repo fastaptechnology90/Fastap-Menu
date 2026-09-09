@@ -37,6 +37,14 @@ export const platformSettlementsTable = pgTable("platform_settlements", {
   status: text("status").notNull().default("pending"),
   holdReason: text("hold_reason"),
   dueDate: timestamp("due_date", { withTimezone: true }),
+  /**
+   * The trading period this payout covers. Without it every recompute summed the venue's
+   * entire order history, so each release re-billed the platform for orders it had already
+   * paid out — a weekly payout paid for the same meal every week. A settlement now starts
+   * where the last released one ended.
+   */
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
   releasedAt: timestamp("released_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

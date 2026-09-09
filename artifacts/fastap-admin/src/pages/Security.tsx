@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, Smartphone, Monitor, Loader2, RefreshCw, XCircle, Plus, Trash2, Globe, AlertTriangle, Key, Eye } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 // These switches persist to platform settings, but nothing in the API reads them back:
 // login does not check the IP list, issue a second factor, expire idle sessions, or age
@@ -72,29 +73,31 @@ export default function Security() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Security Center</h2>
-          <p className="text-muted-foreground">2FA, sessions, IP restrictions, device tracking & access control.</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Security Center"
+        description="Two-factor policy, active admin sessions, and the IP allow list."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Active Sessions" value={sessions.length} icon={<Monitor className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Registered Devices" value={devices.length} icon={<Smartphone className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="Whitelisted IPs" value={ipWhitelist.length} icon={<Globe className="h-4 w-4 text-purple-500" />} />
-        <KpiCard title="Failed Logins (24h)" value={loginAttempts.filter((a: any) => a.success === false).length} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Active Sessions" value={sessions.length} icon={<Monitor className="h-4 w-4 text-success" />} />
+        <KpiCard title="Registered Devices" value={devices.length} icon={<Smartphone className="h-4 w-4 text-info" />} />
+        <KpiCard title="Whitelisted IPs" value={ipWhitelist.length} icon={<Globe className="h-4 w-4 text-muted-foreground" />} />
+        <KpiCard title="Failed Logins (24h)" value={loginAttempts.filter((a: any) => a.success === false).length} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
             <CardTitle className="text-base">Security Settings</CardTitle>
-            <CardDescription className="text-amber-600 dark:text-amber-400">
+            <CardDescription className="text-warning dark:text-warning">
               Saved as policy only — none of these are enforced at login yet. Do not rely on
               them to restrict access.
             </CardDescription>

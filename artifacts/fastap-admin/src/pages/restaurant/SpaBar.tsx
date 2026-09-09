@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Leaf, Wine, Calendar, Clock, Users, Plus, X, CheckCircle, Star, Package, Droplets, FlaskConical, Scissors, Dumbbell } from "lucide-react";
+import { Leaf, Wine, Calendar, Clock, Users, Plus, X, CheckCircle, Star, Package, Droplets, FlaskConical, Scissors, Dumbbell, AlertTriangle, Check } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { spa as spaApi, barApi, staff as staffApi, roomService as roomServiceApi } from "@/lib/api";
 import { FEATURES } from "@/lib/featureFlags";
@@ -20,15 +20,15 @@ type CocktailRecipe = { name: string; ingredients: string[]; glass: string; garn
 type Therapist = { name: string; specialization: string; status: string; busyUntil?: string; bookingsToday: number };
 
 const CATEGORY_CFG: Record<string,{label:string;icon:any;color:string}> = {
-  massage:  {label:"Massage",   icon:Leaf,        color:"text-emerald-400"},
-  couple:   {label:"Couples",   icon:Users,       color:"text-pink-400"},
-  beauty:   {label:"Beauty",    icon:Scissors,    color:"text-violet-400"},
-  wellness: {label:"Wellness",  icon:Dumbbell,    color:"text-blue-400"},
-  spirits:  {label:"Spirits",   icon:FlaskConical,color:"text-amber-400"},
-  beer:     {label:"Beer",      icon:Wine,        color:"text-yellow-400"},
-  wine:     {label:"Wine",      icon:Wine,        color:"text-rose-400"},
-  cocktail: {label:"Cocktails", icon:Droplets,    color:"text-cyan-400"},
-  mocktail: {label:"Mocktails", icon:Droplets,    color:"text-green-400"},
+  massage:  {label:"Massage",   icon:Leaf,        color:"text-success"},
+  couple:   {label:"Couples",   icon:Users,       color:"text-muted-foreground"},
+  beauty:   {label:"Beauty",    icon:Scissors,    color:"text-muted-foreground"},
+  wellness: {label:"Wellness",  icon:Dumbbell,    color:"text-info"},
+  spirits:  {label:"Spirits",   icon:FlaskConical,color:"text-primary"},
+  beer:     {label:"Beer",      icon:Wine,        color:"text-warning"},
+  wine:     {label:"Wine",      icon:Wine,        color:"text-danger"},
+  cocktail: {label:"Cocktails", icon:Droplets,    color:"text-info"},
+  mocktail: {label:"Mocktails", icon:Droplets,    color:"text-success"},
 };
 
 type Tab = "spa-bookings"|"spa-packages"|"bar-orders"|"bar-inventory"|"recipes";
@@ -207,13 +207,13 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">{mode==="bar"?"Bar":mode==="spa"?"Spa":"Spa & Bar"}</h1>
-          <p className="text-xs text-white/40">{mode==="bar"?"Beverage & bar management":mode==="spa"?"Wellness & spa services":"Wellness services and beverage management"}</p>
+          <h1 className="text-xl font-semibold">{mode==="bar"?"Bar":mode==="spa"?"Spa":"Spa & Bar"}</h1>
+          <p className="text-xs text-muted-foreground">{mode==="bar"?"Beverage & bar management":mode==="spa"?"Wellness & spa services":"Wellness services and beverage management"}</p>
         </div>
         {showSpa && (tab==="spa-bookings"||tab==="spa-packages")&&(
-          <button onClick={()=>setShowBook(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={()=>setShowBook(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
             <Plus className="h-4 w-4"/>Book Spa
           </button>
         )}
@@ -223,19 +223,19 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           ...(showSpa ? [
-            {label:"Today's Bookings",value:spaToday,color:"text-emerald-400",bg:"bg-emerald-500/10"},
-            {label:"Spa Revenue",value:`₹${(spaRevenue/1000).toFixed(1)}K`,color:"text-amber-400",bg:"bg-amber-500/10"},
-            {label:"Pending Sessions",value:spaPending,color:"text-yellow-400",bg:"bg-yellow-500/10"},
+            {label:"Today's Bookings",value:spaToday,color:"text-success",bg:"bg-success-subtle"},
+            {label:"Spa Revenue",value:`₹${(spaRevenue/1000).toFixed(1)}K`,color:"text-primary",bg:"bg-primary/10"},
+            {label:"Pending Sessions",value:spaPending,color:"text-warning",bg:"bg-warning-subtle"},
           ] : []),
           ...(showBar ? [
-            {label:"Bar Items",value:barItems.length,color:"text-cyan-400",bg:"bg-cyan-500/10"},
-            {label:"Cocktail Recipes",value:cocktailRecipes.length,color:"text-violet-400",bg:"bg-violet-500/10"},
-            {label:"Bar Alerts (low stock)",value:lowStock.length,color:"text-red-400",bg:"bg-red-500/10"},
+            {label:"Bar Items",value:barItems.length,color:"text-info",bg:"bg-info-subtle"},
+            {label:"Cocktail Recipes",value:cocktailRecipes.length,color:"text-muted-foreground",bg:"bg-muted"},
+            {label:"Bar Alerts (low stock)",value:lowStock.length,color:"text-danger",bg:"bg-danger-subtle"},
           ] : []),
         ].map(s=>(
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
+            <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
@@ -244,41 +244,41 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       {mode==="bar" && <ModulePackages restaurantId={restaurantId} module="bar" title="Bar Packages / Plans" label="Plan" />}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit overflow-x-auto no-scrollbar">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit overflow-x-auto no-scrollbar">
         {(([
           ...(showSpa ? [["spa-bookings","Spa Bookings"],["spa-packages","Packages & Therapists"]] : []),
           ...(showBar ? [["bar-orders","Bar Orders"],["bar-inventory","Bar Inventory"],["recipes","Cocktail Recipes"]] : []),
         ]) as [Tab,string][]).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} className={`shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} className={`shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
       {tab==="spa-bookings"&&(
         <div className="space-y-3">
           {bookings.length === 0 && (
-            <div className="text-center py-12 text-white/40 text-sm">No spa bookings yet. Create services and accept bookings from guests.</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">No spa bookings yet. Create services and accept bookings from guests.</div>
           )}
           {bookings.map(b=>(
-            <div key={b.id} onClick={()=>setDetailBooking(b)} title="Click for full guest details" className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 cursor-pointer hover:border-emerald-500/30 transition-colors">
+            <div key={b.id} onClick={()=>setDetailBooking(b)} title="Click for full guest details" className="bg-card border border-border rounded-lg p-4 cursor-pointer hover:border-success-border transition-colors">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0"><Leaf className="h-5 w-5 text-emerald-400"/></div>
+                <div className="h-10 w-10 rounded-lg bg-success-subtle flex items-center justify-center shrink-0"><Leaf className="h-5 w-5 text-success"/></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="text-sm font-bold">{b.guest}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${b.status==="confirmed"?"bg-emerald-500/20 text-emerald-400":b.status==="completed"?"bg-teal-500/20 text-teal-400":"bg-yellow-500/20 text-yellow-400"}`}>{b.status}</span>
-                    {b.amount>0&&<span className="text-xs text-amber-400 font-bold">₹{b.amount}</span>}
+                    <p className="text-sm font-semibold">{b.guest}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${b.status==="confirmed"?"bg-success-subtle text-success":b.status==="completed"?"bg-success-subtle text-success":"bg-warning-subtle text-warning"}`}>{b.status}</span>
+                    {b.amount>0&&<span className="text-xs text-primary font-semibold">₹{b.amount}</span>}
                   </div>
-                  <p className="text-sm text-white/70">{b.service}</p>
-                  <div className="flex items-center gap-3 text-xs text-white/40 mt-1">
+                  <p className="text-sm text-foreground">{b.service}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{b.time}</span>
                     <span>Room: {b.room}</span>
                     <span>Therapist: {b.therapist}</span>
                   </div>
-                  {b.notes&&<p className="text-xs text-yellow-300/70 mt-1">⚠️ {b.notes}</p>}
+                  {b.notes&&<p className="text-xs text-warning mt-1"><AlertTriangle className="h-3 w-3 inline mb-0.5" /> {b.notes}</p>}
                 </div>
                 <div className="flex gap-2 shrink-0" onClick={e=>e.stopPropagation()}>
-                  {b.status==="pending"&&<button onClick={()=>updateBooking(b.id,"confirmed")} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Confirm</button>}
-                  {b.status==="confirmed"&&<button onClick={()=>updateBooking(b.id,"completed")} className="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 text-xs font-semibold hover:bg-teal-500/30 flex items-center gap-1"><CheckCircle className="h-3 w-3"/>Done</button>}
+                  {b.status==="pending"&&<button onClick={()=>updateBooking(b.id,"confirmed")} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate">Confirm</button>}
+                  {b.status==="confirmed"&&<button onClick={()=>updateBooking(b.id,"completed")} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate flex items-center gap-1"><CheckCircle className="h-3 w-3"/>Done</button>}
                 </div>
               </div>
             </div>
@@ -290,22 +290,22 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
         <div className="space-y-5">
           {/* Therapist Availability */}
           <div>
-            <h3 className="text-sm font-bold text-white/70 mb-3">Therapist Status</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Therapist Status</h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {therapists.length === 0 && (
-                <p className="text-sm text-white/40 col-span-full">Add spa staff in Staff Management to see therapist availability.</p>
+                <p className="text-sm text-muted-foreground col-span-full">Add spa staff in Staff Management to see therapist availability.</p>
               )}
               {therapists.map(t=>(
-                <div key={t.name} className={`rounded-xl border p-3 ${t.status==="available"?"border-emerald-500/20 bg-emerald-500/5":"border-orange-500/20 bg-orange-500/5"}`}>
+                <div key={t.name} className={`rounded-lg border p-3 ${t.status==="available"?"border-success-border bg-success-subtle":"border-warning-border bg-warning-subtle"}`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <div className={`h-2 w-2 rounded-full ${t.status==="available"?"bg-emerald-400":"bg-orange-400"}`}/>
-                    <p className="text-sm font-bold">{t.name}</p>
+                    <div className={`h-2 w-2 rounded-full ${t.status==="available"?"bg-success":"bg-warning"}`}/>
+                    <p className="text-sm font-semibold">{t.name}</p>
                   </div>
-                  <p className="text-xs text-white/40">{t.specialization}</p>
-                  <p className={`text-xs mt-1 font-semibold ${t.status==="available"?"text-emerald-400":"text-orange-400"}`}>
+                  <p className="text-xs text-muted-foreground">{t.specialization}</p>
+                  <p className={`text-xs mt-1 font-semibold ${t.status==="available"?"text-success":"text-warning"}`}>
                     {t.status==="available"?"Available":t.busyUntil?`Busy until ${t.busyUntil}`:"Busy"}
                   </p>
-                  <p className="text-xs text-white/30">{t.bookingsToday} bookings today</p>
+                  <p className="text-xs text-muted-foreground">{t.bookingsToday} bookings today</p>
                 </div>
               ))}
             </div>
@@ -314,7 +314,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
           {/* Category Filter */}
           <div className="flex gap-2 flex-wrap">
             {["all","massage","couple","beauty","wellness"].map(c=>(
-              <button key={c} onClick={()=>setCatFilter(c)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border capitalize transition-all ${catFilter===c?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/40"}`}>{c==="all"?"All Services":c}</button>
+              <button key={c} onClick={()=>setCatFilter(c)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${catFilter===c?"bg-primary/20 border-primary/40 text-primary":"border-border bg-muted text-muted-foreground"}`}>{c==="all"?"All Services":c}</button>
             ))}
           </div>
 
@@ -322,26 +322,26 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
             {packages.filter(p=>catFilter==="all"||p.category===catFilter).map(p=>{
               const cfg = CATEGORY_CFG[p.category]||CATEGORY_CFG.wellness;
               return (
-                <div key={p.id} className={`bg-[#0e1520] border rounded-2xl p-4 ${p.available?"border-white/5":"border-red-500/15 opacity-60"}`}>
+                <div key={p.id} className={`bg-card border rounded-lg p-4 ${p.available?"border-border":"border-danger-border opacity-60"}`}>
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-bold">{p.name}</h3>
-                      <div className="flex items-center gap-2 text-xs text-white/40 mt-0.5">
+                      <h3 className="font-semibold">{p.name}</h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{p.duration}</span>
-                        <span className={`capitalize px-1.5 py-0.5 rounded-md bg-white/10 ${cfg.color}`}>{p.category}</span>
+                        <span className={`capitalize px-1.5 py-0.5 rounded-md bg-muted ${cfg.color}`}>{p.category}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-extrabold text-amber-400">₹{p.price.toLocaleString()}</p>
-                      {!p.available&&<span className="text-xs text-red-400">Not available</span>}
+                      <p className="text-lg font-semibold text-primary">₹{p.price.toLocaleString()}</p>
+                      {!p.available&&<span className="text-xs text-danger">Not available</span>}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {p.includes.map(inc=><span key={inc} className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-white/50">✓ {inc}</span>)}
+                    {p.includes.map(inc=><span key={inc} className="text-xs px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground inline-flex items-center gap-1"><Check className="h-3 w-3" />{inc}</span>)}
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-white/30">Therapists: {p.therapists.join(", ")}</p>
-                    {p.available&&<button onClick={()=>setShowBook(true)} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Book Now</button>}
+                    <p className="text-xs text-muted-foreground">Therapists: {p.therapists.join(", ")}</p>
+                    {p.available&&<button onClick={()=>setShowBook(true)} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate">Book Now</button>}
                   </div>
                 </div>
               );
@@ -354,19 +354,19 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
         <div className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             {["all","spirits","beer","wine","cocktail","mocktail"].map(c=>(
-              <button key={c} onClick={()=>setCatFilter(c)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border capitalize transition-all ${catFilter===c?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/40"}`}>{c==="all"?"All Categories":c}</button>
+              <button key={c} onClick={()=>setCatFilter(c)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${catFilter===c?"bg-primary/20 border-primary/40 text-primary":"border-border bg-muted text-muted-foreground"}`}>{c==="all"?"All Categories":c}</button>
             ))}
           </div>
           {FEATURES.hotelReception && (
-            <div className="bg-[#0e1520] border border-amber-500/20 rounded-2xl p-4">
-              <p className="text-sm font-bold mb-1 flex items-center gap-2"><Wine className="h-4 w-4 text-amber-400"/>Charge to Room</p>
-              <p className="text-xs text-white/30 mb-3">Neeche items pe click karke cart me daalo, room number bharo, phir Charge — bill us room ke folio me chala jayega.</p>
+            <div className="bg-card border border-primary/20 rounded-lg p-4">
+              <p className="text-sm font-semibold mb-1 flex items-center gap-2"><Wine className="h-4 w-4 text-primary"/>Charge to Room</p>
+              <p className="text-xs text-muted-foreground mb-3">Neeche items pe click karke cart me daalo, room number bharo, phir Charge — bill us room ke folio me chala jayega.</p>
               <div className="flex flex-wrap items-center gap-2">
-                <input value={barRoom} onChange={e=>setBarRoom(e.target.value)} placeholder="Room No." className="w-28 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
-                <div className="flex-1 min-w-0 text-xs text-white/50 truncate">{barCart.length ? barCart.map(c=>`${c.qty}x ${c.name}`).join(", ") : "No items yet — tap items below"}</div>
-                <span className="text-sm font-bold text-amber-400">₹{barCartTotal}</span>
-                {barCart.length>0 && <button onClick={()=>setBarCart([])} className="text-xs text-white/40 hover:text-white px-2">Clear</button>}
-                <button onClick={chargeBarToRoom} disabled={!barRoom.trim()||barCart.length===0||chargingBar} className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">{chargingBar?"…":"Charge"}</button>
+                <input value={barRoom} onChange={e=>setBarRoom(e.target.value)} placeholder="Room No." className="w-28 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
+                <div className="flex-1 min-w-0 text-xs text-muted-foreground truncate">{barCart.length ? barCart.map(c=>`${c.qty}x ${c.name}`).join(", ") : "No items yet — tap items below"}</div>
+                <span className="text-sm font-semibold text-primary">₹{barCartTotal}</span>
+                {barCart.length>0 && <button onClick={()=>setBarCart([])} className="text-xs text-muted-foreground hover:text-foreground px-2">Clear</button>}
+                <button onClick={chargeBarToRoom} disabled={!barRoom.trim()||barCart.length===0||chargingBar} className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold disabled:opacity-40">{chargingBar?"…":"Charge"}</button>
               </div>
             </div>
           )}
@@ -374,11 +374,11 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
             {filteredBar.map(item=>{
               const cfg = CATEGORY_CFG[item.category]||CATEGORY_CFG.cocktail;
               return (
-                <button key={item.id} onClick={FEATURES.hotelReception ? ()=>addBarItem(item) : undefined} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 text-left hover:border-white/10 transition-all">
-                  <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center mb-3 ${cfg.color}`}><cfg.icon className="h-5 w-5"/></div>
-                  <p className="text-sm font-bold">{item.name}</p>
-                  <p className="text-xs text-amber-400 font-extrabold mt-0.5">₹{item.price}</p>
-                  <p className={`text-xs mt-1 ${item.stock<item.minStock?"text-red-400":"text-white/30"}`}>{item.stock<999?`Stock: ${item.stock} ${item.unit}${item.stock<item.minStock?" ⚠️":""}`:item.category}</p>
+                <button key={item.id} onClick={FEATURES.hotelReception ? ()=>addBarItem(item) : undefined} className="bg-card border border-border rounded-lg p-4 text-left hover:border-border transition-colors">
+                  <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-3 ${cfg.color}`}><cfg.icon className="h-5 w-5"/></div>
+                  <p className="text-sm font-semibold">{item.name}</p>
+                  <p className="text-xs text-primary font-semibold mt-0.5">₹{item.price}</p>
+                  <p className={`text-xs mt-1 ${item.stock<item.minStock?"text-danger":"text-muted-foreground"}`}>{item.stock<999?`Stock: ${item.stock} ${item.unit}${item.stock<item.minStock?" (low)":""}`:item.category}</p>
                 </button>
               );
             })}
@@ -389,49 +389,51 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       {tab==="bar-inventory"&&(
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-white/70">Bar Products ({barItems.length})</p>
-            <button onClick={()=>setShowAddBar(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all">
+            <p className="text-sm font-semibold text-foreground">Bar Products ({barItems.length})</p>
+            <button onClick={()=>setShowAddBar(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors">
               <Plus className="h-4 w-4"/>Add Product
             </button>
           </div>
           {lowStock.length>0&&(
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-              <p className="text-sm font-bold text-red-400 mb-2">⚠️ Low Stock Alerts ({lowStock.length} items)</p>
+            <div className="bg-danger-subtle border border-danger-border rounded-lg p-4">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-danger mb-2"><AlertTriangle className="h-4 w-4" />Low Stock Alerts ({lowStock.length} items)</p>
               <div className="flex flex-wrap gap-2">
-                {lowStock.map(i=><span key={i.id} className="text-xs bg-red-500/20 text-red-300 px-2.5 py-1 rounded-full">{i.name} — {i.stock} left</span>)}
+                {lowStock.map(i=><span key={i.id} className="text-xs bg-danger-subtle text-danger px-2.5 py-1 rounded-full">{i.name} — {i.stock} left</span>)}
               </div>
             </div>
           )}
           {barItems.length===0 && (
-            <div className="text-center py-12 text-white/40 text-sm border border-white/5 rounded-2xl bg-white/[0.02]">
+            <div className="text-center py-12 text-muted-foreground text-sm border border-border rounded-lg bg-card">
               No bar products yet. Click "Add Product" to add spirits, beer, wine, cocktails etc.
             </div>
           )}
           {barItems.length>0 && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-white/30 border-b border-white/5">
-                {["Item","Category","Price","Stock","Min Stock","Status"].map(h=><th key={h} className="pb-3 pr-4 font-medium">{h}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {barItems.filter(i=>i.stock<999).map(item=>{
-                const isLow = item.stock<item.minStock;
-                return (
-                  <tr key={item.id} className={`hover:bg-white/3 transition-all ${isLow?"bg-red-500/3":""}`}>
-                    <td className="py-3 pr-4 font-semibold">{item.name}</td>
-                    <td className="py-3 pr-4 capitalize text-white/50">{item.category}</td>
-                    <td className="py-3 pr-4 text-amber-400">₹{item.price}</td>
-                    <td className="py-3 pr-4 font-bold">{item.stock} <span className="text-white/30 font-normal">{item.unit}</span></td>
-                    <td className="py-3 pr-4 text-white/40">{item.minStock}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isLow?"bg-red-500/20 text-red-400":"bg-emerald-500/20 text-emerald-400"}`}>{isLow?"Low Stock":"OK"}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  {["Item","Category","Price","Stock","Min Stock","Status"].map(h=><th key={h} className="pb-3 pr-4 font-medium">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {barItems.filter(i=>i.stock<999).map(item=>{
+                  const isLow = item.stock<item.minStock;
+                  return (
+                    <tr key={item.id} className={`hover:bg-muted transition-colors ${isLow?"bg-danger-subtle":""}`}>
+                      <td className="py-3 pr-4 font-semibold">{item.name}</td>
+                      <td className="py-3 pr-4 capitalize text-muted-foreground">{item.category}</td>
+                      <td className="py-3 pr-4 text-primary">₹{item.price}</td>
+                      <td className="py-3 pr-4 font-semibold">{item.stock} <span className="text-muted-foreground font-normal">{item.unit}</span></td>
+                      <td className="py-3 pr-4 text-muted-foreground">{item.minStock}</td>
+                      <td className="py-3 pr-4">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isLow?"bg-danger-subtle text-danger":"bg-success-subtle text-success"}`}>{isLow?"Low Stock":"OK"}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           )}
         </div>
       )}
@@ -439,30 +441,30 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       {tab==="recipes"&&(
         <div className="grid lg:grid-cols-3 gap-4">
           {cocktailRecipes.map(recipe=>(
-            <div key={recipe.name} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5 hover:border-amber-500/20 cursor-pointer transition-all" onClick={()=>setSelectedRecipe(selectedRecipe?.name===recipe.name?null:recipe)}>
+            <div key={recipe.name} className="bg-card border border-border rounded-lg p-5 hover:border-primary/20 cursor-pointer transition-colors" onClick={()=>setSelectedRecipe(selectedRecipe?.name===recipe.name?null:recipe)}>
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="font-bold">{recipe.name}</h3>
-                  <p className="text-xs text-white/40 mt-0.5">Glass: {recipe.glass}</p>
+                  <h3 className="font-semibold">{recipe.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Glass: {recipe.glass}</p>
                 </div>
-                <Wine className="h-5 w-5 text-amber-400"/>
+                <Wine className="h-5 w-5 text-primary"/>
               </div>
-              <p className="text-xs text-white/50 mb-3">Garnish: {recipe.garnish}</p>
+              <p className="text-xs text-muted-foreground mb-3">Garnish: {recipe.garnish}</p>
               <div className="flex flex-wrap gap-1">
-                {recipe.ingredients.slice(0,3).map(i=><span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-white/40">{i}</span>)}
-                {recipe.ingredients.length>3&&<span className="text-xs text-white/30">+{recipe.ingredients.length-3} more</span>}
+                {recipe.ingredients.slice(0,3).map(i=><span key={i} className="text-xs px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">{i}</span>)}
+                {recipe.ingredients.length>3&&<span className="text-xs text-muted-foreground">+{recipe.ingredients.length-3} more</span>}
               </div>
               {selectedRecipe?.name===recipe.name&&(
-                <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                <div className="mt-4 pt-4 border-t border-border space-y-3">
                   <div>
-                    <p className="text-xs text-white/40 mb-1 uppercase tracking-wide">All Ingredients</p>
+                    <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">All Ingredients</p>
                     <div className="space-y-1">
-                      {recipe.ingredients.map(i=><p key={i} className="text-xs text-white/70">• {i}</p>)}
+                      {recipe.ingredients.map(i=><p key={i} className="text-xs text-foreground">• {i}</p>)}
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-white/40 mb-1 uppercase tracking-wide">Preparation</p>
-                    <p className="text-xs text-white/70 leading-relaxed">{recipe.prep}</p>
+                    <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Preparation</p>
+                    <p className="text-xs text-foreground leading-relaxed">{recipe.prep}</p>
                   </div>
                 </div>
               )}
@@ -473,46 +475,46 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
 
       {/* Spa Booking Modal */}
       {showAddBar&&(
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={()=>setShowAddBar(false)}>
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <h3 className="font-bold flex items-center gap-2"><Wine className="h-5 w-5 text-amber-400"/> Add bar product</h3>
-              <button onClick={()=>setShowAddBar(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={()=>setShowAddBar(false)}>
+          <div className="w-full max-w-md bg-card rounded-lg border border-border max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><Wine className="h-5 w-5 text-primary"/> Add bar product</h3>
+              <button onClick={()=>setShowAddBar(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
-                <label className="block text-xs text-white/40 mb-1">Product name <span className="text-red-400">*</span></label>
-                <input value={newBar.name} onChange={e=>setNewBar(p=>({...p,name:e.target.value}))} placeholder="e.g. Old Monk Rum" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                <label className="block text-xs text-muted-foreground mb-1">Product name <span className="text-danger">*</span></label>
+                <input value={newBar.name} onChange={e=>setNewBar(p=>({...p,name:e.target.value}))} placeholder="e.g. Old Monk Rum" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"/>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Category</label>
-                  <select value={newBar.category} onChange={e=>setNewBar(p=>({...p,category:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+                  <label className="block text-xs text-muted-foreground mb-1">Category</label>
+                  <select value={newBar.category} onChange={e=>setNewBar(p=>({...p,category:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                     {["spirits","beer","wine","cocktail","mocktail"].map(c=><option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Unit</label>
-                  <select value={newBar.unit} onChange={e=>setNewBar(p=>({...p,unit:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+                  <label className="block text-xs text-muted-foreground mb-1">Unit</label>
+                  <select value={newBar.unit} onChange={e=>setNewBar(p=>({...p,unit:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                     {["bottle","peg","glass","pint","can","unit"].map(u=><option key={u} value={u}>{u}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Price (₹)</label>
-                  <input type="number" min={0} value={newBar.price} onChange={e=>setNewBar(p=>({...p,price:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                  <label className="block text-xs text-muted-foreground mb-1">Price (₹)</label>
+                  <input type="number" min={0} value={newBar.price} onChange={e=>setNewBar(p=>({...p,price:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"/>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Stock</label>
-                  <input type="number" min={0} value={newBar.stock} onChange={e=>setNewBar(p=>({...p,stock:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                  <label className="block text-xs text-muted-foreground mb-1">Stock</label>
+                  <input type="number" min={0} value={newBar.stock} onChange={e=>setNewBar(p=>({...p,stock:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"/>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Min stock (alert)</label>
-                  <input type="number" min={0} value={newBar.minStock} onChange={e=>setNewBar(p=>({...p,minStock:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"/>
+                  <label className="block text-xs text-muted-foreground mb-1">Min stock (alert)</label>
+                  <input type="number" min={0} value={newBar.minStock} onChange={e=>setNewBar(p=>({...p,minStock:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"/>
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={()=>setShowAddBar(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
-                <button onClick={saveNewBarItem} disabled={savingBar||!newBar.name.trim()} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">{savingBar?"Saving…":"Add product"}</button>
+                <button onClick={()=>setShowAddBar(false)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Cancel</button>
+                <button onClick={saveNewBarItem} disabled={savingBar||!newBar.name.trim()} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold disabled:opacity-40">{savingBar?"Saving…":"Add product"}</button>
               </div>
             </div>
           </div>
@@ -520,11 +522,11 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       )}
 
       {showBook&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Book Spa Service</h2>
-              <button onClick={()=>setShowBook(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">Book Spa Service</h2>
+              <button onClick={()=>setShowBook(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-4">
               {[
@@ -532,31 +534,31 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
                 {label:"Room Number",key:"room",placeholder:"e.g. 205 or Walk-in"},
                 {label:"Preferred Time",key:"time",type:"time"},
               ].map(f=>(
-                <div key={f.key}><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
-                  <input type={f.type||"text"} value={(newBook as any)[f.key]} onChange={e=>setNewBook(p=>({...p,[f.key]:e.target.value}))} placeholder={(f as any).placeholder||""} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                <div key={f.key}><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  <input type={f.type||"text"} value={(newBook as any)[f.key]} onChange={e=>setNewBook(p=>({...p,[f.key]:e.target.value}))} placeholder={(f as any).placeholder||""} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
                 </div>
               ))}
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Service</label>
-                <select value={newBook.serviceId} onChange={e=>setNewBook(p=>({...p,serviceId:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Service</label>
+                <select value={newBook.serviceId} onChange={e=>setNewBook(p=>({...p,serviceId:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none text-foreground">
                   {packages.filter(p=>p.available).map(p=><option key={p.id} value={p.id}>{p.name} — ₹{p.price} ({p.duration})</option>)}
                 </select>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Therapist</label>
-                <select value={newBook.therapist} onChange={e=>setNewBook(p=>({...p,therapist:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Therapist</label>
+                <select value={newBook.therapist} onChange={e=>setNewBook(p=>({...p,therapist:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none text-foreground">
                   {therapists.map(t=><option key={t.name} value={t.name}>{t.name} — {t.specialization} {t.status==="busy"?`(Busy until ${t.busyUntil})`:""}</option>)}
                 </select>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Special Notes</label>
-                <textarea value={newBook.notes} onChange={e=>setNewBook(p=>({...p,notes:e.target.value}))} rows={2} placeholder="Allergies, preferences..." className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Special Notes</label>
+                <textarea value={newBook.notes} onChange={e=>setNewBook(p=>({...p,notes:e.target.value}))} rows={2} placeholder="Allergies, preferences..." className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-muted-foreground"/>
               </div>
               {FEATURES.hotelReception && (
-                <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Discount ₹ (in-house guest)</label>
-                  <input type="number" value={newBook.discount} onChange={e=>setNewBook(p=>({...p,discount:e.target.value}))} placeholder="0" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
-                  <p className="text-[11px] text-white/30 mt-1">Room number bharoge to bill us room ke folio me add ho jayega.</p>
+                <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Discount ₹ (in-house guest)</label>
+                  <input type="number" value={newBook.discount} onChange={e=>setNewBook(p=>({...p,discount:e.target.value}))} placeholder="0" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
+                  <p className="text-2xs text-muted-foreground mt-1">Room number bharoge to bill us room ke folio me add ho jayega.</p>
                 </div>
               )}
               <div className="flex gap-3">
-                <button onClick={()=>setShowBook(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
+                <button onClick={()=>setShowBook(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
                 <button onClick={async ()=>{
                   const svc = packages.find(p=>p.id===newBook.serviceId);
                   if(!newBook.guest || !restaurantId) return;
@@ -587,7 +589,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
                     setNewBook({guest:"",room:"",serviceId:packages[0]?.id || "",therapist:therapists[0]?.name || "",time:"",notes:"",discount:""});
                     setShowBook(false);
                   } catch (e) { console.error(e); }
-                }} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Book Now</button>
+                }} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm">Book Now</button>
               </div>
             </div>
           </div>
@@ -621,32 +623,32 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
         }
         if (b.notes) rows.push(["Notes", b.notes]);
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailBooking(null)}>
-            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+          <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailBooking(null)}>
+            <div className="w-full max-w-md bg-card rounded-lg border border-border text-foreground max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-base truncate flex items-center gap-2"><Leaf className="h-4 w-4 text-emerald-400" />{b.guest}</h3>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.status === "completed" ? "bg-teal-500/20 text-teal-300" : b.status === "confirmed" ? "bg-emerald-500/20 text-emerald-300" : b.status === "cancelled" ? "bg-rose-500/20 text-rose-300" : "bg-yellow-500/20 text-yellow-300"}`}>{b.status}</span>
-                    {paid && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">PAID</span>}
+                    <h3 className="font-semibold text-base truncate flex items-center gap-2"><Leaf className="h-4 w-4 text-success" />{b.guest}</h3>
+                    <span className={`text-2xs font-semibold px-2 py-0.5 rounded-full ${b.status === "completed" ? "bg-success-subtle text-success" : b.status === "confirmed" ? "bg-success-subtle text-success" : b.status === "cancelled" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"}`}>{b.status}</span>
+                    {paid && <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-success-subtle text-success">PAID</span>}
                   </div>
-                  <p className="text-xs text-white/40 mt-0.5">{b.service}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{b.service}</p>
                 </div>
-                <button onClick={() => setDetailBooking(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+                <button onClick={() => setDetailBooking(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
               </div>
               <div className="p-5">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {rows.map(([k, v]) => (
                     <div key={k}>
-                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-2xs text-muted-foreground">{k}</p>
                       <p className="text-sm font-medium break-all capitalize">{v}</p>
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2 mt-5" onClick={e => e.stopPropagation()}>
-                  {b.status === "pending" && <button onClick={() => { updateBooking(b.id, "confirmed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30">Confirm</button>}
-                  {b.status === "confirmed" && <button onClick={() => { updateBooking(b.id, "completed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-xl bg-teal-500/20 text-teal-300 text-sm font-bold hover:bg-teal-500/30 flex items-center justify-center gap-1"><CheckCircle className="h-4 w-4" /> Mark Done</button>}
-                  <button onClick={() => setDetailBooking(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">Close</button>
+                  {b.status === "pending" && <button onClick={() => { updateBooking(b.id, "confirmed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-lg bg-success-subtle text-success text-sm font-semibold hover-elevate">Confirm</button>}
+                  {b.status === "confirmed" && <button onClick={() => { updateBooking(b.id, "completed"); setDetailBooking(null); }} className="flex-1 py-2.5 rounded-lg bg-success-subtle text-success text-sm font-semibold hover-elevate flex items-center justify-center gap-1"><CheckCircle className="h-4 w-4" /> Mark Done</button>}
+                  <button onClick={() => setDetailBooking(null)} className="flex-1 py-2.5 rounded-lg border border-border text-muted-foreground text-sm font-semibold hover:bg-muted">Close</button>
                 </div>
               </div>
             </div>

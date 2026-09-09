@@ -350,6 +350,11 @@ router.post("/superadmin/owners/:userId/reject", ...admin, async (req: any, res)
 router.put("/superadmin/vendors/:vendorId/plan", ...admin, async (req, res): Promise<void> => {
     const id = parseInt(String(req.params.vendorId), 10);
     const { plan } = req.body;
+    // Any string used to be accepted here. A plan id that is not in platform_plans has
+    // no price, so the vendor's subscription silently falls to zero and drops out of
+    // MRR while the change still reports success.
+    const [planRow] = await db.select().from(platformPlansTable).where(eq(platformPlansTable.id, String(plan ?? "")));
+    if (!planRow) { res.status(400).json({ error: "Unknown plan" }); return; }
     const [updated] = await db.update(restaurantsTable).set({ plan }).where(eq(restaurantsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     const { syncPlanKitchenEntitlements } = await import("../lib/feature-modules/entitlements.js");
@@ -591,14 +596,61 @@ router.get("/superadmin/plans", ...admin, async (_req, res) => {
   })));
 });
 
+/**
+ * A plan is a price list. Nothing validated it, so a plan could be published at a
+ * negative price — a venue subscribing to it would be credited rather than billed —
+ * or with a negative/zero allowance, which grants nothing and cannot be sold. Only the
+ * fields actually present are checked, so this serves the partial PUT as well as POST.
+ *
+ * Zero is allowed where zero is a real offer (a free plan, a plan with no trial) and
+ * refused where it is not (a plan that permits no branches, items, staff or tables).
+ */
+function validatePlanInput(body: Record<string, unknown>): string | null {
+  if ("name" in body && String(body.name ?? "").trim() === "") {
+    return "name cannot be blank";
+  }
+  if ("price" in body && body.price !== undefined) {
+    const price = Number(body.price);
+    if (!Number.isFinite(price)) return "price must be a number";
+    if (price < 0) return "price cannot be negative — a plan bills the vendor, it does not pay them";
+  }
+  const limits: [string, unknown][] = [
+    ["maxBranches", body.maxBranches], ["maxItems", body.maxItems],
+    ["maxStaff", body.maxStaff], ["maxTables", body.maxTables],
+  ];
+  for (const [field, raw] of limits) {
+    if (raw === undefined || raw === null) continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n)) return `${field} must be a whole number`;
+    if (n < 1) return `${field} must be at least 1 — a plan that allows none of them cannot be sold`;
+  }
+  if (body.maxOrdersPerMonth !== undefined && body.maxOrdersPerMonth !== null) {
+    const n = Number(body.maxOrdersPerMonth);
+    if (!Number.isInteger(n) || n < 1) return "maxOrdersPerMonth must be at least 1, or empty for unlimited";
+  }
+  if (body.trialDays !== undefined && body.trialDays !== null) {
+    const n = Number(body.trialDays);
+    if (!Number.isInteger(n) || n < 0) return "trialDays must be a whole number of 0 or more";
+  }
+  return null;
+}
+
 router.post("/superadmin/plans", ...admin, async (req, res) => {
   const { id, name, price, features, maxBranches, maxItems, maxStaff, maxTables,
     maxOrdersPerMonth, trialDays, isPublished, featureToggles } = req.body;
+  if (!String(name ?? "").trim()) { res.status(400).json({ error: "name is required" }); return; }
+  const invalid = validatePlanInput(req.body ?? {});
+  if (invalid) { res.status(400).json({ error: invalid }); return; }
+  // Checked here rather than left to the unique constraint, so the message names the
+  // plan instead of surfacing a generic "that value is already in use".
+  const planId = String(id || `plan_${Date.now()}`);
+  const [clash] = await db.select().from(platformPlansTable).where(eq(platformPlansTable.id, planId));
+  if (clash) { res.status(409).json({ error: `A plan with the id "${planId}" already exists` }); return; }
   // Every field the plan builder sends has to be persisted here. Dropping maxTables /
   // trialDays / isPublished meant a plan created with a 14-day trial silently came back
   // with none, and the admin got a success toast either way.
   const [plan] = await db.insert(platformPlansTable).values({
-    id: id || `plan_${Date.now()}`, name, price: String(price ?? 0), currency: PLATFORM_CURRENCY,
+    id: planId, name, price: String(price ?? 0), currency: PLATFORM_CURRENCY,
     features: features ?? [], maxBranches: maxBranches ?? 1, maxItems: maxItems ?? 50, maxStaff: maxStaff ?? 5,
     maxTables: maxTables ?? 20, maxOrdersPerMonth: maxOrdersPerMonth ?? null, trialDays: trialDays ?? 0,
     isPublished: isPublished !== false,
@@ -609,14 +661,30 @@ router.post("/superadmin/plans", ...admin, async (req, res) => {
 
 router.put("/superadmin/plans/:id", ...admin, async (req, res) => {
   const { name, price, features, maxBranches, maxItems, maxStaff, maxTables, maxOrdersPerMonth, trialDays, isPublished, featureToggles, currency } = req.body;
+  // The edit path went unchecked entirely, so an existing published plan could be
+  // repriced to a negative figure.
+  const invalid = validatePlanInput(req.body ?? {});
+  if (invalid) { res.status(400).json({ error: invalid }); return; }
   const [plan] = await db.update(platformPlansTable).set({
     name, price: price !== undefined ? String(price) : undefined, features, maxBranches, maxItems, maxStaff,
     maxTables, maxOrdersPerMonth, trialDays, isPublished, featureToggles, currency: PLATFORM_CURRENCY,
   }).where(eq(platformPlansTable.id, req.params.id)).returning();
-  res.json(plan ?? { error: "Not found" });
+  // This answered 200 with an error body, and the web client only throws on !res.ok —
+  // so an edit that saved nothing came back to the operator as "Plan saved".
+  if (!plan) { res.status(404).json({ error: "Plan not found" }); return; }
+  res.json(plan);
 });
 
 router.delete("/superadmin/plans/:id", ...admin, async (req, res) => {
+  // Deleting a plan vendors are still on left them pointing at a row that no longer
+  // exists: their invoice amount became 0 and that revenue vanished from MRR with no
+  // warning. Move them to another plan first.
+  const [{ inUse } = { inUse: 0 }] = await db.select({ inUse: count() })
+    .from(restaurantsTable).where(eq(restaurantsTable.plan, String(req.params.id)));
+  if (inUse > 0) {
+    res.status(409).json({ error: `${inUse} vendor${inUse === 1 ? " is" : "s are"} still on this plan` });
+    return;
+  }
   const [deleted] = await db.delete(platformPlansTable).where(eq(platformPlansTable.id, req.params.id)).returning();
   if (!deleted) { res.status(404).json({ error: "Plan not found" }); return; }
   res.json({ deleted: true });
@@ -755,11 +823,17 @@ router.get("/superadmin/settlements", ...admin, async (_req, res) => {
 
 router.post("/superadmin/settlements/:id/release", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("STL-", ""), 10);
+  // Stamp where this payout period ends, so the next one starts here rather than summing
+  // the venue's whole history again and paying for these orders a second time.
+  const releasedAt = new Date();
   const [updated] = await db.update(platformSettlementsTable).set({
-    status: "released", releasedAt: new Date(),
+    status: "released", releasedAt, periodEnd: releasedAt,
   }).where(eq(platformSettlementsTable.id, id)).returning();
+  // No row matched: the payout was never released. This used to answer 200 with a
+  // synthesised "released" body, so the screen reported a payout that never moved.
+  if (!updated) { res.status(404).json({ error: "Settlement not found" }); return; }
   await logPlatformAudit(req, "Payout Released", "Settlements", req.params.id);
-  res.json(updated ?? { id: req.params.id, status: "released" });
+  res.json(updated);
 });
 
 router.post("/superadmin/settlements/:id/hold", ...admin, async (req, res) => {
@@ -768,16 +842,18 @@ router.post("/superadmin/settlements/:id/hold", ...admin, async (req, res) => {
   const [updated] = await db.update(platformSettlementsTable).set({
     status: "held", holdReason: reason || "Manual hold",
   }).where(eq(platformSettlementsTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "Settlement not found" }); return; }
   await logPlatformAudit(req, "Payout Held", "Settlements", req.params.id, { reason });
-  res.json(updated ?? { id: req.params.id, status: "held" });
+  res.json(updated);
 });
 
 router.post("/superadmin/settlements/:id/retry", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace(/^(STL-|SET-)/, ""), 10);
   const [updated] = await db.update(platformSettlementsTable).set({ status: "pending", holdReason: null })
     .where(eq(platformSettlementsTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "Settlement not found" }); return; }
   await logPlatformAudit(req, "Settlement Retry", "Settlements", req.params.id);
-  res.json(updated ?? { id: req.params.id, status: "pending" });
+  res.json(updated);
 });
 
 router.get("/superadmin/kyc", ...admin, async (_req, res) => {
@@ -786,7 +862,10 @@ router.get("/superadmin/kyc", ...admin, async (_req, res) => {
 
 router.post("/superadmin/kyc/:id/approve", ...admin, async (req, res) => {
   const restaurantId = parseInt(String(req.params.id).replace("kyc_", ""), 10);
-  await updateKycStatus(restaurantId, "approved");
+  // updateKycStatus returns nothing when the vendor does not exist. Without this the
+  // route answered "Approved" and wrote an audit row for a restaurant that is not there.
+  const approved = await updateKycStatus(restaurantId, "approved");
+  if (!approved) { res.status(404).json({ error: "Vendor not found" }); return; }
   await logPlatformAudit(req, "KYC Approved", "KYC", String(restaurantId));
   res.json({ id: req.params.id, status: "Approved" });
 });
@@ -794,14 +873,16 @@ router.post("/superadmin/kyc/:id/approve", ...admin, async (req, res) => {
 router.post("/superadmin/kyc/:id/reject", ...admin, async (req, res) => {
   const restaurantId = parseInt(String(req.params.id).replace("kyc_", ""), 10);
   const { reason } = req.body;
-  await updateKycStatus(restaurantId, "rejected", reason);
+  const rejected = await updateKycStatus(restaurantId, "rejected", reason);
+  if (!rejected) { res.status(404).json({ error: "Vendor not found" }); return; }
   await logPlatformAudit(req, "KYC Rejected", "KYC", String(restaurantId), { reason });
   res.json({ id: req.params.id, status: "Action Required", rejectionReason: reason });
 });
 
 router.post("/superadmin/kyc/:id/request-more", ...admin, async (req, res) => {
   const restaurantId = parseInt(String(req.params.id).replace("kyc_", ""), 10);
-  await updateKycStatus(restaurantId, "action_required");
+  const flagged = await updateKycStatus(restaurantId, "action_required");
+  if (!flagged) { res.status(404).json({ error: "Vendor not found" }); return; }
   res.json({ id: req.params.id, status: "Action Required" });
 });
 
@@ -841,8 +922,11 @@ router.post("/superadmin/refunds/:id/approve", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("REF-", ""), 10);
   const [updated] = await db.update(platformRefundsTable).set({ status: "approved", processedAt: new Date() })
     .where(eq(platformRefundsTable.id, id)).returning();
+  // Approving a refund that is not there is not an approval. Reporting it as one told
+  // the operator money had been signed off when no row had changed.
+  if (!updated) { res.status(404).json({ error: "Refund not found" }); return; }
   await logPlatformAudit(req, "Refund Approved", "Refunds", req.params.id);
-  res.json(updated ?? { id: req.params.id, status: "Approved" });
+  res.json(updated);
 });
 
 router.post("/superadmin/refunds/:id/reject", ...admin, async (req, res) => {
@@ -851,7 +935,8 @@ router.post("/superadmin/refunds/:id/reject", ...admin, async (req, res) => {
   const { reason } = req.body;
   const [updated] = await db.update(platformRefundsTable).set({ status: "rejected", rejectionReason: reason, processedAt: new Date() })
     .where(eq(platformRefundsTable.id, id)).returning();
-  res.json(updated ?? { id: req.params.id, status: "Rejected", reason });
+  if (!updated) { res.status(404).json({ error: "Refund not found" }); return; }
+  res.json(updated);
 });
 
 router.get("/superadmin/support", ...admin, async (_req, res) => {
@@ -877,19 +962,22 @@ router.get("/superadmin/support", ...admin, async (_req, res) => {
 router.post("/superadmin/support/:id/resolve", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("TKT-", ""), 10);
   const { resolution } = req.body;
-  await db.update(supportTicketsTable).set({ status: "resolved", resolution: resolution || "Resolved" }).where(eq(supportTicketsTable.id, id));
+  const [t] = await db.update(supportTicketsTable).set({ status: "resolved", resolution: resolution || "Resolved" }).where(eq(supportTicketsTable.id, id)).returning();
+  if (!t) { res.status(404).json({ error: "Ticket not found" }); return; }
   res.json({ id: req.params.id, status: "Resolved" });
 });
 
 router.post("/superadmin/support/:id/escalate", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("TKT-", ""), 10);
-  await db.update(supportTicketsTable).set({ status: "escalated", priority: "high" }).where(eq(supportTicketsTable.id, id));
+  const [t] = await db.update(supportTicketsTable).set({ status: "escalated", priority: "high" }).where(eq(supportTicketsTable.id, id)).returning();
+  if (!t) { res.status(404).json({ error: "Ticket not found" }); return; }
   res.json({ id: req.params.id, status: "Escalated" });
 });
 
 router.post("/superadmin/support/:id/close", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("TKT-", ""), 10);
-  await db.update(supportTicketsTable).set({ status: "closed" }).where(eq(supportTicketsTable.id, id));
+  const [t] = await db.update(supportTicketsTable).set({ status: "closed" }).where(eq(supportTicketsTable.id, id)).returning();
+  if (!t) { res.status(404).json({ error: "Ticket not found" }); return; }
   res.json({ id: req.params.id, status: "Closed" });
 });
 
@@ -923,7 +1011,8 @@ router.patch("/superadmin/coupons/:id/toggle", ...admin, async (req, res) => {
 
 router.delete("/superadmin/coupons/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("cp_", ""), 10);
-  await db.delete(platformCouponsTable).where(eq(platformCouponsTable.id, id));
+  const [gone] = await db.delete(platformCouponsTable).where(eq(platformCouponsTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "Coupon not found" }); return; }
   res.json({ deleted: true });
 });
 
@@ -947,20 +1036,23 @@ router.get("/superadmin/fraud", ...admin, async (_req, res) => {
 
 router.post("/superadmin/fraud/:id/resolve", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("FA-", ""), 10);
-  await db.update(platformFraudAlertsTable).set({ status: "resolved", resolvedAt: new Date() }).where(eq(platformFraudAlertsTable.id, id));
+  const [resolved] = await db.update(platformFraudAlertsTable).set({ status: "resolved", resolvedAt: new Date() }).where(eq(platformFraudAlertsTable.id, id)).returning();
+  if (!resolved) { res.status(404).json({ error: "Alert not found" }); return; }
   res.json({ id: req.params.id, status: "Resolved" });
 });
 
 router.post("/superadmin/fraud/:id/dismiss", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("FA-", ""), 10);
-  await db.update(platformFraudAlertsTable).set({ status: "dismissed", resolvedAt: new Date() }).where(eq(platformFraudAlertsTable.id, id));
+  const [dismissed] = await db.update(platformFraudAlertsTable).set({ status: "dismissed", resolvedAt: new Date() }).where(eq(platformFraudAlertsTable.id, id)).returning();
+  if (!dismissed) { res.status(404).json({ error: "Alert not found" }); return; }
   res.json({ id: req.params.id, status: "Dismissed" });
 });
 
 router.post("/superadmin/fraud/:id/block", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("FA-", ""), 10);
   const [alert] = await db.select().from(platformFraudAlertsTable).where(eq(platformFraudAlertsTable.id, id));
-  if (alert?.restaurantId) {
+  if (!alert) { res.status(404).json({ error: "Alert not found" }); return; }
+  if (alert.restaurantId) {
     await db.update(restaurantsTable).set({ isActive: false }).where(eq(restaurantsTable.id, alert.restaurantId));
   }
   await db.update(platformFraudAlertsTable).set({ status: "resolved", resolvedAt: new Date() }).where(eq(platformFraudAlertsTable.id, id));
@@ -990,12 +1082,14 @@ router.put("/superadmin/commissions/:id", ...admin, async (req, res) => {
     name: req.body.name, ruleType: req.body.type, value: req.body.value !== undefined ? String(req.body.value) : undefined,
     unit: req.body.unit, applyTo: req.body.applyTo, status: req.body.status?.toLowerCase(),
   }).where(eq(platformCommissionRulesTable.id, id)).returning();
+  if (!r) { res.status(404).json({ error: "Commission rule not found" }); return; }
   res.json(r);
 });
 
 router.delete("/superadmin/commissions/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("cr_", ""), 10);
-  await db.delete(platformCommissionRulesTable).where(eq(platformCommissionRulesTable.id, id));
+  const [gone] = await db.delete(platformCommissionRulesTable).where(eq(platformCommissionRulesTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "Commission rule not found" }); return; }
   res.json({ deleted: true });
 });
 
@@ -1014,13 +1108,15 @@ router.get("/superadmin/chargebacks", ...admin, async (_req, res) => {
 
 router.post("/superadmin/chargebacks/:id/accept", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("CB-", ""), 10);
-  await db.update(platformChargebacksTable).set({ status: "accepted", resolvedAt: new Date() }).where(eq(platformChargebacksTable.id, id));
+  const [accepted] = await db.update(platformChargebacksTable).set({ status: "accepted", resolvedAt: new Date() }).where(eq(platformChargebacksTable.id, id)).returning();
+  if (!accepted) { res.status(404).json({ error: "Chargeback not found" }); return; }
   res.json({ id: req.params.id, status: "Accepted" });
 });
 
 router.post("/superadmin/chargebacks/:id/contest", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("CB-", ""), 10);
-  await db.update(platformChargebacksTable).set({ status: "evidence_submitted" }).where(eq(platformChargebacksTable.id, id));
+  const [contested] = await db.update(platformChargebacksTable).set({ status: "evidence_submitted" }).where(eq(platformChargebacksTable.id, id)).returning();
+  if (!contested) { res.status(404).json({ error: "Chargeback not found" }); return; }
   res.json({ id: req.params.id, status: "Evidence Submitted" });
 });
 
@@ -1050,7 +1146,8 @@ router.post("/superadmin/api-keys", ...admin, async (req, res) => {
 
 router.delete("/superadmin/api-keys/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("key_", ""), 10);
-  await db.delete(platformApiKeysTable).where(eq(platformApiKeysTable.id, id));
+  const [gone] = await db.delete(platformApiKeysTable).where(eq(platformApiKeysTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "API key not found" }); return; }
   res.json({ deleted: true });
 });
 
@@ -1128,44 +1225,48 @@ router.post("/superadmin/white-label/verify-dns", ...admin, async (req, res) => 
 });
 
 router.get("/superadmin/invoices/export", ...admin, async (_req, res) => {
-  const plans = await db.select().from(platformPlansTable);
-  const planPrices = Object.fromEntries(plans.map(p => [p.id, parseFloat(String(p.price))]));
-  const restaurants = await db.select().from(restaurantsTable).orderBy(desc(restaurantsTable.createdAt));
-  const header = "invoiceId,vendorId,vendorName,type,amount,status,date,dueDate\n";
-  const csv = header + restaurants.map(r => {
-    const amount = planPrices[r.plan || "free"] ?? 0;
-    const status = amount === 0 ? "Paid" : (r.isActive ? "Paid" : "Unpaid");
-    return [`INV-${r.id}`, r.id, `"${r.name}"`, "Subscription", amount, status, r.createdAt.toISOString().split("T")[0],
-      new Date(r.createdAt.getTime() + 30 * 86400000).toISOString().split("T")[0]].join(",");
-  }).join("\n");
+  // This used to rebuild its own list from the restaurant table, so the file held one
+  // row per vendor under a different id scheme and left out every commission invoice —
+  // 10 rows exported against 15 on screen. Export what the screen actually lists.
+  const invoices = await listSubscriptionInvoices();
+  const header = "invoiceId,vendorId,vendorName,type,amount,status,date,dueDate,period\n";
+  const csv = header + invoices.map(i => [
+    i.id, i.vendorId, `"${i.vendorName}"`, i.type, i.amount, i.status, i.date, i.dueDate, i.period,
+  ].join(",")).join("\n");
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=invoices.csv");
   res.send(csv);
 });
 
 router.get("/superadmin/invoices/:id/download", ...admin, async (req, res) => {
-  const vendorId = invoiceVendorId(req.params.id);
-  const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, vendorId));
-  if (!r) { res.status(404).json({ error: "Invoice not found" }); return; }
-  const plans = await db.select().from(platformPlansTable);
-  const planPrices = Object.fromEntries(plans.map(p => [p.id, parseFloat(String(p.price))]));
-  const amount = planPrices[r.plan || "free"] ?? 0;
-  const csv = `invoiceId,vendorName,plan,amount,status,date\nINV-${r.id},"${r.name}",${r.plan},${amount},${r.isActive ? "Paid" : "Unpaid"},${r.createdAt.toISOString().split("T")[0]}\n`;
+  // The id was parsed for a trailing number and that number treated as a vendor id.
+  // Commission invoices are keyed INV-COM-<settlementId>, so downloading one produced
+  // an unrelated vendor's subscription bill — wrong venue, wrong amount, wrong type.
+  // Resolve the invoice the operator actually clicked instead.
+  const invoice = (await listSubscriptionInvoices()).find(i => i.id === req.params.id);
+  if (!invoice) { res.status(404).json({ error: "Invoice not found" }); return; }
+  const csv = "invoiceId,vendorId,vendorName,type,amount,status,date,dueDate,period\n"
+    + [invoice.id, invoice.vendorId, `"${invoice.vendorName}"`, invoice.type, invoice.amount,
+      invoice.status, invoice.date, invoice.dueDate, invoice.period].join(",") + "\n";
   res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", `attachment; filename=INV-${r.id}.csv`);
+  res.setHeader("Content-Disposition", `attachment; filename=${invoice.id}.csv`);
   res.send(csv);
 });
 
 router.post("/superadmin/invoices/:id/email", ...admin, async (req, res) => {
-  const vendorId = invoiceVendorId(req.params.id);
-  const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, vendorId));
-  if (!r) { res.status(404).json({ error: "Invoice not found" }); return; }
+  // Same id-parsing fault as the download route: a commission invoice was emailed to
+  // whichever vendor happened to share the settlement's number.
+  const invoice = (await listSubscriptionInvoices()).find(i => i.id === req.params.id);
+  if (!invoice) { res.status(404).json({ error: "Invoice not found" }); return; }
+  const [r] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, invoice.vendorId));
+  if (!r) { res.status(404).json({ error: "Vendor not found" }); return; }
   const [owner] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, r.userId));
   await db.insert(platformCommunicationsTable).values({
-    commType: "Invoice", subject: `Invoice INV-${r.id}`, message: `Your subscription invoice INV-${r.id} is ready.`,
+    commType: "Invoice", subject: `Invoice ${invoice.id}`,
+    message: `Your ${invoice.type.toLowerCase()} invoice ${invoice.id} for ${PLATFORM_CURRENCY} ${invoice.amount} is ready.`,
     channel: "email", target: owner?.email || r.name, recipients: 1, deliveryRate: "100", status: "queued",
   });
-  await logPlatformAudit(req, "Invoice Emailed", "Invoices", `INV-${r.id}`);
+  await logPlatformAudit(req, "Invoice Emailed", "Invoices", invoice.id);
   res.json({ sent: true, to: owner?.email });
 });
 
@@ -1233,7 +1334,8 @@ router.post("/superadmin/notifications", ...admin, async (req, res) => {
 
 router.delete("/superadmin/notifications/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("notif_", ""), 10);
-  await db.delete(platformNotificationsTable).where(eq(platformNotificationsTable.id, id));
+  const [gone] = await db.delete(platformNotificationsTable).where(eq(platformNotificationsTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "Notification not found" }); return; }
   res.json({ deleted: true });
 });
 
@@ -1293,7 +1395,8 @@ router.put("/superadmin/security/settings", ...admin, async (req, res) => {
 });
 
 router.delete("/superadmin/security/sessions/:id", ...admin, async (req, res) => {
-  await revokeAdminSession(req.params.id);
+  const revoked = await revokeAdminSession(req.params.id);
+  if (!revoked) { res.status(404).json({ error: "Session not found" }); return; }
   await logPlatformAudit(req, "Session Revoked", "Security", req.params.id);
   res.json({ id: req.params.id, revoked: true });
 });
@@ -1306,7 +1409,8 @@ router.post("/superadmin/security/ip-whitelist", ...admin, async (req, res) => {
 
 router.delete("/superadmin/security/ip-whitelist/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("ip_", ""), 10);
-  await db.delete(platformIpWhitelistTable).where(eq(platformIpWhitelistTable.id, id));
+  const [gone] = await db.delete(platformIpWhitelistTable).where(eq(platformIpWhitelistTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "Address not on the list" }); return; }
   res.json({ id: req.params.id, removed: true });
 });
 
@@ -1489,6 +1593,7 @@ router.post("/superadmin/tasks", ...admin, async (req, res) => {
 router.put("/superadmin/tasks/:id/status", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("TASK-", ""), 10);
   const [t] = await db.update(platformTasksTable).set({ status: req.body.status }).where(eq(platformTasksTable.id, id)).returning();
+  if (!t) { res.status(404).json({ error: "Task not found" }); return; }
   res.json(t);
 });
 
@@ -1513,7 +1618,8 @@ router.post("/superadmin/announcements", ...admin, async (req, res) => {
 
 router.delete("/superadmin/announcements/:id", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("ANN-", ""), 10);
-  await db.delete(platformAnnouncementsTable).where(eq(platformAnnouncementsTable.id, id));
+  const [gone] = await db.delete(platformAnnouncementsTable).where(eq(platformAnnouncementsTable.id, id)).returning();
+  if (!gone) { res.status(404).json({ error: "Announcement not found" }); return; }
   res.json({ deleted: true });
 });
 
@@ -1698,11 +1804,13 @@ router.post("/superadmin/agreements", ...admin, async (req, res) => {
 router.post("/superadmin/agreements/:id/renew", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("AGR-", ""), 10);
   const [a] = await db.select().from(platformAgreementsTable).where(eq(platformAgreementsTable.id, id));
-  if (a?.expiryDate) {
-    const next = new Date(a.expiryDate); next.setFullYear(next.getFullYear() + 1);
-    await db.update(platformAgreementsTable).set({ expiryDate: next, status: "active" }).where(eq(platformAgreementsTable.id, id));
-  }
-  res.json({ id: req.params.id, renewed: true });
+  if (!a) { res.status(404).json({ error: "Agreement not found" }); return; }
+  // An agreement with no expiry date has nothing to roll forward, so reporting it as
+  // renewed would be as untrue as reporting it for one that is not there at all.
+  if (!a.expiryDate) { res.status(400).json({ error: "Agreement has no expiry date to renew" }); return; }
+  const next = new Date(a.expiryDate); next.setFullYear(next.getFullYear() + 1);
+  await db.update(platformAgreementsTable).set({ expiryDate: next, status: "active" }).where(eq(platformAgreementsTable.id, id));
+  res.json({ id: req.params.id, renewed: true, expiryDate: next.toISOString() });
 });
 
 router.get("/superadmin/vendor-crm", ...admin, async (_req, res) => {
@@ -1845,6 +1953,7 @@ router.put("/superadmin/roles/:id", ...admin, async (req, res) => {
   const [r] = await db.update(platformRolesTable).set({
     name: req.body.name, description: req.body.description, permissions: req.body.permissions,
   }).where(eq(platformRolesTable.id, id)).returning();
+  if (!r) { res.status(404).json({ error: "Role not found" }); return; }
   res.json(r);
 });
 
@@ -1858,8 +1967,12 @@ router.post("/superadmin/restaurants/:restaurantId/toggle", ...admin, async (req
 
 router.put("/superadmin/restaurants/:restaurantId/plan", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.restaurantId), 10);
-  const [updated] = await db.update(restaurantsTable).set({ plan: req.body.plan }).where(eq(restaurantsTable.id, id)).returning();
-  res.json(updated ?? { error: "Not found" });
+  const planId = String(req.body.plan ?? "");
+  const [planRow] = await db.select().from(platformPlansTable).where(eq(platformPlansTable.id, planId));
+  if (!planRow) { res.status(400).json({ error: "Unknown plan" }); return; }
+  const [updated] = await db.update(restaurantsTable).set({ plan: planId }).where(eq(restaurantsTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updated);
 });
 
 router.put("/superadmin/vendors/:vendorId", ...admin, async (req, res) => {
@@ -1993,13 +2106,16 @@ router.post("/superadmin/webhooks", ...admin, async (req, res) => {
 });
 
 router.delete("/superadmin/webhooks/:id", ...admin, async (req, res) => {
-  const items = (await getWebhooks() as { id: string }[]).filter(w => w.id !== req.params.id);
+  const all = await getWebhooks() as { id: string }[];
+  const items = all.filter(w => w.id !== req.params.id);
+  if (items.length === all.length) { res.status(404).json({ error: "Webhook not found" }); return; }
   await saveWebhooks(items);
   res.json({ deleted: true });
 });
 
 router.post("/superadmin/webhooks/:id/retry", ...admin, async (req, res) => {
   const items = await getWebhooks() as { id: string; failures?: number; lastDelivery?: string }[];
+  if (!items.some(w => w.id === req.params.id)) { res.status(404).json({ error: "Webhook not found" }); return; }
   const next = items.map(w => w.id === req.params.id
     ? { ...w, failures: 0, lastDelivery: new Date().toISOString(), status: "active" }
     : w);
@@ -2145,7 +2261,9 @@ router.put("/superadmin/sandbox", ...admin, async (req, res) => { res.json(await
 
 router.get("/superadmin/archival", ...admin, async (_req, res) => { res.json(await getArchivalPolicies()); });
 router.post("/superadmin/archival/:policyId/run", ...admin, async (req, res) => {
-  res.json(await runArchival(req.params.policyId));
+  const archive = await runArchival(String(req.params.policyId));
+  if (!archive) { res.status(404).json({ error: "Archival policy not found" }); return; }
+  res.json(archive);
 });
 
 router.get("/superadmin/feature-releases", ...admin, async (_req, res) => { res.json(await getFeatureReleases()); });

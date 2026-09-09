@@ -11,7 +11,21 @@ export const PAYMENT_MODES = [
   { id: "netbanking" as const, label: "Net Banking", icon: "🏦", desc: "All major banks supported", instant: true },
 ];
 
-export const TIP_PRESETS = [0, 20, 50, 100, 150, 200];
+/**
+ * Tips, as a share of the bill rather than a fixed list of rupee amounts.
+ *
+ * The presets were `[0, 20, 50, 100, 150, 200]`, the same six figures whatever the bill
+ * came to. On a ₹45 tea and dosa the smallest tip offered was ₹20 — 44% — and the
+ * options ran to 444%. On a ₹5,000 dinner the largest was 4%. Percentages of the bill
+ * behave sensibly at both ends, and are what a diner expects to be asked.
+ */
+export const TIP_PERCENT_PRESETS = [0, 5, 10, 15, 20];
+
+/** Rounded to the nearest rupee — nobody tips in paise. */
+export function tipPresetsFor(billTotal: number): { percent: number; amount: number }[] {
+  const base = Number.isFinite(billTotal) && billTotal > 0 ? billTotal : 0;
+  return TIP_PERCENT_PRESETS.map(percent => ({ percent, amount: Math.round((base * percent) / 100) }));
+}
 export const GST_RATE = 0.05;
 export const CGST_RATE = 0.025;
 export const SGST_RATE = 0.025;

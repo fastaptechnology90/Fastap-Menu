@@ -13,7 +13,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "admin-panel hidden md:flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 z-40 shrink-0 h-screen sticky top-0 overflow-hidden",
+        "admin-panel hidden md:flex flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 z-40 shrink-0 h-screen sticky top-0 overflow-hidden",
         collapsed ? "w-[4.5rem]" : "w-64",
       )}
     >

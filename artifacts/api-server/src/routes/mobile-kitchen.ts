@@ -2,13 +2,13 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, staffTable } from "@workspace/db";
-import { loginRateLimit } from "../middlewares/rate-limit.js";
+import { loginRateLimit, loginNetworkRateLimit } from "../middlewares/rate-limit.js";
 import {
   requireMobileAuth,
   mobileSession,
   sessionPayload,
   revokeMobileSession,
-  revokeAllMobileSessions,
+  revokeStaffMobileSessions,
   type MobileSession,
 } from "../lib/mobile-kitchen/session.js";
 import {
@@ -100,7 +100,7 @@ router.post("/auth/register", async (req, res) => {
 
 // Every credential-checking route is rate limited. Without this a six-digit OTP or a
 // four-digit PIN is guessable in seconds from a script.
-router.post("/auth/otp/request", loginRateLimit, async (req, res) => {
+router.post("/auth/otp/request", loginNetworkRateLimit, loginRateLimit, async (req, res) => {
   try {
     res.json(await requestOtp(String(req.body?.phone ?? "")));
   } catch (err) {
@@ -108,21 +108,23 @@ router.post("/auth/otp/request", loginRateLimit, async (req, res) => {
   }
 });
 
-router.post("/auth/otp/verify", loginRateLimit, (req, res) => authPost(verifyOtp, req, res));
-router.post("/auth/pin", loginRateLimit, (req, res) => authPost(loginWithPin, req, res));
-router.post("/auth/password", loginRateLimit, (req, res) => authPost(loginWithPassword, req, res));
-router.post("/auth/qr/verify", loginRateLimit, (req, res) => authPost(loginWithQr, req, res));
-router.post("/auth/biometric", loginRateLimit, (req, res) => authPost(loginWithBiometric, req, res));
+router.post("/auth/otp/verify", loginNetworkRateLimit, loginRateLimit, (req, res) => authPost(verifyOtp, req, res));
+router.post("/auth/pin", loginNetworkRateLimit, loginRateLimit, (req, res) => authPost(loginWithPin, req, res));
+router.post("/auth/password", loginNetworkRateLimit, loginRateLimit, (req, res) => authPost(loginWithPassword, req, res));
+router.post("/auth/qr/verify", loginNetworkRateLimit, loginRateLimit, (req, res) => authPost(loginWithQr, req, res));
+router.post("/auth/biometric", loginNetworkRateLimit, loginRateLimit, (req, res) => authPost(loginWithBiometric, req, res));
 
-router.post("/auth/logout", requireMobileAuth, (req, res) => {
+router.post("/auth/logout", requireMobileAuth, async (req, res) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
-  revokeMobileSession(token);
+  await revokeMobileSession(token);
   res.json({ success: true });
 });
 
-router.post("/auth/emergency-logout", requireMobileAuth, (_req, res) => {
-  revokeAllMobileSessions();
-  res.json({ success: true });
+router.post("/auth/emergency-logout", requireMobileAuth, async (req, res) => {
+  // Scoped to the staff member who asked. See revokeStaffMobileSessions.
+  const s = mobileSession(req);
+  const revoked = await revokeStaffMobileSessions(s.staffId);
+  res.json({ success: true, sessionsEnded: revoked });
 });
 
 router.get("/auth/session", requireMobileAuth, async (req, res) => {
@@ -233,7 +235,7 @@ router.post("/auth/profile/delete", requireMobileAuth, async (req, res) => {
     return;
   }
   await db.update(staffTable).set({ isActive: false, status: "inactive" }).where(eq(staffTable.id, s.staffId));
-  revokeMobileSession(s.token);
+  await revokeMobileSession(s.token);
   res.json({ success: true });
 });
 
@@ -277,14 +279,34 @@ router.get("/kds", requireMobileAuth, async (req, res) => {
   });
 });
 
+// Every failure used to come back as a flat 404 "Order not found", so a rejected
+// transition or an action the server does not know read on the handset as "that ticket
+// is gone". Tell the app which of the three it was.
+function kdsError(res: Response, err: unknown) {
+  const msg = err instanceof Error ? err.message : "Action failed";
+  if (msg.startsWith("INVALID_TRANSITION")) {
+    res.status(409).json({ message: msg.replace("INVALID_TRANSITION: ", ""), code: "INVALID_TRANSITION" });
+    return;
+  }
+  if (msg === "UNKNOWN_ACTION") {
+    res.status(400).json({ message: "That action is not available on this order", code: "UNKNOWN_ACTION" });
+    return;
+  }
+  if (msg === "INVALID_SECTION") {
+    res.status(400).json({ message: "Unknown kitchen section", code: "INVALID_SECTION" });
+    return;
+  }
+  res.status(404).json({ message: "Order not found" });
+}
+
 router.post("/kds/orders/:orderId/action", requireMobileAuth, async (req, res) => {
   if (!(await gateModuleAccess(req, res, "/kds"))) return;
   const s = mobileSession(req);
   try {
-    const order = await applyKdsAction(s.restaurantId, req.params.orderId, String(req.body?.action ?? ""));
+    const order = await applyKdsAction(s.restaurantId, req.params.orderId, String(req.body?.action ?? ""), s.user.name);
     res.json({ success: true, order });
-  } catch {
-    res.status(404).json({ message: "Order not found" });
+  } catch (err) {
+    kdsError(res, err);
   }
 });
 
@@ -300,10 +322,10 @@ router.post("/orders/:orderId/process", requireMobileAuth, async (req, res) => {
   try {
     const order = action === "reassign"
       ? await reassignKdsSection(s.restaurantId, req.params.orderId, String(req.body?.targetSection ?? ""))
-      : await applyKdsAction(s.restaurantId, req.params.orderId, action);
+      : await applyKdsAction(s.restaurantId, req.params.orderId, action, s.user.name);
     res.json({ success: true, order });
-  } catch {
-    res.status(404).json({ message: "Order not found" });
+  } catch (err) {
+    kdsError(res, err);
   }
 });
 

@@ -1,5 +1,36 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+
 const BASE = process.env.API_BASE || "http://localhost:8080/api";
+
+/**
+ * The venue this script registers has to be removed again.
+ *
+ * It signed up a "Smoke Venue <timestamp>" on every run and left it there, so the
+ * platform's vendor list, its counts and its revenue reports slowly filled with test
+ * restaurants that nobody could tell apart from real customers.
+ *
+ * Cleanup is skipped when the script is aimed at a deployed environment — deleting rows
+ * from someone else's database is not this script's business.
+ */
+const IS_LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
+
+async function removeVenue(createdVenueId) {
+  // Only a venue this run registered, only locally, and never one of the seeded ids.
+  if (!IS_LOCAL || !createdVenueId || createdVenueId <= 6) return;
+  try {
+    const require = createRequire(import.meta.url);
+    const pg = require("../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/index.js");
+    const client = new pg.Client({
+      host: "localhost", port: 5455, user: "fastapmenu", password: "fastapmenu", database: "fastapmenu",
+    });
+    await client.connect();
+    await client.query("delete from restaurants where id = $1", [createdVenueId]);
+    await client.end();
+  } catch {
+    // A cleanup that cannot run must not fail the smoke test it was cleaning up after.
+  }
+}
 let cookie = "";
 const results = [];
 
@@ -24,6 +55,7 @@ function record(name, ok, detail = "") {
 async function main() {
   console.log(`\nRestaurant panel smoke test — ${BASE}\n`);
   let restaurantId = 1;
+  let createdVenueId = null;
   const stamp = Date.now();
   const smokeEmail = `smoke-${stamp}@fastap.test`;
 
@@ -61,7 +93,12 @@ async function main() {
     ],
   });
   record("register + KYC", register.status === 201, register.data?.restaurant?.name);
-  if (register.data?.restaurant?.id) restaurantId = register.data.restaurant.id;
+  // Tracked separately from restaurantId, which defaults to the seeded venue 1: cleanup
+  // must only ever remove the venue THIS run created, never a real one.
+  if (register.data?.restaurant?.id) {
+    restaurantId = register.data.restaurant.id;
+    createdVenueId = register.data.restaurant.id;
+  }
 
   // A restaurant that registers with documents lands in `pending` and cannot sign in
   // until the platform team approves it — that is the flow working, not a fault.
@@ -169,6 +206,8 @@ async function main() {
       record(`web ${route}`, false, e.message);
     }
   }
+
+  await removeVenue(createdVenueId);
 
   const passed = results.filter(r => r.ok).length;
   console.log(`\n${passed}/${results.length} passed`);

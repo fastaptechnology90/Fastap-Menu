@@ -1,16 +1,31 @@
-export const THERAPISTS = [
-  { id: "priya", name: "Priya Sharma", specialty: "Swedish & Deep Tissue", rating: 4.9 },
-  { id: "ahmed", name: "Ahmed Al-Rashid", specialty: "Sports & Thai Massage", rating: 4.8 },
-  { id: "meera", name: "Meera Patel", specialty: "Facial & Aromatherapy", rating: 4.9 },
-  { id: "raj", name: "Raj Kumar", specialty: "Ayurveda & Wellness", rating: 4.7 },
-  { id: "sana", name: "Sana Khan", specialty: "Yoga & Meditation", rating: 4.9 },
-];
+export type Therapist = { id: string; name: string; specialty?: string; rating?: number };
+export type MembershipPlan = { id: string; label: string; price: number; period?: string; sessions?: number };
 
-export const MEMBERSHIP_PLANS = [
-  { id: "silver", label: "Silver Wellness", price: 4999, period: "month", sessions: 4 },
-  { id: "gold", label: "Gold Wellness", price: 8999, period: "month", sessions: 8 },
-  { id: "platinum", label: "Platinum Wellness", price: 14999, period: "month", sessions: 12 },
-];
+/**
+ * Five named therapists with 4.7–4.9 star ratings, and three membership tiers at
+ * ₹4,999 / ₹8,999 / ₹14,999, used to be served to every venue on the platform as though
+ * they were its own. Nobody at any venue set them; the chosen therapist's name was written
+ * into `spa_bookings.therapist`, and a ₹14,999 membership booked itself as PAID and flowed
+ * into the owner's revenue as money that had never been collected.
+ *
+ * A venue's therapists and plans now come only from what it has published in its own
+ * settings (`spaCatalog`). These lists are empty, so a venue that has published nothing
+ * offers nothing rather than offering someone else's price list.
+ */
+export const THERAPISTS: Therapist[] = [];
+
+export const MEMBERSHIP_PLANS: MembershipPlan[] = [];
+
+/** What this venue actually offers, from its own published catalog. */
+export function therapistsFor(overrides?: { therapists?: unknown }): Therapist[] {
+  return Array.isArray(overrides?.therapists) ? overrides!.therapists as Therapist[] : THERAPISTS;
+}
+
+export function membershipPlansFor(overrides?: { membershipPlans?: unknown }): MembershipPlan[] {
+  const plans = Array.isArray(overrides?.membershipPlans) ? overrides!.membershipPlans as MembershipPlan[] : MEMBERSHIP_PLANS;
+  // A plan with no price is not a plan a guest can be charged for.
+  return plans.filter(p => p && typeof p.id === "string" && Number.isFinite(Number(p.price)) && Number(p.price) > 0);
+}
 
 export const SLOT_TIMES = [
   "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -43,10 +58,10 @@ export function computeAvailableSlots(
   });
 }
 
-export function getCatalog() {
+export function getCatalog(overrides?: { therapists?: unknown; membershipPlans?: unknown }) {
   return {
-    therapists: THERAPISTS,
-    membershipPlans: MEMBERSHIP_PLANS,
+    therapists: therapistsFor(overrides),
+    membershipPlans: membershipPlansFor(overrides),
     wellnessTypes: [
       { id: "yoga", label: "Yoga Sessions", icon: "🧘" },
       { id: "gym", label: "Gym Sessions", icon: "🏋️" },

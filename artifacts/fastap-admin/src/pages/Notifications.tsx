@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, Mail, MessageSquare, Phone, Plus, RefreshCw, Trash2, Loader2, Send, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   push: <Bell className="h-3.5 w-3.5" />,
@@ -23,10 +24,10 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 };
 
 const channelColor: Record<string, string> = {
-  push: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  email: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  sms: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  whatsapp: "bg-green-500/10 text-green-400 border-green-500/20",
+  push: "bg-info-subtle text-info border-info-border",
+  email: "bg-muted text-muted-foreground border",
+  sms: "bg-warning-subtle text-warning border-warning-border",
+  whatsapp: "bg-success-subtle text-success border-success-border",
 };
 
 // The API returns notification status lowercase ("sent"); the create response uses
@@ -85,74 +86,74 @@ export default function Notifications() {
   ]);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Notification Center</h2>
-          <p className="text-muted-foreground">Manage platform alerts across all channels (Push, Email, SMS, WhatsApp).</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Notification Center"
+        description="Manage platform alerts across all channels (Push, Email, SMS, WhatsApp)."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Send className="mr-2 h-4 w-4" /> Send Notification</Button>
+            <Button><Send className="mr-2 h-4 w-4" /> Send Notification</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
-              <DialogHeader><DialogTitle>Send New Notification</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Alert Type</Label>
-                  <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{alertTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input placeholder="Notification title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Message</Label>
-                  <Textarea placeholder="Notification message..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={3} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Channel</Label>
-                    <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{channels.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  Send Notification
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Send New Notification</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+            <Label>Alert Type</Label>
+            <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{alertTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Title</Label>
+            <Input placeholder="Notification title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea placeholder="Notification message..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={3} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Channel</Label>
+            <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{channels.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Priority</Label>
+            <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Send Notification
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Sent" value={notifications.length} icon={<Bell className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active / Sent" value={activeAlerts} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Failed" value={failedCount} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Pending" value={notifications.filter((n: any) => ["pending", "queued"].includes(norm(n.status))).length} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
+        <KpiCard title="Active / Sent" value={activeAlerts} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Failed" value={failedCount} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Pending" value={notifications.filter((n: any) => ["pending", "queued"].includes(norm(n.status))).length} icon={<Clock className="h-4 w-4 text-warning" />} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-4">

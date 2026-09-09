@@ -14,6 +14,7 @@ import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Megaphone, RefreshCw, Loader2, Trash2, AlertTriangle, Wrench, Zap, Radio } from "lucide-react";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Announcements() {
   const { toast } = useToast();
@@ -49,109 +50,109 @@ export default function Announcements() {
     "Maintenance Alert": <Wrench className="h-4 w-4" />,
     "Feature Release": <Zap className="h-4 w-4" />,
     "Downtime Notice": <AlertTriangle className="h-4 w-4" />,
-    "Emergency Alert": <AlertTriangle className="h-4 w-4 text-red-400" />,
+    "Emergency Alert": <AlertTriangle className="h-4 w-4 text-danger" />,
     "General Update": <Megaphone className="h-4 w-4" />,
   };
 
   const severityStyle: Record<string, string> = {
-    info: "border-blue-500/30 bg-blue-500/5",
-    warning: "border-yellow-500/30 bg-yellow-500/5",
-    critical: "border-red-500/30 bg-red-500/5",
-    success: "border-green-500/30 bg-green-500/5",
+    info: "border-info-border bg-info-subtle",
+    warning: "border-warning-border bg-warning-subtle",
+    critical: "border-danger-border bg-danger-subtle",
+    success: "border-success-border bg-success-subtle",
   };
 
   const activeAnnouncements = announcements.filter((a: any) => a.active);
   const scheduledAnnouncements = announcements.filter((a: any) => a.scheduledAt && new Date(a.scheduledAt) > new Date());
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Announcement & Maintenance Broadcast</h2>
-          <p className="text-muted-foreground">Keep a record of maintenance alerts, feature releases, downtime notices, and emergency alerts.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Announcement & Maintenance Broadcast"
+        description="Keep a record of maintenance alerts, feature releases, downtime notices, and emergency alerts."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Radio className="mr-2 h-4 w-4" /> New Announcement</Button>
+            <Button><Radio className="mr-2 h-4 w-4" /> New Announcement</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
-              <DialogHeader><DialogTitle>Create Announcement</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["Maintenance Alert", "Feature Release", "Downtime Notice", "Emergency Alert", "General Update"].map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Severity</Label>
-                    <Select value={form.severity} onValueChange={v => setForm(f => ({ ...f, severity: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="info">Info</SelectItem>
-                        <SelectItem value="warning">Warning</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="success">Success</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input placeholder="Announcement title..." value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Message</Label>
-                  <Textarea placeholder="Announcement content..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Target Audience</Label>
-                    <Select value={form.targetAudience} onValueChange={v => setForm(f => ({ ...f, targetAudience: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Vendors</SelectItem>
-                        <SelectItem value="active">Active Only</SelectItem>
-                        <SelectItem value="enterprise">Enterprise</SelectItem>
-                        <SelectItem value="trial">Trial</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Scheduled At (optional)</Label>
-                    <Input type="datetime-local" value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
-                  <Label>Mark as live</Label>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  A scheduled time is stored for reference only — nothing flips this to live automatically.
-                </p>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Megaphone className="mr-2 h-4 w-4" />}
-                  Publish Announcement
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Create Announcement</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Maintenance Alert", "Feature Release", "Downtime Notice", "Emergency Alert", "General Update"].map(t => (
+            <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Severity</Label>
+            <Select value={form.severity} onValueChange={v => setForm(f => ({ ...f, severity: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="info">Info</SelectItem>
+            <SelectItem value="warning">Warning</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+            <SelectItem value="success">Success</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Title</Label>
+            <Input placeholder="Announcement title..." value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea placeholder="Announcement content..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Target Audience</Label>
+            <Select value={form.targetAudience} onValueChange={v => setForm(f => ({ ...f, targetAudience: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="all">All Vendors</SelectItem>
+            <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="enterprise">Enterprise</SelectItem>
+            <SelectItem value="trial">Trial</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Scheduled At (optional)</Label>
+            <Input type="datetime-local" value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} />
+            </div>
+            </div>
+            <div className="flex items-center gap-2">
+            <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
+            <Label>Mark as live</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+            A scheduled time is stored for reference only — nothing flips this to live automatically.
+            </p>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Megaphone className="mr-2 h-4 w-4" />}
+            Publish Announcement
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
-      <Card className="border-amber-500/30 bg-amber-500/5">
+      <Card className="border-warning-border bg-warning-subtle">
         <CardContent className="flex items-start gap-3 py-4">
-          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
           <div className="text-sm">
             <p className="font-medium">Announcements are recorded here only.</p>
             <p className="text-muted-foreground text-xs mt-0.5">
@@ -164,9 +165,9 @@ export default function Announcements() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total" value={announcements.length} icon={<Megaphone className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active" value={activeAnnouncements.length} icon={<Radio className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Scheduled" value={scheduledAnnouncements.length} icon={<Loader2 className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Emergency" value={announcements.filter((a: any) => a.type === "Emergency Alert").length} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Active" value={activeAnnouncements.length} icon={<Radio className="h-4 w-4 text-success" />} />
+        <KpiCard title="Scheduled" value={scheduledAnnouncements.length} icon={<Loader2 className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Emergency" value={announcements.filter((a: any) => a.type === "Emergency Alert").length} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
       </div>
 
       {isLoading ? (

@@ -11,6 +11,7 @@ import {
   documentsTable,
   platformPlansTable,
 } from "@workspace/db";
+import { loginRateLimit, loginNetworkRateLimit } from "../middlewares/rate-limit.js";
 import { getSettingsSection, setSettingsSection } from "../lib/restaurant-settings";
 import { normalizeCurrencyCode, PLATFORM_CURRENCY } from "../lib/currency.js";
 import {
@@ -335,7 +336,7 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
   res.json({ success: true, message: "OTP sent to your registered mobile number" });
 });
 
-router.post("/restaurant-auth/login", async (req, res): Promise<void> => {
+router.post("/restaurant-auth/login", loginNetworkRateLimit, loginRateLimit, async (req, res): Promise<void> => {
   const { restaurantId, email, password, phone, otp } = req.body;
   const rid = restaurantId ? parseInt(String(restaurantId), 10) : undefined;
 

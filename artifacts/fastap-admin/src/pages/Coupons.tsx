@@ -14,6 +14,7 @@ import { Plus, Copy, Ban, Loader2, Tag } from "lucide-react";
 import { api, type Coupon } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
+import { PageHeader } from "@/components/shared/Page";
 
 const defaultForm = { code: "", type: "Percentage", discount: "", maxUses: "1000", expires: "" };
 
@@ -46,20 +47,29 @@ export default function Coupons() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Coupons & Promos</h2><p className="text-muted-foreground">Manage platform-wide discount codes.</p></div>
-        <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Create Coupon</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Coupons & Promos"
+        description="Manage platform-wide discount codes."
+        actions={
+          <>
+            <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Create Coupon</Button>
+          </>
+        }
+      />
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Active Coupons" value={coupons.filter(c => c.status === "Active").length} icon={<Tag className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Active Coupons" value={coupons.filter(c => c.status === "Active").length} icon={<Tag className="h-4 w-4 text-success" />} />
         <KpiCard title="Total Uses" value={coupons.reduce((s, c) => s + c.used, 0).toLocaleString()} icon={<Tag className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Suspended" value={coupons.filter(c => c.status === "Suspended").length} icon={<Ban className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Suspended" value={coupons.filter(c => c.status === "Suspended").length} icon={<Ban className="h-4 w-4 text-danger" />} />
       </div>
       <Card>
         <CardContent className="pt-6">
           {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : (
-            <DataTable data={coupons} columns={[
+            <DataTable
+              data={coupons}
+              emptyMessage="No coupons yet"
+              emptyDescription="Create a code above and it becomes available to every venue on the platform."
+              columns={[
               { header: "Code", cell: (row: Coupon) => (
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold tracking-wider">{row.code}</span>

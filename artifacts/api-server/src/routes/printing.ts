@@ -77,7 +77,7 @@ const STYLE = `
   @media screen and (min-width:600px){body{margin:16px auto;border:1px solid #ddd}}
 `;
 
-function page(title: string, body: string, autoPrint: boolean) {
+function page(title: string, body: string, autoPrint: boolean, ackUrl?: string) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title><style>${STYLE}</style></head>
@@ -86,6 +86,20 @@ function page(title: string, body: string, autoPrint: boolean) {
   <button onclick="window.print()" style="padding:8px 16px;font:inherit;cursor:pointer">Print</button>
 </div>
 ${autoPrint ? "<script>window.addEventListener('load',()=>window.print())</script>" : ""}
+<script data-ack="${esc(ackUrl ?? "")}">
+  // The only moment this page can honestly say a copy was printed: the browser's own
+  // signal that its print dialog has closed. Fetching the page no longer counts.
+  (function () {
+    var url = document.currentScript && document.currentScript.dataset.ack;
+    if (!url) return;
+    var sent = false;
+    window.addEventListener("afterprint", function () {
+      if (sent) return;
+      sent = true;
+      fetch(url, { method: "POST", credentials: "include" }).catch(function () {});
+    });
+  })();
+</script>
 </body></html>`;
 }
 
@@ -105,7 +119,7 @@ const qtyOf = (l: Line) => Number(l.quantity ?? l.qty ?? 1) || 1;
  * down. Voided and comped lines are printed struck through rather than dropped, because
  * the pass has to know a dish was pulled after it was already called.
  */
-function kotHtml(order: any, venue: any, copy: number) {
+function kotHtml(order: any, venue: any, copy: number, ackUrl?: string) {
   const lines = linesOf(order);
   const rows = lines.map(l => {
     const flags = [
@@ -130,7 +144,7 @@ function kotHtml(order: any, venue: any, copy: number) {
   <div class="rule"></div>
   ${order.notes ? `<p>ORDER NOTE: ${esc(order.notes)}</p>` : ""}
   <p class="foot">${lines.reduce((t, l) => t + qtyOf(l), 0)} items</p>
-`, true);
+`, true, ackUrl);
 }
 
 /**
@@ -139,7 +153,7 @@ function kotHtml(order: any, venue: any, copy: number) {
  * price, as the old invoice template did, left a bill whose lines did not add up to its
  * own total.
  */
-function billHtml(order: any, venue: any, copy: number) {
+function billHtml(order: any, venue: any, copy: number, ackUrl?: string) {
   const lines = linesOf(order);
   const billing = billingFromSettings(
     (venue?.settings && typeof venue.settings === "object" ? venue.settings : {}) as Record<string, unknown>,
@@ -194,16 +208,32 @@ function billHtml(order: any, venue: any, copy: number) {
   <div class="rule"></div>
   <div class="row"><span>${esc(order.paymentMethod ?? "Not collected")}</span><span>${esc(order.paymentStatus ?? "pending")}</span></div>
   <p class="foot">Thank you — please visit again</p>
-`, true);
+`, true, ackUrl);
 }
 
-/** Record that a second copy was taken, and say which copy this is. */
-async function countCopy(order: any, kind: "kot" | "bill", by: string) {
+/** How many copies of this document have been printed so far. */
+function copiesSoFar(order: any, kind: "kot" | "bill") {
+  const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
+  const log = Array.isArray(meta.prints) ? meta.prints as Record<string, unknown>[] : [];
+  return log.filter(p => p.kind === kind).length;
+}
+
+/**
+ * Record that a copy was printed.
+ *
+ * Merely fetching the document used to write one of these. Opening a bill to read it on
+ * screen therefore appeared in the log as a printed copy, so the reprint log — the one
+ * thing a manager checks when the kitchen says "we never got the ticket" — was full of
+ * prints that never happened. Nothing here can see a printer, so the only honest signals
+ * are the browser telling us its print dialog closed, and a member of staff pressing
+ * Reprint. Each entry says which it was; neither is a printer confirming it printed.
+ */
+async function recordPrint(order: any, kind: "kot" | "bill", by: string, source: "dialog" | "manual") {
   const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
   const log = Array.isArray(meta.prints) ? meta.prints as Record<string, unknown>[] : [];
   const copy = log.filter(p => p.kind === kind).length + 1;
   await db.update(ordersTable)
-    .set({ metadata: { ...meta, prints: [...log, { kind, copy, by, at: new Date().toISOString() }] } })
+    .set({ metadata: { ...meta, prints: [...log, { kind, copy, by, source, at: new Date().toISOString() }] } })
     .where(eq(ordersTable.id, order.id));
   return copy;
 }
@@ -222,8 +252,10 @@ router.get("/restaurants/:restaurantId/orders/:orderId/kot", requireAuth, async 
   const orderId = parseInt(String(req.params.orderId), 10);
   const found = await loadOrder(restaurantId, orderId);
   if (!found) { res.status(404).json({ error: "Order not found" }); return; }
-  const copy = await countCopy(found.order, "kot", actorOf(req));
-  send(res, kotHtml(found.order, found.venue, copy));
+  // Reading the ticket is not printing it. The page reports back when the print dialog
+  // actually closes; see the afterprint hook in `page()`.
+  send(res, kotHtml(found.order, found.venue, copiesSoFar(found.order, "kot") + 1,
+    `/api/restaurants/${restaurantId}/orders/${orderId}/printed?kind=kot`));
 });
 
 /** The customer bill. */
@@ -232,8 +264,22 @@ router.get("/restaurants/:restaurantId/orders/:orderId/print", requireAuth, asyn
   const orderId = parseInt(String(req.params.orderId), 10);
   const found = await loadOrder(restaurantId, orderId);
   if (!found) { res.status(404).json({ error: "Order not found" }); return; }
-  const copy = await countCopy(found.order, "bill", actorOf(req));
-  send(res, billHtml(found.order, found.venue, copy));
+  send(res, billHtml(found.order, found.venue, copiesSoFar(found.order, "bill") + 1,
+    `/api/restaurants/${restaurantId}/orders/${orderId}/printed?kind=bill`));
+});
+
+/**
+ * The page reporting that its print dialog closed. This, and an explicit Reprint, are the
+ * only two things that put a copy in the log — fetching the document no longer does.
+ */
+router.post("/restaurants/:restaurantId/orders/:orderId/printed", requireAuth, async (req, res): Promise<void> => {
+  const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const orderId = parseInt(String(req.params.orderId), 10);
+  const kind = String(req.query.kind ?? req.body?.kind ?? "bill") === "kot" ? "kot" : "bill";
+  const found = await loadOrder(restaurantId, orderId);
+  if (!found) { res.status(404).json({ error: "Order not found" }); return; }
+  const copy = await recordPrint(found.order, kind, actorOf(req), "dialog");
+  res.json({ kind, copy });
 });
 
 /**
@@ -249,7 +295,7 @@ router.post("/restaurants/:restaurantId/orders/:orderId/reprint", requireAuth, a
   if (!found) { res.status(404).json({ error: "Order not found" }); return; }
 
   const by = actorOf(req);
-  const copy = await countCopy(found.order, kind, by);
+  const copy = await recordPrint(found.order, kind, by, "manual");
   const html = kind === "kot" ? kotHtml(found.order, found.venue, copy) : billHtml(found.order, found.venue, copy);
 
   logger.info({ restaurantId, orderId, kind, copy, by }, "document reprinted");
@@ -271,7 +317,13 @@ router.get("/restaurants/:restaurantId/orders/:orderId/prints", requireAuth, asy
   if (!found) { res.status(404).json({ error: "Order not found" }); return; }
   const meta = (typeof found.order.metadata === "object" && found.order.metadata !== null
     ? found.order.metadata : {}) as Record<string, unknown>;
-  res.json({ prints: Array.isArray(meta.prints) ? meta.prints : [] });
+  res.json({
+    prints: Array.isArray(meta.prints) ? meta.prints : [],
+    // There is no printer integration, so nothing here is a printer confirming it printed.
+    // "dialog" is the browser reporting its print dialog closed; "manual" is a member of
+    // staff pressing Reprint. A ticket lost to an offline printer will still show here.
+    notice: "Recorded when the print dialog closes or a reprint is taken — not confirmed by the printer.",
+  });
 });
 
 export default router;

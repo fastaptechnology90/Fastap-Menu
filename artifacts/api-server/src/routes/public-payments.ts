@@ -1,13 +1,16 @@
 import { Router, type IRouter } from "express";
+import type { Request } from "express";
 import { eq } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
 import { db, ordersTable, restaurantsTable } from "@workspace/db";
 import {
   getPaymentCatalog, computeBillQuote, buildGstInvoice, buildInvoiceHtml,
-  generateInvoiceNumber, validateSplitPayments, resolvePaymentStatus,
+  validateSplitPayments, resolvePaymentStatus,
 } from "../lib/paymentLogic.js";
 import { buildInvoicePdfBuffer } from "../lib/invoicePdf.js";
 import { billingFromSettings } from "../lib/restaurant-catalogs.js";
 import { taxRateFor } from "../lib/order-pricing.js";
+import { allocateInvoiceNumber } from "../lib/invoice-series.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPaymentsPublicConfig, isOnlinePaymentMethod, isCashPaymentMethod, processGatewayPayment } from "../lib/payment-gateway.js";
@@ -32,6 +35,52 @@ function payAmountForOrder(grandTotal: number, body: Record<string, unknown>): n
       : grandTotal;
   if (!Number.isFinite(requested) || requested <= 0) return grandTotal;
   return Math.min(requested, grandTotal);
+}
+
+/**
+ * A receipt the guest can still open tomorrow.
+ *
+ * The invoice was reachable only from the browser session that placed and paid for the
+ * order. Close the tab, run out of battery, hand the phone to whoever is splitting the
+ * bill — and the GST invoice for money already handed over was gone for good, because
+ * the only other way in was to guess the order id, which is exactly the hole that got
+ * shut. The order now carries a receipt token: a long random string returned once, at
+ * payment, that opens that one invoice and nothing else.
+ */
+function receiptTokenFor(order: { metadata: unknown }): string | null {
+  const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
+  const token = meta.receiptToken;
+  return typeof token === "string" && token.length >= 16 ? token : null;
+}
+
+function newReceiptToken(): string {
+  return `rct_${randomBytes(24).toString("hex")}`;
+}
+
+/** The order behind an invoice request: the caller's own, or one whose receipt token they hold. */
+async function loadInvoiceOrder(req: Request, orderId: number) {
+  const owned = await loadOwnedOrder(req, orderId);
+  if (owned) return owned;
+
+  const supplied = String(req.query.token ?? req.query.receiptToken ?? "").trim();
+  if (!supplied || supplied.length < 16) return null;
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  if (!order) return null;
+  const stored = receiptTokenFor(order);
+  return stored && stored === supplied ? order : null;
+}
+
+/**
+ * The bill as the guest has to settle it.
+ *
+ * `buildGstInvoice` puts the tip on its own line and then prints a grand total that is
+ * the order total — which never had the tip added to it. So a ₹29.40 bill with a ₹3 tip
+ * showed "Tip ₹3.00" directly above "Grand Total ₹29.40", and the guest handed over
+ * ₹29.40. Every tip taken on a printed bill was lost between the two lines.
+ */
+function guestInvoice(order: Parameters<typeof buildGstInvoice>[0], restaurantName: string, billing: Parameters<typeof buildGstInvoice>[2]) {
+  const base = buildGstInvoice(order, restaurantName, billing);
+  return { ...base, amountBeforeTip: base.grandTotal, grandTotal: Math.round((base.grandTotal + base.tip) * 100) / 100 };
 }
 
 router.get("/public/payments/catalog", async (_req, res) => {
@@ -202,18 +251,28 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
     return;
   }
 
+  const receiptToken = receiptTokenFor(order) ?? newReceiptToken();
+
   const [updated] = await db.update(ordersTable).set({
     paymentMethod: method,
     paymentStatus,
     tipAmount: tipAmount != null ? String(parseNum(tipAmount).toFixed(2)) : order.tipAmount,
-    invoiceNumber: order.invoiceNumber ?? generateInvoiceNumber(order.id, order.restaurantId),
-    metadata: { ...meta, ...gatewayMeta, billing },
+    // An invoice number is drawn from the venue's consecutive series when the money is
+    // booked — see allocateInvoiceNumber — not stamped on here from the order id, which
+    // left the series full of holes and numbered payments that had failed.
+    ...(paymentStatus === "paid"
+      ? { invoiceNumber: order.invoiceNumber ?? await allocateInvoiceNumber(order.restaurantId, order) ?? undefined }
+      : {}),
+    metadata: { ...meta, ...gatewayMeta, billing, receiptToken },
   }).where(eq(ordersTable.id, orderId)).returning();
 
   res.json({
     success: true,
     order: updated,
     paymentStatus,
+    // The only way back to this receipt once the browser session is gone.
+    receiptToken,
+    receiptUrl: `/api/public/payments/invoice/${orderId}?token=${receiptToken}`,
     gateway: gatewayMeta.gatewayId ?? null,
     gatewayMode: gatewayMeta.gatewayMode ?? null,
   });
@@ -223,19 +282,18 @@ router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> 
   const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
-  // venue.
-  const order = await loadOwnedOrder(req, orderId);
+  // venue. `?token=` is the receipt token handed back at payment, so the guest can open
+  // their own bill again from a different tab, phone or day.
+  const order = await loadInvoiceOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
   const billing = billingFromSettings(settings, restaurant);
-  const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
+  const invoice = guestInvoice(order, restaurant?.name ?? "Restaurant", billing);
 
-  if (!order.invoiceNumber) {
-    await db.update(ordersTable).set({ invoiceNumber: invoice.invoiceNumber }).where(eq(ordersTable.id, orderId));
-  }
-
+  // Looking at a bill no longer issues an invoice number. It used to, which is how a
+  // payment that failed still consumed one.
   res.json({ invoice, html: buildInvoiceHtml(invoice) });
 });
 
@@ -243,18 +301,19 @@ router.get("/public/payments/invoice/:orderId/download", async (req, res): Promi
   const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
-  // venue.
-  const order = await loadOwnedOrder(req, orderId);
+  // venue. `?token=` is the receipt token handed back at payment, so the guest can open
+  // their own bill again from a different tab, phone or day.
+  const order = await loadInvoiceOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
   const billing = billingFromSettings(settings, restaurant);
-  const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
+  const invoice = guestInvoice(order, restaurant?.name ?? "Restaurant", billing);
   const html = buildInvoiceHtml(invoice);
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.html"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber ?? `bill-${orderId}`}.html"`);
   res.send(html);
 });
 
@@ -262,18 +321,19 @@ router.get("/public/payments/invoice/:orderId/pdf", async (req, res): Promise<vo
   const orderId = parseInt(String(req.params.orderId), 10);
   // An invoice carries the diner's name, phone and everything they ate. It used to be
   // fetched by id alone, so counting upward printed a GST bill for every table in the
-  // venue.
-  const order = await loadOwnedOrder(req, orderId);
+  // venue. `?token=` is the receipt token handed back at payment, so the guest can open
+  // their own bill again from a different tab, phone or day.
+  const order = await loadInvoiceOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId));
   const settings = (restaurant?.settings && typeof restaurant.settings === "object" ? restaurant.settings : {}) as Record<string, unknown>;
   const billing = billingFromSettings(settings, restaurant);
-  const invoice = buildGstInvoice(order, restaurant?.name ?? "Restaurant", billing);
+  const invoice = guestInvoice(order, restaurant?.name ?? "Restaurant", billing);
   const pdf = buildInvoicePdfBuffer(invoice);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber ?? `bill-${orderId}`}.pdf"`);
   res.send(pdf);
 });
 

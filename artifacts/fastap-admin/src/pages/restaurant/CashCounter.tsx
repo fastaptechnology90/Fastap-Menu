@@ -126,24 +126,24 @@ export default function CashCounter() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Cash Counter</h1>
-          <p className="text-xs text-white/40">Shift management & cash tracking</p>
+          <h1 className="text-xl font-semibold">Cash Counter</h1>
+          <p className="text-xs text-muted-foreground">Shift management & cash tracking</p>
         </div>
         <div className="flex gap-2">
           {activeShift ? (
             <>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold">
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success-subtle text-success text-xs font-semibold">
+                <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
                 Shift Open · {activeShift.cashier}
               </div>
-              <button onClick={() => setShowClose(true)} className="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold px-4 py-2 rounded-xl text-sm transition-all border border-red-500/20">
+              <button onClick={() => setShowClose(true)} className="flex items-center gap-2 bg-danger-subtle hover-elevate text-danger font-semibold px-4 py-2 rounded-lg text-sm transition-colors border border-danger-border">
                 <Lock className="h-4 w-4" /> Close Shift
               </button>
             </>
           ) : (
-            <button onClick={() => setShowOpen(true)} className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 font-bold px-4 py-2 rounded-xl text-sm transition-all border border-emerald-500/20">
+            <button onClick={() => setShowOpen(true)} className="flex items-center gap-2 bg-success-subtle hover-elevate text-success font-semibold px-4 py-2 rounded-lg text-sm transition-colors border border-success-border">
               <Unlock className="h-4 w-4" /> Open Shift
             </button>
           )}
@@ -155,34 +155,34 @@ export default function CashCounter() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Opening Balance", value: `₹${(activeShift?.openingBalance ?? 0).toLocaleString()}`, icon: Unlock, color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Cash Sales", value: `₹${currentSales.toLocaleString()}`, icon: TrendingUp, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Refunds", value: `₹${currentRefunds.toLocaleString()}`, icon: Minus, color: "text-orange-400", bg: "bg-orange-500/10" },
-          { label: "Expected Closing", value: `₹${expected.toLocaleString()}`, icon: Banknote, color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "Opening Balance", value: `₹${(activeShift?.openingBalance ?? 0).toLocaleString()}`, icon: Unlock, color: "text-info", bg: "bg-info-subtle" },
+          { label: "Cash Sales", value: `₹${currentSales.toLocaleString()}`, icon: TrendingUp, color: "text-success", bg: "bg-success-subtle" },
+          { label: "Refunds", value: `₹${currentRefunds.toLocaleString()}`, icon: Minus, color: "text-warning", bg: "bg-warning-subtle" },
+          { label: "Expected Closing", value: `₹${expected.toLocaleString()}`, icon: Banknote, color: "text-primary", bg: "bg-primary/10" },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4 flex items-center gap-3`}>
-            <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center ${s.color}`}>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4 flex items-center gap-3`}>
+            <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}>
               <s.icon className="h-5 w-5" />
             </div>
             <div>
-              <p className={`text-lg font-extrabold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-white/40">{s.label}</p>
+              <p className={`text-lg font-semibold ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-muted rounded-lg p-1 w-fit">
         {(["shift", "transactions", "denominations"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t ? "bg-amber-500 text-black" : "text-white/50 hover:text-white"}`}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-colors ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>
         ))}
       </div>
 
       {tab === "shift" && (
         <div className="grid lg:grid-cols-2 gap-4">
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
-            <h2 className="text-sm font-bold mb-4 text-white/70">Current Shift Summary</h2>
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-sm font-semibold mb-4 text-foreground">Current Shift Summary</h2>
             {activeShift ? (
             <div className="space-y-3">
               {[
@@ -194,63 +194,63 @@ export default function CashCounter() {
                 { label: "Expenses Paid", value: `₹${currentExpenses.toLocaleString()}` },
                 { label: "Expected Closing", value: `₹${expected.toLocaleString()}` },
               ].map(r => (
-                <div key={r.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                  <span className="text-sm text-white/50">{r.label}</span>
+                <div key={r.label} className="flex justify-between items-center py-2 border-b border-border last:border-0">
+                  <span className="text-sm text-muted-foreground">{r.label}</span>
                   <span className="text-sm font-semibold">{r.value}</span>
                 </div>
               ))}
             </div>
             ) : (
-              <p className="text-sm text-white/40 text-center py-8">No active shift. Open a shift to start tracking cash.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">No active shift. Open a shift to start tracking cash.</p>
             )}
           </div>
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
-            <h2 className="text-sm font-bold mb-4 text-white/70">Past Shifts</h2>
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-sm font-semibold mb-4 text-foreground">Past Shifts</h2>
             {allShifts.filter(s => s.status === "closed").map(s => (
-              <div key={s.id} className="p-3 rounded-xl bg-white/5 border border-white/5 mb-2">
+              <div key={s.id} className="p-3 rounded-lg bg-muted border border-border mb-2">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <p className="text-sm font-semibold">{s.cashier}</p>
-                    <p className="text-xs text-white/40">{s.opened} → {s.closed}</p>
+                    <p className="text-xs text-muted-foreground">{s.opened} to {s.closed}</p>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 text-xs font-semibold">Closed</span>
+                  <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs font-semibold">Closed</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-white/5 rounded-lg p-2"><p className="text-xs text-white/40">Sales</p><p className="text-sm font-bold text-emerald-400">₹{s.sales.toLocaleString()}</p></div>
-                  <div className="bg-white/5 rounded-lg p-2"><p className="text-xs text-white/40">Refunds</p><p className="text-sm font-bold text-orange-400">₹{s.refunds.toLocaleString()}</p></div>
-                  <div className={`rounded-lg p-2 ${s.closingBalance! > s.expectedBalance ? "bg-red-500/10" : "bg-emerald-500/10"}`}>
-                    <p className="text-xs text-white/40">Balance</p>
-                    <p className={`text-sm font-bold ${s.closingBalance! > s.expectedBalance ? "text-red-400" : "text-emerald-400"}`}>₹{s.closingBalance?.toLocaleString()}</p>
+                  <div className="bg-muted rounded-lg p-2"><p className="text-xs text-muted-foreground">Sales</p><p className="text-sm font-semibold text-success">₹{s.sales.toLocaleString()}</p></div>
+                  <div className="bg-muted rounded-lg p-2"><p className="text-xs text-muted-foreground">Refunds</p><p className="text-sm font-semibold text-warning">₹{s.refunds.toLocaleString()}</p></div>
+                  <div className={`rounded-lg p-2 ${s.closingBalance! > s.expectedBalance ? "bg-danger-subtle" : "bg-success-subtle"}`}>
+                    <p className="text-xs text-muted-foreground">Balance</p>
+                    <p className={`text-sm font-semibold ${s.closingBalance! > s.expectedBalance ? "text-danger" : "text-success"}`}>₹{s.closingBalance?.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
             ))}
             {allShifts.filter(s => s.status === "closed").length === 0 && (
-              <p className="text-sm text-white/30 text-center py-6">No closed shifts yet</p>
+              <p className="text-sm text-muted-foreground text-center py-6">No closed shifts yet</p>
             )}
           </div>
         </div>
       )}
 
       {tab === "transactions" && (
-        <div className="bg-[#0e1520] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-white/5">
-            <h2 className="text-sm font-bold">Cash Transactions</h2>
-            <p className="text-xs text-white/40 mt-0.5">Current shift only</p>
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-sm font-semibold">Cash Transactions</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Current shift only</p>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-border">
             {transactions.map(t => (
               <div key={t.id} className="flex items-center gap-3 px-4 py-3">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t.type === "sale" ? "bg-emerald-500/15 text-emerald-400" : t.type === "refund" ? "bg-orange-500/15 text-orange-400" : "bg-red-500/15 text-red-400"}`}>
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t.type === "sale" ? "bg-success-subtle text-success" : t.type === "refund" ? "bg-warning-subtle text-warning" : "bg-danger-subtle text-danger"}`}>
                   {t.type === "sale" ? <Plus className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold capitalize">{t.type}</p>
-                  <p className="text-xs text-white/40">{t.note}</p>
+                  <p className="text-xs text-muted-foreground">{t.note}</p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold ${t.amount > 0 ? "text-emerald-400" : "text-red-400"}`}>{t.amount > 0 ? "+" : ""}₹{Math.abs(t.amount).toLocaleString()}</p>
-                  <p className="text-xs text-white/30">{t.time}</p>
+                  <p className={`text-sm font-semibold ${t.amount > 0 ? "text-success" : "text-danger"}`}>{t.amount > 0 ? "+" : ""}₹{Math.abs(t.amount).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{t.time}</p>
                 </div>
               </div>
             ))}
@@ -259,62 +259,62 @@ export default function CashCounter() {
       )}
 
       {tab === "denominations" && (
-        <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+        <div className="bg-card border border-border rounded-lg p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold">Cash Declaration</h2>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-bold ${Math.abs(mismatch) < 50 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+            <h2 className="text-sm font-semibold">Cash Declaration</h2>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold ${Math.abs(mismatch) < 50 ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"}`}>
               {Math.abs(mismatch) < 50 ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               {mismatch >= 0 ? "+" : ""}₹{mismatch.toLocaleString()} vs expected
             </div>
           </div>
           <div className="space-y-2 mb-4">
             {denom.map((d, i) => (
-              <div key={d.note} className="flex items-center gap-3 p-3 bg-white/3 rounded-xl border border-white/5">
-                <span className="text-sm font-bold w-16 text-amber-400">{d.note}</span>
+              <div key={d.note} className="flex items-center gap-3 p-3 bg-muted rounded-lg border border-border">
+                <span className="text-sm font-semibold w-16 text-primary">{d.note}</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => updateDenom(i, -1)} className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"><Minus className="h-3 w-3" /></button>
-                  <span className="text-sm font-bold w-8 text-center">{d.qty}</span>
-                  <button onClick={() => updateDenom(i, 1)} className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"><Plus className="h-3 w-3" /></button>
+                  <button onClick={() => updateDenom(i, -1)} className="h-7 w-7 rounded-lg bg-muted flex items-center justify-center hover-elevate transition-colors"><Minus className="h-3 w-3" /></button>
+                  <span className="text-sm font-semibold w-8 text-center">{d.qty}</span>
+                  <button onClick={() => updateDenom(i, 1)} className="h-7 w-7 rounded-lg bg-muted flex items-center justify-center hover-elevate transition-colors"><Plus className="h-3 w-3" /></button>
                 </div>
-                <span className="ml-auto text-sm font-semibold text-white/60">= ₹{d.value.toLocaleString()}</span>
+                <span className="ml-auto text-sm font-semibold text-muted-foreground">= ₹{d.value.toLocaleString()}</span>
               </div>
             ))}
           </div>
-          <div className="flex justify-between items-center p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-            <span className="text-sm font-bold text-amber-400">Total Declared</span>
-            <span className="text-lg font-extrabold text-amber-400">₹{totalDeclared.toLocaleString()}</span>
+          <div className="flex justify-between items-center p-3 bg-primary/10 rounded-lg border border-primary/20">
+            <span className="text-sm font-semibold text-primary">Total Declared</span>
+            <span className="text-lg font-semibold text-primary">₹{totalDeclared.toLocaleString()}</span>
           </div>
         </div>
       )}
 
       {/* Close Shift Modal */}
       {showClose && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold">Close Shift</h2>
-              <button onClick={() => setShowClose(false)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/15"><X className="h-4 w-4" /></button>
+              <h2 className="text-base font-semibold">Close Shift</h2>
+              <button onClick={() => setShowClose(false)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-3 mb-5">
-              <div className="p-4 bg-white/5 rounded-xl">
-                <p className="text-xs text-white/40 mb-1">Expected Closing Balance</p>
-                <p className="text-2xl font-extrabold text-amber-400">₹{expected.toLocaleString()}</p>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Expected Closing Balance</p>
+                <p className="text-2xl font-semibold text-primary">₹{expected.toLocaleString()}</p>
               </div>
-              <div className="p-4 bg-white/5 rounded-xl">
-                <p className="text-xs text-white/40 mb-1">Declared Cash</p>
-                <p className="text-2xl font-extrabold text-white">₹{totalDeclared.toLocaleString()}</p>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Declared Cash</p>
+                <p className="text-2xl font-semibold text-foreground">₹{totalDeclared.toLocaleString()}</p>
               </div>
               {Math.abs(mismatch) > 50 && (
-                <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-                  <p className="text-xs text-red-400">Cash mismatch of ₹{Math.abs(mismatch)} detected. A report will be generated.</p>
+                <div className="flex items-center gap-2 p-3 bg-danger-subtle border border-danger-border rounded-lg">
+                  <AlertTriangle className="h-4 w-4 text-danger shrink-0" />
+                  <p className="text-xs text-danger">Cash mismatch of ₹{Math.abs(mismatch)} detected. A report will be generated.</p>
                 </div>
               )}
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setShowClose(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setShowClose(false)} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold hover-elevate transition-colors">Cancel</button>
               <PermissionGate permission="view_wallet">
-              <button onClick={handleCloseShift} disabled={closing} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm hover:bg-amber-600 transition-all disabled:opacity-50">{closing ? "Closing…" : "Confirm & Close"}</button>
+              <button onClick={handleCloseShift} disabled={closing} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50">{closing ? "Closing…" : "Confirm & Close"}</button>
               </PermissionGate>
             </div>
           </div>
@@ -322,18 +322,18 @@ export default function CashCounter() {
       )}
 
       {showOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold">Open Shift</h2>
-              <button onClick={() => setShowOpen(false)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/15"><X className="h-4 w-4" /></button>
+              <h2 className="text-base font-semibold">Open Shift</h2>
+              <button onClick={() => setShowOpen(false)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><X className="h-4 w-4" /></button>
             </div>
-            <label className="text-xs text-white/40 block mb-1">Opening float (₹)</label>
-            <input type="number" value={openBalance} onChange={e => setOpenBalance(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm mb-4 focus:outline-none focus:border-amber-500/40" />
+            <label className="text-xs text-muted-foreground block mb-1">Opening float (₹)</label>
+            <input type="number" value={openBalance} onChange={e => setOpenBalance(e.target.value)} className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm mb-4 focus:outline-none focus:border-primary/40" />
             <div className="flex gap-3">
-              <button onClick={() => setShowOpen(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold">Cancel</button>
+              <button onClick={() => setShowOpen(false)} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold">Cancel</button>
               <PermissionGate permission="view_wallet">
-              <button onClick={handleOpenShift} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-black font-bold text-sm">Open Shift</button>
+              <button onClick={handleOpenShift} className="flex-1 py-2.5 rounded-lg bg-success text-background font-semibold text-sm">Open Shift</button>
               </PermissionGate>
             </div>
           </div>

@@ -12,12 +12,56 @@ import { loadCatalogSection } from "../lib/restaurant-catalogs.js";
 
 const router: IRouter = Router();
 
+interface BarCatalogOverrides {
+  happyHour?: { label?: string; days?: string; start?: string; end?: string; discountPercent?: number };
+  djEvents?: unknown[];
+  barTables?: unknown[];
+  loungeZones?: unknown[];
+  timeSlots?: unknown[];
+  cocktailBases?: unknown[];
+}
+
+/**
+ * The bar programme this venue actually runs.
+ *
+ * Every venue on the platform used to be handed the same invented nightlife: a happy
+ * hour from 16:00 to 19:00 Monday to Friday at 20% off, four DJ nights with named DJs
+ * — "Friday Night DJ — DJ Aakash", ₹500 cover — bar tables, lounge zones and a priced
+ * cocktail builder, all stamped `live: true`. A family restaurant with no bar showed a
+ * guest another business's Saturday line-up as its own, and the cover charges were
+ * numbers nobody at the venue had ever agreed to.
+ *
+ * Nothing is offered now unless the venue has published it in its own settings.
+ */
 router.get("/public/bar/catalog/:restaurantId", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Venue not found" }); return; }
-  const overrides = await loadCatalogSection(restaurantId, "barCatalog", {});
-  res.json({ ...getBarCatalog(), ...overrides, restaurantName: restaurant.name, live: true });
+  const overrides = await loadCatalogSection<BarCatalogOverrides>(restaurantId, "barCatalog", {});
+
+  const list = (v: unknown) => (Array.isArray(v) && v.length ? v : []);
+  const happyHour = overrides.happyHour && typeof overrides.happyHour === "object" ? overrides.happyHour : null;
+  const djEvents = list(overrides.djEvents);
+  const barTables = list(overrides.barTables);
+  const loungeZones = list(overrides.loungeZones);
+  const cocktailBases = list(overrides.cocktailBases);
+  const configured = Boolean(happyHour) || djEvents.length > 0 || barTables.length > 0 || loungeZones.length > 0;
+
+  res.json({
+    happyHour,
+    isHappyHourNow: happyHour ? isHappyHourActive() : false,
+    djEvents,
+    barTables,
+    loungeZones,
+    timeSlots: list(overrides.timeSlots),
+    cocktailBases,
+    restaurantName: restaurant.name,
+    configured,
+    live: configured,
+    notice: configured
+      ? null
+      : `${restaurant.name} has not published a bar or nightlife programme. Drinks on the menu can still be ordered from your table.`,
+  });
 });
 
 router.get("/public/bar/happy-hour/:slug", async (req, res): Promise<void> => {
@@ -36,17 +80,49 @@ router.get("/public/bar/happy-hour/:slug", async (req, res): Promise<void> => {
     categorySlug: catById[i.categoryId ?? 0] ?? "",
   }));
 
+  // A venue that has not set a happy hour does not have one. This used to discount its
+  // whole drinks list by 20% between 16:00 and 19:00 on a schedule invented in code —
+  // a price the venue never agreed to, shown to the guest as its offer.
+  const barOverrides = await loadCatalogSection<BarCatalogOverrides>(restaurant.id, "barCatalog", {});
+  const publishedHappyHour = barOverrides.happyHour && typeof barOverrides.happyHour === "object" ? barOverrides.happyHour : null;
+  if (!publishedHappyHour) {
+    res.json({
+      happyHour: null,
+      isActive: false,
+      items: [],
+      restaurantName: restaurant.name,
+      configured: false,
+      notice: `${restaurant.name} is not running a happy hour.`,
+    });
+    return;
+  }
+
   const happyHourItems = filterHappyHourItems(mapped);
   res.json({
-    happyHour: getBarCatalog().happyHour,
+    happyHour: publishedHappyHour,
     isActive: isHappyHourActive(),
     items: happyHourItems,
     restaurantName: restaurant.name,
+    configured: true,
   });
 });
 
 router.post("/public/bar/cocktail", async (req, res): Promise<void> => {
-  const { baseId, mixerId, styleId, garnishIds, name } = req.body;
+  const { restaurantId, baseId, mixerId, styleId, garnishIds, name } = req.body;
+
+  // The builder priced a drink from spirit and garnish rates written into the source,
+  // then had no way to send it to a bartender. Quoting a price a venue never set, for a
+  // drink nobody can make, is worse than not offering it.
+  const rid = parseInt(String(restaurantId ?? 0), 10);
+  const cocktailOverrides = rid ? await loadCatalogSection<BarCatalogOverrides>(rid, "barCatalog", {}) : {};
+  if (!Array.isArray(cocktailOverrides.cocktailBases) || cocktailOverrides.cocktailBases.length === 0) {
+    res.status(409).json({
+      error: "This venue does not offer build-your-own cocktails. Please order from the drinks menu.",
+      configured: false,
+    });
+    return;
+  }
+
   const quote = cocktailQuote(baseId ?? "rum", styleId ?? "regular", garnishIds ?? []);
   const cocktailName = name ?? `Custom ${baseId ?? "rum"} cocktail`;
   res.json({

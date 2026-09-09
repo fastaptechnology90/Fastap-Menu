@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, RefreshCw, Loader2, Search, TrendingUp, Phone, Calendar, MessageSquare, Star, Zap } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function VendorCRM() {
   const { toast } = useToast();
@@ -95,108 +96,108 @@ export default function VendorCRM() {
   const filteredLogs = logs.filter((l: any) => l.vendorName?.toLowerCase().includes(search.toLowerCase()));
 
   const lifecycleStages = [
-    { stage: "Trial", count: crm?.lifecycle?.trial || 0, color: "bg-blue-500" },
-    { stage: "Active", count: crm?.lifecycle?.active || 0, color: "bg-green-500" },
-    { stage: "Growth", count: crm?.lifecycle?.growth || 0, color: "bg-teal-500" },
-    { stage: "Enterprise", count: crm?.lifecycle?.enterprise || 0, color: "bg-purple-500" },
-    { stage: "Dormant", count: crm?.lifecycle?.dormant || 0, color: "bg-gray-500" },
-    { stage: "Churn Risk", count: crm?.lifecycle?.churnRisk || 0, color: "bg-red-500" },
+    { stage: "Trial", count: crm?.lifecycle?.trial || 0, color: "bg-info" },
+    { stage: "Active", count: crm?.lifecycle?.active || 0, color: "bg-success" },
+    { stage: "Growth", count: crm?.lifecycle?.growth || 0, color: "bg-success" },
+    { stage: "Enterprise", count: crm?.lifecycle?.enterprise || 0, color: "bg-muted-foreground" },
+    { stage: "Dormant", count: crm?.lifecycle?.dormant || 0, color: "bg-muted-foreground" },
+    { stage: "Churn Risk", count: crm?.lifecycle?.churnRisk || 0, color: "bg-danger" },
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vendor Success CRM</h2>
-          <p className="text-muted-foreground">Meeting logs, follow-ups, renewal reminders, and upsell opportunities.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Vendor Success CRM"
+        description="Meeting logs, follow-ups, renewal reminders, and upsell opportunities."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Log Interaction</Button>
+            <Button><Plus className="mr-2 h-4 w-4" /> Log Interaction</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Log Vendor Interaction</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); submitLog(); }} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  <Select
-                    value={form.vendorId}
-                    onValueChange={v => {
-                      const picked = vendorList.find(x => String(x.id) === v);
-                      setForm(f => ({ ...f, vendorId: v, vendorName: picked?.name ?? f.vendorName }));
-                    }}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Select vendor…" /></SelectTrigger>
-                    <SelectContent>
-                      {vendorList.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Interaction Type</Label>
-                    <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["Meeting Log", "Phone Call", "Email", "Follow-up", "Renewal Discussion", "Upsell Pitch", "Complaint"].map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Outcome</Label>
-                    <Select value={form.outcome} onValueChange={v => setForm(f => ({ ...f, outcome: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Positive">Positive</SelectItem>
-                        <SelectItem value="Neutral">Neutral</SelectItem>
-                        <SelectItem value="Negative">Negative</SelectItem>
-                        <SelectItem value="Pending Follow-up">Pending Follow-up</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes</Label>
-                  <Textarea placeholder="Meeting notes, key points discussed..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Follow-up Date</Label>
-                    <Input type="date" value={form.followUpDate} onChange={e => setForm(f => ({ ...f, followUpDate: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Upsell Plan (if any)</Label>
-                    <Select value={form.upsellPlan} onValueChange={v => setForm(f => ({ ...f, upsellPlan: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select plan..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="starter">→ Starter</SelectItem>
-                        <SelectItem value="pro">→ Pro</SelectItem>
-                        <SelectItem value="enterprise">→ Enterprise</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full" disabled={createLog.isPending || !form.vendorId || !form.notes.trim()}>
-                  {createLog.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Log Interaction
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Log Vendor Interaction</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); submitLog(); }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+            <Label>Vendor</Label>
+            <Select
+            value={form.vendorId}
+            onValueChange={v => {
+            const picked = vendorList.find(x => String(x.id) === v);
+            setForm(f => ({ ...f, vendorId: v, vendorName: picked?.name ?? f.vendorName }));
+            }}
+            >
+            <SelectTrigger><SelectValue placeholder="Select vendor…" /></SelectTrigger>
+            <SelectContent>
+            {vendorList.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>)}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Interaction Type</Label>
+            <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Meeting Log", "Phone Call", "Email", "Follow-up", "Renewal Discussion", "Upsell Pitch", "Complaint"].map(t => (
+            <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Outcome</Label>
+            <Select value={form.outcome} onValueChange={v => setForm(f => ({ ...f, outcome: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="Positive">Positive</SelectItem>
+            <SelectItem value="Neutral">Neutral</SelectItem>
+            <SelectItem value="Negative">Negative</SelectItem>
+            <SelectItem value="Pending Follow-up">Pending Follow-up</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Notes</Label>
+            <Textarea placeholder="Meeting notes, key points discussed..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Follow-up Date</Label>
+            <Input type="date" value={form.followUpDate} onChange={e => setForm(f => ({ ...f, followUpDate: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+            <Label>Upsell Plan (if any)</Label>
+            <Select value={form.upsellPlan} onValueChange={v => setForm(f => ({ ...f, upsellPlan: v }))}>
+            <SelectTrigger><SelectValue placeholder="Select plan..." /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            <SelectItem value="starter">→ Starter</SelectItem>
+            <SelectItem value="pro">→ Pro</SelectItem>
+            <SelectItem value="enterprise">→ Enterprise</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={createLog.isPending || !form.vendorId || !form.notes.trim()}>
+            {createLog.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Log Interaction
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Interactions" value={logs.length} icon={<MessageSquare className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Pending Follow-ups" value={followUps.length} icon={<Calendar className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Upsell Opportunities" value={upsellOpportunities.length} icon={<Zap className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Renewals Due (30d)" value={renewalAlerts.length} icon={<Star className="h-4 w-4 text-orange-500" />} />
+        <KpiCard title="Pending Follow-ups" value={followUps.length} icon={<Calendar className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Upsell Opportunities" value={upsellOpportunities.length} icon={<Zap className="h-4 w-4 text-success" />} />
+        <KpiCard title="Renewals Due (30d)" value={renewalAlerts.length} icon={<Star className="h-4 w-4 text-warning" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-6">
@@ -255,11 +256,11 @@ export default function VendorCRM() {
                       <div>
                         <p className="font-medium">{fu.vendorName}</p>
                         <p className="text-xs text-muted-foreground">{fu.notes}</p>
-                        <p className="text-xs text-yellow-400 mt-1">Due: {fu.followUpDate ? new Date(fu.followUpDate).toLocaleDateString() : "—"}</p>
+                        <p className="text-xs text-warning mt-1">Due: {fu.followUpDate ? new Date(fu.followUpDate).toLocaleDateString() : "—"}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={createLog.isPending} onClick={() => callFollowUp(fu)}><Phone className="h-3 w-3 mr-1" /> Call</Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" disabled={completeFollowUp.isPending} onClick={() => completeFollowUp.mutate(fu.id)}>Done</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-success" disabled={completeFollowUp.isPending} onClick={() => completeFollowUp.mutate(fu.id)}>Done</Button>
                       </div>
                     </div>
                   ))}
@@ -278,8 +279,8 @@ export default function VendorCRM() {
                   { header: "Vendor", cell: (row: any) => <span className="font-medium">{row.vendorName}</span> },
                   { header: "Current Plan", cell: (row: any) => <Badge variant="outline" className="text-xs capitalize">{row.currentPlan}</Badge> },
                   { header: "Target Plan", cell: (row: any) => <Badge className="text-xs capitalize">{row.targetPlan}</Badge> },
-                  { header: "MRR Uplift", cell: (row: any) => <span className="font-bold text-green-400">+₹{row.mrrUplift?.toLocaleString("en-IN")}/mo</span> },
-                  { header: "Probability", cell: (row: any) => <span className={`font-bold ${row.probability > 70 ? "text-green-400" : "text-yellow-400"}`}>{row.probability}%</span> },
+                  { header: "MRR Uplift", cell: (row: any) => <span className="font-bold text-success">+₹{row.mrrUplift?.toLocaleString("en-IN")}/mo</span> },
+                  { header: "Probability", cell: (row: any) => <span className={`font-bold ${row.probability > 70 ? "text-success" : "text-warning"}`}>{row.probability}%</span> },
                   { header: "Action", cell: (row: any) => <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => createLog.mutate({ vendorName: row.vendorName, type: "Upsell Pitch", notes: `Pitch ${row.targetPlan} plan`, outcome: "Scheduled", vendorId: Number(String(row.id).replace("UP-", "")) })}>Pitch</Button> },
                 ]} />
               )}
@@ -295,12 +296,12 @@ export default function VendorCRM() {
                   { header: "Vendor", cell: (row: any) => <span className="font-medium">{row.vendorName}</span> },
                   { header: "Plan", cell: (row: any) => <Badge variant="outline" className="text-xs capitalize">{row.plan}</Badge> },
                   { header: "MRR", cell: (row: any) => <span className="font-bold">₹{row.mrr?.toLocaleString("en-IN")}/mo</span> },
-                  { header: "Renewal Date", cell: (row: any) => <span className="text-xs font-medium text-yellow-400">{row.renewalDate}</span> },
-                  { header: "Days Left", cell: (row: any) => <span className={`font-bold ${row.daysLeft <= 7 ? "text-red-400" : "text-yellow-400"}`}>{row.daysLeft}d</span> },
+                  { header: "Renewal Date", cell: (row: any) => <span className="text-xs font-medium text-warning">{row.renewalDate}</span> },
+                  { header: "Days Left", cell: (row: any) => <span className={`font-bold ${row.daysLeft <= 7 ? "text-danger" : "text-warning"}`}>{row.daysLeft}d</span> },
                   { header: "Actions", cell: (row: any) => (
                     <div className="flex gap-1">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={remindVendor.isPending} onClick={() => remindVendor.mutate({ vendorId: row.vendorId, vendorName: row.vendorName })}>Remind</Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" disabled={renewVendor.isPending} onClick={() => renewVendor.mutate(row.vendorId)}>Renew</Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-success" disabled={renewVendor.isPending} onClick={() => renewVendor.mutate(row.vendorId)}>Renew</Button>
                     </div>
                   )},
                 ]} />

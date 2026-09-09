@@ -260,7 +260,7 @@ export default function UserAuth() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white flex flex-col px-4 py-12">
+    <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col px-4 py-12">
       <div className="w-full max-w-sm mx-auto mb-4">
         <GuestBackButton onClick={() => (mode === "select" ? goBack() : setMode("select"))} />
       </div>
@@ -270,9 +270,9 @@ export default function UserAuth() {
           <div className="flex justify-center mb-5">
             <GuestLogo size="lg" />
           </div>
-          <h1 className="font-display text-2xl font-bold">Welcome to FastMenu</h1>
-          <p className="text-white/50 text-sm mt-1">Sign in to unlock personalized dining</p>
-          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+          <h1 className="font-display text-2xl font-semibold">Welcome to FastMenu</h1>
+          <p className="text-muted-foreground text-sm mt-1">Sign in to unlock personalized dining</p>
+          {error && <p className="text-danger text-sm mt-2">{error}</p>}
           {venuesLoaded && venues.length === 0 && (
             <div className="mt-4">
               <GuestEmpty
@@ -288,11 +288,11 @@ export default function UserAuth() {
               diner is shown a list of every other restaurant on the platform. */}
           {venues.length > 0 && !resolveGuestSlug(venue.restaurantSlug || undefined) && (
             <div className="mt-3 text-left">
-              <label className="text-[11px] text-white/45 block mb-1.5">Venue</label>
+              <label className="text-2xs text-muted-foreground block mb-1.5">Venue</label>
               <select
                 value={selectedSlug}
                 onChange={e => { pickVenue(e.target.value).catch(() => {}); }}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500/50"
+                className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
               >
                 <option value="">Select venue</option>
                 {venues.map(v => (
@@ -309,16 +309,16 @@ export default function UserAuth() {
               <button
                 onClick={oneTapLogin}
                 disabled={loading}
-                className="w-full flex items-center gap-4 rounded-xl border border-orange-500/40 bg-orange-500/10 hover:bg-orange-500/20 transition-all p-4"
+                className="w-full flex items-center gap-4 rounded-xl border border-primary bg-muted hover:bg-muted transition-all p-4"
               >
-                <div className="h-10 w-10 rounded-lg bg-orange-500/30 flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-orange-300" />
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left flex-1">
                   <div className="text-sm font-semibold">One-Tap Login</div>
-                  <div className="text-xs text-white/40">Trusted device — instant sign in</div>
+                  <div className="text-xs text-muted-foreground">Trusted device — instant sign in</div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-white/30" />
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
 
@@ -326,95 +326,95 @@ export default function UserAuth() {
               onClick={() => setMode("otp-input")}
               className="guest-card guest-card-interactive w-full flex items-center gap-4 p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                <Smartphone className="h-5 w-5 text-orange-400" />
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <Smartphone className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left flex-1">
                 <div className="text-sm font-semibold">Mobile OTP Login</div>
-                <div className="text-xs text-white/40">Quick & secure</div>
+                <div className="text-xs text-muted-foreground">Quick & secure</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/30" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
             <button
               onClick={() => setMode("email")}
-              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all p-4"
+              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <Mail className="h-5 w-5 text-blue-400" />
+              <div className="h-10 w-10 rounded-lg bg-info-subtle flex items-center justify-center">
+                <Mail className="h-5 w-5 text-info" />
               </div>
               <div className="text-left flex-1">
                 <div className="text-sm font-semibold">Email & Password</div>
-                <div className="text-xs text-white/40">Classic login</div>
+                <div className="text-xs text-muted-foreground">Classic login</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/30" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
             <button
               onClick={() => openSocial("google")}
               disabled={loading}
-              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all p-4"
+              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                <Chrome className="h-5 w-5 text-red-400" />
+              <div className="h-10 w-10 rounded-lg bg-danger-subtle flex items-center justify-center">
+                <Chrome className="h-5 w-5 text-danger" />
               </div>
               <div className="text-left flex-1">
                 <div className="text-sm font-semibold">Continue with Google</div>
-                <div className="text-xs text-white/40">One-tap login</div>
+                <div className="text-xs text-muted-foreground">One-tap login</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/30" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
             <button
               onClick={() => openSocial("apple")}
               disabled={loading}
-              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all p-4"
+              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
-                <Apple className="h-5 w-5 text-white" />
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <Apple className="h-5 w-5 text-foreground" />
               </div>
               <div className="text-left flex-1">
                 <div className="text-sm font-semibold">Continue with Apple</div>
-                <div className="text-xs text-white/40">Sign in with Apple ID</div>
+                <div className="text-xs text-muted-foreground">Sign in with Apple ID</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/30" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
             <button
               onClick={() => setMode("register")}
-              className="w-full flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all p-4"
+              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-teal-500/20 flex items-center justify-center">
-                <UserPlus className="h-5 w-5 text-teal-400" />
+              <div className="h-10 w-10 rounded-lg bg-info-subtle flex items-center justify-center">
+                <UserPlus className="h-5 w-5 text-info" />
               </div>
               <div className="text-left flex-1">
                 <div className="text-sm font-semibold">Create Account</div>
-                <div className="text-xs text-white/40">Register with email</div>
+                <div className="text-xs text-muted-foreground">Register with email</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/30" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/10" />
+                <div className="w-full border-t border-border" />
               </div>
-              <div className="relative flex justify-center text-xs text-white/30">
+              <div className="relative flex justify-center text-xs text-muted-foreground">
                 <span className="bg-[#0b1120] px-3">or</span>
               </div>
             </div>
 
             <button
               onClick={() => setMode("guest-type")}
-              className="w-full flex items-center gap-4 rounded-xl border border-dashed border-white/10 bg-transparent hover:bg-white/5 transition-all p-4"
+              className="w-full flex items-center gap-4 rounded-xl border border-dashed border-border bg-transparent hover:bg-muted transition-all p-4"
             >
-              <div className="h-10 w-10 rounded-lg bg-white/5 flex items-center justify-center">
-                <User2 className="h-5 w-5 text-white/40" />
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <User2 className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="text-left flex-1">
-                <div className="text-sm font-semibold text-white/70">Continue as Guest</div>
-                <div className="text-xs text-white/30">Limited features, no sign-up</div>
+                <div className="text-sm font-semibold text-muted-foreground">Continue as Guest</div>
+                <div className="text-xs text-muted-foreground">Limited features, no sign-up</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-white/20" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>
         )}
@@ -422,15 +422,15 @@ export default function UserAuth() {
         {/* OTP Input */}
         {mode === "otp-input" && (
           <div className="space-y-5">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white mb-2">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-2">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Enter your mobile</h2>
-              <p className="text-white/40 text-sm">We'll send a 6-digit OTP to verify</p>
+              <h2 className="text-xl font-semibold mb-1">Enter your mobile</h2>
+              <p className="text-muted-foreground text-sm">We'll send a 6-digit OTP to verify</p>
             </div>
-            <div className="flex rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-              <div className="flex items-center px-4 border-r border-white/10 text-sm text-white/50">🇮🇳 +91</div>
+            <div className="flex rounded-xl border border-border bg-muted overflow-hidden">
+              <div className="flex items-center px-4 border-r border-border text-sm text-muted-foreground">🇮🇳 +91</div>
               <input
                 className="flex-1 bg-transparent px-4 py-3.5 text-sm focus:outline-none"
                 placeholder="98765 43210"
@@ -442,7 +442,7 @@ export default function UserAuth() {
             <button
               onClick={sendOtp}
               disabled={mobile.length !== 10 || loading}
-              className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 font-semibold text-sm transition-all"
+              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm transition-all"
             >
               {loading ? "Sending…" : "Send OTP"}
             </button>
@@ -452,19 +452,19 @@ export default function UserAuth() {
         {/* OTP Verify */}
         {mode === "otp-verify" && (
           <div className="space-y-6">
-            <button onClick={() => setMode("otp-input")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("otp-input")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Change number
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Verify OTP</h2>
-              <p className="text-white/40 text-sm">Sent to +91 {mobile.slice(0, 5)}xxxxx</p>
+              <h2 className="text-xl font-semibold mb-1">Verify OTP</h2>
+              <p className="text-muted-foreground text-sm">Sent to +91 {mobile.slice(0, 5)}xxxxx</p>
             </div>
             <div className="flex gap-2 justify-between">
               {otp.map((v, i) => (
                 <input
                   key={i}
                   id={`otp-${i}`}
-                  className="w-12 h-12 text-center text-lg font-bold rounded-xl border border-white/10 bg-white/5 focus:border-orange-500 focus:outline-none transition-colors"
+                  className="w-12 h-12 text-center text-lg font-semibold rounded-xl border border-border bg-muted focus:border-primary focus:outline-none transition-colors"
                   maxLength={1}
                   value={v}
                   onChange={e => handleOtpChange(i, e.target.value)}
@@ -474,29 +474,29 @@ export default function UserAuth() {
             <button
               onClick={verifyOtpSubmit}
               disabled={otp.some(v => !v) || loading}
-              className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 font-semibold text-sm transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm transition-all flex items-center justify-center gap-2"
             >
-              {loading ? <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Shield className="h-4 w-4" /> Verify & Continue</>}
+              {loading ? <div className="h-4 w-4 border-2 border-border border-t-white rounded-full animate-spin" /> : <><Shield className="h-4 w-4" /> Verify & Continue</>}
             </button>
-            <p className="text-center text-xs text-white/30">Resend OTP in 30s</p>
+            <p className="text-center text-xs text-muted-foreground">Resend OTP in 30s</p>
           </div>
         )}
 
         {/* Email Login */}
         {mode === "email" && (
           <div className="space-y-5">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Email Login</h2>
-              <p className="text-white/40 text-sm">Enter your credentials</p>
+              <h2 className="text-xl font-semibold mb-1">Email Login</h2>
+              <p className="text-muted-foreground text-sm">Enter your credentials</p>
             </div>
             <div className="space-y-3">
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:border-orange-500/50"
+                  className="w-full bg-muted border border-border rounded-xl pl-11 pr-4 py-3.5 text-sm focus:outline-none focus:border-primary"
                   placeholder="your@email.com"
                   type="email"
                   value={email}
@@ -504,15 +504,15 @@ export default function UserAuth() {
                 />
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-11 pr-11 py-3.5 text-sm focus:outline-none focus:border-orange-500/50"
+                  className="w-full bg-muted border border-border rounded-xl pl-11 pr-11 py-3.5 text-sm focus:outline-none focus:border-primary"
                   placeholder="Password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
-                <button onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70">
+                <button onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -520,7 +520,7 @@ export default function UserAuth() {
             <button
               onClick={emailLoginSubmit}
               disabled={!email || !password || loading}
-              className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 font-semibold text-sm"
+              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm"
             >
               Sign In
             </button>
@@ -530,20 +530,20 @@ export default function UserAuth() {
         {/* Social login profile */}
         {mode === "social" && socialProvider && (
           <div className="space-y-5">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Continue with {socialProvider === "google" ? "Google" : "Apple"}</h2>
-              <p className="text-white/40 text-sm">
+              <h2 className="text-xl font-semibold mb-1">Continue with {socialProvider === "google" ? "Google" : "Apple"}</h2>
+              <p className="text-muted-foreground text-sm">
                 {oauthReady && !oauthReady[socialProvider]
                   ? "Native OAuth is not configured — enter your account email to link your profile."
                   : "Confirm your account details"}
               </p>
             </div>
-            <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Full name" value={socialName} onChange={e => setSocialName(e.target.value)} />
-            <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Email address" type="email" value={socialEmail} onChange={e => setSocialEmail(e.target.value)} />
-            <button onClick={socialLoginSubmit} disabled={!socialEmail || loading} className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 font-semibold text-sm">
+            <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Full name" value={socialName} onChange={e => setSocialName(e.target.value)} />
+            <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Email address" type="email" value={socialEmail} onChange={e => setSocialEmail(e.target.value)} />
+            <button onClick={socialLoginSubmit} disabled={!socialEmail || loading} className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm">
               {loading ? "Signing in…" : "Complete Sign In"}
             </button>
           </div>
@@ -552,12 +552,12 @@ export default function UserAuth() {
         {/* Guest Type Selection */}
         {mode === "guest-type" && (
           <div className="space-y-4">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Guest Profile Type</h2>
-              <p className="text-white/40 text-sm">Select your guest category for personalized service</p>
+              <h2 className="text-xl font-semibold mb-1">Guest Profile Type</h2>
+              <p className="text-muted-foreground text-sm">Select your guest category for personalized service</p>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {(guestTypes.length ? guestTypes : [
@@ -568,14 +568,14 @@ export default function UserAuth() {
                 <button
                   key={t.id}
                   onClick={() => setSelectedGuestType(t.id as GuestTypeId)}
-                  className={`w-full text-left p-3 rounded-xl border transition-all ${selectedGuestType === t.id ? "bg-orange-500/20 border-orange-500/50" : "bg-white/5 border-white/10"}`}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${selectedGuestType === t.id ? "bg-muted border-primary" : "bg-muted border-border"}`}
                 >
                   <p className="text-sm font-semibold">{t.label}</p>
-                  <p className="text-xs text-white/40">{t.desc}</p>
+                  <p className="text-xs text-muted-foreground">{t.desc}</p>
                 </button>
               ))}
             </div>
-            <button onClick={() => setMode("guest")} className="w-full py-3.5 rounded-xl bg-orange-500 font-semibold text-sm">
+            <button onClick={() => setMode("guest")} className="w-full py-3.5 rounded-xl bg-primary font-semibold text-sm">
               Continue as Guest
             </button>
           </div>
@@ -584,20 +584,20 @@ export default function UserAuth() {
         {/* Register */}
         {mode === "register" && (
           <div className="space-y-5">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Create Account</h2>
-              <p className="text-white/40 text-sm">Register to save orders & earn rewards</p>
+              <h2 className="text-xl font-semibold mb-1">Create Account</h2>
+              <p className="text-muted-foreground text-sm">Register to save orders & earn rewards</p>
             </div>
             <div className="space-y-3">
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Full name" value={regName} onChange={e => setRegName(e.target.value)} />
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Mobile (optional)" value={regPhone} onChange={e => setRegPhone(e.target.value)} />
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm" placeholder="Password (min 6 chars)" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+              <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Full name" value={regName} onChange={e => setRegName(e.target.value)} />
+              <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Mobile (optional)" value={regPhone} onChange={e => setRegPhone(e.target.value)} />
+              <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+              <input className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm" placeholder="Password (min 6 chars)" type="password" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
-            <button onClick={registerSubmit} disabled={!email || password.length < 6 || loading} className="w-full py-3.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-40 font-semibold text-sm">
+            <button onClick={registerSubmit} disabled={!email || password.length < 6 || loading} className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm">
               {loading ? "Creating…" : "Create Account"}
             </button>
           </div>
@@ -606,15 +606,15 @@ export default function UserAuth() {
         {/* Guest Login */}
         {mode === "guest" && (
           <div className="space-y-5">
-            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-white/50 hover:text-white">
+            <button onClick={() => setMode("select")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <div>
-              <h2 className="text-xl font-bold mb-1">Continue as Guest</h2>
-              <p className="text-white/40 text-sm">Your name helps us personalise service</p>
+              <h2 className="text-xl font-semibold mb-1">Continue as Guest</h2>
+              <p className="text-muted-foreground text-sm">Your name helps us personalise service</p>
             </div>
             <input
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-orange-500/50"
+              className="w-full bg-muted border border-border rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-primary"
               placeholder="Your name (optional)"
               value={guestName}
               onChange={e => setGuestName(e.target.value)}
@@ -622,12 +622,12 @@ export default function UserAuth() {
             <button
               onClick={guestLoginSubmit}
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-white/10 hover:bg-white/15 font-semibold text-sm"
+              className="w-full py-3.5 rounded-xl bg-muted hover:bg-muted font-semibold text-sm"
             >
               Browse as Guest
             </button>
-            <div className="flex items-start gap-2 text-xs text-white/30 bg-white/5 rounded-xl p-3">
-              <CheckCircle className="h-3.5 w-3.5 mt-0.5 text-orange-400 flex-shrink-0" />
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded-xl p-3">
+              <CheckCircle className="h-3.5 w-3.5 mt-0.5 text-primary flex-shrink-0" />
               Guest access lets you view menus and place orders. Sign in to earn loyalty points and access order history.
             </div>
           </div>

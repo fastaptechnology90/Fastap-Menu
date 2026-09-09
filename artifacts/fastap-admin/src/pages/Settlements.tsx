@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { api, type Settlement } from "@/lib/apiClient";
 import { PlayCircle, StopCircle, Loader2, RefreshCcw } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Settlements() {
   const [holdDialog, setHoldDialog] = useState<Settlement | null>(null);
@@ -62,16 +63,18 @@ export default function Settlements() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Settlement Engine</h2>
-          <p className="text-muted-foreground">Manage vendor payouts and holding rules.</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
-          <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Settlement Engine"
+        description="Manage vendor payouts and holding rules."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <KpiCard title="Pending Settlements" value={fmtMoney(pendingTotal)} subtitle={`${pending.length} batches`} />
@@ -93,7 +96,7 @@ export default function Settlements() {
                 { header: "Vendor", cell: (row) => <span className="font-medium">{row.vendorName}</span> },
                 { header: "Gross Sales", cell: (row) => <span>₹{row.grossSales.toLocaleString("en-IN")}</span> },
                 { header: "Commission", cell: (row) => <span className="text-muted-foreground">-₹{row.commission.toLocaleString("en-IN")}</span> },
-                { header: "Net Payout", cell: (row) => <span className="font-bold text-green-400">₹{row.finalPayout.toLocaleString("en-IN")}</span> },
+                { header: "Net Payout", cell: (row) => <span className="font-bold text-success">₹{row.finalPayout.toLocaleString("en-IN")}</span> },
                 { header: "Cycle", cell: (row) => <span className="capitalize">{row.cycle}</span> },
                 { header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
                 {
@@ -102,16 +105,16 @@ export default function Settlements() {
                     <div className="flex items-center gap-1">
                       {row.status === "pending" && (
                         <>
-                          <Button variant="ghost" size="icon" className="text-green-500 h-8 w-8" title="Release" onClick={() => releaseMutation.mutate(row.id)} disabled={releaseMutation.isPending}>
+                          <Button variant="ghost" size="icon" className="text-success h-8 w-8" title="Release" onClick={() => releaseMutation.mutate(row.id)} disabled={releaseMutation.isPending}>
                             <PlayCircle className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="text-yellow-500 h-8 w-8" title="Hold" onClick={() => { setHoldDialog(row); setHoldReason(""); }}>
+                          <Button variant="ghost" size="icon" className="text-warning h-8 w-8" title="Hold" onClick={() => { setHoldDialog(row); setHoldReason(""); }}>
                             <StopCircle className="h-4 w-4" />
                           </Button>
                         </>
                       )}
                       {(row.status === "held" || row.status === "failed") && (
-                        <Button variant="ghost" size="icon" className="text-blue-500 h-8 w-8" title="Retry" onClick={() => retryMutation.mutate(row.id)}>
+                        <Button variant="ghost" size="icon" className="text-info h-8 w-8" title="Retry" onClick={() => retryMutation.mutate(row.id)}>
                           <RefreshCcw className="h-4 w-4" />
                         </Button>
                       )}

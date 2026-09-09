@@ -40,7 +40,7 @@ export default function AlertEngine() {
           return (
             <div key={r.id} className="admin-card-elevated flex items-center justify-between p-4 gap-4">
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning-subtle text-warning">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div>

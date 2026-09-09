@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import {
   Smartphone, Download, ChefHat, ConciergeBell, BedDouble, Copy, Check,
-  ShieldCheck, RefreshCw, Info, PackageOpen, History,
-} from "lucide-react";
+  ShieldCheck, RefreshCw, Info, PackageOpen, History, Store } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { staffAppsApi, type StaffAppEntry, type StaffAppDownload } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -15,24 +14,21 @@ const APP_ICON: Record<string, typeof ChefHat> = {
 };
 
 // Each app gets its own colour so staff can tell the three cards apart at a glance.
-const APP_STYLE: Record<string, { ring: string; chip: string; glow: string; btn: string }> = {
+const APP_STYLE: Record<string, { ring: string; chip: string; btn: string }> = {
   kitchen: {
-    ring: "border-orange-500/30",
-    chip: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-    glow: "from-orange-500/20",
-    btn: "bg-orange-500 hover:bg-orange-600 text-white",
+    ring: "border-warning-border",
+    chip: "bg-warning-subtle text-warning border-warning-border",
+    btn: "bg-warning hover:bg-warning/90 text-background",
   },
   waiter: {
-    ring: "border-blue-500/30",
-    chip: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-    glow: "from-blue-500/20",
-    btn: "bg-blue-500 hover:bg-blue-600 text-white",
+    ring: "border-info-border",
+    chip: "bg-info-subtle text-info border-info-border",
+    btn: "bg-info hover:bg-info/90 text-background",
   },
   housekeeping: {
-    ring: "border-emerald-500/30",
-    chip: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    glow: "from-emerald-500/20",
-    btn: "bg-emerald-500 hover:bg-emerald-600 text-white",
+    ring: "border-success-border",
+    chip: "bg-success-subtle text-success border-success-border",
+    btn: "bg-success hover:bg-success/90 text-background",
   },
 };
 
@@ -127,30 +123,30 @@ export default function StaffApps() {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/15 text-primary">
             <Smartphone className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold">Staff Apps</h1>
-            <p className="text-sm text-white/50 mt-0.5 max-w-xl">
+            <h1 className="text-xl font-semibold">Staff Apps</h1>
+            <p className="text-sm text-muted-foreground mt-0.5 max-w-xl">
               Install these apps on your staff phones. Scan the QR code or send the link — no Play Store needed.
             </p>
           </div>
         </div>
-        <button onClick={() => load()} className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/5">
+        <button onClick={() => load()} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted">
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
       </div>
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-3">
-          {[0, 1, 2].map(i => <div key={i} className="h-72 rounded-2xl border border-white/10 bg-white/[0.02] animate-pulse" />)}
+          {[0, 1, 2].map(i => <div key={i} className="h-72 rounded-lg border border-border bg-card animate-pulse" />)}
         </div>
       ) : apps.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 p-12 text-center">
-          <PackageOpen className="mx-auto h-10 w-10 text-white/25" />
-          <h3 className="mt-3 font-bold">No apps available yet</h3>
-          <p className="text-sm text-white/45 mt-1">
+        <div className="rounded-lg border border-dashed border-border p-12 text-center">
+          <PackageOpen className="mx-auto h-10 w-10 text-muted-foreground" />
+          <h3 className="mt-3 font-semibold">No apps available yet</h3>
+          <p className="text-sm text-muted-foreground mt-1">
             The Fastap team has not enabled any staff app for your restaurant yet. Please contact support.
           </p>
         </div>
@@ -161,63 +157,61 @@ export default function StaffApps() {
             const style = APP_STYLE[app.appKey] ?? APP_STYLE.kitchen!;
             const url = window.location.origin + (app.downloadPath ?? "");
             return (
-              <div key={app.appKey} className={`relative overflow-hidden rounded-2xl border ${style.ring} bg-white/[0.02]`}>
-                <div className={`absolute -right-16 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${style.glow} to-transparent blur-2xl pointer-events-none`} />
-
+              <div key={app.appKey} className={`relative overflow-hidden rounded-lg border ${style.ring} bg-card`}>
                 <div className="relative p-5">
                   <div className="flex items-start gap-3">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${style.chip}`}>
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border ${style.chip}`}>
                       <Icon className="h-6 w-6" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-extrabold truncate">{app.name}</h3>
-                      <p className="text-xs text-white/45 mt-0.5">{app.role}</p>
+                      <h3 className="font-semibold truncate">{app.name}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{app.role}</p>
                     </div>
                   </div>
 
-                  <p className="text-sm text-white/60 mt-3">{app.tagline}</p>
+                  <p className="text-sm text-muted-foreground mt-3">{app.tagline}</p>
 
                   {app.available ? (
                     <>
                       <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded-lg border ${style.chip}`}>v{app.version}</span>
-                        {app.fileSize ? <span className="text-[11px] text-white/40">{formatSize(app.fileSize)}</span> : null}
+                        <span className={`text-2xs font-semibold px-2 py-1 rounded-lg border ${style.chip}`}>v{app.version}</span>
+                        {app.fileSize ? <span className="text-2xs text-muted-foreground">{formatSize(app.fileSize)}</span> : null}
                         {app.publishedAt ? (
-                          <span className="text-[11px] text-white/40">· {new Date(app.publishedAt).toLocaleDateString()}</span>
+                          <span className="text-2xs text-muted-foreground">· {new Date(app.publishedAt).toLocaleDateString()}</span>
                         ) : null}
                       </div>
 
                       {app.changelog ? (
-                        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-[11px] font-bold text-white/50 uppercase tracking-wide">What's new</p>
-                          <p className="text-xs text-white/70 mt-1 whitespace-pre-line">{app.changelog}</p>
+                        <div className="mt-3 rounded-lg border border-border bg-card p-3">
+                          <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">What's new</p>
+                          <p className="text-xs text-foreground mt-1 whitespace-pre-line">{app.changelog}</p>
                         </div>
                       ) : null}
 
-                      <div className="mt-4 flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-border bg-card p-4">
                         {qr[app.appKey] ? (
                           <img src={qr[app.appKey]} alt={`${app.name} download QR`} className="h-36 w-36 rounded-lg" />
                         ) : (
-                          <div className="h-36 w-36 rounded-lg bg-white/5 animate-pulse" />
+                          <div className="h-36 w-36 rounded-lg bg-muted animate-pulse" />
                         )}
-                        <p className="text-[11px] text-white/45 text-center">Scan with the staff phone</p>
+                        <p className="text-2xs text-muted-foreground text-center">Scan with the staff phone</p>
                       </div>
 
                       <div className="mt-4 flex items-center gap-2">
                         <a href={url} download
-                          className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${style.btn}`}>
+                          className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${style.btn}`}>
                           <Download className="h-4 w-4" /> Download APK
                         </a>
                         <button onClick={() => copyLink(app)} title="Copy download link"
-                          className="rounded-xl border border-white/10 p-2.5 hover:bg-white/5">
-                          {copied === app.appKey ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                          className="rounded-lg border border-border p-2.5 hover:bg-muted">
+                          {copied === app.appKey ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                         </button>
                       </div>
                     </>
                   ) : (
-                    <div className="mt-4 rounded-xl border border-dashed border-white/15 p-6 text-center">
-                      <p className="text-sm font-semibold text-white/60">Coming soon</p>
-                      <p className="text-xs text-white/40 mt-1">No version of this app has been published yet.</p>
+                    <div className="mt-4 rounded-lg border border-dashed border-border p-6 text-center">
+                      <p className="text-sm font-semibold text-muted-foreground">Coming soon</p>
+                      <p className="text-xs text-muted-foreground mt-1">No version of this app has been published yet.</p>
                     </div>
                   )}
                 </div>
@@ -228,19 +222,19 @@ export default function StaffApps() {
       )}
 
       {/* ── Who on this team is actually running the apps ── */}
-      <div className="rounded-2xl border border-white/10 bg-white/[0.02]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+      <div className="rounded-lg border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-bold">Installed by your team</h3>
+            <h3 className="text-sm font-semibold">Installed by your team</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {Object.entries(latestPerApp).map(([appKey, d]) => (
-              <span key={appKey} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
-                <span className="capitalize">{appKey}</span> on <span className="font-semibold text-white/85">v{d.version ?? "?"}</span>
+              <span key={appKey} className="rounded-lg border border-border bg-muted px-2 py-1 text-2xs text-muted-foreground">
+                <span className="capitalize">{appKey}</span> on <span className="font-semibold text-foreground">v{d.version ?? "?"}</span>
               </span>
             ))}
-            <button onClick={loadDownloads} className="rounded-lg border border-white/10 px-2.5 py-1 text-[11px] font-semibold hover:bg-white/5">
+            <button onClick={loadDownloads} className="rounded-lg border border-border px-2.5 py-1 text-2xs font-semibold hover:bg-muted">
               Refresh
             </button>
           </div>
@@ -248,34 +242,34 @@ export default function StaffApps() {
 
         {downloadsError ? (
           <div role="alert" className="flex items-center justify-between gap-3 p-5">
-            <p className="text-sm text-red-200">
-              We could not read the install history. <span className="text-red-200/60">{downloadsError}</span>
+            <p className="text-sm text-danger">
+              We could not read the install history. <span className="text-danger">{downloadsError}</span>
             </p>
-            <button onClick={loadDownloads} className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100">
+            <button onClick={loadDownloads} className="shrink-0 rounded-lg bg-danger-subtle px-3 py-1.5 text-xs font-semibold text-danger">
               Try again
             </button>
           </div>
         ) : downloads.length === 0 ? (
-          <p className="p-5 text-sm text-white/45">
+          <p className="p-5 text-sm text-muted-foreground">
             Nobody has installed an app yet. Send a staff member the link or QR above and this fills in.
           </p>
         ) : (
           <div className="max-h-80 overflow-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-[#0e1520]">
-                <tr className="border-b border-white/5 text-xs text-white/40">
+              <thead className="sticky top-0 bg-card">
+                <tr className="border-b border-border text-xs text-muted-foreground">
                   {["App", "Version", "Staff member", "When"].map(h => (
                     <th key={h} className="px-5 py-2.5 text-left font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-border">
                 {downloads.map(d => (
-                  <tr key={d.id} className="hover:bg-white/[0.02]">
+                  <tr key={d.id} className="hover:bg-card">
                     <td className="px-5 py-2.5 capitalize">{d.appKey}</td>
-                    <td className="px-5 py-2.5 font-mono text-xs text-white/70">{d.version ? `v${d.version}` : "—"}</td>
-                    <td className="px-5 py-2.5">{d.staffName ?? <span className="text-white/35">Shared link</span>}</td>
-                    <td className="px-5 py-2.5 text-xs text-white/40">{new Date(d.downloadedAt).toLocaleString()}</td>
+                    <td className="px-5 py-2.5 font-mono text-xs text-foreground">{d.version ? `v${d.version}` : "—"}</td>
+                    <td className="px-5 py-2.5">{d.staffName ?? <span className="text-muted-foreground">Shared link</span>}</td>
+                    <td className="px-5 py-2.5 text-xs text-muted-foreground">{new Date(d.downloadedAt).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -285,15 +279,15 @@ export default function StaffApps() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Info className="h-4 w-4 text-primary" />
-            <h3 className="font-bold text-sm">How to install</h3>
+            <h3 className="font-semibold text-sm">How to install</h3>
           </div>
           <ol className="mt-3 space-y-2">
             {INSTALL_STEPS.map((step, i) => (
-              <li key={i} className="flex gap-3 text-sm text-white/65">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-[11px] font-bold">
+              <li key={i} className="flex gap-3 text-sm text-foreground">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-2xs font-semibold">
                   {i + 1}
                 </span>
                 {step}
@@ -302,12 +296,12 @@ export default function StaffApps() {
           </ol>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            <h3 className="font-bold text-sm">Good to know</h3>
+            <ShieldCheck className="h-4 w-4 text-success" />
+            <h3 className="font-semibold text-sm">Good to know</h3>
           </div>
-          <ul className="mt-3 space-y-2 text-sm text-white/65">
+          <ul className="mt-3 space-y-2 text-sm text-foreground">
             <li>• These apps run on Android only. On iPhone, staff can open the panel in a browser instead.</li>
             <li>• Each staff member signs in with their own email and password — never share one account.</li>
             <li>• When a new version is released this page updates on its own — staff just download it again.</li>

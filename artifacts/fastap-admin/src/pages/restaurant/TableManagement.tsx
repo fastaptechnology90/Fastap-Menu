@@ -5,20 +5,21 @@ import { toast } from "@/hooks/use-toast";
 import {
   Plus, RefreshCw, Clock, Users, X, Edit2, Trash2, Star, Lock,
   Unlock, Link2, Unlink, ChevronRight, CheckCircle2, Settings,
-  LayoutGrid, List, ArrowRight, GitMerge, Copy, MapPin, ArrowRightLeft
+  LayoutGrid, List, ArrowRight, GitMerge, Copy, MapPin, ArrowRightLeft,
+  Check, Wrench, UtensilsCrossed, ConciergeBell, Brush, IndianRupee
 } from "lucide-react";
 
 const STATUS_CFG = {
-  free:         { label: "Free",         bg: "bg-emerald-500/15", border: "border-emerald-500/40", text: "text-emerald-400",  dot: "bg-emerald-400",             icon: "✓" },
-  occupied:     { label: "Occupied",     bg: "bg-orange-500/15",  border: "border-orange-500/40",  text: "text-orange-400",   dot: "bg-orange-400 animate-pulse", icon: "●" },
-  reserved:     { label: "Reserved",     bg: "bg-blue-500/15",    border: "border-blue-500/40",    text: "text-blue-400",     dot: "bg-blue-400",                icon: "R" },
-  cleaning:     { label: "Cleaning",     bg: "bg-yellow-500/15",  border: "border-yellow-500/40",  text: "text-yellow-400",   dot: "bg-yellow-400 animate-pulse", icon: "~" },
-  blocked:      { label: "Locked",       bg: "bg-red-500/15",     border: "border-red-500/40",     text: "text-red-400",      dot: "bg-red-400",                 icon: "✕" },
-  billing:      { label: "Billing",      bg: "bg-violet-500/15",  border: "border-violet-500/40",  text: "text-violet-400",   dot: "bg-violet-400 animate-pulse", icon: "₹" },
-  maintenance:  { label: "Maintenance",  bg: "bg-gray-500/15",    border: "border-gray-500/40",    text: "text-gray-400",     dot: "bg-gray-400",                icon: "⚙" },
-  vip_occupied: { label: "VIP Occupied", bg: "bg-purple-500/15",  border: "border-purple-500/40",  text: "text-purple-400",   dot: "bg-purple-400 animate-pulse", icon: "★" },
-  waiting_food: { label: "Waiting for Food", bg: "bg-amber-500/15", border: "border-amber-500/40", text: "text-amber-400", dot: "bg-amber-400 animate-pulse", icon: "🍽" },
-  under_service: { label: "Under Service", bg: "bg-cyan-500/15", border: "border-cyan-500/40", text: "text-cyan-400", dot: "bg-cyan-400 animate-pulse", icon: "🛎" },
+  free:         { label: "Free",         bg: "bg-success-subtle", border: "border-success-border", text: "text-success",  dot: "bg-success",             icon: Check },
+  occupied:     { label: "Occupied",     bg: "bg-warning-subtle",  border: "border-warning-border",  text: "text-warning",   dot: "bg-warning animate-pulse", icon: Users },
+  reserved:     { label: "Reserved",     bg: "bg-info-subtle",    border: "border-info-border",    text: "text-info",     dot: "bg-info",                icon: Clock },
+  cleaning:     { label: "Cleaning",     bg: "bg-warning-subtle",  border: "border-warning-border",  text: "text-warning",   dot: "bg-warning animate-pulse", icon: Brush },
+  blocked:      { label: "Locked",       bg: "bg-danger-subtle",     border: "border-danger-border",     text: "text-danger",      dot: "bg-danger",                 icon: X },
+  billing:      { label: "Billing",      bg: "bg-muted",  border: "border-border",  text: "text-muted-foreground",   dot: "bg-muted animate-pulse", icon: IndianRupee },
+  maintenance:  { label: "Maintenance",  bg: "bg-muted",    border: "border-border",    text: "text-muted-foreground",     dot: "bg-muted",                icon: Wrench },
+  vip_occupied: { label: "VIP Occupied", bg: "bg-muted",  border: "border-border",  text: "text-muted-foreground",   dot: "bg-muted animate-pulse", icon: Star },
+  waiting_food: { label: "Waiting for Food", bg: "bg-primary/15", border: "border-primary/40", text: "text-primary", dot: "bg-primary animate-pulse", icon: UtensilsCrossed },
+  under_service: { label: "Under Service", bg: "bg-info-subtle", border: "border-info-border", text: "text-info", dot: "bg-info animate-pulse", icon: ConciergeBell },
 } as const;
 
 type TableStatus = keyof typeof STATUS_CFG;
@@ -92,49 +93,49 @@ function AddEditModal({ table, onClose, onSave, existingZones }: AddEditModalPro
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-white/5">
-          <h3 className="font-bold text-lg">{table ? "Edit Table" : "Add New Table"}</h3>
-          <button onClick={onClose}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+    <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-card rounded-lg border border-border overflow-hidden shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h3 className="font-semibold text-lg">{table ? "Edit Table" : "Add New Table"}</h3>
+          <button onClick={onClose}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-xs text-white/40 mb-1.5 block">Table Name / Number *</label>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Table Name / Number *</label>
             <input
               value={form.name}
               onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
               placeholder="e.g. T-11, Table 5, VIP-1"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 text-white"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-foreground"
             />
           </div>
           <div>
-            <label className="text-xs text-white/40 mb-1.5 block">Zone / Section *</label>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Zone / Section *</label>
             <select
               value={form.zone}
               onChange={e => setForm(p => ({ ...p, zone: e.target.value }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 text-white"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-foreground"
             >
               {allZones.map(z => <option key={z} value={z}>{z}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-white/40 mb-1.5 block">Seating Capacity</label>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Seating Capacity</label>
             <input
               type="number" min={1} max={50}
               value={form.capacity}
               onChange={e => setForm(p => ({ ...p, capacity: parseInt(e.target.value) || 4 }))}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50 text-white"
+              className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50 text-foreground"
             />
           </div>
           <div>
-            <label className="text-xs text-white/40 mb-1.5 block">Color Code</label>
+            <label className="text-xs text-muted-foreground mb-1.5 block">Color Code</label>
             <div className="flex gap-2 flex-wrap">
               {COLOR_OPTIONS.map(c => (
                 <button
                   key={String(c.value)}
                   onClick={() => setForm(p => ({ ...p, colorCode: c.value }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${form.colorCode === c.value ? "border-white/50 opacity-100" : "border-white/10 opacity-50 hover:opacity-80"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${form.colorCode === c.value ? "border-border opacity-100" : "border-border opacity-50 hover:opacity-80"}`}
                   style={{ borderColor: c.value ?? undefined, background: c.value ? `${c.value}20` : undefined, color: c.value ?? "inherit" }}
                 >
                   {c.label}
@@ -145,20 +146,20 @@ function AddEditModal({ table, onClose, onSave, existingZones }: AddEditModalPro
           <div className="flex items-center gap-3">
             <button
               onClick={() => setForm(p => ({ ...p, isVip: !p.isVip }))}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.isVip ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/50"}`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${form.isVip ? "bg-primary/20 border-primary/40 text-primary" : "bg-muted border-border text-muted-foreground"}`}
             >
               <Star className="h-4 w-4" /> VIP Table
             </button>
           </div>
         </div>
-        <div className="flex gap-3 p-5 border-t border-white/5">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold text-white/60 hover:border-white/20">
+        <div className="flex gap-3 p-5 border-t border-border">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold text-muted-foreground hover:border-border">
             Cancel
           </button>
           <button
             onClick={() => { if (form.name.trim()) onSave(form); }}
             disabled={!form.name.trim()}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all disabled:opacity-40"
+            className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors disabled:opacity-40"
           >
             {table ? "Save Changes" : "Add Table"}
           </button>
@@ -198,31 +199,31 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
   const otherTabs = allTables.filter(t => t.id !== table.id && t.activeOrder?.id);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-4 border-b border-white/5">
+    <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-card rounded-lg border border-border overflow-hidden shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
             <div>
-              <h3 className="font-bold">{table.name}</h3>
-              <p className="text-xs text-white/40">{table.zone || "Main Hall"} · {table.capacity} seats{table.isVip ? " · ⭐ VIP" : ""}</p>
+              <h3 className="font-semibold">{table.name}</h3>
+              <p className="text-xs text-muted-foreground">{table.zone || "Main Hall"} · {table.capacity} seats{table.isVip ? " · VIP" : ""}</p>
             </div>
           </div>
-          <button onClick={onClose}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+          <button onClick={onClose}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
         </div>
 
         <div className={`px-4 py-2.5 ${cfg.bg} border-b ${cfg.border} flex items-center justify-between`}>
           <span className={`text-sm font-semibold ${cfg.text}`}>{cfg.label}</span>
-          <div className="flex items-center gap-2 text-xs text-white/40">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {table.currentGuestCount > 0 && <span><Users className="h-3 w-3 inline mr-1" />{table.currentGuestCount} guests</span>}
             {table.occupiedSince && <span><Clock className="h-3 w-3 inline mr-1" />{elapsed(table.occupiedSince)}</span>}
           </div>
         </div>
 
-        <div className="flex border-b border-white/5 text-xs">
+        <div className="flex border-b border-border text-xs">
           {(["status", "assign", "merge", "move", "order"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 font-semibold capitalize transition-all ${tab === t ? "text-amber-400 border-b-2 border-amber-400" : "text-white/40 hover:text-white/60"}`}>
+              className={`flex-1 py-2.5 font-semibold capitalize transition-colors ${tab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-muted-foreground"}`}>
               {t}
             </button>
           ))}
@@ -235,23 +236,23 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
                 {(Object.entries(STATUS_CFG) as [TableStatus, typeof STATUS_CFG["free"]][]).map(([s, c]) => (
                   <button key={s} onClick={() => onStatusChange(s)}
                     disabled={s === table.status}
-                    className={`py-2.5 rounded-xl text-xs font-semibold border transition-all disabled:opacity-30 ${c.bg} ${c.border} ${c.text}`}>
-                    {c.icon} {c.label}
+                    className={`inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-30 ${c.bg} ${c.border} ${c.text}`}>
+                    <c.icon className="h-3.5 w-3.5" />{c.label}
                   </button>
                 ))}
               </div>
-              <div className="border-t border-white/5 pt-3 mt-1 space-y-2">
+              <div className="border-t border-border pt-3 mt-1 space-y-2">
                 <div>
-                  <p className="text-xs text-white/40 mb-1.5">Guest count</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">Guest count</p>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setGuests(g => Math.max(0, g - 1))} className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 flex items-center justify-center">-</button>
-                    <span className="flex-1 text-center font-bold">{guests}</span>
-                    <button onClick={() => setGuests(g => Math.min(table.capacity, g + 1))} className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 text-white/60 flex items-center justify-center">+</button>
+                    <button onClick={() => setGuests(g => Math.max(0, g - 1))} className="w-8 h-8 rounded-lg bg-muted border border-border text-muted-foreground flex items-center justify-center">-</button>
+                    <span className="flex-1 text-center font-semibold">{guests}</span>
+                    <button onClick={() => setGuests(g => Math.min(table.capacity, g + 1))} className="w-8 h-8 rounded-lg bg-muted border border-border text-muted-foreground flex items-center justify-center">+</button>
                   </div>
                 </div>
                 <button
                   onClick={() => onStatusChange(table.status, { currentGuestCount: guests })}
-                  className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/60 hover:text-white"
+                  className="w-full py-2 rounded-lg bg-muted border border-border text-xs font-semibold text-muted-foreground hover:text-foreground"
                 >
                   Save guest count
                 </button>
@@ -261,25 +262,25 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
 
           {tab === "assign" && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40">Assign waiter to this table</p>
+              <p className="text-xs text-muted-foreground">Assign waiter to this table</p>
               <select
                 value={waiter}
                 onChange={e => setWaiter(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 text-white"
+                className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 text-foreground"
               >
                 <option value="">-- Unassign --</option>
                 {waiters.map(s => <option key={s.id} value={s.name}>{s.name} ({s.role})</option>)}
               </select>
               <button
                 onClick={() => onStatusChange(table.status, { currentWaiterName: waiter || null })}
-                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all"
+                className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors"
               >
                 Assign Waiter
               </button>
-              <div className="border-t border-white/5 pt-3 space-y-2">
+              <div className="border-t border-border pt-3 space-y-2">
                 <button
                   onClick={onVipToggle}
-                  className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border text-sm font-semibold transition-all ${table.isVip ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/60 hover:border-white/20"}`}
+                  className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-lg border text-sm font-semibold transition-colors ${table.isVip ? "bg-primary/20 border-primary/40 text-primary" : "bg-muted border-border text-muted-foreground hover:border-border"}`}
                 >
                   <Star className="h-4 w-4" /> {table.isVip ? "Remove VIP" : "Mark as VIP"}
                 </button>
@@ -291,36 +292,36 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
             <div className="space-y-3">
               {table.mergedInto ? (
                 <div className="space-y-3">
-                  <p className="text-xs text-yellow-400/80">This table is merged into another table.</p>
-                  <button onClick={onUnmerge} className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-300 text-sm font-semibold">
+                  <p className="text-xs text-warning">This table is merged into another table.</p>
+                  <button onClick={onUnmerge} className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg bg-warning-subtle border border-warning-border text-warning text-sm font-semibold">
                     <Unlink className="h-4 w-4" /> Unmerge Tables
                   </button>
                 </div>
               ) : table.name.includes("+") ? (
                 <div className="space-y-3">
-                  <p className="text-xs text-yellow-400/80">This is a merged table ({table.name}).</p>
-                  <button onClick={onUnmerge} className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-300 text-sm font-semibold">
+                  <p className="text-xs text-warning">This is a merged table ({table.name}).</p>
+                  <button onClick={onUnmerge} className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg bg-warning-subtle border border-warning-border text-warning text-sm font-semibold">
                     <Unlink className="h-4 w-4" /> Split / Unmerge
                   </button>
                 </div>
               ) : mergeable.length === 0 ? (
-                <p className="text-xs text-white/40 text-center py-4">No free tables available to merge with</p>
+                <p className="text-xs text-muted-foreground text-center py-4">No free tables available to merge with</p>
               ) : (
                 <>
-                  <p className="text-xs text-white/40">Select a free table to merge with <strong className="text-white">{table.name}</strong></p>
+                  <p className="text-xs text-muted-foreground">Select a free table to merge with <strong className="text-foreground">{table.name}</strong></p>
                   <div className="space-y-1.5">
                     {mergeable.map(t => (
                       <button key={t.id} onClick={() => setMergeTarget(mergeTarget === t.id ? null : t.id)}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm transition-all ${mergeTarget === t.id ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/70 hover:border-white/20"}`}>
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors ${mergeTarget === t.id ? "bg-primary/20 border-primary/40 text-primary" : "bg-muted border-border text-foreground hover:border-border"}`}>
                         <span>{t.name}</span>
-                        <span className="text-xs text-white/40">{t.zone} · {t.capacity} seats</span>
+                        <span className="text-xs text-muted-foreground">{t.zone} · {t.capacity} seats</span>
                       </button>
                     ))}
                   </div>
                   <button
                     disabled={!mergeTarget}
                     onClick={() => mergeTarget && onMerge(mergeTarget)}
-                    className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all disabled:opacity-40"
+                    className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors disabled:opacity-40"
                   >
                     <GitMerge className="h-4 w-4" /> Merge Tables
                   </button>
@@ -331,12 +332,12 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
 
           {tab === "move" && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40">Move <strong className="text-white">{table.name}</strong> to a different zone</p>
+              <p className="text-xs text-muted-foreground">Move <strong className="text-foreground">{table.name}</strong> to a different zone</p>
               <div className="space-y-1.5">
                 {PREDEFINED_ZONES.map(zone => (
                   <button key={zone} onClick={() => { if (table.zone !== zone) onMove(zone); }}
                     disabled={table.zone === zone}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm transition-all disabled:cursor-default ${table.zone === zone ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "bg-white/5 border-white/10 text-white/70 hover:border-white/20"}`}>
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors disabled:cursor-default ${table.zone === zone ? "bg-primary/20 border-primary/40 text-primary" : "bg-muted border-border text-foreground hover:border-border"}`}>
                     <span>{zone}</span>
                     {table.zone === zone && <CheckCircle2 className="h-4 w-4" />}
                   </button>
@@ -348,31 +349,31 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
           {tab === "order" && (
             <div className="space-y-3">
               {!table.activeOrder?.id ? (
-                <p className="py-4 text-center text-xs text-white/40">
+                <p className="py-4 text-center text-xs text-muted-foreground">
                   No running tab on {table.name}. Move and merge become available once a party is seated and has ordered.
                 </p>
               ) : (
                 <>
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="rounded-lg border border-border bg-card p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold">Order #{table.activeOrder.id}</span>
-                      <span className="font-bold text-amber-400">
+                      <span className="font-semibold text-primary">
                         {table.activeOrder.total ? `₹${parseFloat(table.activeOrder.total).toFixed(2)}` : "—"}
                       </span>
                     </div>
                     {table.activeOrder.itemsPreview && (
-                      <p className="mt-1 truncate text-[11px] text-white/40">{table.activeOrder.itemsPreview}</p>
+                      <p className="mt-1 truncate text-2xs text-muted-foreground">{table.activeOrder.itemsPreview}</p>
                     )}
                   </div>
 
                   <div>
-                    <p className="mb-1.5 text-xs text-white/40">Move this tab to another table</p>
+                    <p className="mb-1.5 text-xs text-muted-foreground">Move this tab to another table</p>
                     <div className="space-y-1.5">
                       {allTables.filter(t => t.id !== table.id && t.isActive).map(t => (
                         <button key={t.id} type="button" disabled={busy} onClick={() => onMoveTab(t.name)}
-                          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 transition-all hover:border-white/20 disabled:opacity-40">
+                          className="flex w-full items-center justify-between rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-border disabled:opacity-40">
                           <span className="flex items-center gap-2"><ArrowRightLeft className="h-3.5 w-3.5" /> {t.name}</span>
-                          <span className={`text-xs ${t.activeOrder?.id ? "text-orange-400" : "text-white/35"}`}>
+                          <span className={`text-xs ${t.activeOrder?.id ? "text-warning" : "text-muted-foreground"}`}>
                             {t.activeOrder?.id ? "has a tab" : (STATUS_CFG[t.status]?.label ?? t.status)}
                           </span>
                         </button>
@@ -380,17 +381,17 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
                     </div>
                   </div>
 
-                  <div className="border-t border-white/5 pt-3">
-                    <p className="mb-1.5 text-xs text-white/40">Pull another table's tab onto {table.name}</p>
+                  <div className="border-t border-border pt-3">
+                    <p className="mb-1.5 text-xs text-muted-foreground">Pull another table's tab onto {table.name}</p>
                     {otherTabs.length === 0 ? (
-                      <p className="text-xs text-white/30">No other table has a running tab.</p>
+                      <p className="text-xs text-muted-foreground">No other table has a running tab.</p>
                     ) : (
                       <div className="space-y-1.5">
                         {otherTabs.map(t => (
                           <button key={t.id} type="button" disabled={busy} onClick={() => onMergeTab(t)}
-                            className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 transition-all hover:border-white/20 disabled:opacity-40">
+                            className="flex w-full items-center justify-between rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground transition-colors hover:border-border disabled:opacity-40">
                             <span className="flex items-center gap-2"><GitMerge className="h-3.5 w-3.5" /> {t.name}</span>
-                            <span className="text-xs text-white/35">
+                            <span className="text-xs text-muted-foreground">
                               {t.activeOrder?.total ? `₹${parseFloat(t.activeOrder.total).toFixed(0)}` : `#${t.activeOrder?.id}`}
                             </span>
                           </button>
@@ -404,14 +405,14 @@ function ActionModal({ table, allTables, staffList, onClose, onStatusChange, onE
           )}
         </div>
 
-        <div className="flex gap-2 p-4 border-t border-white/5">
-          <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white/60 hover:text-white transition-all">
+        <div className="flex gap-2 p-4 border-t border-border">
+          <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted border border-border text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
             <Edit2 className="h-3.5 w-3.5" /> Edit
           </button>
-          <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-all">
+          <button onClick={onDelete} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-danger-subtle border border-danger-border text-xs font-semibold text-danger hover-elevate transition-colors">
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>
-          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-white/10 text-xs font-semibold text-white/50 hover:border-white/20">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:border-border">
             Close
           </button>
         </div>
@@ -637,22 +638,22 @@ export default function TableManagement() {
   return (
     <div className="p-4 lg:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Table Management</h1>
-          <p className="text-xs text-white/40">{total} tables · {occupiedCount} occupied · {freeCount} free</p>
+          <h1 className="text-xl font-semibold">Table Management</h1>
+          <p className="text-xs text-muted-foreground">{total} tables · {occupiedCount} occupied · {freeCount} free</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewMode(v => v === "grid" ? "list" : "grid")}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm transition-all">
-            {viewMode === "grid" ? <List className="h-4 w-4 text-white/50" /> : <LayoutGrid className="h-4 w-4 text-white/50" />}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted hover-elevate text-sm transition-colors">
+            {viewMode === "grid" ? <List className="h-4 w-4 text-muted-foreground" /> : <LayoutGrid className="h-4 w-4 text-muted-foreground" />}
           </button>
           <button onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm transition-all">
-            <RefreshCw className={`h-4 w-4 text-amber-400 ${loading ? "animate-spin" : ""}`} />
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted hover-elevate text-sm transition-colors">
+            <RefreshCw className={`h-4 w-4 text-primary ${loading ? "animate-spin" : ""}`} />
           </button>
           <button onClick={() => setAddEditModal({ open: true, table: null })}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold transition-all">
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors">
             <Plus className="h-4 w-4" /> Add Table
           </button>
         </div>
@@ -662,9 +663,9 @@ export default function TableManagement() {
       <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
         {(Object.entries(STATUS_CFG) as [TableStatus, typeof STATUS_CFG["free"]][]).map(([status, cfg]) => (
           <button key={status} onClick={() => setStatusFilter(statusFilter === status ? "all" : status)}
-            className={`rounded-xl p-2.5 border text-center transition-all ${statusFilter === status ? `${cfg.bg} ${cfg.border}` : "border-white/8 bg-white/[0.03] hover:border-white/15"}`}>
-            <div className={`text-xl font-extrabold ${cfg.text}`}>{summary[status] || 0}</div>
-            <div className="text-[10px] text-white/40 mt-0.5 leading-tight">{cfg.label}</div>
+            className={`rounded-lg p-2.5 border text-center transition-colors ${statusFilter === status ? `${cfg.bg} ${cfg.border}` : "border-border bg-card hover:border-border"}`}>
+            <div className={`text-xl font-semibold ${cfg.text}`}>{summary[status] || 0}</div>
+            <div className="text-2xs text-muted-foreground mt-0.5 leading-tight">{cfg.label}</div>
           </button>
         ))}
       </div>
@@ -673,7 +674,7 @@ export default function TableManagement() {
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {zones.map(z => (
           <button key={z} onClick={() => setSelectedZone(z)}
-            className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${selectedZone === z ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"}`}>
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedZone === z ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground hover:border-border"}`}>
             {z}
             {z !== "All" && <span className="ml-1.5 opacity-60">{tableRows.filter(t => t.zone === z && t.isActive).length}</span>}
           </button>
@@ -681,22 +682,22 @@ export default function TableManagement() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-white/30">Loading tables...</div>
+        <div className="text-center py-16 text-muted-foreground">Loading tables...</div>
       ) : loadError ? (
         <div role="alert" className="text-center py-16">
-          <p className="text-sm font-semibold text-red-300">We could not load your floor plan.</p>
-          <p className="mt-1 text-xs text-red-200/60">{loadError}</p>
+          <p className="text-sm font-semibold text-danger">We could not load your floor plan.</p>
+          <p className="mt-1 text-xs text-danger">{loadError}</p>
           <button onClick={() => { setLoading(true); load().finally(() => setLoading(false)); }}
-            className="mt-4 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-200 text-sm font-semibold">
+            className="mt-4 px-4 py-2 rounded-lg bg-danger-subtle border border-danger-border text-danger text-sm font-semibold">
             Try again
           </button>
         </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-16">
-          <LayoutGrid className="h-10 w-10 text-white/10 mx-auto mb-3" />
-          <p className="text-white/30 text-sm">No tables found</p>
+          <LayoutGrid className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No tables found</p>
           <button onClick={() => setAddEditModal({ open: true, table: null })}
-            className="mt-4 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-sm font-semibold">
+            className="mt-4 px-4 py-2 rounded-lg bg-primary/20 border border-primary/40 text-primary text-sm font-semibold">
             + Add First Table
           </button>
         </div>
@@ -708,116 +709,118 @@ export default function TableManagement() {
             const borderColor = table.colorCode ? `border-[${table.colorCode}]/50` : cfg.border;
             return (
               <button key={table.id} onClick={() => setActionModal(table)}
-                className={`rounded-2xl border p-4 text-left transition-all hover:scale-[1.02] hover:shadow-lg ${cfg.bg} ${cfg.border} relative`}
+                className={`rounded-lg border p-4 text-left transition-colors hover:bg-muted ${cfg.bg} ${cfg.border} relative`}
                 style={table.colorCode ? { borderColor: `${table.colorCode}50`, background: `${table.colorCode}10` } : undefined}>
                 {table.isVip && (
                   <div className="absolute top-2 right-2">
-                    <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                    <Star className="h-3.5 w-3.5 text-primary fill-primary" />
                   </div>
                 )}
                 {table.mergedInto && (
                   <div className="absolute top-2 left-2">
-                    <Link2 className="h-3 w-3 text-violet-400" />
+                    <Link2 className="h-3 w-3 text-muted-foreground" />
                   </div>
                 )}
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="font-extrabold text-base leading-tight">{table.name}</p>
-                    <p className="text-[10px] text-white/40 mt-0.5">{table.zone || "Main Hall"}</p>
+                    <p className="font-semibold text-base leading-tight">{table.name}</p>
+                    <p className="text-2xs text-muted-foreground mt-0.5">{table.zone || "Main Hall"}</p>
                   </div>
                   <div className={`h-2 w-2 rounded-full mt-1 ${cfg.dot}`} />
                 </div>
 
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Users className="h-3 w-3 text-white/30" />
-                  <span className="text-xs text-white/50">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
                     {table.currentGuestCount > 0 ? `${table.currentGuestCount}/` : ""}{table.capacity}
                   </span>
                 </div>
 
                 {table.occupiedSince && (
-                  <div className="flex items-center gap-1 text-[10px] text-white/40 mb-1.5">
+                  <div className="flex items-center gap-1 text-2xs text-muted-foreground mb-1.5">
                     <Clock className="h-3 w-3" />{elapsed(table.occupiedSince)}
                   </div>
                 )}
 
                 {table.currentCustomerName && (
-                  <p className="text-[10px] text-white/70 font-medium truncate mb-1">{table.currentCustomerName}</p>
+                  <p className="text-2xs text-foreground font-medium truncate mb-1">{table.currentCustomerName}</p>
                 )}
 
                 {table.activeOrder?.total && (
-                  <p className="text-xs font-bold text-white/90 mb-0.5">₹{parseFloat(table.activeOrder.total).toFixed(0)}</p>
+                  <p className="text-xs font-semibold text-foreground mb-0.5">₹{parseFloat(table.activeOrder.total).toFixed(0)}</p>
                 )}
 
                 {table.activeOrder?.itemsPreview && (
-                  <p className="text-[10px] text-white/40 truncate mb-1">{table.activeOrder.itemsPreview}{table.activeOrder.itemCount > 1 ? ` +${table.activeOrder.itemCount - 1}` : ""}</p>
+                  <p className="text-2xs text-muted-foreground truncate mb-1">{table.activeOrder.itemsPreview}{table.activeOrder.itemCount > 1 ? ` +${table.activeOrder.itemCount - 1}` : ""}</p>
                 )}
 
                 {table.currentWaiterName && (
-                  <p className="text-[10px] text-white/50 truncate mb-1">{table.currentWaiterName}</p>
+                  <p className="text-2xs text-muted-foreground truncate mb-1">{table.currentWaiterName}</p>
                 )}
 
-                <div className={`text-[10px] font-semibold mt-1 ${cfg.text}`}>{cfg.label}</div>
+                <div className={`text-2xs font-semibold mt-1 ${cfg.text}`}>{cfg.label}</div>
               </button>
             );
           })}
           {/* Add Table Card */}
           <button onClick={() => setAddEditModal({ open: true, table: null })}
-            className="rounded-2xl border border-dashed border-white/15 p-4 flex flex-col items-center justify-center gap-2 hover:border-white/30 hover:bg-white/[0.02] transition-all min-h-[120px]">
-            <Plus className="h-6 w-6 text-white/20" />
-            <span className="text-xs text-white/20">Add Table</span>
+            className="rounded-lg border border-dashed border-border p-4 flex flex-col items-center justify-center gap-2 hover:border-border hover:bg-card transition-colors min-h-[120px]">
+            <Plus className="h-6 w-6 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Add Table</span>
           </button>
         </div>
       ) : (
         /* List View */
-        <div className="rounded-2xl border border-white/8 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b border-white/5">
-              <tr className="text-white/40 text-xs">
-                <th className="text-left px-4 py-3 font-semibold">Table</th>
-                <th className="text-left px-4 py-3 font-semibold">Zone</th>
-                <th className="text-left px-4 py-3 font-semibold">Capacity</th>
-                <th className="text-left px-4 py-3 font-semibold">Status</th>
-                <th className="text-left px-4 py-3 font-semibold">Guest</th>
-                <th className="text-left px-4 py-3 font-semibold">Bill</th>
-                <th className="text-left px-4 py-3 font-semibold">Waiter</th>
-                <th className="text-left px-4 py-3 font-semibold">Time</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {visible.map(table => {
-                const cfg = STATUS_CFG[table.status] || STATUS_CFG.free;
-                return (
-                  <tr key={table.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${cfg.dot}`} />
-                        <span className="font-semibold">{table.name}</span>
-                        {table.isVip && <Star className="h-3 w-3 text-amber-400 fill-amber-400" />}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-white/50 text-xs">{table.zone || "—"}</td>
-                    <td className="px-4 py-3 text-white/50 text-xs">
-                      {table.currentGuestCount > 0 ? `${table.currentGuestCount}/` : ""}{table.capacity}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-white/50 text-xs">{table.currentCustomerName || "—"}</td>
-                    <td className="px-4 py-3 text-white/50 text-xs">{table.activeOrder?.total ? `₹${parseFloat(table.activeOrder.total).toFixed(0)}` : "—"}</td>
-                    <td className="px-4 py-3 text-white/50 text-xs">{table.currentWaiterName || "—"}</td>
-                    <td className="px-4 py-3 text-white/40 text-xs">{table.occupiedSince ? elapsed(table.occupiedSince) : "—"}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => setActionModal(table)} className="text-white/30 hover:text-white transition-colors">
-                        <Settings className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="rounded-lg border border-border">
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border">
+                <tr className="text-muted-foreground text-xs">
+                  <th className="text-left px-4 py-3 font-semibold">Table</th>
+                  <th className="text-left px-4 py-3 font-semibold">Zone</th>
+                  <th className="text-left px-4 py-3 font-semibold">Capacity</th>
+                  <th className="text-left px-4 py-3 font-semibold">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold">Guest</th>
+                  <th className="text-left px-4 py-3 font-semibold">Bill</th>
+                  <th className="text-left px-4 py-3 font-semibold">Waiter</th>
+                  <th className="text-left px-4 py-3 font-semibold">Time</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {visible.map(table => {
+                  const cfg = STATUS_CFG[table.status] || STATUS_CFG.free;
+                  return (
+                    <tr key={table.id} className="hover:bg-card transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                          <span className="font-semibold">{table.name}</span>
+                          {table.isVip && <Star className="h-3 w-3 text-primary fill-primary" />}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{table.zone || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {table.currentGuestCount > 0 ? `${table.currentGuestCount}/` : ""}{table.capacity}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-2xs font-semibold ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{table.currentCustomerName || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{table.activeOrder?.total ? `₹${parseFloat(table.activeOrder.total).toFixed(0)}` : "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{table.currentWaiterName || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{table.occupiedSince ? elapsed(table.occupiedSince) : "—"}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setActionModal(table)} className="text-muted-foreground hover:text-foreground transition-colors">
+                          <Settings className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -851,17 +854,17 @@ export default function TableManagement() {
       )}
 
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 p-6 shadow-2xl">
-            <Trash2 className="h-8 w-8 text-red-400 mx-auto mb-3" />
-            <h3 className="font-bold text-center mb-1">Delete Table?</h3>
-            <p className="text-xs text-white/40 text-center mb-5">
-              Are you sure you want to delete <strong className="text-white">{deleteConfirm.name}</strong>? This cannot be undone.
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-card rounded-lg border border-border p-6 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <Trash2 className="h-8 w-8 text-danger mx-auto mb-3" />
+            <h3 className="font-semibold text-center mb-1">Delete Table?</h3>
+            <p className="text-xs text-muted-foreground text-center mb-5">
+              Are you sure you want to delete <strong className="text-foreground">{deleteConfirm.name}</strong>? This cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold text-white/60">Cancel</button>
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold text-muted-foreground">Cancel</button>
               <button onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-sm font-bold">
+                className="flex-1 py-2.5 rounded-lg bg-danger-subtle border border-danger-border text-danger text-sm font-semibold">
                 Delete
               </button>
             </div>

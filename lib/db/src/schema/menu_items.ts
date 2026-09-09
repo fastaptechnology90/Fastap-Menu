@@ -31,6 +31,13 @@ export const menuItemsTable = pgTable("menu_items", {
   sortOrder: integer("sort_order").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
   orderCount: integer("order_count").notNull().default(0),
+  /**
+   * What tax this dish attracts. "food" is GST at the venue's rate; "liquor" is alcohol,
+   * which sits outside GST in India and carries state excise/VAT on its own line; "exempt"
+   * is neither. One flat GST rate used to be applied to the whole basket, so a single malt
+   * was billed at the same 5% as a dosa — a tax invoice that is wrong on its face.
+   */
+  taxCategory: text("tax_category").notNull().default("food"),
   variants: jsonb("variants").notNull().default([]),
   addons: jsonb("addons").notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

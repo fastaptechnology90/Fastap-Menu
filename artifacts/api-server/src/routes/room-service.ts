@@ -10,6 +10,16 @@ import { parseMoney } from "../lib/payment-calculations.js";
 
 const router: IRouter = Router();
 
+/** A line as the panel sends it — either naming a menu item, or a free-text minibar row. */
+type RoomServiceLine = {
+  menuItemId?: number | string | null;
+  qty?: number | string;
+  quantity?: number | string;
+  price?: number | string;
+  name?: string;
+  description?: string;
+};
+
 const DEFAULT_MINIBAR = [
   { id: "MB01", name: "Mineral Water (500ml)", price: 60, category: "beverages" },
   { id: "MB02", name: "Cola (350ml)", price: 80, category: "beverages" },
@@ -163,19 +173,49 @@ router.get("/restaurants/:restaurantId/room-service", requireAuth, async (req, r
 router.post("/restaurants/:restaurantId/room-service", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const { roomNumber, guestName, guestPhone, type, items, notes, total, paymentMethod, assignedTo } = req.body;
-  const [request] = await db.insert(roomServiceRequestsTable).values({ restaurantId: id, roomNumber, guestName, guestPhone, type, items: items ?? [], notes, total: String(parseFloat(total) || 0), paymentMethod }).returning();
+
+  // What goes on the room folio is priced from the hotel's own menu, not from the request.
+  //
+  // This route took `total` and each line's `price` straight from the caller. The guest
+  // ordering route was hardened against exactly that; this one — the same food, the same
+  // folio, the same money — was not, so a line could be posted at any price, and a request
+  // sent without a `total` charged the room ₹0 for food the kitchen still cooked.
+  const requestItems: RoomServiceLine[] = Array.isArray(items) ? items : [];
+  const menuById = new Map(
+    (await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, id)))
+      .map(m => [m.id, m]),
+  );
+  let pricedTotal = 0;
+  const pricedItems = requestItems.map((i, idx) => {
+    const qty = Math.max(1, Math.floor(Number(i.qty ?? i.quantity ?? 1)) || 1);
+    const menuRow = i.menuItemId != null ? menuById.get(Number(i.menuItemId)) : undefined;
+    // A minibar or laundry line has no menu row behind it, so its price still comes from
+    // the catalog the caller read — but a line that names a menu item is priced from that
+    // item, whatever price came with the request.
+    const price = menuRow ? parseMoney(menuRow.price) : Math.max(0, parseMoney(i.price));
+    const lineTotal = Math.round(price * qty * 100) / 100;
+    pricedTotal += lineTotal;
+    return {
+      id: idx + 1,
+      menuItemId: menuRow?.id ?? i.menuItemId ?? null,
+      name: menuRow?.name ?? i.name ?? i.description ?? "Item",
+      price, quantity: qty, subtotal: lineTotal,
+    };
+  });
+  pricedTotal = Math.round(pricedTotal * 100) / 100;
+  // With no priced lines at all (a housekeeping or maintenance request), fall back to the
+  // amount sent — those carry no menu behind them.
+  const chargeTotal = pricedItems.length ? pricedTotal : Math.max(0, parseMoney(total));
+
+  const [request] = await db.insert(roomServiceRequestsTable).values({ restaurantId: id, roomNumber, guestName, guestPhone, type, items: pricedItems.length ? pricedItems : (items ?? []), notes, total: chargeTotal.toFixed(2), paymentMethod }).returning();
 
   // Food / bar charges also mirror into a kitchen order (type "room_service") so the
   // kitchen app and finance/revenue see them. The folio reads the request (above), the
   // kitchen/finance read this order — same amount in each, no double count.
   if (type === "food" || type === "bar") {
     try {
-      const orderItems = (Array.isArray(items) ? items : []).map((i: any, idx: number) => {
-        const qty = Number(i.qty ?? i.quantity ?? 1) || 1;
-        const price = parseMoney(i.price);
-        return { id: idx + 1, name: i.name ?? i.description ?? "Item", price, quantity: qty, subtotal: price * qty };
-      });
-      const totalNum = parseFloat(total) || 0;
+      const orderItems = pricedItems;
+      const totalNum = chargeTotal;
       await db.insert(ordersTable).values({
         restaurantId: id, tableName: `Room ${roomNumber}`, customerName: guestName ?? "Room Guest",
         type: "room_service", status: "pending", items: orderItems.length ? orderItems : [{ id: 1, name: notes || "Room service", price: totalNum, quantity: 1, subtotal: totalNum }],

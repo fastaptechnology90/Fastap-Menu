@@ -44,7 +44,7 @@ export function Preview360Viewer({ src, alt }: Props) {
         draggable={false}
       />
       <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
-        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 text-xs text-white/80">
+        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-foreground/40 text-xs text-foreground">
           <RotateCw className="h-3 w-3" /> Drag to rotate 360°
         </span>
       </div>

@@ -15,6 +15,7 @@ import {
   ChevronLeft, Calendar, Clock, Users, MapPin, CheckCircle,
   CreditCard, Smartphone, Wallet, RefreshCw, X, Edit3,
 } from "lucide-react";
+import { GuestIcon } from "@/components/user/GuestIcon";
 
 type Step = "type" | "details" | "deposit" | "success";
 type Tab = "new" | "my";
@@ -56,6 +57,28 @@ export default function Reservation() {
   const [editBooking, setEditBooking] = useState<ReservationRecord | null>(null);
   const [spaServices, setSpaServices] = useState<{ id: number; name: string; price: number }[]>([]);
   const [spaServiceId, setSpaServiceId] = useState<number | null>(null);
+  /**
+   * Who the booking is for, when nobody is signed in.
+   *
+   * The form never asked. It sent `customerPhone: "0000000000"` for every visitor who
+   * had not logged in, so every anonymous booking on the platform was filed under one
+   * number — "My bookings" looks bookings up by phone, so the guest could never find,
+   * change or cancel what they had just booked, and the venue had no number to ring when
+   * the sitting moved. The server now rejects that placeholder, which without this would
+   * simply turn the bug into a 400. So ask.
+   */
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [lookupTried, setLookupTried] = useState(false);
+
+  const contactName = (user?.name || guestName).trim();
+  const contactPhone = (user?.mobile || guestPhone).trim();
+  const phoneDigits = contactPhone.replace(/\D/g, "");
+  /** Matches the server's rule so the guest is told before the request, not after. */
+  const contactUsable = contactName.length > 0
+    && phoneDigits.length >= 8 && phoneDigits.length <= 15
+    && new Set(phoneDigits).size > 1;
 
   useEffect(() => {
     if (prefilledTable) {
@@ -108,13 +131,18 @@ export default function Reservation() {
     if (guests > lim.max) setGuests(lim.max);
   }, [bookingType, guests, seating]);
 
-  const loadMyBookings = useCallback(async () => {
-    if (!venue.restaurantId || !user?.mobile) return;
+  const loadMyBookings = useCallback(async (phoneOverride?: string) => {
+    // A guest who booked without signing in has a phone number but no account, so the
+    // lookup takes whichever number we know: theirs from the session, the one they just
+    // booked with, or the one they type in.
+    const phone = (phoneOverride ?? user?.mobile ?? guestPhone ?? "").trim();
+    if (!venue.restaurantId || !phone) return;
     try {
-      const list = await publicApi.reservations(venue.restaurantId, user.mobile);
+      const list = await publicApi.reservations(venue.restaurantId, phone);
       setMyBookings(list);
     } catch { setMyBookings([]); }
-  }, [venue.restaurantId, user?.mobile]);
+    setLookupTried(true);
+  }, [venue.restaurantId, user?.mobile, guestPhone]);
 
   useEffect(() => {
     if (tab === "my") loadMyBookings();
@@ -133,8 +161,8 @@ export default function Reservation() {
         : "";
     const payload = {
       restaurantId: venue.restaurantId ?? 1,
-      customerName: user?.name || "Guest",
-      customerPhone: user?.mobile || "0000000000",
+      customerName: contactName,
+      customerPhone: contactPhone,
       customerEmail: user?.email,
       date,
       time: time || timeLabel,
@@ -143,7 +171,8 @@ export default function Reservation() {
       zone: seating,
       specialRequest: [scanNote, ...specialTags, notes].filter(Boolean).join(" | "),
       notes: [scanNote, notes].filter(Boolean).join(" | "),
-      depositAmount: deposit,
+      // The deposit is the venue's to set, not the browser's. Sending it from here meant
+      // the amount written against the booking was whatever the page said it was.
       payDeposit: withDeposit,
       serviceId: bookingType === "spa" ? spaServiceId : undefined,
       tableId: prefilledTable && venue.tableId ? venue.tableId : undefined,
@@ -235,48 +264,53 @@ export default function Reservation() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-10">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-10">
       <div className="guest-header px-4 py-3">
         <div className="flex items-center gap-3">
           <GuestBackButton
             onClick={() => (step === "type" ? goBack() : setStep(step === "deposit" ? "details" : "type"))}
           />
           <div className="flex-1">
-            <h1 className="font-bold">Reservations</h1>
-            <p className="text-xs text-white/40">{activeRestaurant}</p>
+            <h1 className="font-semibold">Reservations</h1>
+            <p className="text-xs text-muted-foreground">{activeRestaurant}</p>
           </div>
         </div>
       </div>
 
       {step === "success" && (
         <div className="flex flex-col items-center px-4 pt-10 text-center">
-          <CheckCircle className="h-16 w-16 text-emerald-400 mb-4" />
-          <h2 className="text-2xl font-extrabold mb-2">
+          <CheckCircle className="h-16 w-16 text-success mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">
             {createdStatus === "confirmed" ? "Booking Confirmed!" : "Booking Requested"}
           </h2>
-          <p className="text-white/50 mb-1">{TYPE_ICONS[bookingType]} {RESERVATION_TYPES.find(t => t.id === bookingType)?.label}</p>
-          <p className="text-white/50 mb-2">{date} · {timeLabel || time} · {guests} guests</p>
+          <p className="text-muted-foreground mb-1">{TYPE_ICONS[bookingType]} {RESERVATION_TYPES.find(t => t.id === bookingType)?.label}</p>
+          <p className="text-muted-foreground mb-2">{date} · {timeLabel || time} · {guests} guests</p>
           {createdStatus !== "confirmed" && (
-            <p className="text-amber-300/90 text-sm mb-3 max-w-sm">
+            <p className="text-warning text-sm mb-3 max-w-sm">
               The restaurant confirms this shortly — you will not have a table until they do.
             </p>
           )}
-          {depositNotice && <p className="text-white/60 text-sm mb-4 max-w-sm">{depositNotice}</p>}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 w-full max-w-sm mb-6">
-            <div className="text-4xl font-black text-orange-400 font-mono">{bookingToken}</div>
-            <p className="text-xs text-white/40 mt-2">Show this token at arrival</p>
+          {depositNotice && <p className="text-muted-foreground text-sm mb-4 max-w-sm">{depositNotice}</p>}
+          <div className="guest-section-card w-full max-w-sm mb-6">
+            <div className="text-3xl font-semibold text-primary font-mono">{bookingToken}</div>
+            <p className="text-xs text-muted-foreground mt-2">Show this token when you arrive</p>
+            {contactPhone && (
+              <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
+                Booked under {contactName} · {contactPhone}. Look it up under My bookings with that number.
+              </p>
+            )}
           </div>
           <div className="flex gap-3 w-full max-w-sm">
-            <button onClick={() => navigate(`/user/menu?slug=${slug}`)} className="flex-1 py-3 rounded-xl bg-orange-500 font-semibold text-sm">Menu</button>
-            <button onClick={() => { resetNew(); setTab("my"); setStep("type"); }} className="flex-1 py-3 rounded-xl border border-white/10 text-sm">My Bookings</button>
+            <button onClick={() => navigate(`/user/menu?slug=${slug}`)} className="flex-1 py-3 rounded-xl bg-primary font-semibold text-sm">Menu</button>
+            <button onClick={() => { resetNew(); setTab("my"); setStep("type"); }} className="flex-1 py-3 rounded-xl border border-border text-sm">My Bookings</button>
           </div>
         </div>
       )}
 
       {step === "deposit" && (
         <div className="px-4 pt-6 space-y-4 max-w-md mx-auto">
-          <h2 className="text-xl font-bold">Pay Advance Deposit</h2>
-          <p className="text-sm text-white/50">₹{deposit} required for {RESERVATION_TYPES.find(t => t.id === bookingType)?.label}. Refundable on arrival.</p>
+          <h2 className="text-xl font-semibold">Pay Advance Deposit</h2>
+          <p className="text-sm text-muted-foreground">₹{deposit} required for {RESERVATION_TYPES.find(t => t.id === bookingType)?.label}. Refundable on arrival.</p>
           <div className="grid grid-cols-3 gap-2">
             {(
               [
@@ -288,25 +322,25 @@ export default function Reservation() {
               <button
                 key={id}
                 onClick={() => setPaymentMethod(id)}
-                className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-xs ${paymentMethod === id ? "bg-orange-500/20 border-orange-500/50" : "bg-white/5 border-white/10"}`}
+                className={`flex flex-col items-center gap-1 py-3 rounded-xl border text-xs ${paymentMethod === id ? "bg-muted border-primary" : "bg-muted border-border"}`}
               >
                 <PayIcon className="h-5 w-5" />
                 {label}
               </button>
             ))}
           </div>
-          <button onClick={payDeposit} disabled={submitting} className="w-full py-4 rounded-xl bg-orange-500 font-bold disabled:opacity-50">
+          <button onClick={payDeposit} disabled={submitting} className="w-full py-4 rounded-xl bg-primary font-semibold disabled:opacity-50">
             Pay ₹{deposit}
           </button>
-          <button onClick={() => setStep("success")} className="w-full py-3 text-sm text-white/40">Skip — pay at venue</button>
+          <button onClick={() => setStep("success")} className="w-full py-3 text-sm text-muted-foreground">Skip — pay at venue</button>
         </div>
       )}
 
       {step !== "success" && step !== "deposit" && (
         <>
-          <div className="mx-4 mt-4 flex gap-1 bg-white/5 p-1 rounded-xl">
+          <div className="mx-4 mt-4 flex gap-1 bg-muted p-1 rounded-xl">
             {(["new", "my"] as Tab[]).map(t => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-orange-500 text-white" : "text-white/50"}`}>
+              <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
                 {t === "new" ? "New Booking" : "My Bookings"}
               </button>
             ))}
@@ -314,42 +348,67 @@ export default function Reservation() {
 
           {tab === "my" && (
             <div className="px-4 mt-4 space-y-3">
+              {/* Bookings are found by the phone number they were made with. A guest who
+                  booked without an account has that number but no session, so let them
+                  type it rather than telling them to sign in for an account they
+                  never made. */}
+              {!user?.mobile && (
+                <div className="guest-section-card space-y-2">
+                  <label htmlFor="res-lookup" className="text-sm font-semibold block">Find a booking</label>
+                  <div className="flex gap-2">
+                    <input
+                      id="res-lookup"
+                      value={lookupPhone || guestPhone}
+                      onChange={e => setLookupPhone(e.target.value)}
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="The number you booked with"
+                      className="guest-input flex-1"
+                    />
+                    <button
+                      onClick={() => loadMyBookings(lookupPhone || guestPhone)}
+                      disabled={!(lookupPhone || guestPhone).trim()}
+                      className="guest-btn-primary px-5 disabled:opacity-40"
+                    >
+                      Find
+                    </button>
+                  </div>
+                </div>
+              )}
               {myBookings.length === 0 && (
-                // Bookings are found by the phone number they were made with, so a guest
-                // who never signed in has nothing to look them up by. Saying "No bookings
-                // yet" to someone holding a confirmation token is worse than useless.
-                <p className="text-center text-white/40 py-8 text-sm">
-                  {user?.mobile
-                    ? "No bookings yet"
-                    : "Sign in with the phone number you booked with to see your bookings."}
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  {user?.mobile || lookupTried
+                    ? "No bookings found for that number."
+                    : "Enter the number you booked with to see your bookings."}
                 </p>
               )}
               {myBookings.map(b => (
-                <div key={b.id} className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+                <div key={b.id} className="rounded-2xl bg-card border border-border p-4">
                   <div className="flex justify-between mb-2">
                     <div>
                       <p className="font-semibold flex items-center gap-2">
-                        {TYPE_ICONS[b.reservationType] ?? "📅"} {RESERVATION_TYPES.find(t => t.id === b.reservationType)?.label ?? b.reservationType}
+                        {RESERVATION_TYPES.find(t => t.id === b.reservationType)?.label ?? b.reservationType}
                       </p>
-                      <p className="text-sm text-white/50">{b.date} · {b.time} · {b.guestCount} guests</p>
+                      <p className="text-sm text-muted-foreground">{b.date} · {b.time} · {b.guestCount} guests</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full h-fit ${b.status === "confirmed" ? "bg-emerald-500/20 text-emerald-400" : b.status === "cancelled" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full h-fit ${b.status === "confirmed" ? "bg-success-subtle text-success" : b.status === "cancelled" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"}`}>
                       {b.status}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-3">
-                    <span className="font-mono text-orange-400 text-sm">{b.bookingToken ?? `#REV${b.id}`}</span>
+                    <span className="font-mono text-primary text-sm">{b.bookingToken ?? `#REV${b.id}`}</span>
                     {b.status !== "cancelled" && (
                       <div className="flex gap-2">
-                        <button onClick={() => setEditBooking({ ...b })} className="text-xs border border-white/10 px-3 py-1.5 rounded-lg flex items-center gap-1">
+                        <button onClick={() => setEditBooking({ ...b })} className="text-xs border border-border px-3 py-1.5 rounded-lg flex items-center gap-1">
                           <Edit3 className="h-3 w-3" /> Modify
                         </button>
-                        <button onClick={() => cancelBooking(b.id)} className="text-xs border border-red-500/30 text-red-400 px-3 py-1.5 rounded-lg">Cancel</button>
+                        <button onClick={() => cancelBooking(b.id)} className="text-xs border border-danger-border text-danger px-3 py-1.5 rounded-lg">Cancel</button>
                       </div>
                     )}
                   </div>
                   {parseFloat(b.depositAmount ?? "0") > 0 && (
-                    <p className="text-xs text-white/40 mt-2">Deposit: ₹{b.depositAmount} · {b.depositStatus ?? "pending"}</p>
+                    <p className="text-xs text-muted-foreground mt-2">Deposit: ₹{b.depositAmount} · {b.depositStatus ?? "pending"}</p>
                   )}
                 </div>
               ))}
@@ -358,18 +417,18 @@ export default function Reservation() {
 
           {tab === "new" && step === "type" && (
             <div className="px-4 mt-4 space-y-4">
-              <p className="text-xs text-white/40 uppercase tracking-wide">Reservation type</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Reservation type</p>
               <div className="grid grid-cols-2 gap-2">
                 {RESERVATION_TYPES.map(bt => (
                   <button
                     key={bt.id}
                     onClick={() => { setBookingType(bt.id); setStep("details"); }}
-                    className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${bookingType === bt.id ? "bg-orange-500/20 border-orange-500/50" : "bg-white/5 border-white/10 hover:border-white/20"}`}
+                    className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${bookingType === bt.id ? "bg-muted border-primary" : "bg-muted border-border hover:border-border"}`}
                   >
-                    <span className="text-2xl">{bt.icon}</span>
+                    <GuestIcon id={bt.id} className="h-5 w-5 text-primary" />
                     <span className="text-sm font-semibold">{bt.label}</span>
-                    <span className="text-[10px] text-white/40">{bt.desc}</span>
-                    {bt.deposit > 0 && <span className="text-[10px] text-amber-400">Deposit ₹{bt.deposit}</span>}
+                    <span className="text-2xs text-muted-foreground">{bt.desc}</span>
+                    {bt.deposit > 0 && <span className="text-2xs text-warning">Deposit ₹{bt.deposit}</span>}
                   </button>
                 ))}
               </div>
@@ -379,28 +438,28 @@ export default function Reservation() {
           {tab === "new" && step === "details" && (
             <div className="px-4 mt-4 space-y-4">
               {scanLabel && (
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-3 flex items-center gap-3">
-                  <MapPin className="h-5 w-5 text-emerald-400 shrink-0" />
+                <div className="rounded-xl bg-success-subtle border border-success-border p-3 flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-success shrink-0" />
                   <div>
-                    <p className="text-xs text-emerald-300/80 uppercase tracking-wide">QR scan</p>
+                    <p className="text-xs text-success uppercase tracking-wide">QR scan</p>
                     <p className="font-semibold">Booking for {scanLabel}</p>
                   </div>
                 </div>
               )}
-              <div className="rounded-xl bg-orange-500/10 border border-orange-500/20 p-3 flex items-center gap-3">
+              <div className="rounded-xl bg-muted border border-primary p-3 flex items-center gap-3">
                 <span className="text-2xl">{TYPE_ICONS[bookingType]}</span>
                 <div>
                   <p className="font-semibold">{RESERVATION_TYPES.find(t => t.id === bookingType)?.label}</p>
-                  <button onClick={() => setStep("type")} className="text-xs text-orange-300">Change type</button>
+                  <button onClick={() => setStep("type")} className="text-xs text-primary">Change type</button>
                 </div>
               </div>
 
               {bookingType === "spa" && spaServices.length > 0 && (
-                <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+                <div className="rounded-2xl bg-card border border-border p-4">
                   <p className="text-sm font-semibold mb-2">Spa service</p>
                   <div className="space-y-2">
                     {spaServices.map(s => (
-                      <button key={s.id} onClick={() => setSpaServiceId(s.id)} className={`w-full text-left p-3 rounded-xl border text-sm ${spaServiceId === s.id ? "bg-pink-500/20 border-pink-500/40" : "bg-white/5 border-white/10"}`}>
+                      <button key={s.id} onClick={() => setSpaServiceId(s.id)} className={`w-full text-left p-3 rounded-xl border text-sm ${spaServiceId === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
                         {s.name} · ₹{s.price}
                       </button>
                     ))}
@@ -408,18 +467,18 @@ export default function Reservation() {
                 </div>
               )}
 
-              <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
-                <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Calendar className="h-4 w-4 text-orange-400" /> Date</p>
+              <div className="rounded-2xl bg-card border border-border p-4">
+                <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /> Date</p>
                 <input type="date" value={date} onChange={e => { setDate(e.target.value); setTime(""); setTimeLabel(""); }}
                   min={new Date().toISOString().split("T")[0]}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm [color-scheme:dark]" />
+                  className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-sm [color-scheme:dark]" />
               </div>
 
               {date && (
-                <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+                <div className="rounded-2xl bg-card border border-border p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-orange-400" /> Live slot availability</p>
-                    <button onClick={fetchSlots} className="text-white/40"><RefreshCw className={`h-4 w-4 ${loadingSlots ? "animate-spin" : ""}`} /></button>
+                    <p className="text-sm font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Live slot availability</p>
+                    <button onClick={fetchSlots} className="text-muted-foreground"><RefreshCw className={`h-4 w-4 ${loadingSlots ? "animate-spin" : ""}`} /></button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {slots.map(slot => (
@@ -427,73 +486,120 @@ export default function Reservation() {
                         key={slot.time}
                         disabled={!slot.available}
                         onClick={() => { setTime(slot.time); setTimeLabel(slot.label); }}
-                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${!slot.available ? "opacity-30 line-through bg-white/5 border-white/5" : time === slot.time ? "bg-orange-500/20 border-orange-500/50 text-orange-300" : "bg-white/5 border-white/10"}`}
+                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${!slot.available ? "opacity-30 line-through bg-muted border-border" : time === slot.time ? "bg-muted border-primary text-primary" : "bg-muted border-border"}`}
                       >
                         {slot.label}
-                        {slot.available && slot.remaining <= 1 && <span className="block text-[9px] text-amber-400">Last slot</span>}
+                        {slot.available && slot.remaining <= 1 && <span className="block text-2xs text-warning">Last slot</span>}
                       </button>
                     ))}
                   </div>
                   {slots.length === 0 && !loadingSlots && (
-                    <p className="text-xs text-white/40 text-center py-4">Select a date to see available slots</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">Select a date to see available slots</p>
                   )}
                 </div>
               )}
 
-              <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
-                <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-orange-400" /> Guest count</p>
+              <div className="rounded-2xl bg-card border border-border p-4">
+                <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Guest count</p>
                 <div className="flex items-center gap-4 justify-center">
-                  <button onClick={() => setGuests(g => Math.max(limits.min, g - 1))} className="h-10 w-10 rounded-xl bg-white/10 text-lg">−</button>
-                  <span className="text-2xl font-extrabold">{guests}</span>
-                  <button onClick={() => setGuests(g => Math.min(limits.max, g + 1))} className="h-10 w-10 rounded-xl bg-orange-500 text-lg">+</button>
+                  <button onClick={() => setGuests(g => Math.max(limits.min, g - 1))} className="h-10 w-10 rounded-xl bg-muted text-lg">−</button>
+                  <span className="text-2xl font-semibold">{guests}</span>
+                  <button onClick={() => setGuests(g => Math.min(limits.max, g + 1))} className="h-10 w-10 rounded-xl bg-primary text-lg">+</button>
                 </div>
-                <p className="text-xs text-white/40 text-center mt-2">{limits.min}–{limits.max} guests for this type</p>
+                <p className="text-xs text-muted-foreground text-center mt-2">{limits.min}–{limits.max} guests for this type</p>
               </div>
 
               {seatingOptions.length > 0 && (
-                <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
-                  <p className="text-sm font-semibold mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-orange-400" /> Seating preference</p>
+                <div className="rounded-2xl bg-card border border-border p-4">
+                  <p className="text-sm font-semibold mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Seating preference</p>
                   <div className="grid grid-cols-3 gap-2">
                     {seatingOptions.map(s => (
-                      <button key={s.id} onClick={() => setSeating(s.id)} className={`flex flex-col items-center gap-1 py-2 rounded-xl text-xs border ${seating === s.id ? "bg-orange-500/20 border-orange-500/50" : "bg-white/5 border-white/10"}`}>
-                        <span className="text-lg">{s.icon}</span>{s.label}
+                      <button key={s.id} onClick={() => setSeating(s.id)} className={`flex flex-col items-center gap-1 py-2 rounded-xl text-xs border ${seating === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
+                        <GuestIcon id={s.id} className="h-4 w-4" />{s.label}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+              <div className="rounded-2xl bg-card border border-border p-4">
                 <p className="text-sm font-semibold mb-3">Special requests</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {SPECIAL_OCCASIONS.map(occ => (
-                    <button key={occ} onClick={() => toggleTag(occ)} className={`px-3 py-1.5 rounded-full text-xs border ${specialTags.includes(occ) ? "bg-orange-500/20 border-orange-500/40" : "border-white/10 bg-white/5"}`}>
+                    <button key={occ} onClick={() => toggleTag(occ)} className={`px-3 py-1.5 rounded-full text-xs border ${specialTags.includes(occ) ? "bg-muted border-primary" : "border-border bg-muted"}`}>
                       {occ}
                     </button>
                   ))}
                 </div>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Dietary needs, décor, AV equipment, pool towels..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm resize-none" />
+                  className="w-full bg-muted border border-border rounded-xl p-3 text-sm resize-none" />
               </div>
 
+              {/* Who the table is for. Skipped entirely when the guest is signed in. */}
+              {!user?.mobile && (
+                <div className="guest-section-card space-y-3">
+                  <p className="text-sm font-semibold">Who is the table for?</p>
+                  <div>
+                    <label htmlFor="res-name" className="text-xs text-muted-foreground mb-1 block">Name</label>
+                    <input
+                      id="res-name"
+                      value={guestName}
+                      onChange={e => setGuestName(e.target.value)}
+                      autoComplete="name"
+                      placeholder="The name on the booking"
+                      className="guest-input"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="res-phone" className="text-xs text-muted-foreground mb-1 block">Mobile number</label>
+                    <input
+                      id="res-phone"
+                      value={guestPhone}
+                      onChange={e => setGuestPhone(e.target.value)}
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="10-digit mobile"
+                      aria-describedby="res-phone-help"
+                      className="guest-input"
+                    />
+                    <p id="res-phone-help" className="text-xs text-muted-foreground mt-1">
+                      The venue calls this number if anything changes, and it is how you find this booking again.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {deposit > 0 && (
-                <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4 flex items-center justify-between">
+                <div className="guest-section-card flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold">Advance deposit</p>
-                    <p className="text-xs text-white/40">₹{deposit} — pay now or at venue</p>
+                    <p className="text-xs text-muted-foreground">₹{deposit} — pay now or at the venue</p>
                   </div>
-                  <button onClick={() => setPayDepositNow(!payDepositNow)} className={`w-12 h-6 rounded-full relative ${payDepositNow ? "bg-orange-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${payDepositNow ? "left-6" : "left-0.5"}`} />
+                  <button
+                    onClick={() => setPayDepositNow(!payDepositNow)}
+                    role="switch"
+                    aria-checked={payDepositNow}
+                    aria-label="Pay the deposit now"
+                    className={`w-11 h-6 rounded-full relative shrink-0 transition-colors ${payDepositNow ? "bg-primary" : "bg-muted"}`}
+                  >
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card transition-[left] ${payDepositNow ? "left-[22px]" : "left-0.5"}`} />
                   </button>
                 </div>
               )}
 
+              {!contactUsable && date && time && (
+                <p className="text-xs text-warning">
+                  {!contactName ? "Add the name the booking is under." : "Enter a mobile number the venue can reach you on."}
+                </p>
+              )}
+
               <button
                 onClick={() => submitReservation(payDepositNow)}
-                disabled={!date || !time || submitting}
-                className="w-full py-4 rounded-xl bg-orange-500 font-bold disabled:opacity-40"
+                disabled={!date || !time || !contactUsable || submitting}
+                className="guest-btn-primary w-full py-4 disabled:opacity-40"
               >
-                {submitting ? "Booking..." : deposit > 0 && payDepositNow ? `Book & Pay ₹${deposit}` : "Confirm Reservation"}
+                {submitting ? "Booking…" : deposit > 0 && payDepositNow ? `Book and pay ₹${deposit}` : "Confirm reservation"}
               </button>
             </div>
           )}
@@ -501,24 +607,24 @@ export default function Reservation() {
       )}
 
       {editBooking && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-5 w-full max-w-md space-y-4">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-border rounded-2xl p-5 w-full max-w-md space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold">Modify reservation</h3>
+              <h3 className="font-semibold">Modify reservation</h3>
               <button onClick={() => setEditBooking(null)}><X className="h-5 w-5" /></button>
             </div>
             <input type="date" value={editBooking.date} onChange={e => setEditBooking({ ...editBooking, date: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm [color-scheme:dark]" />
+              className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm [color-scheme:dark]" />
             <input value={editBooking.time} onChange={e => setEditBooking({ ...editBooking, time: e.target.value })}
-              placeholder="Time" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm" />
+              placeholder="Time" className="w-full bg-muted border border-border rounded-xl px-4 py-2.5 text-sm" />
             <div className="flex items-center gap-3 justify-center">
-              <button onClick={() => setEditBooking({ ...editBooking, guestCount: Math.max(1, editBooking.guestCount - 1) })} className="h-9 w-9 rounded-lg bg-white/10">−</button>
+              <button onClick={() => setEditBooking({ ...editBooking, guestCount: Math.max(1, editBooking.guestCount - 1) })} className="h-9 w-9 rounded-lg bg-muted">−</button>
               <span>{editBooking.guestCount} guests</span>
-              <button onClick={() => setEditBooking({ ...editBooking, guestCount: editBooking.guestCount + 1 })} className="h-9 w-9 rounded-lg bg-orange-500">+</button>
+              <button onClick={() => setEditBooking({ ...editBooking, guestCount: editBooking.guestCount + 1 })} className="h-9 w-9 rounded-lg bg-primary">+</button>
             </div>
             <textarea value={editBooking.notes ?? ""} onChange={e => setEditBooking({ ...editBooking, notes: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm" rows={2} placeholder="Notes" />
-            <button onClick={saveEdit} className="w-full py-3 rounded-xl bg-orange-500 font-semibold">Save changes</button>
+              className="w-full bg-muted border border-border rounded-xl p-3 text-sm" rows={2} placeholder="Notes" />
+            <button onClick={saveEdit} className="w-full py-3 rounded-xl bg-primary font-semibold">Save changes</button>
           </div>
         </div>
       )}

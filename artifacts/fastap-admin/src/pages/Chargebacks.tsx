@@ -14,6 +14,7 @@ import { api, type Chargeback } from "@/lib/apiClient";
 import { fmtINRFull } from "@/lib/format";
 import { toast } from "sonner";
 import { statusIs, statusLabel } from "@/pages/statusValue";
+import { PageHeader } from "@/components/shared/Page";
 
 /** The column defaults to `pending_response`; the screen used to look for `"Pending Response"`. */
 const isOpen = (chargeback: Chargeback) => statusIs(chargeback.status, "pending_response");
@@ -51,12 +52,15 @@ export default function Chargebacks() {
   const overdue = pending.filter(c => new Date(c.deadline) < new Date());
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div><h2 className="text-2xl font-bold tracking-tight">Chargeback Management</h2><p className="text-muted-foreground">Handle disputes and upload evidence to payment networks.</p></div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Chargeback Management"
+        description="Handle disputes and upload evidence to payment networks."
+      />
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Pending Response" value={pending.length} icon={<ShieldAlert className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Overdue" value={overdue.length} icon={<ShieldAlert className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Total Disputed" value={fmtINRFull(totalAmount)} icon={<ShieldAlert className="h-4 w-4 text-orange-500" />} />
+        <KpiCard title="Pending Response" value={pending.length} icon={<ShieldAlert className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Overdue" value={overdue.length} icon={<ShieldAlert className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Total Disputed" value={fmtINRFull(totalAmount)} icon={<ShieldAlert className="h-4 w-4 text-warning" />} />
       </div>
       <Card>
         <CardHeader><CardTitle>Dispute Cases</CardTitle></CardHeader>
@@ -76,7 +80,7 @@ export default function Chargebacks() {
               { header: "Vendor", accessorKey: "vendorName", sortable: true },
               { header: "Amount", sortable: true, sortValue: (row: Chargeback) => row.amount, cell: (row: Chargeback) => <span className="font-medium text-destructive">{fmtINRFull(row.amount)}</span> },
               { header: "Reason", searchValue: (row: Chargeback) => row.reason, cell: (row: Chargeback) => <span className="text-xs text-muted-foreground">{row.reason}</span> },
-              { header: "Deadline", sortable: true, sortValue: (row: Chargeback) => row.deadline, cell: (row: Chargeback) => { const isOverdue = new Date(row.deadline) < new Date(); return <span className={`text-xs font-medium ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>{row.deadline}{isOverdue ? " ⚠" : ""}</span>; } },
+              { header: "Deadline", sortable: true, sortValue: (row: Chargeback) => row.deadline, cell: (row: Chargeback) => { const isOverdue = new Date(row.deadline) < new Date(); return <span className={`text-xs font-medium ${isOverdue ? "text-danger" : "text-muted-foreground"}`}>{row.deadline}</span>; } },
               { header: "Status", sortable: true, sortValue: (row: Chargeback) => row.status, cell: (row: Chargeback) => <StatusBadge status={statusLabel(row.status)} /> },
               { header: "Actions", cell: (row: Chargeback) => (
                 <div className="flex items-center gap-1">
@@ -84,12 +88,12 @@ export default function Chargebacks() {
                     <UploadCloud className="h-3 w-3 mr-1" /> Evidence
                   </Button>
                   <AsyncButton
-                    size="sm" variant="outline" className="h-7 text-xs text-blue-500" disabled={!isOpen(row)}
+                    size="sm" variant="outline" className="h-7 text-xs text-info" disabled={!isOpen(row)}
                     errorMessage="Failed to contest"
                     onClick={() => contestMutation.mutateAsync(row.id)}
                   >Contest</AsyncButton>
                   <AsyncButton
-                    size="sm" variant="ghost" className="h-7 text-xs text-red-500" disabled={!isOpen(row)}
+                    size="sm" variant="ghost" className="h-7 text-xs text-danger" disabled={!isOpen(row)}
                     errorMessage="Failed to accept"
                     onClick={async () => {
                       const ok = await confirm({

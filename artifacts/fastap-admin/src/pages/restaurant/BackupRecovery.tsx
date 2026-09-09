@@ -19,7 +19,7 @@ export default function BackupRecovery() {
       ]}
       workaround={
         <>
-          <span className="font-semibold text-white/85">Until this ships:</span> take your own copies of
+          <span className="font-semibold text-foreground">Until this ships:</span> take your own copies of
           anything you cannot lose. Menu, staff, customers, orders and invoices can each be exported to a
           file from their own screens, and your payment provider keeps an independent record of every
           settled transaction.

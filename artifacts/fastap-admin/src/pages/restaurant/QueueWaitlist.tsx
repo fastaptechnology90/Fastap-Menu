@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Clock, Plus, Check, X, Bell, Users, Timer, Phone, Search, BarChart3, Settings, MessageSquare, ChevronDown, Loader } from "lucide-react";
+import { Clock, Plus, Check, X, Bell, Users, Timer, Phone, Search, BarChart3, Settings, MessageSquare, ChevronDown, Loader, MapPin, StickyNote, Smartphone } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { queue as queueApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -7,11 +7,11 @@ import { toast } from "@/hooks/use-toast";
 const PREFS = ["No preference","Window seat","Non-AC","Outdoor","VIP area","Rooftop","Booth","Corner table","High chair needed","Wheelchair accessible","Conference","Near kitchen"];
 
 const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  waiting:  {label:"Waiting",   color:"text-yellow-400", bg:"bg-yellow-500/15"},
-  called:   {label:"Notified",  color:"text-blue-400",   bg:"bg-blue-500/15"},
-  notified: {label:"Notified",  color:"text-blue-400",   bg:"bg-blue-500/15"},
-  seated:   {label:"Seated",    color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  cancelled:{label:"Left",      color:"text-red-400",    bg:"bg-red-500/15"},
+  waiting:  {label:"Waiting",   color:"text-warning", bg:"bg-warning-subtle"},
+  called:   {label:"Notified",  color:"text-info",   bg:"bg-info-subtle"},
+  notified: {label:"Notified",  color:"text-info",   bg:"bg-info-subtle"},
+  seated:   {label:"Seated",    color:"text-success",bg:"bg-success-subtle"},
+  cancelled:{label:"Left",      color:"text-danger",    bg:"bg-danger-subtle"},
 };
 
 function mapQueueEntry(e: any) {
@@ -133,12 +133,12 @@ export default function QueueWaitlist() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Queue & Waitlist</h1>
-          <p className="text-xs text-white/40">Real-time customer queue management</p>
+          <h1 className="text-xl font-semibold">Queue & Waitlist</h1>
+          <p className="text-xs text-muted-foreground">Real-time customer queue management</p>
         </div>
-        <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-amber-500/20 transition-all">
+        <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2.5 rounded-lg text-sm shadow-sm transition-colors">
           <Plus className="h-4 w-4"/>Add to Queue
         </button>
       </div>
@@ -146,22 +146,22 @@ export default function QueueWaitlist() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Waiting",value:waiting.length,icon:Users,color:"text-yellow-400",bg:"bg-yellow-500/10"},
-          {label:"Notified",value:notified.length,icon:Bell,color:"text-blue-400",bg:"bg-blue-500/10"},
-          {label:"Seated Today",value:seated.length,icon:Check,color:"text-emerald-400",bg:"bg-emerald-500/10"},
-          {label:"Avg Wait (min)",value:avgWait||"—",icon:Timer,color:"text-amber-400",bg:"bg-amber-500/10"},
+          {label:"Waiting",value:waiting.length,icon:Users,color:"text-warning",bg:"bg-warning-subtle"},
+          {label:"Notified",value:notified.length,icon:Bell,color:"text-info",bg:"bg-info-subtle"},
+          {label:"Seated Today",value:seated.length,icon:Check,color:"text-success",bg:"bg-success-subtle"},
+          {label:"Avg Wait (min)",value:avgWait||"—",icon:Timer,color:"text-primary",bg:"bg-primary/10"},
         ].map(s=>(
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4 flex items-center gap-3`}>
-            <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
-            <div><p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p><p className="text-xs text-white/40">{s.label}</p></div>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4 flex items-center gap-3`}>
+            <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
+            <div><p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["queue","Queue"],["history","History"],["settings","Settings"]] as [Tab,string][]).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
@@ -169,30 +169,30 @@ export default function QueueWaitlist() {
         <>
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30"/>
-            <input className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder="Search name, token, phone..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+            <input className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search name, token, phone..." value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-4">
             {/* Token Display Board */}
-            <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-4">
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"/>
-                <h2 className="text-sm font-bold text-white/70">Live Queue Board</h2>
+                <div className="h-2 w-2 rounded-full bg-success animate-pulse"/>
+                <h2 className="text-sm font-semibold text-foreground">Live Queue Board</h2>
               </div>
               <div className="space-y-2">
                 {filtered.slice(0,6).map((q,i)=>(
-                  <div key={q.id} className={`flex items-center gap-3 p-3 rounded-xl ${i===0?"bg-amber-500/20 border border-amber-500/30":"bg-white/3 border border-white/5"}`}>
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${i===0?"bg-amber-500 text-black":"bg-white/10 text-white"}`}>{q.token}</div>
+                  <div key={q.id} className={`flex items-center gap-3 p-3 rounded-lg ${i===0?"bg-primary/20 border border-primary/30":"bg-muted border border-border"}`}>
+                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-semibold text-sm shrink-0 ${i===0?"bg-primary text-primary-foreground":"bg-muted text-foreground"}`}>{q.token}</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{q.name}</p>
-                      <p className="text-xs text-white/40">{q.guests} guests · ~{q.estimatedWait}m</p>
+                      <p className="text-xs text-muted-foreground">{q.guests} guests · ~{q.estimatedWait}m</p>
                     </div>
-                    {q.status==="notified"&&<Bell className="h-4 w-4 text-blue-400 shrink-0"/>}
-                    {i===0&&<span className="text-xs bg-amber-500 text-black font-bold px-2 py-0.5 rounded-full">NOW</span>}
+                    {q.status==="notified"&&<Bell className="h-4 w-4 text-info shrink-0"/>}
+                    {i===0&&<span className="text-xs bg-primary text-primary-foreground font-semibold px-2 py-0.5 rounded-full">NOW</span>}
                   </div>
                 ))}
-                {filtered.length===0&&<p className="text-center text-sm text-white/30 py-6">Queue is empty</p>}
+                {filtered.length===0&&<p className="text-center text-sm text-muted-foreground py-6">Queue is empty</p>}
               </div>
             </div>
 
@@ -201,36 +201,36 @@ export default function QueueWaitlist() {
               {filtered.map(item=>{
                 const cfg = STATUS_CFG[item.status];
                 return (
-                  <div key={item.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+                  <div key={item.id} className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-extrabold text-amber-400 text-sm shrink-0">{item.token}</div>
+                      <div className="h-10 w-10 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center font-semibold text-primary text-sm shrink-0">{item.token}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-bold">{item.name}</p>
+                          <p className="text-sm font-semibold">{item.name}</p>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-white/40 flex-wrap">
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                           <span className="flex items-center gap-1"><Users className="h-3 w-3"/>{item.guests} guests</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>Since {item.waitSince}</span>
                           <span className="flex items-center gap-1"><Timer className="h-3 w-3"/>~{item.estimatedWait}m</span>
                           <span className="flex items-center gap-1"><Phone className="h-3 w-3"/>{item.mobile}</span>
                         </div>
-                        {item.preference&&item.preference!=="No preference"&&<p className="text-xs text-amber-400/70 mt-1">📍 {item.preference}</p>}
-                        {item.note&&<p className="text-xs text-white/50 mt-0.5">📝 {item.note}</p>}
+                        {item.preference&&item.preference!=="No preference"&&<p className="text-xs text-primary mt-1"><MapPin className="h-3 w-3 inline mb-0.5" /> {item.preference}</p>}
+                        {item.note&&<p className="text-xs text-muted-foreground mt-0.5"><StickyNote className="h-3 w-3 inline mb-0.5" /> {item.note}</p>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {item.status==="waiting"&&(
-                          <button onClick={()=>notify(item.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30 transition-all">
+                          <button onClick={()=>notify(item.id)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate transition-colors">
                             <Bell className="h-3 w-3"/>{smsNotify?"SMS +":""}Notify
                           </button>
                         )}
                         {(item.status==="waiting"||item.status==="notified")&&(
-                          <button onClick={()=>updateStatus(item.id,"seated")} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 transition-all">
+                          <button onClick={()=>updateStatus(item.id,"seated")} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate transition-colors">
                             <Check className="h-3 w-3"/>Seat
                           </button>
                         )}
                         {item.status!=="seated"&&item.status!=="cancelled"&&(
-                          <button onClick={()=>updateStatus(item.id,"cancelled")} className="h-7 w-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/20 transition-all"><X className="h-3 w-3"/></button>
+                          <button onClick={()=>updateStatus(item.id,"cancelled")} className="h-7 w-7 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate transition-colors"><X className="h-3 w-3"/></button>
                         )}
                       </div>
                     </div>
@@ -238,7 +238,7 @@ export default function QueueWaitlist() {
                 );
               })}
               {filtered.length===0&&(
-                <div className="text-center py-16 text-white/30">
+                <div className="text-center py-16 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-3"/>
                   <p className="font-semibold">No customers in queue</p>
                 </div>
@@ -249,79 +249,81 @@ export default function QueueWaitlist() {
       )}
 
       {tab==="history"&&(
-        <div className="rounded-2xl border border-white/8 overflow-hidden">
-          <div className="bg-white/[0.02] px-4 py-3 border-b border-white/5 grid grid-cols-3 gap-4">
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="bg-card px-4 py-3 border-b border-border grid grid-cols-3 gap-4">
             {[
-              {label:"Seated Today",value:seated.length,color:"text-emerald-400"},
-              {label:"Avg Wait Today",value:avgWait?`${avgWait}m`:"—",color:"text-amber-400"},
-              {label:"No-shows",value:queue.filter(q=>q.status==="cancelled").length,color:"text-red-400"},
+              {label:"Seated Today",value:seated.length,color:"text-success"},
+              {label:"Avg Wait Today",value:avgWait?`${avgWait}m`:"—",color:"text-primary"},
+              {label:"No-shows",value:queue.filter(q=>q.status==="cancelled").length,color:"text-danger"},
             ].map(s=>(
               <div key={s.label} className="text-center">
-                <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-white/40">{s.label}</p>
+                <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             ))}
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-white/30 border-b border-white/5 bg-white/[0.02]">
-                {["Token","Name","Guests","Wait Time","Seated At","Table"].map(h=><th key={h} className="px-4 py-3 font-medium">{h}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {history.map(h=>(
-                <tr key={h.id} className="hover:bg-white/3">
-                  <td className="px-4 py-3 font-bold text-amber-400">{h.token}</td>
-                  <td className="px-4 py-3 font-semibold">{h.name}</td>
-                  <td className="px-4 py-3 text-white/60">{h.guests}</td>
-                  <td className="px-4 py-3 text-white/60">{h.estimatedWait}m</td>
-                  <td className="px-4 py-3 text-white/60">{h.waitSince}</td>
-                  <td className="px-4 py-3"><span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{h.status}</span></td>
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border bg-card">
+                  {["Token","Name","Guests","Wait Time","Seated At","Table"].map(h=><th key={h} className="px-4 py-3 font-medium">{h}</th>)}
                 </tr>
-              ))}
-              {history.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-white/30">No seated guests yet today</td></tr>}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {history.map(h=>(
+                  <tr key={h.id} className="hover:bg-muted">
+                    <td className="px-4 py-3 font-semibold text-primary">{h.token}</td>
+                    <td className="px-4 py-3 font-semibold">{h.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{h.guests}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{h.estimatedWait}m</td>
+                    <td className="px-4 py-3 text-muted-foreground">{h.waitSince}</td>
+                    <td className="px-4 py-3"><span className="text-xs bg-success-subtle text-success px-2 py-0.5 rounded-full">{h.status}</span></td>
+                  </tr>
+                ))}
+                {history.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No seated guests yet today</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {tab==="settings"&&(
         <div className="grid lg:grid-cols-2 gap-5">
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
-            <h3 className="font-bold mb-4">Wait Time Settings</h3>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h3 className="font-semibold mb-4">Wait Time Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Avg time per table turnover (minutes)</label>
+                <label className="text-xs text-muted-foreground mb-2 block">Avg time per table turnover (minutes)</label>
                 <div className="flex items-center gap-3">
-                  <button onClick={()=>setAvgWaitBuffer(Math.max(3,avgWaitBuffer-1))} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20">−</button>
-                  <span className="flex-1 text-center text-lg font-bold text-amber-400">{avgWaitBuffer}m</span>
-                  <button onClick={()=>setAvgWaitBuffer(avgWaitBuffer+1)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20">+</button>
+                  <button onClick={()=>setAvgWaitBuffer(Math.max(3,avgWaitBuffer-1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate">−</button>
+                  <span className="flex-1 text-center text-lg font-semibold text-primary">{avgWaitBuffer}m</span>
+                  <button onClick={()=>setAvgWaitBuffer(avgWaitBuffer+1)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate">+</button>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Max queue capacity</label>
+                <label className="text-xs text-muted-foreground mb-2 block">Max queue capacity</label>
                 <div className="flex items-center gap-3">
-                  <button onClick={()=>setMaxQueue(Math.max(5,maxQueue-5))} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20">−</button>
-                  <span className="flex-1 text-center text-lg font-bold text-amber-400">{maxQueue}</span>
-                  <button onClick={()=>setMaxQueue(maxQueue+5)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/20">+</button>
+                  <button onClick={()=>setMaxQueue(Math.max(5,maxQueue-5))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate">−</button>
+                  <span className="flex-1 text-center text-lg font-semibold text-primary">{maxQueue}</span>
+                  <button onClick={()=>setMaxQueue(maxQueue+5)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate">+</button>
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
-            <h3 className="font-bold mb-4">Notification Settings</h3>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h3 className="font-semibold mb-4">Notification Settings</h3>
             <div className="space-y-3">
               {[
                 {label:"SMS notifications",val:smsNotify,set:setSmsNotify,desc:"Send SMS when table is ready"},
                 {label:"Auto-notify when table freed",val:autoSms,set:setAutoSms,desc:"Automatically notify next in queue"},
               ].map(({label,val,set,desc})=>(
-                <div key={label} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/8">
+                <div key={label} className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
                   <div>
                     <p className="text-sm font-semibold">{label}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
                   </div>
-                  <button onClick={()=>set(!val)} className={`h-6 w-11 rounded-full transition-all relative shrink-0 ${val?"bg-amber-500":"bg-white/10"}`}>
-                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${val?"left-[22px]":"left-0.5"}`}/>
+                  <button onClick={()=>set(!val)} className={`h-6 w-11 rounded-full transition-colors relative shrink-0 ${val?"bg-primary":"bg-muted"}`}>
+                    <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-colors ${val?"left-[22px]":"left-0.5"}`}/>
                   </button>
                 </div>
               ))}
@@ -332,11 +334,11 @@ export default function QueueWaitlist() {
 
       {/* Add Modal */}
       {showAdd&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold">Add to Waitlist</h2>
-              <button onClick={()=>setShowAdd(false)} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center hover:bg-white/15"><X className="h-4 w-4"/></button>
+              <h2 className="text-base font-semibold">Add to Waitlist</h2>
+              <button onClick={()=>setShowAdd(false)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><X className="h-4 w-4"/></button>
             </div>
             <div className="space-y-4">
               {[
@@ -345,27 +347,27 @@ export default function QueueWaitlist() {
                 {label:"Number of Guests",key:"guests",type:"number",placeholder:"2"},
               ].map(f=>(
                 <div key={f.key}>
-                  <label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">{f.label}</label>
-                  <input type={f.type} value={(form as any)[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"/>
+                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">{f.label}</label>
+                  <input type={f.type} value={(form as any)[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"/>
                 </div>
               ))}
               <div>
-                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Seating Preference</label>
+                <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">Seating Preference</label>
                 <div className="relative">
-                  <select value={form.preference} onChange={e=>setForm(p=>({...p,preference:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 appearance-none">
+                  <select value={form.preference} onChange={e=>setForm(p=>({...p,preference:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 appearance-none">
                     {PREFS.map(p=><option key={p} value={p}>{p}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none"/>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"/>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-white/50 font-semibold uppercase tracking-wide mb-1.5 block">Special Note</label>
-                <input type="text" value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} placeholder="Birthday, anniversary, allergies..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"/>
+                <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">Special Note</label>
+                <input type="text" value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} placeholder="Birthday, anniversary, allergies..." className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"/>
               </div>
-              {smsNotify&&form.mobile&&<p className="text-xs text-emerald-400 bg-emerald-500/10 rounded-lg px-3 py-2">📱 SMS confirmation will be sent to {form.mobile}</p>}
+              {smsNotify&&form.mobile&&<p className="text-xs text-success bg-success-subtle rounded-lg px-3 py-2"><Smartphone className="h-3 w-3 inline mb-0.5" /> SMS confirmation will be sent to {form.mobile}</p>}
               <div className="flex gap-3 pt-2">
-                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/60 text-sm font-semibold hover:bg-white/10 transition-all">Cancel</button>
-                <button onClick={addToQueue} disabled={!form.name||!form.mobile} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm hover:bg-amber-400 transition-all disabled:opacity-40">Add to Queue</button>
+                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold hover-elevate transition-colors">Cancel</button>
+                <button onClick={addToQueue} disabled={!form.name||!form.mobile} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-40">Add to Queue</button>
               </div>
             </div>
           </div>

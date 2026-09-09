@@ -14,6 +14,7 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { Plus, Percent, Trash2, Loader2, Pencil } from "lucide-react";
 import { api, type CommissionRule } from "@/lib/apiClient";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/Page";
 
 const defaultForm = { id: "", name: "", type: "Fixed %", value: "", unit: "%", applyTo: "All Restaurants" };
 
@@ -61,15 +62,20 @@ export default function Commissions() {
     : "0";
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Commission Management</h2><p className="text-muted-foreground">Configure take-rates and transaction fees.</p></div>
-        <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> New Rule</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Commission Management"
+        description="Configure take-rates and transaction fees."
+        actions={
+          <>
+            <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> New Rule</Button>
+          </>
+        }
+      />
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Commission Collected" value={fmtMoney(commissionEarned)} icon={<Percent className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Commission Collected" value={fmtMoney(commissionEarned)} icon={<Percent className="h-4 w-4 text-success" />} />
         <KpiCard title="Active Rules" value={rules.filter(r => r.status === "Active").length} icon={<Percent className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Average Rate" value={`${avgRate}%`} icon={<Percent className="h-4 w-4 text-blue-500" />} />
+        <KpiCard title="Average Rate" value={`${avgRate}%`} icon={<Percent className="h-4 w-4 text-info" />} />
         <KpiCard title="Total Rules" value={rules.length} icon={<Percent className="h-4 w-4 text-muted-foreground" />} />
       </div>
       <Card>

@@ -1,6 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, ordersTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { accrueStaffEarningsForOrder } from "./staff-earnings.js";
+import { allocateInvoiceNumber } from "./invoice-series.js";
 
 /**
  * Records a paid order in the finance ledger.
@@ -26,6 +27,13 @@ export async function recordOrderPaymentInLedger(opts: {
   try {
     const amount = String(parseFloat(String(order.total ?? "0")).toFixed(2));
     const method = (opts.method || order.paymentMethod || "cash") as string;
+
+    // The moment money is booked is the moment a tax invoice exists, so the number is
+    // drawn here and nowhere else. Doing it at the point the bill was merely displayed
+    // burnt numbers on orders that were never paid, leaving holes in a series that has
+    // to be consecutive.
+    const invoiceNumber = await allocateInvoiceNumber(restaurantId, order);
+    if (invoiceNumber) order.invoiceNumber = invoiceNumber;
 
     // The server who closed the table earns on this order the moment it is paid. Doing it
     // here — not at the ledger's duplicate guard below — means an order whose income row
@@ -138,46 +146,59 @@ export async function recordAncillaryPaymentInLedger(opts: {
 }
 
 /**
- * Reverses a booked payment when a paid order is cancelled or refunded.
+ * Books money handed back on an order that has already been paid for — a partial refund,
+ * or a line voided or comped after the bill was settled.
  *
- * Writes a matching "refund" row rather than deleting the income one, so the
- * ledger keeps the full history — and the Finance summary nets refunds off the
- * income. Without this, cancelling a paid order dropped it from Revenue but
- * left the money sitting in Finance forever.
+ * Only a FULL refund used to reach the ledger. A partial one wrote the amount onto the
+ * order metadata and stopped there, and voiding a line on a settled bill quietly rewrote
+ * the order total with no matching row at all. Either way the income row kept the whole
+ * original amount, so Finance held money the guest had been given back, and Revenue (which
+ * reads the order) and Finance (which reads the ledger) stopped agreeing.
  *
- * Idempotent: a second cancel of the same order books nothing extra.
+ * Never books more than is left un-refunded on the order, so calling it twice for the same
+ * money — or following a partial refund with a cancellation — cannot double-count.
+ * Returns what it actually booked.
  */
-export async function reverseOrderPaymentInLedger(opts: {
+export async function recordOrderRefundInLedger(opts: {
   restaurantId: number;
   order: typeof ordersTable.$inferSelect;
+  amount: number;
   reason?: string | null;
-}): Promise<void> {
+  /** Shown in the ledger description, e.g. "refunded", "line voided". */
+  what?: string;
+}): Promise<number> {
   const { restaurantId, order } = opts;
   try {
+    const requested = Math.round(Number(opts.amount) * 100) / 100;
+    if (!Number.isFinite(requested) || requested <= 0) return 0;
+
     const [income] = await db.select().from(financeTransactionsTable)
       .where(and(
         eq(financeTransactionsTable.orderId, order.id),
         eq(financeTransactionsTable.type, "income"),
       ))
       .limit(1);
-    if (!income) return; // nothing was ever booked for this order
+    if (!income) return 0; // nothing was ever booked for this order
 
-    const [already] = await db.select({ id: financeTransactionsTable.id })
+    const priorRefunds = await db.select({ amount: financeTransactionsTable.amount })
       .from(financeTransactionsTable)
       .where(and(
         eq(financeTransactionsTable.orderId, order.id),
         eq(financeTransactionsTable.type, "refund"),
-      ))
-      .limit(1);
-    if (already) return;
+      ));
+    const alreadyBooked = priorRefunds.reduce((t, r) => t + parseFloat(String(r.amount ?? 0)), 0);
+    const refundable = Math.round((parseFloat(String(income.amount)) - alreadyBooked) * 100) / 100;
+    const amount = Math.min(requested, refundable);
+    if (amount <= 0) return 0;
 
     const method = income.paymentMethod || "cash";
+    const why = opts.reason ? ` — ${opts.reason}` : "";
     await db.insert(financeTransactionsTable).values({
       restaurantId,
       type: "refund",
       category: "order_refund",
-      description: `Order #${order.id} cancelled — ${opts.reason || "reversed"}`,
-      amount: income.amount,
+      description: `Order #${order.id} ${opts.what ?? "refunded"}${why}`,
+      amount: amount.toFixed(2),
       paymentMethod: method,
       reference: income.reference,
       orderId: order.id,
@@ -194,11 +215,49 @@ export async function reverseOrderPaymentInLedger(opts: {
         .orderBy(desc(cashShiftsTable.openedAt))
         .limit(1);
       if (shift) {
-        const newSales = (parseFloat(String(shift.cashSales ?? "0")) - parseFloat(String(income.amount))).toFixed(2);
+        const newSales = (parseFloat(String(shift.cashSales ?? "0")) - amount).toFixed(2);
         await db.update(cashShiftsTable).set({ cashSales: newSales }).where(eq(cashShiftsTable.id, shift.id));
       }
     }
+    return amount;
   } catch (e) {
-    console.error("finance ledger reversal failed for order", order.id, e);
+    console.error("finance ledger refund failed for order", order.id, e);
+    return 0;
   }
+}
+
+/**
+ * Reverses a booked payment when a paid order is cancelled or refunded.
+ *
+ * Writes a matching "refund" row rather than deleting the income one, so the
+ * ledger keeps the full history — and the Finance summary nets refunds off the
+ * income. Without this, cancelling a paid order dropped it from Revenue but
+ * left the money sitting in Finance forever.
+ *
+ * Idempotent: a second cancel of the same order books nothing extra.
+ */
+export async function reverseOrderPaymentInLedger(opts: {
+  restaurantId: number;
+  order: typeof ordersTable.$inferSelect;
+  reason?: string | null;
+}): Promise<void> {
+  const [income] = await db.select({ amount: financeTransactionsTable.amount })
+    .from(financeTransactionsTable)
+    .where(and(
+      eq(financeTransactionsTable.orderId, opts.order.id),
+      eq(financeTransactionsTable.type, "income"),
+    ))
+    .limit(1);
+  if (!income) return; // nothing was ever booked for this order
+
+  // Ask for the whole thing; the helper books only what is still un-refunded, so an order
+  // that was already partly refunded reverses the remainder rather than the full amount
+  // twice, and a second cancellation books nothing.
+  await recordOrderRefundInLedger({
+    restaurantId: opts.restaurantId,
+    order: opts.order,
+    amount: parseFloat(String(income.amount)),
+    reason: opts.reason ?? "reversed",
+    what: "cancelled",
+  });
 }

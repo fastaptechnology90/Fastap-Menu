@@ -3,8 +3,8 @@ import type { LucideIcon } from "lucide-react";
 
 export function GuestLoading({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-20 text-white/50">
-      <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+    <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
       <p className="text-sm">{label}</p>
     </div>
   );
@@ -19,8 +19,8 @@ export function GuestError({
 }) {
   return (
     <div className="guest-section-card mx-4 my-8 text-center">
-      <WifiOff className="h-10 w-10 text-red-400 mx-auto mb-3" />
-      <p className="text-sm text-white/70 mb-4">{message}</p>
+      <WifiOff className="h-10 w-10 text-danger mx-auto mb-3" />
+      <p className="text-sm text-muted-foreground mb-4">{message}</p>
       {onRetry && (
         <button
           type="button"
@@ -50,9 +50,9 @@ export function GuestEmpty({
 }) {
   return (
     <div className="guest-section-card mx-4 my-8 text-center py-10 px-6">
-      <Icon className="h-12 w-12 text-white/20 mx-auto mb-4" strokeWidth={1.5} />
-      {title && <h2 className="font-display font-semibold text-lg text-white/85 mb-2">{title}</h2>}
-      <p className="text-sm text-white/45 max-w-sm mx-auto leading-relaxed">{message}</p>
+      <Icon className="h-12 w-12 text-muted-foreground mx-auto mb-4" strokeWidth={1.5} />
+      {title && <h2 className="font-display font-semibold text-lg text-foreground mb-2">{title}</h2>}
+      <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">{message}</p>
       {actionLabel && onAction && (
         <button
           type="button"
@@ -98,7 +98,7 @@ export function GuestVenuePicker({
 
   return (
     <div className="mx-auto my-6 space-y-2 max-w-md px-4">
-      <p className="text-xs text-white/40 text-center mb-3">
+      <p className="text-xs text-muted-foreground text-center mb-3">
         {selectedSlug ? "Choose another venue" : "Select a restaurant to continue"}
       </p>
       {venues.map(v => (
@@ -108,15 +108,15 @@ export function GuestVenuePicker({
           disabled={loading}
           onClick={() => onSelect(v.slug)}
           className={`w-full text-left guest-card guest-card-interactive p-4 flex items-center gap-3 ${
-            selectedSlug === v.slug ? "ring-1 ring-orange-500/50" : ""
+            selectedSlug === v.slug ? "ring-1 ring-primary" : ""
           }`}
         >
-          <div className="h-10 w-10 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
-            <Store className="h-5 w-5 text-orange-400" />
+          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <Store className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-sm truncate">{v.name}</p>
-            <p className="text-xs text-white/40 truncate">{v.slug}</p>
+            <p className="text-xs text-muted-foreground truncate">{v.slug}</p>
           </div>
         </button>
       ))}

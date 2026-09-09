@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { api, type AdminUser } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, Shield, Search } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 const ROLES = [
   { id: "super_admin", label: "Super Admin" },
@@ -66,14 +67,16 @@ export default function Users() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Admin Users</h2>
-          <p className="text-muted-foreground">Platform staff accounts and their role assignments.</p>
-        </div>
-        <Button onClick={() => setDialog(true)}><Plus className="mr-2 h-4 w-4" /> Add Admin</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Admin Users"
+        description="Platform staff accounts and their role assignments."
+        actions={
+          <>
+            <Button onClick={() => setDialog(true)}><Plus className="mr-2 h-4 w-4" /> Add Admin</Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 space-y-0">

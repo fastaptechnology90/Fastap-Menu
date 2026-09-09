@@ -10,6 +10,7 @@ import { DataTable } from "@/components/shared/DataTable";
 import { Activity, Server, Database, Cpu, HardDrive, Network, RefreshCw, Loader2, AlertTriangle, CheckCircle, Clock, Download, Play, RotateCcw, Archive } from "lucide-react";
 import { api, type InfraMetrics } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/shared/Page";
 
 function formatTime(iso: string) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -82,29 +83,32 @@ export default function Infrastructure() {
       <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{icon} {title}</CardTitle></CardHeader>
       <CardContent>
         <div className="text-2xl font-bold mb-2">{value ?? "—"}{unit}</div>
-        {max !== undefined && value !== undefined && <Progress value={Math.min(value, 100)} className={`h-2 ${value > 80 ? "[&>div]:bg-red-500" : value > 60 ? "[&>div]:bg-yellow-500" : ""}`} />}
+        {max !== undefined && value !== undefined && <Progress value={Math.min(value, 100)} className={`h-2 ${value > 80 ? "[&>div]:bg-danger" : value > 60 ? "[&>div]:bg-warning" : ""}`} />}
       </CardContent>
     </Card>
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Infrastructure & Monitoring</h2><p className="text-muted-foreground">Job queues, system alerts, and vendor snapshots.</p></div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 border rounded-md p-2 bg-card">
-            <span className="text-sm font-medium">Maintenance Mode</span>
-            <Switch
-              checked={maintenanceMode}
-              disabled={maintenanceMutation.isPending}
-              onCheckedChange={v => maintenanceMutation.mutate(v)}
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={() => { refetch(); qc.invalidateQueries({ queryKey: ["infrastructure-overview"] }); }} disabled={isFetching}>
-            {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Infrastructure & Monitoring"
+        description="Job queues, system alerts, and vendor snapshots."
+        actions={
+          <>
+            <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-2">
+              <span className="text-sm font-medium">Maintenance mode</span>
+              <Switch
+                checked={maintenanceMode}
+                disabled={maintenanceMutation.isPending}
+                onCheckedChange={v => maintenanceMutation.mutate(v)}
+              />
+            </label>
+            <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={() => { refetch(); qc.invalidateQueries({ queryKey: ["infrastructure-overview"] }); }} disabled={isFetching}>
+              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </>
+        }
+      />
 
       {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : metrics && (
         <>
@@ -112,9 +116,9 @@ export default function Infrastructure() {
               queue depth, not read off the host. Showing them as live telemetry would invite
               capacity decisions based on figures nothing measured. */}
           {(metrics as any).estimated && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+            <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle p-3">
+              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+              <p className="text-xs text-warning dark:text-warning">
                 <span className="font-semibold">Estimated, not measured.</span> These figures are
                 derived from database row counts and queue depth — the platform has no host-metrics
                 agent. Disk is a fixed placeholder. Do not use them for capacity planning.
@@ -122,10 +126,10 @@ export default function Infrastructure() {
             </div>
           )}
           <div className="grid gap-4 md:grid-cols-4">
-            <KpiCard title="Uptime" value={metrics.uptime} icon={<Activity className="h-4 w-4 text-green-500" />} />
+            <KpiCard title="Uptime" value={metrics.uptime} icon={<Activity className="h-4 w-4 text-success" />} />
             <KpiCard title="API Req/min (est.)" value={metrics.apiRpm.toLocaleString()} icon={<Network className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Cache Hit Rate (est.)" value={`${metrics.cacheHitRate}%`} icon={<Server className="h-4 w-4 text-blue-500" />} />
-            <KpiCard title="Queue Depth" value={metrics.queueDepth} icon={<Activity className="h-4 w-4 text-yellow-500" />} />
+            <KpiCard title="Cache Hit Rate (est.)" value={`${metrics.cacheHitRate}%`} icon={<Server className="h-4 w-4 text-info" />} />
+            <KpiCard title="Queue Depth" value={metrics.queueDepth} icon={<Activity className="h-4 w-4 text-warning" />} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
@@ -166,14 +170,14 @@ export default function Infrastructure() {
                   columns={[
                     { header: "Queue", cell: (row: any) => <span className="font-medium">{row.name}</span> },
                     { header: "Pending", cell: (row: any) => <Badge variant={row.pending > 20 ? "destructive" : "outline"} className="text-xs">{row.pending}</Badge> },
-                    { header: "Running", cell: (row: any) => <span className="text-blue-500 font-medium">{row.running}</span> },
-                    { header: "Failed", cell: (row: any) => <span className={`font-medium ${row.failed > 0 ? "text-red-500" : "text-muted-foreground"}`}>{row.failed}</span> },
+                    { header: "Running", cell: (row: any) => <span className="text-info font-medium">{row.running}</span> },
+                    { header: "Failed", cell: (row: any) => <span className={`font-medium ${row.failed > 0 ? "text-danger" : "text-muted-foreground"}`}>{row.failed}</span> },
                     { header: "Last Run", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.lastRun}</span> },
                     { header: "Status", cell: (row: any) => (
                       <Badge variant={row.status === "Running" ? "outline" : row.status === "Degraded" ? "destructive" : "secondary"} className="text-xs">{row.status}</Badge>
                     )},
                     { header: "Actions", cell: (row: any) => row.failed > 0 ? (
-                      <Button size="sm" variant="ghost" className="h-7 text-xs text-orange-500" disabled={retryMutation.isPending} onClick={() => retryMutation.mutate()}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-warning" disabled={retryMutation.isPending} onClick={() => retryMutation.mutate()}>
                         <Play className="h-3 w-3 mr-1" /> Retry
                       </Button>
                     ) : null },
@@ -193,8 +197,8 @@ export default function Infrastructure() {
               ) : (
                 <div className="space-y-3">
                   {systemAlerts.map((alert: any, i: number) => (
-                    <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alert.type === "warning" ? "border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20" : "border-blue-200 bg-blue-50/50 dark:bg-blue-950/20"}`}>
-                      {alert.type === "warning" ? <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" /> : <Activity className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />}
+                    <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alert.type === "warning" ? "border-warning-border bg-warning-subtle dark:bg-warning-subtle" : "border-info-border bg-info-subtle dark:bg-info-subtle"}`}>
+                      {alert.type === "warning" ? <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" /> : <Activity className="h-4 w-4 text-info mt-0.5 shrink-0" />}
                       <div className="flex-1">
                         <p className="text-sm">{alert.message}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(alert.time)}</p>
@@ -209,9 +213,9 @@ export default function Infrastructure() {
 
         <TabsContent value="backup" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <KpiCard title="Last Snapshot" value={backupStats.lastBackup ? formatTime(backupStats.lastBackup) : "—"} icon={<Archive className="h-4 w-4 text-green-500" />} />
+            <KpiCard title="Last Snapshot" value={backupStats.lastBackup ? formatTime(backupStats.lastBackup) : "—"} icon={<Archive className="h-4 w-4 text-success" />} />
             <KpiCard title="Total Snapshots" value={backupStats.total} icon={<CheckCircle className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Snapshot Size" value={`${backupStats.totalSizeMb.toFixed(1)} MB`} icon={<HardDrive className="h-4 w-4 text-blue-500" />} />
+            <KpiCard title="Snapshot Size" value={`${backupStats.totalSizeMb.toFixed(1)} MB`} icon={<HardDrive className="h-4 w-4 text-info" />} />
           </div>
           <div className="flex items-center gap-3">
             <Button disabled={backupMutation.isPending} onClick={() => backupMutation.mutate()}>
@@ -267,7 +271,7 @@ export default function Infrastructure() {
               ) : (
                 <div className="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-1.5 max-h-[350px] overflow-y-auto">
                   {systemLogs.map((log: string, i: number) => (
-                    <div key={i} className={log.includes("ERROR") || log.includes("critical") ? "text-red-400" : log.includes("WARN") ? "text-yellow-400" : "text-green-400"}>
+                    <div key={i} className={log.includes("ERROR") || log.includes("critical") ? "text-danger" : log.includes("WARN") ? "text-warning" : "text-success"}>
                       {log}
                     </div>
                   ))}

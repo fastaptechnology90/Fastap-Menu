@@ -3,6 +3,7 @@ import { eq, or, ilike } from "drizzle-orm";
 import { db, staffTable, restaurantsTable } from "@workspace/db";
 import {
   createMobileSession,
+  saveMobileSession,
   staffCodeFor,
   sessionPayload,
   type MobileSession,
@@ -131,14 +132,15 @@ async function buildSession(
   const basePermissions = permissionsForRole(role);
   const enabledSystems = await getEnabledSystemNumbers(staff.restaurantId);
   const permissions = filterPermissionsByEntitlements(basePermissions, enabledSystems);
-  return createMobileSession(
+  // Written through to the database so the handset stays signed in across a restart.
+  return saveMobileSession(createMobileSession(
     staff,
     deviceId,
     loginMethod,
     permissions,
     role,
     sectionForRole(role),
-  );
+  ));
 }
 
 export async function loginWithPassword(body: Record<string, unknown>) {

@@ -12,6 +12,17 @@ import {
 const router: IRouter = Router();
 
 /**
+ * Payroll figures are stored as a decimal string, and an empty box means "no salary set"
+ * rather than zero. Returns "invalid" for anything that is neither.
+ */
+function salaryToStore(value: unknown): string | null | "invalid" {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return "invalid";
+  return n.toFixed(2);
+}
+
+/**
  * Staff rows carry what each person actually sold.
  *
  * Screens wanting a server's sales had no field to read and were inferring it from a
@@ -55,7 +66,7 @@ router.get("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Pr
 
 router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
-  const { name, email, role, phone, password, isActive } = req.body;
+  const { name, email, role, phone, password, isActive, salary, shift } = req.body;
   if (!name?.trim() || !email?.trim() || !role) {
     res.status(400).json({ error: "name, email, and role are required" });
     return;
@@ -64,6 +75,8 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
     res.status(400).json({ error: "password (6+ characters) is required for staff login" });
     return;
   }
+  const salaryValue = salaryToStore(salary);
+  if (salaryValue === "invalid") { res.status(400).json({ error: "Salary must be a positive amount." }); return; }
   const pinHash = await bcrypt.hash(String(password), 10);
   const [member] = await db
     .insert(staffTable)
@@ -75,6 +88,11 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
       role,
       pinHash,
       isActive: isActive ?? true,
+      // The column, the payroll figure the staff list displays, and the `edit_salary`
+      // permission all existed; nothing ever wrote one. A venue could type a salary when
+      // adding someone and it was dropped on the way to the database.
+      salary: salaryValue,
+      shift: shift ? String(shift) : undefined,
       joinDate: new Date(),
     })
     .returning();
@@ -85,7 +103,7 @@ router.post("/restaurants/:restaurantId/staff", requireAuth, async (req, res): P
 router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req, res): Promise<void> => {
   const staffId = parseInt(String(req.params.staffId), 10);
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
-  const { name, email, role, phone, password, isActive, shift, weeklySchedule } = req.body;
+  const { name, email, role, phone, password, isActive, shift, weeklySchedule, salary } = req.body;
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
   if (email !== undefined) updates.email = String(email).trim().toLowerCase();
@@ -96,6 +114,11 @@ router.put("/restaurants/:restaurantId/staff/:staffId", requireAuth, async (req,
   // HR day-wise roster: { Mon: "Night", Tue: "Morning", ..., Sun: "Off" }
   if (weeklySchedule !== undefined && weeklySchedule && typeof weeklySchedule === "object") {
     updates.weeklySchedule = weeklySchedule;
+  }
+  if (salary !== undefined) {
+    const salaryValue = salaryToStore(salary);
+    if (salaryValue === "invalid") { res.status(400).json({ error: "Salary must be a positive amount." }); return; }
+    updates.salary = salaryValue;
   }
   if (password) {
     if (String(password).length < 6) {

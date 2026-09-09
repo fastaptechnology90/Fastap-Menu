@@ -37,12 +37,12 @@ export default function AccessibilitySettings() {
   if (loadError && !settings) {
     return (
       <div className="p-6">
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-5 flex items-start gap-3 max-w-lg">
-          <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+        <div className="rounded-lg bg-danger-subtle border border-danger-border p-5 flex items-start gap-3 max-w-lg">
+          <AlertCircle className="h-5 w-5 text-danger shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-red-200">Couldn't load accessibility settings</p>
-            <p className="text-xs text-white/50 mt-1">Check your connection and try again.</p>
-            <button onClick={() => { setLoadError(false); if (restaurantId) platformApi.accessibility(restaurantId).then(setSettings).catch(() => setLoadError(true)); }} className="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-black text-sm font-bold">Retry</button>
+            <p className="text-sm font-semibold text-danger">Couldn't load accessibility settings</p>
+            <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
+            <button onClick={() => { setLoadError(false); if (restaurantId) platformApi.accessibility(restaurantId).then(setSettings).catch(() => setLoadError(true)); }} className="mt-3 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold">Retry</button>
           </div>
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function AccessibilitySettings() {
   }
 
   if (!settings) {
-    return <div className="p-6 flex items-center gap-2 text-white/40"><Loader className="h-4 w-4 animate-spin" />Loading accessibility settings…</div>;
+    return <div className="p-6 flex items-center gap-2 text-muted-foreground"><Loader className="h-4 w-4 animate-spin" />Loading accessibility settings…</div>;
   }
 
   const langs = settings.catalog?.languages || [
@@ -67,23 +67,23 @@ export default function AccessibilitySettings() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Accessibility & Languages</h1>
-          <p className="text-xs text-white/40">Guest menu defaults — Hindi, English & regional languages</p>
+          <h1 className="text-xl font-semibold">Accessibility & Languages</h1>
+          <p className="text-xs text-muted-foreground">Guest menu defaults — Hindi, English & regional languages</p>
         </div>
-        <button onClick={save} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-black text-sm font-bold">
+        <button onClick={save} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold">
           {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {saved ? "Saved" : "Save"}
         </button>
       </div>
 
-      <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5 space-y-4">
-        <h3 className="font-bold flex items-center gap-2"><Languages className="h-4 w-4 text-blue-400" /> Default Language</h3>
+      <div className="rounded-lg bg-card border border-border p-5 space-y-4">
+        <h3 className="font-semibold flex items-center gap-2"><Languages className="h-4 w-4 text-info" /> Default Language</h3>
         <select
           value={settings.defaultLanguage || "en"}
           onChange={e => setSettings((s: any) => ({ ...s, defaultLanguage: e.target.value }))}
-          className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm max-w-xs"
+          className="bg-muted border border-border rounded-lg px-3 py-2 text-sm max-w-xs"
         >
           {langs.map((l: any) => <option key={l.code} value={l.code}>{l.label || l.name || l.code}</option>)}
         </select>
@@ -91,20 +91,20 @@ export default function AccessibilitySettings() {
           {(settings.enabledLanguages || ["en", "hi"]).map((code: string) => {
             const label = langs.find((l: any) => l.code === code)?.label || code;
             return (
-              <span key={code} className="text-xs px-3 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/20">{label}</span>
+              <span key={code} className="text-xs px-3 py-1 rounded-full bg-info-subtle text-info border border-info-border">{label}</span>
             );
           })}
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5 space-y-4">
-        <h3 className="font-bold flex items-center gap-2"><Accessibility className="h-4 w-4 text-violet-400" /> Guest Defaults</h3>
+      <div className="rounded-lg bg-card border border-border p-5 space-y-4">
+        <h3 className="font-semibold flex items-center gap-2"><Accessibility className="h-4 w-4 text-muted-foreground" /> Guest Defaults</h3>
         {toggles.map(t => (
-          <div key={t.key} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+          <div key={t.key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
             <span className="text-sm">{t.label}</span>
             <button
               onClick={() => setSettings((s: any) => ({ ...s, [t.key]: !s[t.key] }))}
-              className={`h-7 w-12 rounded-full ${settings[t.key] ? "bg-violet-500" : "bg-white/20"}`}
+              className={`h-7 w-12 rounded-full ${settings[t.key] ? "bg-muted" : "bg-muted"}`}
             >
               <span className={`block h-5 w-5 rounded-full bg-white transition-transform ${settings[t.key] ? "translate-x-6" : "translate-x-1"}`} />
             </button>

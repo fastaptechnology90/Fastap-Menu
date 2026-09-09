@@ -21,12 +21,6 @@ function parseNum(v: unknown, fallback = 0): number {
   return Number.isNaN(n) ? fallback : n;
 }
 
-export function generateInvoiceNumber(orderId: number, restaurantId?: number): string {
-  const prefix = restaurantId ? `SG${restaurantId}` : "FM";
-  const year = new Date().getFullYear();
-  return `INV-${prefix}-${year}-${String(orderId).padStart(5, "0")}`;
-}
-
 /**
  * Split GST into its halves at the venue's own rate.
  *
@@ -43,8 +37,20 @@ export function computeGstBreakdown(taxableAmount: number, rate = DEFAULT_GST_RA
   const totalGst = actualTax != null && Number.isFinite(actualTax) && actualTax >= 0
     ? Math.round(actualTax * 100) / 100
     : Math.round(taxableAmount * usableRate * 100) / 100;
-  const cgst = Math.round((totalGst / 2) * 100) / 100;
-  const sgst = Math.round((totalGst - cgst) * 100) / 100;
+
+  // Each half is half of the tax, equally. The old code took `cgst = round(totalGst / 2)`
+  // and then `sgst = totalGst - cgst`, so a tax landing on an odd number of paise printed
+  // as CGST 1.63 / SGST 1.62 — unequal halves on roughly half of all bills, which is
+  // legally malformed. Under GST the two components are computed the same way from the
+  // same taxable value and are therefore always equal.
+  const half = Math.round((totalGst / 2) * 100) / 100;
+  const cgst = half;
+  const sgst = half;
+  // New bills are priced as two equal halves upstream, so this is 0. It exists for bills
+  // raised before that, whose stored tax cannot be split into two equal paise amounts: the
+  // odd paisa is shown as a round-off rather than hidden inside one of the halves.
+  const roundingAdjustment = Math.round((totalGst - cgst - sgst) * 100) / 100;
+
   // When the invoice restates a stored tax, the caption has to describe that tax — not
   // the configured rate, which may have been changed since the bill was raised.
   const effectiveRate = taxableAmount > 0 ? totalGst / taxableAmount : usableRate;
@@ -53,6 +59,7 @@ export function computeGstBreakdown(taxableAmount: number, rate = DEFAULT_GST_RA
     taxableAmount,
     cgst,
     sgst,
+    roundingAdjustment,
     totalGst,
     gstRate: Math.round(effectiveRate * 10000) / 10000,
     gstRatePercent: Math.round(effectiveRate * 10000) / 100,
@@ -61,6 +68,18 @@ export function computeGstBreakdown(taxableAmount: number, rate = DEFAULT_GST_RA
     hsn: "996331",
     sac: "Restaurant services",
   };
+}
+
+/** The Indian financial year a date falls in, e.g. "2026-27". Numbering restarts each April. */
+export function financialYearOf(when: Date): string {
+  const y = when.getFullYear();
+  const startYear = when.getMonth() >= 3 ? y : y - 1;
+  return `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
+}
+
+/** Format a number drawn from the venue's own consecutive series. */
+export function formatInvoiceNumber(restaurantId: number, financialYear: string, serial: number): string {
+  return `INV-SG${restaurantId}-${financialYear}-${String(serial).padStart(5, "0")}`;
 }
 
 export function computeBillQuote(input: {
@@ -136,19 +155,40 @@ export function buildGstInvoice(order: {
   // The tax on the order is what the guest was charged; the invoice restates it rather
   // than recomputing it at whatever rate happens to be configured today.
   const storedTax = parseNum(order.tax, NaN);
+  const orderMeta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
+  const storedBilling = (typeof orderMeta.billing === "object" && orderMeta.billing !== null ? orderMeta.billing : {}) as Record<string, unknown>;
+  // Alcohol sits outside GST, so its tax must not be apportioned into CGST and SGST. The
+  // split recorded when the order was priced says how much of the tax was which; an order
+  // raised before that record existed is treated as all food, exactly as it was billed.
+  const storedTaxSplit = (typeof storedBilling.tax === "object" && storedBilling.tax !== null ? storedBilling.tax : null) as
+    { foodTaxable?: unknown; liquorTaxable?: unknown; gst?: unknown; liquorTax?: unknown; liquorRatePercent?: unknown } | null;
+  const liquorTaxable = parseNum(storedTaxSplit?.liquorTaxable);
+  const liquorTax = parseNum(storedTaxSplit?.liquorTax);
+  const gstTaxable = storedTaxSplit ? parseNum(storedTaxSplit.foodTaxable) : taxableAmount;
+  const gstAmount = storedTaxSplit ? parseNum(storedTaxSplit.gst) : storedTax;
   const gst = computeGstBreakdown(
-    taxableAmount,
+    gstTaxable,
     billingSettings?.taxRate,
-    Number.isFinite(storedTax) && storedTax > 0 ? storedTax : undefined,
+    Number.isFinite(gstAmount) && gstAmount > 0 ? gstAmount : undefined,
   );
   const tip = parseNum(order.tipAmount);
   const total = parseNum(order.total);
   const items = Array.isArray(order.items) ? order.items : [];
-  const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
-  const metaBilling = (typeof meta.billing === "object" && meta.billing !== null ? meta.billing : {}) as Record<string, unknown>;
+  const meta = orderMeta;
+  const metaBilling = storedBilling;
+
+  // A tax invoice is the record of a completed sale. One used to be issued for any order
+  // that was merely looked at — including a payment that had just FAILED — and it burnt a
+  // number from a series that has to be consecutive. Until the money is in, this is a
+  // proforma: it prices the meal, it carries no invoice number, and it says so.
+  const settled = ["paid", "partially_refunded", "refunded"].includes(String(order.paymentStatus ?? ""));
 
   return {
-    invoiceNumber: order.invoiceNumber ?? generateInvoiceNumber(order.id, order.restaurantId),
+    orderId: order.id,
+    invoiceNumber: settled ? (order.invoiceNumber ?? null) : null,
+    /** False means this is a proforma bill, not a tax invoice — nothing has been paid yet. */
+    isTaxInvoice: settled && Boolean(order.invoiceNumber),
+    documentTitle: settled && order.invoiceNumber ? "TAX INVOICE" : "PROFORMA BILL — NOT A TAX INVOICE",
     invoiceDate: order.createdAt.toISOString(),
     restaurantName: (metaBilling.legalName as string) || billingSettings?.legalName || restaurantName,
     // A GSTIN that is not the venue's own turns a tax invoice into a false document.
@@ -168,9 +208,16 @@ export function buildGstInvoice(order: {
     subtotal,
     discount,
     taxableAmount,
+    /** The part of the bill GST is charged on — alcohol is excluded from it. */
+    gstTaxableAmount: gst.taxableAmount,
     cgst: gst.cgst,
     sgst: gst.sgst,
+    gstRoundingAdjustment: gst.roundingAdjustment,
     totalGst: gst.totalGst,
+    /** Alcohol: outside GST, taxed on its own line at the state's excise/VAT rate. */
+    liquorTaxableAmount: liquorTaxable,
+    liquorTax,
+    liquorRatePercent: parseNum(storedTaxSplit?.liquorRatePercent),
     gstRatePercent: gst.gstRatePercent,
     cgstRatePercent: gst.cgstRatePercent,
     sgstRatePercent: gst.sgstRatePercent,
@@ -190,7 +237,7 @@ export function buildInvoiceHtml(invoice: ReturnType<typeof buildGstInvoice>): s
   ).join("");
 
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Invoice ${invoice.invoiceNumber}</title>
+<html><head><meta charset="utf-8"><title>${invoice.isTaxInvoice ? `Invoice ${invoice.invoiceNumber}` : `Bill for order #${invoice.orderId}`}</title>
 <style>
   body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:24px;color:#111}
   h1{font-size:22px;margin:0 0 4px} .muted{color:#666;font-size:13px}
@@ -200,18 +247,22 @@ export function buildInvoiceHtml(invoice: ReturnType<typeof buildGstInvoice>): s
   .grand{font-size:18px;font-weight:700;border-top:2px solid #111;margin-top:8px;padding-top:8px}
   .gst-box{background:#f9fafb;border:1px solid #e5e7eb;padding:12px;border-radius:8px;margin-top:16px;font-size:13px}
 </style></head><body>
-  <h1>TAX INVOICE</h1>
+  <h1>${invoice.documentTitle}</h1>
   <p class="muted">${invoice.restaurantName}${invoice.restaurantAddress ? ` · ${invoice.restaurantAddress}` : ""}</p>
   <p class="muted">${invoice.restaurantGstin ? `GSTIN: ${invoice.restaurantGstin}` : "Not registered for GST"}</p>
-  <p class="muted">Invoice: <strong>${invoice.invoiceNumber}</strong> · Date: ${new Date(invoice.invoiceDate).toLocaleString()}</p>
+  <p class="muted">${invoice.isTaxInvoice ? `Invoice: <strong>${invoice.invoiceNumber}</strong>` : `Order #${invoice.orderId} · no invoice number is issued until the bill is settled`} · Date: ${new Date(invoice.invoiceDate).toLocaleString()}</p>
   <p>Customer: ${invoice.customerName}${invoice.customerPhone ? ` · ${invoice.customerPhone}` : ""}${invoice.tableName ? ` · Table ${invoice.tableName}` : ""}</p>
   <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
   <div class="totals">
     <div><span>Subtotal</span><span>₹${invoice.subtotal.toFixed(2)}</span></div>
     ${invoice.discount > 0 ? `<div><span>Discount</span><span>-₹${invoice.discount.toFixed(2)}</span></div>` : ""}
     <div><span>Taxable Amount</span><span>₹${invoice.taxableAmount.toFixed(2)}</span></div>
+    ${invoice.liquorTaxableAmount > 0 ? `<div><span>Of which GST-taxable (food &amp; beverage)</span><span>₹${invoice.gstTaxableAmount.toFixed(2)}</span></div>` : ""}
     <div><span>CGST (${invoice.cgstRatePercent}%)</span><span>₹${invoice.cgst.toFixed(2)}</span></div>
     <div><span>SGST (${invoice.sgstRatePercent}%)</span><span>₹${invoice.sgst.toFixed(2)}</span></div>
+    ${invoice.gstRoundingAdjustment !== 0 ? `<div><span>Round off</span><span>₹${invoice.gstRoundingAdjustment.toFixed(2)}</span></div>` : ""}
+    ${invoice.liquorTaxableAmount > 0 ? `<div><span>Alcoholic beverages (outside GST)</span><span>₹${invoice.liquorTaxableAmount.toFixed(2)}</span></div>` : ""}
+    ${invoice.liquorTaxableAmount > 0 ? `<div><span>Excise / VAT on liquor (${invoice.liquorRatePercent}%)</span><span>₹${invoice.liquorTax.toFixed(2)}</span></div>` : ""}
     ${invoice.tip > 0 ? `<div><span>Tip</span><span>₹${invoice.tip.toFixed(2)}</span></div>` : ""}
     <div class="grand"><span>Grand Total</span><span>₹${invoice.grandTotal.toFixed(2)}</span></div>
   </div>
@@ -219,7 +270,9 @@ export function buildInvoiceHtml(invoice: ReturnType<typeof buildGstInvoice>): s
     <strong>GST Summary</strong> — SAC: ${invoice.sac} · HSN: 996331<br>
     Payment: ${invoice.paymentMethod ?? "—"} · Status: ${invoice.paymentStatus ?? "pending"}
   </div>
-  <p class="muted" style="margin-top:24px">This is a computer-generated GST invoice from FastMenu.</p>
+  <p class="muted" style="margin-top:24px">${invoice.isTaxInvoice
+    ? "This is a computer-generated GST invoice."
+    : "This is a proforma bill. It is not a tax invoice and carries no invoice number; one is issued when the bill is settled."}</p>
 </body></html>`;
 }
 

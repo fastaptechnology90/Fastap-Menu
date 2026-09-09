@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Plus, RefreshCw, Loader2, Search, Download, CheckCircle, Clock, AlertTriangle, Upload } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Agreements() {
   const { toast } = useToast();
@@ -56,79 +57,79 @@ export default function Agreements() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Agreement Management</h2>
-          <p className="text-muted-foreground">Manage vendor contracts, signed agreements, and renewal tracking.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Agreement Management"
+        description="Manage vendor contracts, signed agreements, and renewal tracking."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Add Agreement</Button>
+            <Button><Plus className="mr-2 h-4 w-4" /> Add Agreement</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Add New Agreement</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Vendor Name</Label>
-                  <Input placeholder="Vendor business name" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Agreement Type</Label>
-                  <Select value={form.agreementType} onValueChange={v => setForm(f => ({ ...f, agreementType: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {["Service Agreement", "NDA", "Commission Agreement", "White Label Agreement", "Enterprise Contract", "Partner Agreement"].map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Signed Date</Label>
-                    <Input type="date" value={form.signedDate} onChange={e => setForm(f => ({ ...f, signedDate: e.target.value }))} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Expiry Date</Label>
-                    <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Pending Signature">Pending Signature</SelectItem>
-                      <SelectItem value="Expired">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* No file-upload/storage endpoint exists (POST /superadmin/agreements stores metadata only),
-                    so the dropzone is shown as unavailable rather than faking an upload. */}
-                <div className="border-2 border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground opacity-60">
-                  <Upload className="h-6 w-6 mx-auto mb-2" />
-                  PDF upload unavailable — no file storage endpoint
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Agreement
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Add New Agreement</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+            <Label>Vendor Name</Label>
+            <Input placeholder="Vendor business name" value={form.vendorName} onChange={e => setForm(f => ({ ...f, vendorName: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+            <Label>Agreement Type</Label>
+            <Select value={form.agreementType} onValueChange={v => setForm(f => ({ ...f, agreementType: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Service Agreement", "NDA", "Commission Agreement", "White Label Agreement", "Enterprise Contract", "Partner Agreement"].map(t => (
+            <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Signed Date</Label>
+            <Input type="date" value={form.signedDate} onChange={e => setForm(f => ({ ...f, signedDate: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+            <Label>Expiry Date</Label>
+            <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Pending Signature">Pending Signature</SelectItem>
+            <SelectItem value="Expired">Expired</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            {/* No file-upload/storage endpoint exists (POST /superadmin/agreements stores metadata only),
+            so the dropzone is shown as unavailable rather than faking an upload. */}
+            <div className="border-2 border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground opacity-60">
+            <Upload className="h-6 w-6 mx-auto mb-2" />
+            PDF upload unavailable — no file storage endpoint
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Save Agreement
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Agreements" value={agreements.length} icon={<FileText className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active" value={active} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Expiring (30d)" value={expiringDocs.length} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Expired" value={expired} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Active" value={active} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Expiring (30d)" value={expiringDocs.length} icon={<Clock className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Expired" value={expired} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
       </div>
 
       <Card>
@@ -153,14 +154,19 @@ export default function Agreements() {
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
-            <DataTable data={filtered} pageSize={10} columns={[
+            <DataTable
+              data={filtered}
+              pageSize={10}
+              emptyMessage="No agreements recorded"
+              emptyDescription="Agreements are entered here by hand — no contract is created when a venue signs up."
+              columns={[
               { header: "Agreement ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
               { header: "Vendor", cell: (row: any) => <span className="font-medium">{row.vendorName}</span> },
               { header: "Type", cell: (row: any) => <span className="text-sm">{row.agreementType}</span> },
               { header: "Signed Date", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.signedDate}</span> },
               { header: "Expiry Date", cell: (row: any) => {
                 const daysLeft = row.expiryDate ? Math.ceil((new Date(row.expiryDate).getTime() - Date.now()) / 86400000) : null;
-                return <span className={`text-xs font-medium ${!daysLeft ? "text-muted-foreground" : daysLeft < 0 ? "text-red-400" : daysLeft <= 30 ? "text-yellow-400" : "text-muted-foreground"}`}>{row.expiryDate || "No expiry"}</span>;
+                return <span className={`text-xs font-medium ${!daysLeft ? "text-muted-foreground" : daysLeft < 0 ? "text-danger" : daysLeft <= 30 ? "text-warning" : "text-muted-foreground"}`}>{row.expiryDate || "No expiry"}</span>;
               }},
               { header: "Status", cell: (row: any) => (
                 <Badge variant={statusOf(row) === "active" ? "default" : statusOf(row) === "expired" ? "destructive" : "secondary"} className="text-xs capitalize">{row.status}</Badge>

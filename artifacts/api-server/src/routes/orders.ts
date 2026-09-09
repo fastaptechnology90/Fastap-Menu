@@ -4,12 +4,13 @@ import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesM
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
-import { generateInvoiceNumber, resolvePaymentStatus } from "../lib/paymentLogic.js";
+import { resolvePaymentStatus } from "../lib/paymentLogic.js";
 import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
-import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, clampTip, round2 } from "../lib/order-pricing.js";
+import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, taxRatesFor, taxForOrderItems, computeBasketTax, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 import { canTransition } from "../lib/order-status.js";
+import { venueHours, closedResponse } from "../lib/venue-hours.js";
 import {
   isRestaurantPublished,
   getPublicationStatus,
@@ -163,13 +164,18 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
 
     const reduction = round2(originalTotal - requested);
     if (reduction > 0) {
-      const staffName = req.session.staffSession?.name ?? collectedBy ?? "staff";
+      // The session field is `staffName`; `.name` has never existed on it, so this always
+      // fell through to whatever the client put in `collectedBy` — a free-text field the
+      // caller chooses. Every discount was therefore signed by a name the person applying
+      // it typed themselves. Trust the session first.
+      const staffName = req.session.staffSession?.staffName ?? collectedBy ?? "staff";
       orderPatch.metadata = {
         ...(orderPatch.metadata as Record<string, unknown>),
         discount: {
           amount: reduction,
           originalTotal: round2(originalTotal),
           reason: typeof req.body?.discountReason === "string" ? req.body.discountReason.trim() : "",
+          appliedByRole: req.session.staffSession?.staffRole ?? null,
           appliedBy: staffName,
           appliedAt: new Date().toISOString(),
         },
@@ -202,6 +208,23 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     // every cancellation would permanently understate stock.
     if (String(existing.status ?? "").toLowerCase() !== "cancelled") {
       await restoreStockForOrder(restaurantId, orderId);
+    }
+
+    // The ledger reversal above hands the money back, but the ORDER was left saying
+    // `paymentStatus: "paid"` — so a voided bill still read as collected on the orders
+    // list, on a reprint, in an export and to the mobile apps, while Finance showed the
+    // money returned. Two records of the same bill telling opposite stories.
+    //
+    // Cancelling is the one gesture a floor makes ("void that, give it back"), so the
+    // refund is recorded as part of it rather than demanded as a separate step first —
+    // requiring two calls would leave bills stranded half-voided whenever the second is
+    // forgotten, which is worse than the problem being fixed.
+    if (order.paymentStatus === "paid" || order.paymentStatus === "partially_refunded") {
+      const [settledOff] = await db.update(ordersTable)
+        .set({ paymentStatus: "refunded" })
+        .where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)))
+        .returning();
+      if (settledOff) order = settledOff;
     }
   }
 
@@ -252,6 +275,18 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     return;
   }
 
+  // Trading hours, on the one route that matters most. The kiosk and room service
+  // already checked them; the main guest order route did not, so a 4 a.m. order still
+  // reached a kitchen with nobody in it. A scheduled order is exempt — booking ahead
+  // for tomorrow lunch is the whole point of one.
+  if (!scheduledAt) {
+    const hours = venueHours(venue);
+    if (!hours.isOpen) {
+      res.status(409).json(closedResponse(hours));
+      return;
+    }
+  }
+
   const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
 
@@ -278,6 +313,9 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     orderItems.push({
       id: mi.id, menuItemId: mi.id, name: mi.name, price: unitPrice, quantity,
       variant, addons, notes: item.notes, customizations: item.customizations,
+      // Carried on the line so the bill and the invoice can tax a whisky and a dosa
+      // differently, and so a reprint years later still knows which was which.
+      taxCategory: mi.taxCategory ?? "food",
       course: item.course, subtotal: lineTotal,
     });
   }
@@ -287,7 +325,15 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // The raw discountAmount the client used to send is ignored entirely.
   const { discount, appliedCoupon, promoId, reason: couponReason } = await resolveDiscount(restaurantId, couponCode, subtotal);
   const taxable = Math.max(0, round2(subtotal - discount));
-  const tax = round2(taxable * (await taxRateFor(restaurantId)));
+  // Tax is worked out per line, not as one flat rate over the basket: CGST and SGST are
+  // each computed from the food value so they come out equal, and alcohol is taxed on its
+  // own line at the venue's excise/VAT rate rather than being swept into GST.
+  const taxBreakdown = computeBasketTax(
+    orderItems.map(i => ({ amount: i.subtotal, taxCategory: i.taxCategory })),
+    await taxRatesFor(restaurantId),
+    discount,
+  );
+  const tax = taxBreakdown.tax;
   // A tip is the one figure the guest legitimately chooses, but it still cannot be
   // negative and is capped so a typo cannot create an absurd bill.
   const tip = clampTip(tipAmount, taxable);
@@ -311,6 +357,10 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   const trackingMeta = initialTrackingMetadata(prepMinutes);
 
   const billingMeta: Record<string, unknown> = {
+    // The tax as it was worked out at the moment of ordering. The invoice restates this
+    // rather than recomputing it, so a bill reprinted after the venue changes its rate
+    // still shows what the guest actually paid.
+    tax: taxBreakdown,
     couponCode: couponCode ?? null,
     splitPayment: Array.isArray(splitPayments) && splitPayments.length
       ? { enabled: true, splits: splitPayments }
@@ -397,9 +447,9 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
   }).returning();
 
-  await db.update(ordersTable).set({
-    invoiceNumber: generateInvoiceNumber(order.id, restaurantId),
-  }).where(eq(ordersTable.id, order.id));
+  // No invoice number is stamped here. Placing an order is not a sale: a number is drawn
+  // from the venue's consecutive series when the bill is actually settled, so cancelled
+  // and abandoned orders no longer leave holes in it.
 
   for (const item of items) {
     const mi = menuMap.get(item.menuItemId);
@@ -450,7 +500,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   broadcastEvent("new_order", { id: order.id, restaurantId, tableName, total, status: "pending" });
   broadcastOrderEvent(order.id, "order_status", { id: order.id, status: "pending", tableName });
   res.status(201).json({
-    ...parseOrder({ ...order, invoiceNumber: generateInvoiceNumber(order.id, restaurantId) }),
+    ...parseOrder(order),
     // A code that quietly did nothing leaves the guest staring at the full price. Say so.
     ...(couponReason ? { couponNotApplied: couponReason } : {}),
   });
@@ -487,7 +537,7 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
     const [mi] = await db.select().from(menuItemsTable).where(and(eq(menuItemsTable.id, menuItemId), eq(menuItemsTable.restaurantId, order.restaurantId)));
     if (!mi) { res.status(400).json({ error: "Menu item not found" }); return; }
     const unit = parseFloat(String(mi.discountedPrice || mi.price)) || 0;
-    items.push({ id: mi.id, menuItemId: mi.id, name: mi.name, price: unit, quantity: d, qty: d, subtotal: unit * d });
+    items.push({ id: mi.id, menuItemId: mi.id, name: mi.name, price: unit, quantity: d, qty: d, taxCategory: mi.taxCategory ?? "food", subtotal: unit * d });
   } else {
     res.status(400).json({ error: "Item not in order" }); return;
   }
@@ -495,7 +545,8 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   const subtotal = Math.round(items.reduce((s, i) => s + (parseFloat(String(i.subtotal)) || (parseFloat(String(i.price)) || 0) * (i.quantity ?? i.qty ?? 1)), 0) * 100) / 100;
   // Adjusting a round re-taxed the basket at a flat 5% while the original order was taxed
   // at the venue's configured rate, so editing an order silently changed the tax on it.
-  const tax = round2(subtotal * (await taxRateFor(order.restaurantId)));
+  // It also re-taxed everything as food; the lines carry their own treatment now.
+  const tax = (await taxForOrderItems(order.restaurantId, items as { subtotal?: unknown; taxCategory?: string | null }[])).tax;
   const total = Math.round((subtotal + tax) * 100) / 100;
   // If the round was already finished, bump it back so the kitchen makes the new/changed items.
   const bumped = ["ready", "served"].includes(String(order.status)) ? "pending" : order.status;
@@ -530,13 +581,14 @@ router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> =
     subtotal += lineTotal;
     orderItems.push({
       id: mi.id, menuItemId: mi.id, name: mi.name, price, quantity: qty,
-      variant: item.variant, addons: item.addons, notes: item.notes, course: item.course ?? "main", subtotal: lineTotal,
+      variant: item.variant, addons: item.addons, notes: item.notes, course: item.course ?? "main",
+      taxCategory: mi.taxCategory ?? "food", subtotal: lineTotal,
     });
   }
   if (!orderItems.length) { res.status(400).json({ error: "Menu items no longer available" }); return; }
 
-  // Same rate as a first order at this venue — a reorder is not taxed differently.
-  const tax = round2(subtotal * (await taxRateFor(original.restaurantId)));
+  // Same treatment as a first order at this venue — a reorder is not taxed differently.
+  const tax = (await taxForOrderItems(original.restaurantId, orderItems)).tax;
   const total = round2(subtotal + tax);
   const prepMinutes = Math.min(45, Math.max(15, orderItems.reduce((s, i) => s + (Number(i.quantity) ?? 1) * 5, 10)));
 

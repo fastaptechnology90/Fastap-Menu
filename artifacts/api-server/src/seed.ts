@@ -797,12 +797,12 @@ export async function runSeed() {
   console.log("Ensured hardware devices (kiosks + POS)");
 
   await setSettingsSection(restaurant.id, "trainingVideos", [
-    { id: "V01", title: "POS System Training — Complete Guide", duration: "18 min", category: "operations", views: 12, completions: 8, level: "required", thumbnail: "POS", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    { id: "V02", title: "Food Safety: Handling Raw & Cooked Items", duration: "12 min", category: "safety", views: 16, completions: 15, level: "required", thumbnail: "FOOD", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    { id: "V03", title: "Customer Greeting & Table Etiquette", duration: "8 min", category: "service", views: 14, completions: 11, level: "required", thumbnail: "SVC", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    { id: "V04", title: "How to Handle Customer Complaints", duration: "10 min", category: "service", views: 10, completions: 7, level: "recommended", thumbnail: "CHAT", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    { id: "V05", title: "Fire Extinguisher & Emergency Procedures", duration: "6 min", category: "safety", views: 18, completions: 18, level: "required", thumbnail: "SAFE", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-    { id: "V06", title: "Upselling & Revenue-Building Techniques", duration: "15 min", category: "sales", views: 8, completions: 4, level: "recommended", thumbnail: "SALE", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+    { id: "V01", title: "POS System Training — Complete Guide", duration: "18 min", category: "operations", views: 12, completions: 8, level: "required", thumbnail: "POS", videoUrl: null },
+    { id: "V02", title: "Food Safety: Handling Raw & Cooked Items", duration: "12 min", category: "safety", views: 16, completions: 15, level: "required", thumbnail: "FOOD", videoUrl: null },
+    { id: "V03", title: "Customer Greeting & Table Etiquette", duration: "8 min", category: "service", views: 14, completions: 11, level: "required", thumbnail: "SVC", videoUrl: null },
+    { id: "V04", title: "How to Handle Customer Complaints", duration: "10 min", category: "service", views: 10, completions: 7, level: "recommended", thumbnail: "CHAT", videoUrl: null },
+    { id: "V05", title: "Fire Extinguisher & Emergency Procedures", duration: "6 min", category: "safety", views: 18, completions: 18, level: "required", thumbnail: "SAFE", videoUrl: null },
+    { id: "V06", title: "Upselling & Revenue-Building Techniques", duration: "15 min", category: "sales", views: 8, completions: 4, level: "recommended", thumbnail: "SALE", videoUrl: null },
   ]);
   console.log("Ensured training videos");
 

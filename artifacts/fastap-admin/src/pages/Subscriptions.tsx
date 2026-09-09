@@ -2,15 +2,17 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { PageHeader } from "@/components/shared/Page";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Link } from "wouter";
-import { Check, Users, TrendingUp, Loader2, RefreshCcw, AlertTriangle, Pause, Play, ArrowUp, ArrowDown, Layers } from "lucide-react";
+import { Check, Users, TrendingUp, Loader2, RefreshCcw, AlertTriangle, Pause, Play, ArrowUp, Layers } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,22 +57,12 @@ export default function Subscriptions() {
   const planCounts = plans.map((p: any) => ({
     ...p,
     count: subs.filter((s: any) => s.plan === p.id).length,
-    color: p.id === "enterprise" ? "text-orange-500" : p.id === "pro" ? "text-purple-500" : p.id === "starter" ? "text-blue-500" : "text-muted-foreground",
   }));
 
   const activeCount = subs.filter((s: any) => s.status === "Active").length;
   const trialCount = subs.filter((s: any) => s.plan === "free" && s.status === "Active").length;
   const cancelledCount = subs.filter((s: any) => s.status === "Canceled" || s.status === "Cancelled").length;
   const mrr = subs.filter((s: any) => s.status === "Active").reduce((sum: number, s: any) => sum + (s.amount || 0), 0);
-
-  const expiringSoon = subs
-    .filter((s: any) => s.status === "Active" && s.renewal)
-    .map((s: any) => {
-      const daysLeft = Math.ceil((new Date(s.renewal).getTime() - Date.now()) / 86400000);
-      return { ...s, name: s.vendorName, daysLeft, mrr: s.amount };
-    })
-    .filter((s: any) => s.daysLeft >= 0 && s.daysLeft <= 14)
-    .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
 
   const handleAction = (vendor: any, type: string) => {
     setActionVendor(vendor);
@@ -92,39 +84,56 @@ export default function Subscriptions() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Subscription & SaaS Management</h2><p className="text-muted-foreground">Manage vendor plans, lifecycle, and recurring billing.</p></div>
-        <div className="flex gap-2">
-          <Link href="/plans"><Button variant="outline" size="sm"><Layers className="mr-2 h-4 w-4" /> Plan Builder</Button></Link>
-          <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCcw className="mr-2 h-4 w-4" /> Refresh</Button>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Subscriptions"
+        description="Which plan every venue is on, and the monthly value of those plans."
+        actions={
+          <>
+            <Link href="/plans"><Button variant="outline" size="sm"><Layers className="mr-2 h-4 w-4" /> Plan builder</Button></Link>
+            <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCcw className="mr-2 h-4 w-4" /> Refresh</Button>
+          </>
+        }
+      />
+
+      {/* Every field on a row here is derived on read: `status` means "not suspended",
+          `renewal` is the venue's signup date plus 30 days and never advances, and
+          `autoRenew` is the active flag under another name. No subscription payment has
+          ever been recorded, so the MRR below is contracted value, not money received. */}
+      <Alert variant="warning">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>These rows are derived, not billed</AlertTitle>
+        <AlertDescription>
+          There is no subscription ledger behind this screen. Status means the venue is switched on,
+          the renewal date is signup plus 30 days and does not move, and nothing renews on its own.
+          The MRR figure is the value of the plans venues are assigned, not money collected.
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title="Active vendors" value={activeCount} icon={<Users />} />
+        <KpiCard title="On the free plan" value={trialCount} icon={<TrendingUp />} />
+        <KpiCard title="Switched off" value={cancelledCount} icon={<AlertTriangle />} />
+        <KpiCard title="Contracted MRR" value={`₹${mrr.toLocaleString("en-IN")}`} icon={<TrendingUp />} subtitle="Plan value, not collected" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Active Subscriptions" value={activeCount} icon={<Users className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Trial (Free) Vendors" value={trialCount} icon={<TrendingUp className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="Cancelled" value={cancelledCount} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Monthly MRR" value={`₹${mrr.toLocaleString("en-IN")}`} icon={<TrendingUp className="h-4 w-4 text-green-500" />} />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {planCounts.map((plan: any) => (
-          <Card key={plan.id} className={plan.id === "pro" ? "border-primary/50 ring-1 ring-primary/20" : ""}>
+          <Card key={plan.id}>
             <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className={`text-base ${plan.color}`}>{plan.name}</CardTitle>
-                <Badge variant={plan.id === "pro" ? "default" : "secondary"} className="text-xs">{plan.count} vendors</Badge>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm">{plan.name}</CardTitle>
+                <Badge variant="muted">{plan.count} {plan.count === 1 ? "vendor" : "vendors"}</Badge>
               </div>
               <CardDescription>
-                <span className="text-2xl font-bold text-foreground">₹{plan.price}</span>
+                <span className="text-2xl font-semibold tabular-nums text-foreground">₹{plan.price.toLocaleString("en-IN")}</span>
                 {plan.price > 0 && <span className="text-xs text-muted-foreground"> /month</span>}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-1.5 text-xs">
                 {(plan.features as string[] || []).slice(0, 5).map((f, i) => (
-                  <li key={i} className="flex items-center text-muted-foreground"><Check className="mr-2 h-3 w-3 text-primary flex-shrink-0" />{f}</li>
+                  <li key={i} className="flex items-center text-muted-foreground"><Check className="mr-2 h-3 w-3 shrink-0 text-primary" />{f}</li>
                 ))}
               </ul>
             </CardContent>
@@ -133,49 +142,33 @@ export default function Subscriptions() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Expiring Soon</CardTitle>
-          <CardDescription>Subscriptions renewing in the next 14 days</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-sm">All vendor subscriptions</CardTitle></CardHeader>
         <CardContent>
-          {expiringSoon.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No subscriptions expiring in the next 14 days.</p>
+          {isLoading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : subs.length === 0 ? (
+            <EmptyState title="No vendors yet" description="Vendors appear here as soon as they are onboarded." />
           ) : (
-            <div className="space-y-3">
-              {expiringSoon.map((v: any) => (
-                <div key={v.vendorId} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium text-sm">{v.name}</p>
-                    <p className="text-xs text-muted-foreground">Renews in <span className="text-red-500 font-semibold">{v.daysLeft} days</span> · ₹{v.mrr}/mo</p>
-                  </div>
-                  <Button size="sm" className="text-xs" onClick={() => handleAction(v, "renew")}>Renew Now</Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>All Vendor Subscriptions</CardTitle></CardHeader>
-        <CardContent>
-          {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : (
             <DataTable data={subs} pageSize={10} columns={[
               { header: "Vendor", cell: (row: any) => <span className="font-medium">{row.vendorName}</span> },
               { header: "Plan", cell: (row: any) => <Badge variant="outline" className="capitalize">{row.plan}</Badge> },
-              { header: "Amount", cell: (row: any) => <span className="font-medium">{row.amount > 0 ? `₹${row.amount}/mo` : "Free"}</span> },
-              { header: "Renewal", cell: (row: any) => <span className="text-sm text-muted-foreground">{row.renewal}</span> },
+              { header: "Amount", cell: (row: any) => <span className="tabular-nums font-medium">{row.amount > 0 ? `₹${row.amount.toLocaleString("en-IN")}/mo` : "Free"}</span> },
+              // Header says "derived": this is signup + 30 days for every venue, not a
+              // date anything bills on. The old column read as a real renewal schedule.
+              { header: "Renews (derived)", cell: (row: any) => <span className="text-sm tabular-nums text-muted-foreground">{row.renewal}</span> },
               { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
-              { header: "Auto-Renew", cell: (row: any) => <Switch checked={row.autoRenew} disabled title="Follows the subscription status — pause or resume to change it" /> },
+              // Was a checked Switch for every row, which asserted automatic renewal for
+              // vendors that nothing renews.
+              { header: "Renewal", cell: () => <Badge variant="muted">Manual</Badge> },
               { header: "Actions", cell: (row: any) => (
-                <div className="flex gap-1 flex-wrap">
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleAction(row, "upgrade")} title="Change plan"><ArrowUp className="h-3 w-3" /></Button>
+                <div className="flex flex-wrap gap-1">
+                  <Button size="icon-sm" variant="ghost" onClick={() => handleAction(row, "upgrade")} title="Change plan" aria-label={`Change ${row.vendorName}'s plan`}><ArrowUp className="h-3.5 w-3.5" /></Button>
                   {row.status === "Active" ? (
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-yellow-500" onClick={() => handleAction(row, "pause")} title="Pause"><Pause className="h-3 w-3" /></Button>
+                    <Button size="icon-sm" variant="ghost" onClick={() => handleAction(row, "pause")} title="Pause" aria-label={`Pause ${row.vendorName}`}><Pause className="h-3.5 w-3.5" /></Button>
                   ) : (
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-green-500" onClick={() => handleAction(row, "resume")} title="Resume"><Play className="h-3 w-3" /></Button>
+                    <Button size="icon-sm" variant="ghost" onClick={() => handleAction(row, "resume")} title="Resume" aria-label={`Resume ${row.vendorName}`}><Play className="h-3.5 w-3.5" /></Button>
                   )}
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-primary" onClick={() => handleAction(row, "renew")} title="Renew"><RefreshCcw className="h-3 w-3" /></Button>
+                  <Button size="icon-sm" variant="ghost" onClick={() => handleAction(row, "renew")} title="Renew" aria-label={`Renew ${row.vendorName}`}><RefreshCcw className="h-3.5 w-3.5" /></Button>
                 </div>
               )},
             ]} />
@@ -186,15 +179,15 @@ export default function Subscriptions() {
       <Dialog open={!!actionVendor} onOpenChange={() => setActionVendor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="capitalize">{actionType} Subscription — {actionVendor?.vendorName}</DialogTitle>
+            <DialogTitle className="capitalize">{actionType} subscription — {actionVendor?.vendorName}</DialogTitle>
           </DialogHeader>
           {(actionType === "upgrade" || actionType === "downgrade") && (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Current plan: <Badge variant="outline" className="capitalize ml-1">{actionVendor?.plan}</Badge></p>
+              <p className="text-sm text-muted-foreground">Current plan: <Badge variant="outline" className="ml-1 capitalize">{actionVendor?.plan}</Badge></p>
               <Select value={selectedPlan} onValueChange={setSelectedPlan}>
                 <SelectTrigger><SelectValue placeholder="Select new plan" /></SelectTrigger>
                 <SelectContent>
-                  {plans.filter((p: any) => p.isPublished !== false).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — ₹{p.price}/mo</SelectItem>)}
+                  {plans.filter((p: any) => p.isPublished !== false).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name} — ₹{p.price.toLocaleString("en-IN")}/mo</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -202,7 +195,7 @@ export default function Subscriptions() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionVendor(null)}>Cancel</Button>
             <Button onClick={confirmAction} disabled={actionMutation.isPending || planUnchanged}>
-              {actionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {actionMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Confirm
             </Button>
           </DialogFooter>

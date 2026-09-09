@@ -55,6 +55,7 @@ import {
 import {
   calcCommissionAmount,
   calcNetPayout,
+  calcNetPosition,
   isPaidOrder,
   isRefundedOrder,
   orderCommissionBase,
@@ -140,9 +141,22 @@ export async function getCommissionRate(): Promise<number> {
   return val?.defaultCommission ?? DEFAULT_SETTINGS.defaultCommission;
 }
 
-export async function computeVendorSettlement(restaurantId: number, commissionRate: number) {
-  const vendorOrders = await db.select().from(ordersTable)
-    .where(eq(ordersTable.restaurantId, restaurantId));
+/**
+ * What a venue is owed for one trading period.
+ *
+ * `since` is the end of the last payout that was actually released. Without it this summed
+ * the venue's whole history every time it ran, so releasing a payout and recomputing
+ * produced a new one that included everything already paid.
+ */
+export async function computeVendorSettlement(
+  restaurantId: number,
+  commissionRate: number,
+  period?: { since?: Date | null; until?: Date | null },
+) {
+  const bounds = [eq(ordersTable.restaurantId, restaurantId)];
+  if (period?.since) bounds.push(gte(ordersTable.createdAt, period.since));
+  if (period?.until) bounds.push(lte(ordersTable.createdAt, period.until));
+  const vendorOrders = await db.select().from(ordersTable).where(and(...bounds));
 
   const paidOrders = vendorOrders.filter(isPaidOrder);
   const gross = sumOrderTotals(paidOrders);
@@ -152,11 +166,14 @@ export async function computeVendorSettlement(restaurantId: number, commissionRa
     .filter(isRefundedOrder)
     .reduce((s, o) => s + orderGrossTotal(o), 0);
 
-  const refundRows = await db.select().from(platformRefundsTable)
-    .where(and(
-      eq(platformRefundsTable.restaurantId, restaurantId),
-      inArray(platformRefundsTable.status, ["completed", "approved", "processed"]),
-    ));
+  const refundBounds = [
+    eq(platformRefundsTable.restaurantId, restaurantId),
+    inArray(platformRefundsTable.status, ["completed", "approved", "processed"]),
+  ];
+  // A refund belongs to the period it was actually paid out in, not when it was asked for.
+  if (period?.since) refundBounds.push(gte(platformRefundsTable.requestedAt, period.since));
+  if (period?.until) refundBounds.push(lte(platformRefundsTable.requestedAt, period.until));
+  const refundRows = await db.select().from(platformRefundsTable).where(and(...refundBounds));
   const refundsFromTable = refundRows.reduce((s, r) => s + parseMoney(r.amount), 0);
   const refunds = roundMoney(Math.max(refundsFromOrders, refundsFromTable));
 
@@ -168,7 +185,27 @@ export async function computeVendorSettlement(restaurantId: number, commissionRa
   const penalties = roundMoney(penaltyRows.reduce((s, p) => s + parseMoney(p.amount), 0));
 
   const finalPayout = calcNetPayout(gross, commission, refunds, penalties);
-  return { gross, commission, refunds, penalties, finalPayout };
+  // The un-floored figure. Below zero the venue owes the platform, and flooring it at zero
+  // is how ~₹2,900 of platform receivable used to vanish with no alert and no balance.
+  const netPosition = calcNetPosition(gross, commission, refunds, penalties);
+  return {
+    gross, commission, refunds, penalties, finalPayout, netPosition,
+    shortfall: netPosition < 0 ? roundMoney(Math.abs(netPosition)) : 0,
+    periodStart: period?.since ?? null,
+    periodEnd: period?.until ?? null,
+  };
+}
+
+/** Where this venue's next payout period starts: the end of the last one actually released. */
+export async function settlementPeriodStart(restaurantId: number): Promise<Date | null> {
+  const [last] = await db.select().from(platformSettlementsTable)
+    .where(and(
+      eq(platformSettlementsTable.restaurantId, restaurantId),
+      eq(platformSettlementsTable.status, "released"),
+    ))
+    .orderBy(desc(platformSettlementsTable.releasedAt))
+    .limit(1);
+  return last?.periodEnd ?? last?.releasedAt ?? null;
 }
 
 export async function getSubscriptionMrr(): Promise<number> {
@@ -582,17 +619,30 @@ export async function getRevenueTimeSeries(months = 12) {
     }));
 }
 
-export async function listPayments(limit = 100, status?: string) {
+/**
+ * `scope` narrows the rows in SQL before the limit is applied. Master Search needs that:
+ * filtering a page of the newest transactions can only ever find what happens to be on
+ * that page.
+ */
+export async function listPayments(
+  limit = 100,
+  status?: string,
+  scope?: { restaurantIds?: number[]; orderIds?: number[] },
+) {
   const commissionRate = await getCommissionRate();
-  let query = db.select({
+  const base = db.select({
     order: ordersTable,
     restaurantName: restaurantsTable.name,
   }).from(ordersTable)
-    .innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
-    .orderBy(desc(ordersTable.createdAt))
-    .limit(limit);
+    .innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id));
 
-  const rows = await query;
+  const scoped = scope?.orderIds?.length
+    ? base.where(inArray(ordersTable.id, scope.orderIds))
+    : scope?.restaurantIds?.length
+      ? base.where(inArray(ordersTable.restaurantId, scope.restaurantIds))
+      : base;
+
+  const rows = await scoped.orderBy(desc(ordersTable.createdAt)).limit(limit);
   return rows
     .filter(r => !status || r.order.paymentStatus === status || r.order.status === status)
     .map(({ order, restaurantName }) => {
@@ -639,8 +689,12 @@ export async function syncPendingSettlements() {
   const cycle = settings.payoutCycle || "weekly";
 
   for (const r of restaurants) {
-    const { gross, commission, refunds, penalties, finalPayout } = await computeVendorSettlement(r.id, commissionRate);
-    if (gross <= 0) continue;
+    // Only what has traded since the last released payout. Recomputing used to re-bill the
+    // platform for the venue's entire history, so every release paid for it again.
+    const since = await settlementPeriodStart(r.id);
+    const { gross, commission, refunds, penalties, finalPayout } =
+      await computeVendorSettlement(r.id, commissionRate, { since });
+    if (gross <= 0 && refunds <= 0 && penalties <= 0) continue;
 
     const [existing] = await db.select().from(platformSettlementsTable)
       .where(and(eq(platformSettlementsTable.restaurantId, r.id), eq(platformSettlementsTable.status, "pending")));
@@ -652,6 +706,7 @@ export async function syncPendingSettlements() {
         refunds: String(refunds),
         penalties: String(penalties),
         finalPayout: String(finalPayout),
+        periodStart: since,
         cycle,
       }).where(eq(platformSettlementsTable.id, existing.id));
       continue;
@@ -665,6 +720,7 @@ export async function syncPendingSettlements() {
       refunds: String(refunds),
       penalties: String(penalties),
       finalPayout: String(finalPayout),
+      periodStart: since,
       status: "pending",
       dueDate: new Date(Date.now() + 7 * 86400000),
     });
@@ -689,8 +745,14 @@ export async function listSettlements() {
     refunds: parseMoney(settlement.refunds),
     penalties: parseMoney(settlement.penalties),
     finalPayout: parseMoney(settlement.finalPayout),
+    // A payout floored at zero hides a venue that owes the platform. Both figures are
+    // carried so the screen can show the debt instead of a silent 0.
+    netPosition: parseMoney(settlement.grossSales) - parseMoney(settlement.commission)
+      - parseMoney(settlement.refunds) - parseMoney(settlement.penalties),
     status: settlement.status,
     cycle: settlement.cycle,
+    periodStart: settlement.periodStart?.toISOString() ?? null,
+    periodEnd: settlement.periodEnd?.toISOString() ?? null,
     dueDate: settlement.dueDate?.toISOString() ?? new Date().toISOString(),
     holdReason: settlement.holdReason,
   }));
@@ -949,13 +1011,18 @@ export async function getTaxReports(months = 6) {
     .orderBy(sql`to_char(${ordersTable.createdAt}, 'YYYY-MM') DESC`)
     .limit(months);
 
-  return rows.map((r, i) => {
+  return rows.map((r) => {
     const d = r.month ? new Date(`${r.month}-01`) : new Date();
     return {
       month: d.toLocaleString("default", { month: "long", year: "numeric" }),
+      period: r.month ?? "",
       totalSales: parseMoney(r.totalSales ?? 0),
       taxCollected: parseMoney(r.taxCollected ?? 0),
-      status: i === 0 ? "Pending" : "Filed",
+      // Every month but the newest used to be labelled "Filed". Nothing on the platform
+      // records a GST return, so that green badge was an invented compliance claim on a
+      // screen an accountant would take at face value. Report the figures; say plainly
+      // that the filing itself is not tracked here.
+      status: "Not tracked",
     };
   });
 }
@@ -1339,8 +1406,11 @@ export async function listAdminSessions() {
   }
 }
 
-export async function revokeAdminSession(sessionId: string) {
-  await pool.query(`DELETE FROM user_sessions WHERE sid = $1`, [sessionId]);
+/** True when a session row was actually removed, so the caller can tell a real
+ *  revocation from a no-op on an id that is not in the session store. */
+export async function revokeAdminSession(sessionId: string): Promise<boolean> {
+  const result = await pool.query(`DELETE FROM user_sessions WHERE sid = $1`, [sessionId]);
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function getWebhooks() {
@@ -1400,9 +1470,23 @@ export async function masterSearch(query: string) {
     r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q) || String(r.id) === q,
   ).slice(0, 10).map(r => ({ id: r.id, name: r.name, plan: r.plan, isActive: r.isActive }));
 
-  const payments = (await listPayments(50)).filter(p =>
-    p.id.toLowerCase().includes(q) || p.vendorName.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q),
-  ).slice(0, 10);
+  // Payments were filtered out of the newest 50 rows platform-wide, so a search for a
+  // venue with 44 transactions returned none as soon as other venues had 50 newer ones.
+  // Gather candidates in SQL — the matching vendors' own payments, plus any transaction
+  // whose number is in the query — then match over that.
+  const idInQuery = Number(q.replace(/[^0-9]/g, ""));
+  const pool = [
+    ...(vendorHits.length ? await listPayments(50, undefined, { restaurantIds: vendorHits.map(v => v.id) }) : []),
+    ...(Number.isFinite(idInQuery) && idInQuery > 0 ? await listPayments(2, undefined, { orderIds: [idInQuery] }) : []),
+    ...await listPayments(50),
+  ];
+  const seenPayments = new Set<string>();
+  const payments = pool.filter(p => {
+    if (seenPayments.has(p.id)) return false;
+    if (!(p.id.toLowerCase().includes(q) || p.vendorName.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q))) return false;
+    seenPayments.add(p.id);
+    return true;
+  }).slice(0, 10);
 
   const refunds = await db.select().from(platformRefundsTable).orderBy(desc(platformRefundsTable.requestedAt)).limit(100);
   const refundHits = refunds.filter(r => String(r.id).includes(q) || r.status.includes(q)).slice(0, 8).map(r => ({

@@ -56,7 +56,7 @@ export function MenuFilterSheet({
     <div className="guest-sheet-overlay" onClick={onClose}>
       <div className="guest-sheet guest-sheet--tall" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-display font-bold text-base">Filters & sort</h3>
+          <h3 className="font-display font-semibold text-base">Filters & sort</h3>
           <button type="button" onClick={onClose} className="menu-icon-btn">
             <X className="h-5 w-5" />
           </button>
@@ -165,7 +165,7 @@ export function ActiveFilterChips({
       {chips.map(chip => (
         <span key={chip} className="active-filter-chip">{chip}</span>
       ))}
-      <button type="button" onClick={onClear} className="text-xs text-orange-400 shrink-0 font-medium">
+      <button type="button" onClick={onClear} className="text-xs text-primary shrink-0 font-medium">
         Clear all
       </button>
     </div>

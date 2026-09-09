@@ -12,6 +12,7 @@ import { Eye, FileCheck, XCircle, RotateCcw, Search, Loader2, FileText } from "l
 import { api, type KYCRecord } from "@/lib/apiClient";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
+import { PageHeader } from "@/components/shared/Page";
 
 // Renders a KYC document preview. A real uploaded image has a long base64 payload;
 // dummy / truncated uploads (e.g. "data:image/png;base64,iVBOR") or broken files can't
@@ -30,15 +31,15 @@ function DocPreview({ d }: { d: any }) {
   }
   if (isImg) {
     return (
-      <div className="rounded border border-dashed border-yellow-500/40 bg-yellow-500/5 p-4 text-center">
-        <p className="text-xs font-medium text-yellow-600">Image preview not available</p>
+      <div className="rounded border border-dashed border-warning-border bg-warning-subtle p-4 text-center">
+        <p className="text-xs font-medium text-warning">Image preview not available</p>
         <p className="text-[11px] text-muted-foreground mt-1">The uploaded file looks empty or corrupted. Reject it and ask the vendor to re-upload a clear photo/scan.</p>
-        <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-blue-500 underline mt-2">Try opening it ↗</a>
+        <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-info underline mt-2">Try opening it ↗</a>
       </div>
     );
   }
   if (isPdf) return <iframe src={url} title={d.type} className="w-full h-64 rounded border bg-white" />;
-  return <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-blue-500 underline">Open document ↗</a>;
+  return <a href={url} target="_blank" rel="noreferrer" className="inline-block text-xs text-info underline">Open document ↗</a>;
 }
 
 export default function KYC() {
@@ -103,17 +104,20 @@ export default function KYC() {
       return rank(a.status) - rank(b.status) || new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
     });
   const DocStatus = ({ status }: { status: string }) => {
-    const color = status === "Verified" ? "text-green-500" : status === "Pending" ? "text-yellow-500" : status === "Rejected" ? "text-red-500" : "text-gray-400";
+    const color = status === "Verified" ? "text-success" : status === "Pending" ? "text-warning" : status === "Rejected" ? "text-danger" : "text-muted-foreground";
     return <span className={`text-xs font-medium ${color}`}>{status}</span>;
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div><h2 className="text-2xl font-bold tracking-tight">KYC & Compliance</h2><p className="text-muted-foreground">Review new restaurant registrations and approve owners before they can access the dashboard.</p></div>
+    <div className="space-y-6">
+      <PageHeader
+        title="KYC & Compliance"
+        description="Review new restaurant registrations and approve owners before they can access the dashboard."
+      />
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Pending Review" value={kycData.filter(k => k.status === "Pending Review").length} icon={<RotateCcw className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Approved" value={kycData.filter(k => k.status === "Approved").length} icon={<FileCheck className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Action Required" value={kycData.filter(k => k.status === "Action Required").length} icon={<XCircle className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Pending Review" value={kycData.filter(k => k.status === "Pending Review").length} icon={<RotateCcw className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Approved" value={kycData.filter(k => k.status === "Approved").length} icon={<FileCheck className="h-4 w-4 text-success" />} />
+        <KpiCard title="Action Required" value={kycData.filter(k => k.status === "Action Required").length} icon={<XCircle className="h-4 w-4 text-danger" />} />
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -144,9 +148,9 @@ export default function KYC() {
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" title="View documents" onClick={() => openDocs(row.vendorId, row.vendorName)}><FileText className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" title="View application" onClick={() => setLocation(`/vendors/${row.vendorId}`)}><Eye className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-green-500" title="Approve All" disabled={row.status === "Approved"} onClick={() => approveMutation.mutate(row.id)}><FileCheck className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-red-500" title="Reject" onClick={() => { setRejectDialog({ open: true, id: row.id, name: row.vendorName }); setRejectReason(""); }}><XCircle className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-yellow-500" title="Request Re-upload" onClick={() => requestMoreMutation.mutate(row.id)}><RotateCcw className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-success" title="Approve All" disabled={row.status === "Approved"} onClick={() => approveMutation.mutate(row.id)}><FileCheck className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-danger" title="Reject" onClick={() => { setRejectDialog({ open: true, id: row.id, name: row.vendorName }); setRejectReason(""); }}><XCircle className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-warning" title="Request Re-upload" onClick={() => requestMoreMutation.mutate(row.id)}><RotateCcw className="h-4 w-4" /></Button>
                 </div>
               )},
             ]} />
@@ -186,8 +190,8 @@ export default function KYC() {
                     </div>
                     <DocPreview d={d} />
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="text-green-600 border-green-500/30" disabled={d.status === "Verified"} onClick={() => verifyDoc(d.id, "verified")}><FileCheck className="h-3.5 w-3.5 mr-1" /> Approve</Button>
-                      <Button size="sm" variant="outline" className="text-red-500 border-red-500/30" disabled={d.status === "Rejected"} onClick={() => verifyDoc(d.id, "rejected")}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
+                      <Button size="sm" variant="outline" className="text-success border-success-border" disabled={d.status === "Verified"} onClick={() => verifyDoc(d.id, "verified")}><FileCheck className="h-3.5 w-3.5 mr-1" /> Approve</Button>
+                      <Button size="sm" variant="outline" className="text-danger border-danger-border" disabled={d.status === "Rejected"} onClick={() => verifyDoc(d.id, "rejected")}><XCircle className="h-3.5 w-3.5 mr-1" /> Reject</Button>
                     </div>
                   </div>
                 );

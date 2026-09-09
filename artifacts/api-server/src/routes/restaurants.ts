@@ -263,6 +263,77 @@ router.put("/restaurants/:restaurantId/settings/app", requireAuth, async (req, r
   res.json(merged);
 });
 
+/**
+ * The venue's tax settings.
+ *
+ * Its GST rate, GSTIN and legal name had no route at all — they could only be set with a
+ * direct database edit — while every bill and every tax invoice is built from them. The
+ * liquor rate is new: alcohol sits outside GST in India and carries state excise/VAT
+ * instead, at a rate that differs by state, so there is no honest default. Until a venue
+ * sets one, alcohol is billed at 0% rather than being swept into GST, because collecting
+ * GST on a non-GST supply is what makes a tax invoice a false document.
+ */
+router.get("/restaurants/:restaurantId/settings/billing", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  const billing = await getSettingsSection(id, "billing", {}) as Record<string, unknown>;
+  const taxPercent = Number(billing.taxPercent);
+  const liquorTaxPercent = Number(billing.liquorTaxPercent);
+  res.json({
+    gstin: (billing.gstin as string) ?? null,
+    legalName: (billing.legalName as string) ?? null,
+    address: (billing.address as string) ?? null,
+    taxPercent: Number.isFinite(taxPercent) && taxPercent > 0 ? taxPercent : 5,
+    taxPercentIsDefault: !(Number.isFinite(taxPercent) && taxPercent > 0),
+    liquorTaxPercent: Number.isFinite(liquorTaxPercent) && liquorTaxPercent > 0 ? liquorTaxPercent : 0,
+    /** False means alcohol on this menu is currently billed with no excise or VAT at all. */
+    liquorTaxConfigured: Number.isFinite(liquorTaxPercent) && liquorTaxPercent > 0,
+  });
+});
+
+router.put("/restaurants/:restaurantId/settings/billing", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.restaurantId), 10);
+  const restaurant = await getAccessibleRestaurant(req, id);
+  if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
+
+  const current = await getSettingsSection(id, "billing", {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...current };
+
+  if (req.body.gstin !== undefined) {
+    const gstin = String(req.body.gstin ?? "").trim().toUpperCase();
+    // A malformed GSTIN on a tax invoice is worse than none: it names a registration that
+    // does not exist. Empty clears it, and the invoice then says "not registered for GST".
+    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/.test(gstin)) {
+      res.status(400).json({ error: "That is not a valid GSTIN. It is 15 characters, e.g. 29AABCT1234M1Z5." });
+      return;
+    }
+    merged.gstin = gstin || null;
+  }
+  if (req.body.legalName !== undefined) merged.legalName = String(req.body.legalName ?? "").trim() || null;
+  if (req.body.address !== undefined) merged.address = String(req.body.address ?? "").trim() || null;
+
+  if (req.body.taxPercent !== undefined) {
+    const rate = parseFloat(String(req.body.taxPercent));
+    if (!Number.isFinite(rate) || rate < 0 || rate > 40) {
+      res.status(400).json({ error: "GST rate must be between 0 and 40 percent." });
+      return;
+    }
+    merged.taxPercent = rate;
+  }
+  if (req.body.liquorTaxPercent !== undefined) {
+    const rate = parseFloat(String(req.body.liquorTaxPercent));
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      res.status(400).json({ error: "Liquor excise/VAT must be between 0 and 100 percent." });
+      return;
+    }
+    merged.liquorTaxPercent = rate;
+  }
+
+  await setSettingsSection(id, "billing", merged);
+  res.json(merged);
+});
+
 router.put("/restaurants/:restaurantId/settings/white-label", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);

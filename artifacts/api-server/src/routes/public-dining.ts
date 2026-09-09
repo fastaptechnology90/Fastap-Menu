@@ -2,6 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, restaurantsTable, ordersTable } from "@workspace/db";
 import { taxRateFor, round2 } from "../lib/order-pricing.js";
+import { loadOwnedOrder } from "../lib/guest-order-access.js";
+import { isCashPaymentMethod, isOnlinePaymentMethod } from "../lib/payment-gateway.js";
+import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 
 const router: IRouter = Router();
 
@@ -115,18 +118,117 @@ router.post("/public/dining/split-bill", async (req, res): Promise<void> => {
   res.json({ mode: mode === "item_wise" ? "item_wise" : "equal", subtotal, gst, total, splits, splitCount });
 });
 
-router.post("/public/dining/group-payment", (req, res) => {
-  const total = parseFloat(String(req.body.total ?? 0));
-  const payments = Array.isArray(req.body.payments) ? req.body.payments as { method: string; amount: number }[] : [];
-  const paid = payments.reduce((s, p) => s + parseFloat(String(p.amount ?? 0)), 0);
-  const remaining = Math.max(0, total - paid);
+/**
+ * Settle one bill between several people.
+ *
+ * This route was a calculator wearing a payment's clothes. It named no order, it took
+ * the bill total straight from the request body, it wrote to no table, and it answered
+ * `complete: true` whenever the numbers it had been handed added up. Post
+ * `{"total": 10, "payments": [{"method":"upi","amount":10}]}` against a ₹235.20 bill and
+ * it agreed the table was settled. Four friends each paid their share on their own
+ * phone, the screen said the bill was done, and the venue had collected nothing and had
+ * no record that anyone had tried.
+ *
+ * The amount owed now comes from the order, the caller has to own that order, a short
+ * payment is refused, and the split is written onto the order the same way a single
+ * payment is — so the floor, the bill and the books all agree.
+ */
+router.post("/public/dining/group-payment", async (req, res): Promise<void> => {
+  const orderId = parseInt(String(req.body.orderId ?? 0), 10);
+  if (!orderId) {
+    res.status(400).json({ error: "orderId is required — a payment has to be against a bill." });
+    return;
+  }
+
+  const order = await loadOwnedOrder(req, orderId);
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (order.paymentStatus === "paid") {
+    res.status(409).json({ error: "This bill has already been settled.", paymentStatus: order.paymentStatus });
+    return;
+  }
+
+  const rawPayments = Array.isArray(req.body.payments) ? req.body.payments as { method?: string; amount?: unknown; name?: string }[] : [];
+  if (!rawPayments.length) {
+    res.status(400).json({ error: "Add at least one share before settling the bill." });
+    return;
+  }
+
+  const payments: { method: string; amount: number; name?: string }[] = [];
+  for (const p of rawPayments) {
+    const amount = parseFloat(String(p.amount ?? 0));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ error: "Every share needs an amount greater than zero." });
+      return;
+    }
+    const method = String(p.method ?? "cash");
+    // Same rule as the single-payment route: money only moves over the counter or
+    // through a confirmed gateway charge. A method name on its own settles nothing.
+    if (!isCashPaymentMethod(method)) {
+      res.status(402).json({
+        error: isOnlinePaymentMethod(method)
+          ? "Online payment is not set up yet. Each person can pay their share at the counter."
+          : "That payment method is not available yet. Please pay at the counter.",
+        paymentStatus: "pending",
+      });
+      return;
+    }
+    payments.push({ method, amount: round2(amount), name: p.name ? String(p.name).slice(0, 60) : undefined });
+  }
+
+  // The bill is what the order says it is, plus any tip already recorded against it.
+  const due = round2(parseFloat(String(order.total ?? 0)) + parseFloat(String(order.tipAmount ?? 0)));
+  const paid = round2(payments.reduce((s, p) => s + p.amount, 0));
+  const remaining = round2(Math.max(0, due - paid));
+
+  if (remaining >= 0.01) {
+    res.status(400).json({
+      error: `The shares add up to ₹${paid.toFixed(2)} but the bill is ₹${due.toFixed(2)}. ₹${remaining.toFixed(2)} is still to be covered.`,
+      total: due, paid, remaining, complete: false,
+    });
+    return;
+  }
+
+  const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;
+  const billing = {
+    ...(typeof meta.billing === "object" && meta.billing !== null ? meta.billing as object : {}),
+    paymentMethod: "split",
+    processedAt: new Date().toISOString(),
+    splitPayment: { enabled: true, splits: payments, total: due, collected: paid },
+  };
+
+  // Cash — which is all this can be until a gateway is configured — is collected at the
+  // counter, so the bill is marked awaiting collection, never "paid". Saying "paid" here
+  // is the fake success screen this route used to be.
+  const paymentStatus = "pending";
+
+  const [updated] = await db.update(ordersTable).set({
+    paymentMethod: "split",
+    paymentStatus,
+    // Nothing has been collected yet, so no invoice number is drawn: one used to be
+    // stamped here on a bill that was still awaiting payment at the counter.
+    metadata: { ...meta, billing },
+  }).where(eq(ordersTable.id, orderId)).returning();
+
+  // Nothing is booked to Finance while the money is still to be handed over; the ledger
+  // row follows when the counter marks the order paid. Kept explicit so the next person
+  // does not have to guess why there is no income row.
+  if (updated.paymentStatus === "paid") {
+    await recordOrderPaymentInLedger({ restaurantId: order.restaurantId, order: updated, method: "split" });
+  }
+
   res.json({
-    total,
+    orderId,
+    total: due,
     paid,
-    remaining,
-    complete: remaining < 0.01,
+    remaining: 0,
+    complete: true,
+    recorded: true,
+    paymentStatus,
+    invoiceNumber: updated.invoiceNumber,
     payments,
-    change: paid > total ? Math.round((paid - total) * 100) / 100 : 0,
+    change: round2(Math.max(0, paid - due)),
+    message: "Each share is recorded against this bill. Please settle at the counter — the total is now on your table's bill.",
   });
 });
 

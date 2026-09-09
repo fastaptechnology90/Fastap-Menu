@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
 
 type Props = { children: ReactNode; page?: string };
 type State = { error: Error | null };
@@ -18,13 +19,13 @@ export class RestaurantPageErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="restaurant-panel flex flex-col items-center justify-center min-h-[40vh] p-8 text-center">
-          <p className="text-4xl mb-3">⚠️</p>
-          <h2 className="text-lg font-bold mb-2">This page failed to load</h2>
-          <p className="text-sm text-white/50 max-w-md mb-4">{this.state.error.message}</p>
+          <AlertTriangle className="h-9 w-9 mb-3 text-danger" aria-hidden="true" />
+          <h2 className="text-lg font-semibold mb-2">This page failed to load</h2>
+          <p className="text-sm text-muted-foreground max-w-md mb-4">{this.state.error.message}</p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-semibold"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold"
           >
             Try again
           </button>

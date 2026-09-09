@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCsv } from "@/lib/download";
+import { PageHeader } from "@/components/shared/Page";
 
 const severityVariant: Record<string, "destructive" | "outline" | "secondary"> = {
   critical: "destructive",
@@ -65,25 +66,25 @@ export default function AuditLogs() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Audit Logs</h2>
-          <p className="text-muted-foreground">Immutable record of all system and administrative actions.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Audit Logs"
+        description="Immutable record of all system and administrative actions."
+        actions={
+          <>
+            <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Logs" value={logs.length} icon={<Activity className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Today" value={todayCount} icon={<Info className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="Warnings" value={warningCount} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Critical" value={criticalCount} icon={<Shield className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Today" value={todayCount} icon={<Info className="h-4 w-4 text-info" />} />
+        <KpiCard title="Warnings" value={warningCount} icon={<AlertTriangle className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Critical" value={criticalCount} icon={<Shield className="h-4 w-4 text-danger" />} />
       </div>
 
       <Card>

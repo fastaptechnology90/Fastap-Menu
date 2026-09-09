@@ -47,10 +47,20 @@ export function isPaidOrder(order: OrderLike): boolean {
   return ps === "paid" || ps === "success";
 }
 
+/**
+ * Was money given back on this order?
+ *
+ * This used to answer yes for every cancelled order, paid or not. A guest changing their
+ * mind before anything was charged therefore reduced the restaurant's payout by the full
+ * value of the order — 44 orders totalling ₹4,518.15 across the platform were cancelled,
+ * never paid and never refunded, and every one of them was deducted. Nothing can be given
+ * back that was never taken, so a cancellation only counts once the order was settled.
+ */
 export function isRefundedOrder(order: OrderLike): boolean {
   const ps = String(order.paymentStatus ?? "").toLowerCase();
   const st = String(order.status ?? "").toLowerCase();
-  return ps === "refunded" || st === "cancelled";
+  if (ps === "refunded" || ps === "partially_refunded") return true;
+  return st === "cancelled" && (ps === "paid" || ps === "success");
 }
 
 export function calcCommissionAmount(order: OrderLike, ratePercent: number): number {
@@ -58,13 +68,28 @@ export function calcCommissionAmount(order: OrderLike, ratePercent: number): num
   return roundMoney(orderCommissionBase(order) * (ratePercent / 100));
 }
 
+/**
+ * What the platform actually transfers. Never negative — you cannot send a venue minus
+ * money — but the floor is why a venue that owes the platform used to disappear without
+ * trace. `calcNetPosition` is the un-floored figure; anything below zero is a receivable
+ * and is carried on the settlement so it can be seen and chased.
+ */
 export function calcNetPayout(
   gross: number,
   commission: number,
   refunds = 0,
   penalties = 0,
 ): number {
-  return roundMoney(Math.max(0, gross - commission - refunds - penalties));
+  return roundMoney(Math.max(0, calcNetPosition(gross, commission, refunds, penalties)));
+}
+
+export function calcNetPosition(
+  gross: number,
+  commission: number,
+  refunds = 0,
+  penalties = 0,
+): number {
+  return roundMoney(gross - commission - refunds - penalties);
 }
 
 export function sumOrderTotals(orders: OrderLike[]): number {

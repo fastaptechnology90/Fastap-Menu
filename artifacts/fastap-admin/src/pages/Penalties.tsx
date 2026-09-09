@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DollarSign, RefreshCw, Plus, Loader2, Search, ShieldBan } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Penalties() {
   const { toast } = useToast();
@@ -60,98 +61,98 @@ export default function Penalties() {
   const applied = penalties.filter((p: any) => norm(p.status) === "Applied").length;
 
   const reasonColor: Record<string, string> = {
-    "Fake Refund": "bg-red-500/10 text-red-400",
-    "Compliance Issue": "bg-orange-500/10 text-orange-400",
-    "Cash Mismatch": "bg-yellow-500/10 text-yellow-400",
-    "Fraud Activity": "bg-red-600/10 text-red-500",
-    "SLA Breach": "bg-purple-500/10 text-purple-400",
-    "Policy Violation": "bg-blue-500/10 text-blue-400",
+    "Fake Refund": "bg-danger-subtle text-danger",
+    "Compliance Issue": "bg-warning-subtle text-warning",
+    "Cash Mismatch": "bg-warning-subtle text-warning",
+    "Fraud Activity": "bg-danger-subtle text-danger",
+    "SLA Breach": "bg-muted text-muted-foreground",
+    "Policy Violation": "bg-info-subtle text-info",
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Penalty & Fine Management</h2>
-          <p className="text-muted-foreground">Apply penalties for fake refunds, compliance issues, and fraud activity.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Penalty & Fine Management"
+        description="Apply penalties for fake refunds, compliance issues, and fraud activity."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button variant="destructive"><Plus className="mr-2 h-4 w-4" /> Apply Penalty</Button>
+            <Button variant="destructive"><Plus className="mr-2 h-4 w-4" /> Apply Penalty</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Apply Penalty / Fine</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  {/* Picked from the real vendor list — a typed name that matched nothing used to
-                      be charged to whichever vendor happened to be first. */}
-                  <Select
-                    value={form.vendorId}
-                    onValueChange={v => setForm(f => ({
-                      ...f, vendorId: v,
-                      vendorName: (vendors as any[]).find((x: any) => String(x.id) === v)?.name ?? "",
-                    }))}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Choose vendor…" /></SelectTrigger>
-                    <SelectContent>
-                      {(vendors as any[]).map((v: any) => (
-                        <SelectItem key={v.id} value={String(v.id)}>{v.name} (#{v.id})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Penalty Reason</Label>
-                  <Select value={form.reason} onValueChange={v => setForm(f => ({ ...f, reason: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {["Fake Refund", "Compliance Issue", "Cash Mismatch", "Fraud Activity", "SLA Breach", "Policy Violation"].map(r => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Penalty Amount (₹)</Label>
-                    <Input type="number" placeholder="e.g. 500" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required min="1" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Deduct From</Label>
-                    <Select value={form.deductFrom} onValueChange={v => setForm(f => ({ ...f, deductFrom: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="wallet">Wallet</SelectItem>
-                        <SelectItem value="settlement">Settlement</SelectItem>
-                        <SelectItem value="freeze">Freeze Payouts</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Internal Notes</Label>
-                  <Textarea placeholder="Reason for penalty (internal)..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
-                </div>
-                <Button type="submit" variant="destructive" className="w-full" disabled={createMutation.isPending || !form.vendorId || !form.amount}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldBan className="mr-2 h-4 w-4" />}
-                  Apply Penalty
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Apply Penalty / Fine</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+            <Label>Vendor</Label>
+            {/* Picked from the real vendor list — a typed name that matched nothing used to
+            be charged to whichever vendor happened to be first. */}
+            <Select
+            value={form.vendorId}
+            onValueChange={v => setForm(f => ({
+            ...f, vendorId: v,
+            vendorName: (vendors as any[]).find((x: any) => String(x.id) === v)?.name ?? "",
+            }))}
+            >
+            <SelectTrigger><SelectValue placeholder="Choose vendor…" /></SelectTrigger>
+            <SelectContent>
+            {(vendors as any[]).map((v: any) => (
+            <SelectItem key={v.id} value={String(v.id)}>{v.name} (#{v.id})</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Penalty Reason</Label>
+            <Select value={form.reason} onValueChange={v => setForm(f => ({ ...f, reason: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Fake Refund", "Compliance Issue", "Cash Mismatch", "Fraud Activity", "SLA Breach", "Policy Violation"].map(r => (
+            <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Penalty Amount (₹)</Label>
+            <Input type="number" placeholder="e.g. 500" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required min="1" />
+            </div>
+            <div className="space-y-2">
+            <Label>Deduct From</Label>
+            <Select value={form.deductFrom} onValueChange={v => setForm(f => ({ ...f, deductFrom: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="wallet">Wallet</SelectItem>
+            <SelectItem value="settlement">Settlement</SelectItem>
+            <SelectItem value="freeze">Freeze Payouts</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Internal Notes</Label>
+            <Textarea placeholder="Reason for penalty (internal)..." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
+            </div>
+            <Button type="submit" variant="destructive" className="w-full" disabled={createMutation.isPending || !form.vendorId || !form.amount}>
+            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldBan className="mr-2 h-4 w-4" />}
+            Apply Penalty
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Total Penalties" value={penalties.length} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Total Amount" value={`₹${totalPenalties.toLocaleString("en-IN")}`} icon={<DollarSign className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="Reversed" value={reversed} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Applied" value={applied} icon={<ShieldBan className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Total Penalties" value={penalties.length} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Total Amount" value={`₹${totalPenalties.toLocaleString("en-IN")}`} icon={<DollarSign className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Reversed" value={reversed} icon={<AlertTriangle className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Applied" value={applied} icon={<ShieldBan className="h-4 w-4 text-success" />} />
       </div>
 
       <Card>
@@ -167,13 +168,18 @@ export default function Penalties() {
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
-            <DataTable data={filtered} pageSize={10} columns={[
+            <DataTable
+              data={filtered}
+              pageSize={10}
+              emptyMessage="No penalties applied"
+              emptyDescription="Penalties are raised by hand from this screen; nothing applies one automatically."
+              columns={[
               { header: "ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
               { header: "Vendor", cell: (row: any) => <span className="font-medium">{row.vendorName}</span> },
               { header: "Reason", cell: (row: any) => (
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${reasonColor[row.reason] || "bg-muted text-muted-foreground"}`}>{row.reason}</span>
               )},
-              { header: "Amount", cell: (row: any) => <span className="font-bold text-red-400">₹{row.amount?.toLocaleString("en-IN")}</span> },
+              { header: "Amount", cell: (row: any) => <span className="font-bold text-danger">₹{row.amount?.toLocaleString("en-IN")}</span> },
               { header: "Deducted From", cell: (row: any) => <Badge variant="outline" className="text-xs capitalize">{row.deductFrom}</Badge> },
               { header: "Applied At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.appliedAt).toLocaleString()}</span> },
               { header: "Applied By", cell: (row: any) => <span className="text-sm">{row.appliedBy}</span> },
@@ -182,7 +188,7 @@ export default function Penalties() {
               )},
               { header: "Action", cell: (row: any) => (
                 norm(row.status) === "Applied" && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-yellow-400" disabled={reverseMutation.isPending} onClick={() => reverseMutation.mutate(row.id)}>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-warning" disabled={reverseMutation.isPending} onClick={() => reverseMutation.mutate(row.id)}>
                     Reverse
                   </Button>
                 )
