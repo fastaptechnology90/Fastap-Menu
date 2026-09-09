@@ -2,22 +2,17 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiCard } from "@/components/shared/KpiCard";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { PageHeader } from "@/components/shared/Page";
+import { PageHeader, Section } from "@/components/shared/Page";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Users, CreditCard, ShoppingCart, AlertTriangle, Building2, Activity,
-  Server, Cpu, Loader2, RefreshCw, Download, Ticket,
-  TrendingUp, Wallet, RotateCcw, IndianRupee, Search,
+  AlertTriangle, Building2, Activity, Loader2, RefreshCw, Download, CreditCard,
+  IndianRupee, Search, CheckCircle2, ShieldAlert, Ticket, RotateCcw, Wallet, FileCheck,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -36,15 +31,14 @@ function ymd(d: Date) {
  * settled, it read "₹500 · 81 orders in range" — the ₹500 was an event advance and no
  * order had contributed a rupee. `revenue` is the sum of three separate books (orders,
  * spa, events) and `totalOrders` counts orders *placed*, paid or not, so the parts are
- * now shown next to the total and the count says what it counts.
+ * shown next to the total and the count says what it counts.
  */
-function GrossTakings() {
+function GrossTakings({ commission }: { commission: number }) {
   const today = new Date();
   const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d; };
   const PRESETS: { key: string; label: string; from?: string; to?: string }[] = [
     { key: "today", label: "Today", from: ymd(today), to: ymd(today) },
     { key: "7d", label: "7 days", from: ymd(daysAgo(6)), to: ymd(today) },
-    { key: "15d", label: "15 days", from: ymd(daysAgo(14)), to: ymd(today) },
     { key: "30d", label: "30 days", from: ymd(daysAgo(29)), to: ymd(today) },
     { key: "all", label: "All time" },
   ];
@@ -58,11 +52,10 @@ function GrossTakings() {
     if (p.to) setTo(p.to);
   }
   const isAll = preset === "all";
-  const params = isAll ? {} : { from, to };
 
   const { data, isFetching, isError, refetch } = useQuery({
     queryKey: ["superadmin-revenue", isAll ? "all" : from, isAll ? "all" : to],
-    queryFn: () => api.dashboard.revenue(params),
+    queryFn: () => api.dashboard.revenue(isAll ? {} : { from, to }),
   });
 
   const parts = [
@@ -73,53 +66,59 @@ function GrossTakings() {
 
   return (
     <Card>
-      <CardContent className="py-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 lg:w-72">
-            <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-              <IndianRupee className="h-3.5 w-3.5" />
-              Gross takings {data?.from ? `${data.from}${data.to && data.to !== data.from ? ` to ${data.to}` : ""}` : "(all time)"}
-            </p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">
-              {isFetching ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : fmtINRFull(data?.revenue ?? 0)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Money taken by the venues. The platform's own income is the commission below.
-            </p>
-          </div>
-
-          <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-3">
-            {parts.map(p => (
-              <div key={p.label} className="rounded-md border px-3 py-2">
-                <p className="text-xs text-muted-foreground">{p.label}</p>
-                <p className="text-sm font-medium tabular-nums">{fmtINRFull(p.value ?? 0)}</p>
-              </div>
+      <CardContent className="space-y-4 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+            <IndianRupee className="h-3.5 w-3.5" />
+            What came in · {data?.from ? `${data.from}${data.to && data.to !== data.from ? ` to ${data.to}` : ""}` : "all time"}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {PRESETS.map(p => (
+              <Button key={p.key} variant={preset === p.key ? "default" : "outline"} size="sm" onClick={() => applyPreset(p)}>{p.label}</Button>
             ))}
-            <p className="text-xs text-muted-foreground sm:col-span-3">
-              {(data?.totalOrders ?? 0).toLocaleString()} orders placed in this range, paid or not.
-            </p>
-          </div>
-
-          <div className="space-y-2 lg:w-64 lg:shrink-0">
-            <div className="flex flex-wrap gap-1.5">
-              {PRESETS.map(p => (
-                <Button key={p.key} variant={preset === p.key ? "default" : "outline"} size="sm" onClick={() => applyPreset(p)}>{p.label}</Button>
-              ))}
-              <Button variant={preset === "custom" ? "default" : "outline"} size="sm" onClick={() => setPreset("custom")}>Custom</Button>
-            </div>
-            {preset === "custom" && (
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-xs text-muted-foreground" htmlFor="takings-from">From</label>
-                <Input id="takings-from" type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className="h-9 w-auto" />
-                <label className="text-xs text-muted-foreground" htmlFor="takings-to">To</label>
-                <Input id="takings-to" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="h-9 w-auto" />
-              </div>
-            )}
+            <Button variant={preset === "custom" ? "default" : "outline"} size="sm" onClick={() => setPreset("custom")}>Custom</Button>
           </div>
         </div>
 
+        {preset === "custom" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-muted-foreground" htmlFor="takings-from">From</label>
+            <Input id="takings-from" type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className="h-9 w-auto" />
+            <label className="text-xs text-muted-foreground" htmlFor="takings-to">To</label>
+            <Input id="takings-to" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="h-9 w-auto" />
+          </div>
+        )}
+
+        {/* The two numbers a platform owner confuses: what the venues took, and what the
+            platform earned from it. They sit side by side, labelled, at the same size. */}
+        <div className="grid gap-4 border-y py-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Taken by the venues</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">
+              {isFetching ? <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /> : fmtINRFull(data?.revenue ?? 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {(data?.totalOrders ?? 0).toLocaleString()} orders placed in this range, paid or not.
+            </p>
+          </div>
+          <div className="sm:border-l sm:pl-4">
+            <p className="text-xs text-muted-foreground">Earned by the platform</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-success">{fmtINRFull(commission)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Commission on settled orders, all time.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {parts.map(p => (
+            <div key={p.label} className="rounded-md border px-3 py-2">
+              <p className="text-xs text-muted-foreground">{p.label}</p>
+              <p className="text-sm font-medium tabular-nums">{fmtINRFull(p.value ?? 0)}</p>
+            </div>
+          ))}
+        </div>
+
         {isError && (
-          <Alert variant="destructive" className="mt-4">
+          <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Takings could not be loaded</AlertTitle>
             <AlertDescription className="flex flex-wrap items-center gap-3">
@@ -142,6 +141,28 @@ function payLabel(mode?: string) {
   return PAY_LABEL[m] ?? (mode ? String(mode).toUpperCase() : "—");
 }
 
+/** One line of the morning queue: a count, what it means, and where to go and fix it. */
+function QueueRow({ icon: Icon, count, label, detail, href, action, tone }: {
+  icon: typeof AlertTriangle; count: number; label: string; detail: string;
+  href: string; action: string; tone: "danger" | "warning";
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-0">
+      <span className={tone === "danger"
+        ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-danger-subtle text-danger"
+        : "flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-warning-subtle text-warning"}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="text-xl font-semibold tabular-nums">{count}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </div>
+      <Link href={href}><Button variant="outline" size="sm">{action}</Button></Link>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -149,68 +170,17 @@ export default function Dashboard() {
   const [txnSearch, setTxnSearch] = useState("");
 
   const { data: stats, isLoading, isError: statsError, refetch, isFetching } = useQuery({
-    queryKey: ["superadmin-stats"],
-    queryFn: api.dashboard.stats,
-    refetchInterval: 60_000,
+    queryKey: ["superadmin-stats"], queryFn: api.dashboard.stats, refetchInterval: 60_000,
   });
-
-  // The lifetime figure on this screen comes from the same endpoint as the card above,
-  // so the two agree by construction. `stats.totalRevenue` counts orders and spa but
-  // NOT event advances, which put a ₹98,965 tile directly beneath a ₹470,465 headline.
-  const { data: lifetime } = useQuery({
-    queryKey: ["superadmin-revenue", "all", "all"],
-    queryFn: () => api.dashboard.revenue({}),
-  });
-
   const { data: payments = [] } = useQuery({
-    queryKey: ["superadmin-payments"],
-    queryFn: () => api.payments.list({ limit: 20 }),
-    staleTime: 30_000,
+    queryKey: ["superadmin-payments"], queryFn: () => api.payments.list({ limit: 20 }), staleTime: 30_000,
   });
+  const { data: refunds = [] } = useQuery({ queryKey: ["refunds"], queryFn: api.refunds.list, staleTime: 30_000 });
+  const { data: fraudAlerts = [] } = useQuery({ queryKey: ["fraud"], queryFn: api.fraud.list, staleTime: 60_000 });
+  const { data: revenueData = [] } = useQuery({ queryKey: ["revenue-series"], queryFn: api.analytics.revenueSeries, staleTime: 120_000 });
+  const { data: extended } = useQuery({ queryKey: ["analytics-extended"], queryFn: api.analytics.extended, staleTime: 120_000 });
 
-  const { data: refunds = [] } = useQuery({
-    queryKey: ["refunds"],
-    queryFn: api.refunds.list,
-    staleTime: 30_000,
-  });
-
-  const { data: fraudAlerts = [] } = useQuery({
-    queryKey: ["fraud"],
-    queryFn: api.fraud.list,
-    staleTime: 60_000,
-  });
-
-  const { data: infraMetrics } = useQuery({
-    queryKey: ["metrics"],
-    queryFn: api.metrics.get,
-    refetchInterval: 30_000,
-  });
-
-  const { data: revenueData = [] } = useQuery({
-    queryKey: ["revenue-series"],
-    queryFn: api.analytics.revenueSeries,
-    staleTime: 120_000,
-  });
-
-  const { data: liveFeed } = useQuery({
-    queryKey: ["live-feed"],
-    queryFn: api.liveFeed.get,
-    refetchInterval: 20_000,
-  });
-
-  // New restaurant registrations waiting for KYC review — surfaced as a banner below.
-  const { data: kycData = [] } = useQuery({
-    queryKey: ["kyc"],
-    queryFn: api.kyc.list,
-    refetchInterval: 30_000,
-  });
-  const pendingRegistrations = kycData.filter((k: any) => k.status === "Pending Review").length;
-
-  const refreshAll = () => {
-    refetch();
-    qc.invalidateQueries();
-    toast({ title: "Dashboard refreshed" });
-  };
+  const refreshAll = () => { refetch(); qc.invalidateQueries(); toast({ title: "Dashboard refreshed" }); };
 
   const exportReport = async () => {
     try {
@@ -224,37 +194,47 @@ export default function Dashboard() {
 
   const pendingRefunds = refunds.filter(r => r.status === "Pending" || r.status === "pending").length;
   const activeFraud = fraudAlerts.filter(a => a.status === "Active" || a.status === "active").length;
+  const pendingKyc = stats?.pendingKycVendors ?? 0;
+  const heldSettlements = stats?.heldSettlements ?? 0;
+  const failedPayments = stats?.failedPayments ?? 0;
+  const openTickets = stats?.totalSupportTickets ?? 0;
+
+  // The morning queue: only the rows that actually want a decision today. A tile reading
+  // "0 pending refunds" is not information, so nothing at zero is drawn at all.
+  const queue = [
+    pendingKyc > 0 && { icon: FileCheck, count: pendingKyc, label: "Venues waiting to be approved", detail: "Their owners cannot sign in until KYC is reviewed.", href: "/kyc", action: "Review", tone: "warning" as const },
+    activeFraud > 0 && { icon: ShieldAlert, count: activeFraud, label: "Open fraud alerts", detail: "Repeated payment failures tripped the risk rule.", href: "/fraud", action: "Investigate", tone: "danger" as const },
+    pendingRefunds > 0 && { icon: RotateCcw, count: pendingRefunds, label: "Refunds awaiting a decision", detail: "Money is not returned to the guest until one of these is approved.", href: "/refunds", action: "Decide", tone: "warning" as const },
+    heldSettlements > 0 && { icon: Wallet, count: heldSettlements, label: "Settlements on hold", detail: "Payouts a venue is owed but is not receiving.", href: "/settlements", action: "Release", tone: "warning" as const },
+    failedPayments > 0 && { icon: CreditCard, count: failedPayments, label: "Failed payments", detail: "Orders where the guest's money never arrived.", href: "/payments", action: "Open", tone: "danger" as const },
+    openTickets > 0 && { icon: Ticket, count: openTickets, label: "Open support tickets", detail: "Raised by venues and not yet closed.", href: "/support", action: "Open", tone: "warning" as const },
+  ].filter(Boolean) as Parameters<typeof QueueRow>[0][];
+
+  const estate = [
+    { label: "Venues on the platform", value: stats?.totalRestaurants ?? 0, detail: `${stats?.activeRestaurants ?? 0} trading · ${stats?.inactiveRestaurants ?? 0} not trading` },
+    { label: "On a paid plan", value: stats?.activeSubscriptions ?? 0, detail: `${stats?.enterpriseVendors ?? 0} enterprise · ${stats?.trialVendors ?? 0} on trial` },
+    { label: "Orders all time", value: (stats?.totalOrders ?? 0).toLocaleString(), detail: `${(stats?.totalBookings ?? 0).toLocaleString()} bookings · ${(stats?.totalCustomers ?? 0).toLocaleString()} guests` },
+    { label: "Payment success", value: `${stats?.paymentSuccessRate ?? 100}%`, detail: `${failedPayments} failed` },
+  ];
+
+  const churnRisk = extended?.forecastSummary?.churnRiskMrr ?? 0;
+  const atRiskVendors = extended?.churnRiskVendors ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Mission Control"
-        description="Live platform metrics and the indicators worth acting on."
+        title="Platform overview"
+        description="What needs a decision this morning, what came in, and who is paying."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={refreshAll} disabled={isFetching}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+              <RefreshCw className={isFetching ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} /> Refresh
             </Button>
             <Button variant="outline" size="sm" onClick={exportReport}><Download className="mr-2 h-4 w-4" /> Export</Button>
             <Link href="/live-monitoring"><Button size="sm"><Activity className="mr-2 h-4 w-4" /> Live panel</Button></Link>
           </>
         }
       />
-
-      {pendingRegistrations > 0 && (
-        <Alert variant="warning">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>
-            {pendingRegistrations} new restaurant {pendingRegistrations === 1 ? "request is" : "requests are"} waiting for KYC review
-          </AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center gap-3">
-            Review the documents and approve so the owner can sign in.
-            <Link href="/kyc"><Button variant="outline" size="sm">Review now</Button></Link>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <GrossTakings />
 
       {statsError && (
         <Alert variant="destructive">
@@ -267,32 +247,47 @@ export default function Dashboard() {
         </Alert>
       )}
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiCard title="Vendors" value={stats?.totalRestaurants.toLocaleString() ?? "—"} icon={<Building2 />} subtitle={`${stats?.activeRestaurants ?? 0} active · ${stats?.trialVendors ?? 0} trial`} />
-            <KpiCard title="Enterprise" value={String(stats?.enterpriseVendors ?? 0)} icon={<TrendingUp />} subtitle={`${stats?.inactiveRestaurants ?? 0} inactive`} />
-            <KpiCard title="Gross takings" value={fmtINR(lifetime?.revenue ?? 0)} icon={<IndianRupee />} subtitle="All venues, all time" />
-            <KpiCard title="Commission earned" value={fmtINR(stats?.platformCommission ?? 0)} icon={<Wallet />} subtitle="The platform's own income" />
-            <KpiCard title="Orders" value={stats?.totalOrders.toLocaleString() ?? "—"} icon={<ShoppingCart />} subtitle={`${stats?.totalBookings ?? 0} bookings`} />
-            <KpiCard title="Customers" value={stats?.totalCustomers?.toLocaleString() ?? "—"} icon={<Users />} subtitle={`${(stats?.totalQrScans ?? 0).toLocaleString()} QR scans`} />
-          </div>
+      {/* 1 — What needs you. The screen opens with the answer, not with tiles. */}
+      <Section title="Needs a decision" description="Everything here is stopping someone from trading, being paid, or being helped.">
+        <Card>
+          {isLoading ? (
+            <CardContent className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent>
+          ) : queue.length === 0 ? (
+            <CardContent className="flex items-center gap-3 py-6">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              <div>
+                <p className="text-sm font-medium">Nothing is waiting on you</p>
+                <p className="text-xs text-muted-foreground">No approvals, refunds, held payouts, fraud alerts or open tickets.</p>
+              </div>
+            </CardContent>
+          ) : (
+            <div>{queue.map(q => <QueueRow key={q.label} {...q} />)}</div>
+          )}
+        </Card>
+      </Section>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <KpiCard title="Active subs" value={String(stats?.activeSubscriptions ?? 0)} icon={<RotateCcw />} />
-            <KpiCard title="Pending settlements" value={String(stats?.pendingSettlements ?? 0)} icon={<Wallet />} subtitle={`${stats?.heldSettlements ?? 0} held`} />
-            <KpiCard title="Payment success" value={`${stats?.paymentSuccessRate ?? 100}%`} icon={<TrendingUp />} subtitle={`${stats?.failedPayments ?? 0} failed`} />
-            <KpiCard title="Refunds" value={fmtINR(stats?.refundAmount ?? 0)} icon={<CreditCard />} subtitle={`${pendingRefunds} pending · chargebacks ${fmtINR(stats?.chargebackAmount ?? 0)}`} />
-            <KpiCard title="Pending KYC" value={String(stats?.pendingKycVendors ?? 0)} icon={<Building2 />} subtitle="Awaiting verification" />
-            <KpiCard title="Open tickets" value={String(stats?.totalSupportTickets ?? 0)} icon={<Ticket />} subtitle={`${activeFraud} active fraud alerts`} />
-          </div>
-        </>
-      )}
+      {/* 2 — What came in. */}
+      <Section title="Money">
+        <GrossTakings commission={stats?.platformCommission ?? 0} />
+      </Section>
 
-      <div className="grid gap-4 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+      {/* 3 — Who signed up and who is paying. */}
+      <Section title="The estate">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {estate.map(s => (
+            <Card key={s.label}>
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{s.label}</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{s.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{s.detail}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </Section>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-sm">Takings and commission by month</CardTitle></CardHeader>
           <CardContent className="pl-2">
             {revenueData.length === 0 ? (
@@ -320,140 +315,76 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-sm">
-              Infrastructure · {infraMetrics?.uptime ?? "—"}{infraMetrics?.estimated ? " (derived)" : ""}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { icon: Cpu, label: "CPU", value: infraMetrics?.cpu },
-              { icon: Server, label: "Memory", value: infraMetrics?.memory },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground"><Icon className="h-4 w-4" />{label}</span>
-                  <span className="font-medium tabular-nums">{value ?? "—"}%</span>
-                </div>
-                <Progress value={value ?? 0} className="h-2" />
-              </div>
-            ))}
-            <div className="grid grid-cols-2 gap-3 border-t pt-3 text-sm">
-              <div><p className="text-xs text-muted-foreground">API RPM</p><p className="font-medium tabular-nums">{infraMetrics?.apiRpm ?? "—"}</p></div>
-              <div><p className="text-xs text-muted-foreground">Queue</p><p className="font-medium tabular-nums">{infraMetrics?.queueDepth ?? "—"}</p></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Live payments</CardTitle></CardHeader>
-          <CardContent className="max-h-48 space-y-2 overflow-y-auto">
-            {(liveFeed?.payments ?? []).length === 0
-              ? <p className="py-6 text-center text-sm text-muted-foreground">Nothing taken yet today.</p>
-              : (liveFeed?.payments ?? []).slice(0, 6).map(p => (
-                <div key={p.id} className="flex justify-between border-b pb-1 text-xs">
-                  <span className="font-mono">{p.id}</span>
-                  <span className="tabular-nums">{fmtINRFull(p.amount)}</span>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Live refunds</CardTitle></CardHeader>
-          <CardContent className="max-h-48 space-y-2 overflow-y-auto">
-            {(liveFeed?.refunds ?? []).length === 0
-              ? <p className="py-6 text-center text-sm text-muted-foreground">No refunds raised.</p>
-              : (liveFeed?.refunds ?? []).slice(0, 6).map(r => (
-                <div key={r.id} className="flex justify-between border-b pb-1 text-xs">
-                  <span className="truncate">{r.vendor}</span>
-                  <span className="tabular-nums">{fmtINRFull(r.amount)}</span>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Live settlements</CardTitle></CardHeader>
-          <CardContent className="max-h-48 space-y-2 overflow-y-auto">
-            {(liveFeed?.settlements ?? []).length === 0
-              ? <p className="py-6 text-center text-sm text-muted-foreground">No settlements in flight.</p>
-              : (liveFeed?.settlements ?? []).slice(0, 6).map(s => (
-                <div key={s.id} className="flex items-center justify-between gap-2 border-b pb-1 text-xs">
-                  <span className="truncate">{s.vendor}</span>
-                  <StatusBadge status={s.status} />
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Recent transactions</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Open a transaction to see how it was paid, the UPI id or UTR, and who collected it.
-            </p>
-            <div className="relative mt-2">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={txnSearch}
-                onChange={e => setTxnSearch(e.target.value)}
-                placeholder="Search by vendor name"
-                aria-label="Search transactions by vendor name"
-                className="pl-9"
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const q = txnSearch.trim().toLowerCase();
-              const filtered = q ? payments.filter(p => String((p as any).vendorName ?? "").toLowerCase().includes(q)) : payments;
-              if (filtered.length === 0) {
-                return q
-                  ? <EmptyState tone="search" title="No matching transactions" description={`Nothing in the recent list matches "${txnSearch}".`} />
-                  : <EmptyState title="No transactions yet" description="Payments appear here as venues take money." />;
-              }
-              return (
-                <DataTable data={filtered.slice(0, q ? 20 : 5)} pageSize={q ? 10 : 5} onRowClick={row => setSelectedTxn(row)} columns={[
-                  { header: "ID", cell: row => <span className="font-mono text-xs">{row.id}</span> },
-                  { header: "Vendor", accessorKey: "vendorName" },
-                  { header: "Amount", cell: row => <span className="tabular-nums">{fmtINRFull(row.grossAmount)}</span> },
-                  { header: "Mode", cell: row => <span className="text-xs">{payLabel((row as any).paymentMode)}</span> },
-                  { header: "Status", cell: row => <StatusBadge status={row.status} /> },
-                ]} />
-              );
-            })()}
-          </CardContent>
-        </Card>
+        {/* 4 — What is at risk. Real plan prices from platform_plans, not a flat per-venue guess. */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <AlertTriangle className="h-4 w-4 text-danger" /> Fraud alerts
-            </CardTitle>
+            <CardTitle className="text-sm">Subscription revenue at risk</CardTitle>
+            <p className="text-xs text-muted-foreground">Monthly plan value of venues showing churn signals.</p>
           </CardHeader>
           <CardContent>
-            {fraudAlerts.length === 0 ? (
-              <EmptyState title="No fraud alerts" description="Nothing has tripped the fraud rules." />
-            ) : (
-              <DataTable data={fraudAlerts.slice(0, 5)} pageSize={5} columns={[
-                { header: "Vendor", accessorKey: "vendorName" },
-                { header: "Risk", cell: row => <span className={`tabular-nums font-medium ${row.riskScore > 80 ? "text-danger" : "text-warning"}`}>{row.riskScore}</span> },
-                { header: "Status", cell: row => <StatusBadge status={row.status} /> },
-              ]} />
-            )}
+            <p className="text-3xl font-semibold tabular-nums tracking-tight">{fmtINRFull(churnRisk)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {atRiskVendors.length === 0 ? "No venue is showing churn signals." : `across ${atRiskVendors.length} ${atRiskVendors.length === 1 ? "venue" : "venues"} · per month`}
+            </p>
+            <div className="mt-4 space-y-2">
+              {atRiskVendors.slice(0, 5).map((v: any) => (
+                <div key={v.name} className="flex items-center justify-between gap-2 border-b pb-2 last:border-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{v.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{(v.signals ?? []).join(" · ")}</p>
+                  </div>
+                  <span className="shrink-0 text-sm tabular-nums">{fmtINRFull(v.mrr ?? 0)}</span>
+                </div>
+              ))}
+            </div>
+            <Link href="/vendors"><Button variant="outline" size="sm" className="mt-3 w-full"><Building2 className="mr-2 h-4 w-4" /> Open vendors</Button></Link>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Recent transactions</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Open a transaction to see how it was paid, the UPI id or UTR, and who collected it.
+          </p>
+          <div className="relative mt-2 max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={txnSearch}
+              onChange={e => setTxnSearch(e.target.value)}
+              placeholder="Search by vendor name"
+              aria-label="Search transactions by vendor name"
+              className="pl-9"
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const q = txnSearch.trim().toLowerCase();
+            const filtered = q ? payments.filter(p => String((p as any).vendorName ?? "").toLowerCase().includes(q)) : payments;
+            if (filtered.length === 0) {
+              return q
+                ? <EmptyState tone="search" title="No matching transactions" description={`Nothing in the recent list matches "${txnSearch}".`} />
+                : <EmptyState title="No transactions yet" description="Payments appear here as venues take money." />;
+            }
+            return (
+              <DataTable data={filtered.slice(0, q ? 20 : 8)} pageSize={8} onRowClick={row => setSelectedTxn(row)} columns={[
+                { header: "ID", cell: row => <span className="font-mono text-xs">{row.id}</span> },
+                { header: "Vendor", accessorKey: "vendorName" },
+                { header: "Amount", cell: row => <span className="tabular-nums">{fmtINRFull(row.grossAmount)}</span> },
+                { header: "Mode", cell: row => <span className="text-xs">{payLabel((row as any).paymentMode)}</span> },
+                { header: "Status", cell: row => <StatusBadge status={row.status} /> },
+              ]} />
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       <Dialog open={!!selectedTxn} onOpenChange={open => { if (!open) setSelectedTxn(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" /> Transaction details
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Transaction details</DialogTitle>
           </DialogHeader>
           {selectedTxn && (
             <div className="space-y-3 text-sm">

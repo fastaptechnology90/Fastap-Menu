@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, orderAdjustments, restaurantApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -14,16 +14,28 @@ import {
 } from "@/components/restaurant/BillAdjustments";
 import {
   Receipt, CreditCard, Smartphone, Banknote, Wallet, Nfc,
-  Plus, Minus, Trash2, CheckCircle, Printer, Download, Search, X, ChevronLeft
+  Plus, Minus, CheckCircle, Printer, Download, Search, X, ChevronLeft, Users,
 } from "lucide-react";
 
+/* ────────────────────────────────────────────────────────────────────────────
+   Billing / POS
+
+   The till. Two panes from 1024px — the tabs a cashier picks from on the left,
+   the bill on the right — and below that the bill slides over the list as a
+   sheet. In both cases the total and the Collect button live in a pinned footer
+   that never scrolls away, because the one question this screen must always be
+   answering is "how much, and is it taken yet".
+   ──────────────────────────────────────────────────────────────────────────── */
+
 const PAYMENT_METHODS = [
-  { id: "upi", label: "UPI", icon: Smartphone, color: "text-info", bg: "bg-info-subtle" },
-  { id: "card", label: "Card", icon: CreditCard, color: "text-muted-foreground", bg: "bg-muted" },
-  { id: "cash", label: "Cash", icon: Banknote, color: "text-success", bg: "bg-success-subtle" },
-  { id: "wallet", label: "Wallet", icon: Wallet, color: "text-primary", bg: "bg-primary/20" },
-  { id: "nfc", label: "NFC Tap", icon: Nfc, color: "text-muted-foreground", bg: "bg-muted" },
+  { id: "upi",    label: "UPI",    icon: Smartphone },
+  { id: "card",   label: "Card",   icon: CreditCard },
+  { id: "cash",   label: "Cash",   icon: Banknote },
+  { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "nfc",    label: "NFC",    icon: Nfc },
 ];
+
+const REF_METHODS = ["upi", "card", "nfc"];
 
 interface BillItem {
   name: string;
@@ -61,8 +73,11 @@ function taxRateOf(order: { total: number; items: { qty: number; price: number; 
   return Number.isFinite(rate) && rate >= 0 && rate <= 0.3 ? rate : DEFAULT_TAX_RATE;
 }
 
+const money = (n: number) => `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moneyShort = (n: number) => `₹${Math.round(Number(n)).toLocaleString("en-IN")}`;
+
 export default function BillingPOS() {
-  const { liveOrders, tables, updateOrderStatus, refreshOrders, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
+  const { liveOrders, updateOrderStatus, refreshOrders, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
   const [selectedOrder, setSelectedOrder] = useState<typeof liveOrders[0] | null>(null);
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   // Bumped after every adjustment so the history under the bill refetches.
@@ -77,7 +92,6 @@ export default function BillingPOS() {
   // order record on any bill containing a drink. 0.05 is only the fallback for an
   // order whose own figures do not add up.
   const [taxRate, setTaxRate] = useState(DEFAULT_TAX_RATE);
-  const [coupon, setCoupon] = useState("");
   const [splitCount, setSplitCount] = useState(1);
   const [paid, setPaid] = useState(false);
   const [search, setSearch] = useState("");
@@ -148,6 +162,15 @@ export default function BillingPOS() {
   }, [restaurantId, settledCount]);
 
   const billableOrders = liveOrders.filter(o => ["preparing", "ready", "served", "accepted"].includes(o.status));
+  const visibleOrders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return billableOrders;
+    return billableOrders.filter(o =>
+      o.tableNo.toLowerCase().includes(q) ||
+      String(o.id).toLowerCase().includes(q) ||
+      (o.customerName || "").toLowerCase().includes(q),
+    );
+  }, [billableOrders, search]);
 
   function loadOrder(order: typeof liveOrders[0]) {
     setSelectedOrder(order);
@@ -165,6 +188,13 @@ export default function BillingPOS() {
     setPaid(false);
     setDiscount(0);
     setTip(0);
+    setSplitCount(1);
+  }
+
+  function closeBill() {
+    setSelectedOrder(null);
+    setPaid(false);
+    setBillItems([]);
   }
 
   /** Re-read the bill from the order the server just returned, flags and all. */
@@ -318,180 +348,314 @@ export default function BillingPOS() {
     }
   }
 
-  return (
-    <div className="flex h-full">
-      {/* Left: Order Selection */}
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Billing & POS</h1>
-          <div className="flex gap-1 bg-muted p-1 rounded-lg">
-            <button onClick={() => setTab("new")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "new" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Active Bills</button>
-            <button onClick={() => setTab("recent")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "recent" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Recent</button>
-          </div>
-        </div>
+  const panelOpen = Boolean(selectedOrder || paid);
+  const chip = "flex min-h-10 flex-1 items-center justify-center rounded-md border px-2 text-sm font-semibold transition-colors hover-elevate active-elevate-2";
+  const chipOn = "border-primary-border bg-primary text-primary-foreground";
+  const chipOff = "border-border bg-card text-muted-foreground";
 
-        {tab === "new" && (
-          <>
-            <RevenueByDate restaurantId={restaurantId} title="Collection" />
-            {/* Today's Summary */}
-            <div className="grid grid-cols-3 gap-3">
+  return (
+    <div className="flex h-full min-h-0">
+      {/* ── Left: what there is to bill ─────────────────────────────────── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="shrink-0 border-b border-border bg-card px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">Billing &amp; POS</h1>
+              <p className="text-xs text-muted-foreground">
+                {billableOrders.length} open {billableOrders.length === 1 ? "tab" : "tabs"} · pick one to bill it
+              </p>
+            </div>
+
+            {/* Today, at a glance. Three numbers, never a card wall. */}
+            <dl className="order-last flex w-full items-stretch gap-px overflow-hidden rounded-md border border-border bg-border sm:order-none sm:ml-auto sm:w-auto">
               {[
-                { label: "Today's Collection", value: `₹${todayStats.collection.toLocaleString("en-IN")}`, color: "text-success" },
-                { label: "Bills Generated", value: String(todayStats.bills), color: "text-info" },
-                { label: "Avg Bill Value", value: `₹${Math.round(todayStats.avgBill).toLocaleString("en-IN")}`, color: "text-primary" },
+                { label: "Collected", value: moneyShort(todayStats.collection), tone: "text-success" },
+                { label: "Bills", value: String(todayStats.bills), tone: "text-foreground" },
+                { label: "Avg bill", value: moneyShort(todayStats.avgBill), tone: "text-foreground" },
               ].map(s => (
-                <div key={s.label} className="rounded-lg bg-card border border-border p-3 text-center">
-                  <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+                <div key={s.label} className="flex-1 bg-card px-3 py-1.5 text-center sm:flex-none">
+                  <dd className={`text-base font-semibold tabular-nums ${s.tone}`}>{s.value}</dd>
+                  <dt className="text-2xs uppercase tracking-wide text-muted-foreground">{s.label}</dt>
                 </div>
               ))}
-            </div>
+            </dl>
+          </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search table..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {billableOrders.filter(o => !search || o.tableNo.toLowerCase().includes(search.toLowerCase())).map(order => (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-border bg-card p-0.5">
+              {([
+                { id: "new" as const, label: "Open tabs", count: billableOrders.length },
+                { id: "recent" as const, label: "Collected", count: recentBills.length },
+              ]).map(t => (
                 <button
-                  key={order.id}
-                  onClick={() => loadOrder(order)}
-                  className={`rounded-lg border p-4 text-left hover:border-primary/30 transition-colors ${selectedOrder?.id === order.id ? "border-primary/50 bg-primary/10" : "border-border bg-card"}`}
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  aria-pressed={tab === t.id}
+                  className={`flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors ${
+                    tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover-elevate"
+                  }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-lg">{order.tableNo}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === "ready" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning"}`}>{order.status}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-1">{order.items.map(i => `${i.qty}× ${i.name}`).join(", ")}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{order.guests} guests</span>
-                    <span className="font-semibold text-primary">₹{order.total}</span>
-                  </div>
+                  {t.label}
+                  <span className="text-2xs tabular-nums opacity-80">{t.count}</span>
                 </button>
               ))}
-              {billableOrders.length === 0 && (
-                <div className="col-span-2 text-center py-12 text-muted-foreground">
-                  <Receipt className="h-12 w-12 mx-auto mb-3" />
-                  <p>No active orders to bill</p>
-                </div>
-              )}
             </div>
-          </>
-        )}
 
-        {tab === "recent" && (
-          <div className="rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            {tab === "new" && (
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <input
+                  className="min-h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  placeholder="Table, order number or guest"
+                  aria-label="Search open tabs"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {tab === "new" ? (
+            <div className="space-y-6">
+              {visibleOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border px-6 py-14 text-center">
+                  <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <Receipt className="h-6 w-6" aria-hidden />
+                  </span>
+                  <h2 className="text-base font-semibold">
+                    {search ? "No open tab matches that" : "Nothing waiting to be billed"}
+                  </h2>
+                  <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                    {search
+                      ? "Clear the search to see every open tab."
+                      : "A tab appears here as soon as the kitchen accepts its first order."}
+                  </p>
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="mt-4 inline-flex min-h-10 items-center rounded-md border border-border bg-card px-4 text-sm font-semibold hover-elevate active-elevate-2"
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {visibleOrders.map(order => {
+                    const on = selectedOrder?.id === order.id;
+                    return (
+                      <li key={order.id}>
+                        <button
+                          type="button"
+                          onClick={() => loadOrder(order)}
+                          aria-pressed={on}
+                          className={`flex w-full flex-col gap-2 rounded-md border p-3 text-left transition-colors hover-elevate active-elevate-2 ${
+                            on ? "border-primary-border bg-primary/10" : "border-border bg-card"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="min-w-0">
+                              <span className="block truncate text-lg font-semibold leading-tight">{order.tableNo}</span>
+                              <span className="mt-0.5 block text-2xs text-muted-foreground">#{order.id}</span>
+                            </span>
+                            <span
+                              className={`shrink-0 rounded-pill px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ${
+                                order.status === "ready" ? "bg-success-subtle text-success"
+                                  : order.status === "served" ? "bg-info-subtle text-info"
+                                  : "bg-warning-subtle text-warning"
+                              }`}
+                            >
+                              {order.status}
+                            </span>
+                          </div>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
+                            {order.items.map(i => `${i.qty}× ${i.name}`).join(", ")}
+                          </p>
+                          <div className="flex items-baseline justify-between gap-2 border-t border-border pt-2">
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Users className="h-3.5 w-3.5" aria-hidden /> {order.guests}
+                            </span>
+                            <span className="text-base font-semibold tabular-nums">{moneyShort(order.total)}</span>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <RevenueByDate restaurantId={restaurantId} title="Collection" />
+            </div>
+          ) : (
+            <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-md border border-border">
+              <table className="w-full min-w-[38rem] text-sm">
+                <caption className="sr-only">Bills collected today. Select a row for payment details and refunds.</caption>
                 <thead>
-                  <tr className="border-b border-border bg-card text-xs text-muted-foreground">
-                    {["Bill ID", "Table", "Amount", "Method", "Time", "Status"].map(h => <th key={h} className="text-left px-4 py-3 font-medium">{h}</th>)}
+                  <tr className="border-b border-border bg-card text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th scope="col" className="px-3 py-2 font-medium">Bill</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Table</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Method</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Time</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {recentBills.map(bill => (
-                    <tr key={bill.id} onClick={() => setBillDetail(bill)} className="hover:bg-muted cursor-pointer" title="Click to view payment details">
-                      <td className="px-4 py-3 font-mono text-xs">{bill.id}</td>
-                      <td className="px-4 py-3 font-semibold">{bill.table}</td>
-                      <td className="px-4 py-3 font-semibold text-primary">₹{bill.amount.toLocaleString("en-IN")}</td>
-                      <td className="px-4 py-3 text-muted-foreground uppercase">{bill.method}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{bill.time}</td>
-                      <td className="px-4 py-3"><span className="text-xs bg-success-subtle text-success px-2 py-0.5 rounded-full">{bill.status}</span></td>
+                    <tr
+                      key={bill.id}
+                      onClick={() => setBillDetail(bill)}
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setBillDetail(bill); } }}
+                      className="cursor-pointer bg-card hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title="Payment details, reprint and refund"
+                    >
+                      <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{bill.id}</td>
+                      <td className="px-3 py-2.5 font-semibold">{bill.table}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">{money(bill.amount)}</td>
+                      <td className="px-3 py-2.5 uppercase text-muted-foreground">{bill.method || "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{bill.time}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="rounded-pill bg-success-subtle px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-success">{bill.status}</span>
+                      </td>
                     </tr>
                   ))}
                   {recentBills.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">No bills collected yet today.</td></tr>
+                    <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-muted-foreground">No bills collected yet today.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Right: Bill Panel.
-          This was `hidden xl:flex`, so on anything narrower than 1280px — which is every
-          tablet a restaurant actually uses — a cashier tapped an order and nothing
-          appeared: no total, no Collect button. Below xl it now slides in as a full-height
-          sheet once an order is selected, and stays the fixed sidebar from xl upwards. */}
-      {(selectedOrder || paid) && (
+      {/* ── Right: the bill ─────────────────────────────────────────────────
+          A permanent pane from 1024px — the width a floor tablet actually runs
+          at in landscape. It used to appear only from 1280px, so on every real
+          tablet a cashier tapped a tab and no total, and no Collect button,
+          ever appeared. Below 1024 it is a sheet over the list. */}
+      {panelOpen && (
         <button
           type="button"
           aria-label="Close bill"
-          onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
-          className="xl:hidden fixed inset-0 z-30 bg-foreground/40"
+          onClick={closeBill}
+          className="fixed inset-0 z-30 bg-foreground/40 lg:hidden"
         />
       )}
-      <div
-        className={`${selectedOrder || paid ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md
-          xl:static xl:flex xl:w-96 xl:max-w-none xl:z-auto
-          border-l border-border flex-col bg-card`}
+      <aside
+        className={`${panelOpen ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card lg:static lg:z-auto lg:flex lg:w-[23rem] lg:max-w-none xl:w-[26rem]`}
+        aria-label="Bill"
       >
-        {/* Only needed while the panel is a sheet — at xl it is a permanent sidebar. */}
-        {(selectedOrder || paid) && (
+        {panelOpen && (
           <button
-            onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
-            className="xl:hidden flex items-center gap-1.5 px-4 py-3 text-sm text-muted-foreground hover:text-foreground border-b border-border"
+            type="button"
+            onClick={closeBill}
+            className="flex shrink-0 items-center gap-1.5 border-b border-border px-4 py-3 text-sm font-medium text-muted-foreground hover-elevate lg:hidden"
           >
-            <ChevronLeft className="h-4 w-4" /> Back to orders
+            <ChevronLeft className="h-4 w-4" aria-hidden /> Back to tabs
           </button>
         )}
+
         {!selectedOrder && !paid ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-            <Receipt className="h-16 w-16 mb-4" />
-            <p className="font-semibold">Select an order to generate bill</p>
+          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
+            <Receipt className="mb-4 h-12 w-12" aria-hidden />
+            <p className="text-sm font-semibold text-foreground">No tab open</p>
+            <p className="mt-1 text-sm">Pick a table on the left to build its bill.</p>
           </div>
         ) : paid ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="h-20 w-20 rounded-full bg-success-subtle border-2 border-success-border flex items-center justify-center mb-5">
-              <CheckCircle className="h-10 w-10 text-success" />
+          <div className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+              <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-pill border border-success-border bg-success-subtle text-success">
+                <CheckCircle className="h-8 w-8" aria-hidden />
+              </span>
+              <h2 className="text-lg font-semibold text-success">Payment recorded</h2>
+              <p className="mt-3 text-3xl font-semibold tabular-nums">{money(grandTotal)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {selectedOrder?.tableNo} · {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}
+              </p>
             </div>
-            <h3 className="text-xl font-semibold text-success mb-1">Payment Successful!</h3>
-            <p className="text-muted-foreground text-sm mb-1">{selectedOrder?.tableNo} · ₹{grandTotal}</p>
-            <p className="text-xs text-muted-foreground">{PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}</p>
-            <div className="flex gap-2 mt-6 w-full">
-              <button onClick={() => window.print()} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold flex items-center justify-center gap-2"><Printer className="h-4 w-4" /> Print</button>
-              <button onClick={() => downloadInvoice(false)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold flex items-center justify-center gap-2"><Download className="h-4 w-4" /> PDF</button>
+            <div className="shrink-0 space-y-2 border-t border-border p-4">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => window.print()} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2">
+                  <Printer className="h-4 w-4" aria-hidden /> Print
+                </button>
+                <button type="button" onClick={() => downloadInvoice(false)} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2">
+                  <Download className="h-4 w-4" aria-hidden /> Download
+                </button>
+              </div>
+              <button type="button" onClick={closeBill} className="min-h-12 w-full rounded-md border border-primary-border bg-primary text-sm font-semibold text-primary-foreground hover-elevate active-elevate-2">
+                Next bill
+              </button>
             </div>
-            <button onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }} className="mt-2 w-full py-3 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold">New Bill</button>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div>
-                <p className="font-semibold">{selectedOrder?.tableNo}</p>
-                <p className="text-xs text-muted-foreground">{selectedOrder?.id} · {selectedOrder?.guests} guests</p>
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{selectedOrder?.tableNo}</p>
+                <p className="text-xs text-muted-foreground">#{selectedOrder?.id} · {selectedOrder?.guests} guests</p>
               </div>
-              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted"><Printer className="h-3.5 w-3.5" /> KOT</button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold hover-elevate active-elevate-2"
+              >
+                <Printer className="h-3.5 w-3.5" aria-hidden /> KOT
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {/* Items */}
-              <div className="space-y-2.5">
-                {billItems.map((item, i) => {
-                  const adjusted = item.voided || item.comped;
-                  return (
-                    <div key={i} className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1.5 bg-muted rounded-lg p-0.5 ${adjusted ? "opacity-40" : ""}`}>
-                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))} className="h-6 w-6 rounded-md bg-muted flex items-center justify-center hover-elevate disabled:cursor-not-allowed"><Minus className="h-3 w-3" /></button>
-                          <span className="w-5 text-center text-xs font-semibold">{item.qty}</span>
-                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-primary flex items-center justify-center hover:bg-primary/90 disabled:cursor-not-allowed"><Plus className="h-3 w-3" /></button>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 custom-scrollbar">
+              {/* Lines */}
+              <section>
+                <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Bill lines</h3>
+                <ul className="space-y-3">
+                  {billItems.map((item, i) => {
+                    const adjusted = item.voided || item.comped;
+                    return (
+                      <li key={i} className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`flex shrink-0 items-center gap-1 rounded-md border border-border bg-background p-0.5 ${adjusted ? "opacity-40" : ""}`}>
+                            <button
+                              type="button"
+                              disabled={adjusted}
+                              aria-label={`One fewer ${item.name}`}
+                              onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))}
+                              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover-elevate active-elevate-2 disabled:cursor-not-allowed"
+                            >
+                              <Minus className="h-3.5 w-3.5" aria-hidden />
+                            </button>
+                            <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
+                            <button
+                              type="button"
+                              disabled={adjusted}
+                              aria-label={`One more ${item.name}`}
+                              onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))}
+                              className="flex h-8 w-8 items-center justify-center rounded-md border border-primary-border bg-primary text-primary-foreground hover-elevate active-elevate-2 disabled:cursor-not-allowed"
+                            >
+                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                            </button>
+                          </span>
+                          <span className={`min-w-0 flex-1 text-sm ${adjusted ? "text-muted-foreground line-through" : ""}`}>{item.name}</span>
+                          <span className={`shrink-0 text-sm font-semibold tabular-nums ${adjusted ? "text-muted-foreground line-through" : ""}`}>
+                            {money(r2(item.price * item.qty))}
+                          </span>
                         </div>
-                        <span className={`flex-1 text-sm ${adjusted ? "line-through text-muted-foreground" : ""}`}>{item.name}</span>
-                        <span className={`font-semibold text-sm ${adjusted ? "line-through text-muted-foreground" : "text-primary"}`}>₹{r2(item.price * item.qty)}</span>
-                      </div>
-                      <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
-                      <LineAdjustControls
-                        disabled={adjusted}
-                        onAdjust={(kind, reason) => adjustLine(item, kind, reason)}
-                        className="pl-[4.25rem]"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+                        <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
+                        <LineAdjustControls
+                          disabled={adjusted}
+                          onAdjust={(kind, reason) => adjustLine(item, kind, reason)}
+                          className="pl-[5.5rem]"
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
 
               <AdjustmentHistory
                 restaurantId={restaurantId}
@@ -505,130 +669,190 @@ export default function BillingPOS() {
                 showHistory={false}
               />
 
-              {/* Discount */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Discount</p>
-                <div className="flex gap-2">
+              <section>
+                <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Discount</h3>
+                <div className="flex gap-1.5">
                   {[0, 5, 10, 15, 20].map(d => (
-                    <button key={d} onClick={() => setDiscount(d)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${discount === d ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                    <button key={d} type="button" onClick={() => setDiscount(d)} aria-pressed={discount === d} className={`${chip} ${discount === d ? chipOn : chipOff}`}>
                       {d === 0 ? "None" : `${d}%`}
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              {/* Tip */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Tip</p>
-                <div className="flex gap-2">
+              <section>
+                <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Tip</h3>
+                <div className="flex gap-1.5">
                   {[0, 20, 50, 100].map(t => (
-                    <button key={t} onClick={() => setTip(t)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${tip === t ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                    <button key={t} type="button" onClick={() => setTip(t)} aria-pressed={tip === t} className={`${chip} ${tip === t ? chipOn : chipOff}`}>
                       {t === 0 ? "None" : `₹${t}`}
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              {/* Split */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Split Bill</p>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Minus className="h-3 w-3" /></button>
-                  <span className="flex-1 text-center text-sm">{splitCount === 1 ? "No split" : `${splitCount} ways`}</span>
-                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+              <section>
+                <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Split the bill</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Split between fewer people"
+                    onClick={() => setSplitCount(Math.max(1, splitCount - 1))}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover-elevate active-elevate-2"
+                  >
+                    <Minus className="h-4 w-4" aria-hidden />
+                  </button>
+                  <p className="flex-1 text-center text-sm tabular-nums">
+                    {splitCount === 1 ? "One bill" : <>{splitCount} ways · <span className="font-semibold">{money(perPerson)}</span> each</>}
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Split between more people"
+                    onClick={() => setSplitCount(Math.min(10, splitCount + 1))}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover-elevate active-elevate-2"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden />
+                  </button>
                 </div>
-              </div>
+              </section>
 
-              {/* Bill Summary */}
-              <div className="rounded-lg bg-muted p-3 space-y-1.5 text-xs">
-                {[
-                  ["Subtotal", `₹${subtotal}`],
-                  discount > 0 && [`Discount (${discount}%)`, `-₹${discountAmt}`],
-                  discount > 0 && ["Taxable value", `₹${taxable}`],
-                  [`GST (${gstLabel})`, `₹${gst}`],
-                  tip > 0 && ["Tip", `₹${tip}`],
-                ].filter(Boolean).map((row: any) => (
-                  <div key={row[0]} className="flex justify-between text-muted-foreground">
-                    <span>{row[0]}</span>
-                    <span>{row[1]}</span>
-                  </div>
-                ))}
-                <div className="border-t border-border pt-1.5 flex justify-between font-semibold text-base">
-                  <span>Total</span>
-                  <span className="text-primary">₹{grandTotal}</span>
-                </div>
-                {splitCount > 1 && (
-                  <div className="text-center text-success font-semibold pt-1 border-t border-border">
-                    ₹{perPerson} / person
-                  </div>
-                )}
-              </div>
-
-              {/* Payment Method */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Payment Method</p>
+              <section>
+                <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">How it was paid</h3>
                 <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
-                  {PAYMENT_METHODS.map(m => (
-                    <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-colors ${paymentMethod === m.id ? `${m.bg} border-current ${m.color}` : "border-border bg-muted text-muted-foreground"}`}>
-                      <m.icon className="h-4 w-4" />
-                      <span className="text-xs">{m.label}</span>
-                    </button>
-                  ))}
+                  {PAYMENT_METHODS.map(m => {
+                    const on = paymentMethod === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(m.id)}
+                        aria-pressed={on}
+                        className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border text-xs font-semibold transition-colors hover-elevate active-elevate-2 ${on ? chipOn : chipOff}`}
+                      >
+                        <m.icon className="h-5 w-5" aria-hidden />
+                        {m.label}
+                      </button>
+                    );
+                  })}
                 </div>
-                {(paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "nfc") && (
+                {REF_METHODS.includes(paymentMethod) && (
                   <input
                     value={reference}
                     onChange={e => setReference(e.target.value)}
-                    placeholder={paymentMethod === "upi" ? "UPI ID / UTR number (optional)" : paymentMethod === "card" ? "Card txn / RRN (optional)" : "NFC txn reference (optional)"}
-                    className="mt-2 w-full bg-muted border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
+                    aria-label="Payment reference"
+                    placeholder={paymentMethod === "upi" ? "UPI ID / UTR (optional)" : paymentMethod === "card" ? "Card txn / RRN (optional)" : "NFC reference (optional)"}
+                    className="mt-2 min-h-10 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 )}
-              </div>
+              </section>
+
+              {/* The workings, kept small and above the total. The total itself is
+                  pinned below and never scrolls out of reach. */}
+              <dl className="space-y-1.5 rounded-md border border-border bg-background p-3 text-xs">
+                {([
+                  ["Subtotal", money(subtotal)],
+                  ...(discount > 0 ? [[`Discount (${discount}%)`, `−${money(discountAmt)}`], ["Taxable value", money(taxable)]] : []),
+                  [`GST (${gstLabel})`, money(gst)],
+                  ...(tip > 0 ? [["Tip", money(tip)]] : []),
+                ] as [string, string][]).map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2 text-muted-foreground">
+                    <dt>{k}</dt>
+                    <dd className="tabular-nums">{v}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
 
-            {/* Pay Button */}
-            <div className="p-4 border-t border-border space-y-2">
+            {/* ── Pinned total + collect ──────────────────────────────────
+                Everything above can scroll. This cannot. The amount is the
+                largest number on the screen and the button repeats it, so
+                there is no way to take a payment without having read it. */}
+            <div className="shrink-0 border-t border-border bg-card p-4">
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Total to collect</p>
+                  <p className="text-3xl font-semibold tabular-nums leading-tight">{money(grandTotal)}</p>
+                </div>
+                {splitCount > 1 && (
+                  <p className="shrink-0 text-right text-xs text-muted-foreground">
+                    {splitCount} ways<br /><span className="text-sm font-semibold tabular-nums text-foreground">{money(perPerson)}</span> each
+                  </p>
+                )}
+              </div>
+
               <PermissionGate permission="view_orders">
-              <button onClick={handlePay} disabled={paying} className="w-full py-3.5 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-60 font-semibold text-base shadow-xl flex items-center justify-center gap-2 transition-colors">
-                {paying ? "Processing…" : <>Collect ₹{grandTotal.toLocaleString()} <CheckCircle className="h-5 w-5" /></>}
-              </button>
+                <button
+                  type="button"
+                  onClick={handlePay}
+                  disabled={paying}
+                  className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-primary-border bg-primary text-base font-semibold text-primary-foreground transition-colors hover-elevate active-elevate-2 disabled:opacity-60"
+                >
+                  {paying ? "Recording payment…" : <>
+                    <CheckCircle className="h-5 w-5" aria-hidden />
+                    Collect {money(grandTotal)} · {PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}
+                  </>}
+                </button>
               </PermissionGate>
-              <div className="flex gap-2">
-                <button onClick={() => window.print()} className="flex-1 py-2 rounded-lg border border-border hover:bg-muted text-xs font-semibold flex items-center justify-center gap-1"><Printer className="h-3.5 w-3.5" /> Print Bill</button>
-                <button onClick={() => downloadInvoice(true)} className="flex-1 py-2 rounded-lg border border-border hover:bg-muted text-xs font-semibold flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> GST Invoice</button>
+
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => window.print()} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2">
+                  <Printer className="h-3.5 w-3.5" aria-hidden /> Print bill
+                </button>
+                <button type="button" onClick={() => downloadInvoice(true)} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2">
+                  <Download className="h-3.5 w-3.5" aria-hidden /> GST invoice
+                </button>
               </div>
             </div>
           </>
         )}
-      </div>
+      </aside>
 
-      {/* Bill payment detail — click a recent bill to see how the payment was made */}
+      {/* ── Collected bill: how it was paid, and refunds ─────────────────── */}
       {billDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm" onClick={() => setBillDetail(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-border bg-card text-foreground max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h3 className="font-semibold flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" /> Payment details</h3>
-              <button onClick={() => setBillDetail(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4" onClick={() => setBillDetail(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Payment details"
+            className="flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-t-md border border-border bg-card sm:max-h-[calc(100dvh-2rem)] sm:max-w-sm sm:rounded-md"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Receipt className="h-4 w-4 text-primary" aria-hidden /> Payment details
+              </h2>
+              <button
+                type="button"
+                onClick={() => setBillDetail(null)}
+                aria-label="Close"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover-elevate"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
             </div>
-            <div className="p-5 space-y-3 text-sm">
-              <div className="text-center py-2">
-                <p className="text-3xl font-semibold text-primary">₹{Number(billDetail.amount).toLocaleString("en-IN")}</p>
-                <p className="text-xs text-muted-foreground mt-1">{billDetail.id} · {billDetail.table}</p>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 custom-scrollbar">
+              <div className="text-center">
+                <p className="text-3xl font-semibold tabular-nums">{money(billDetail.amount)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{billDetail.id} · {billDetail.table}</p>
               </div>
-              {[
-                ["Payment method", String(billDetail.method || "—").toUpperCase()],
-                ["Reference (UPI/UTR)", billDetail.reference || "—"],
-                ["Collected by", billDetail.collectedBy || "—"],
-                ["Collected from", billDetail.collectedFrom || "Cashier POS"],
-                ["Time", billDetail.time || "—"],
-                ["Status", billDetail.status || "paid"],
-                ...(billDetail.refundedTotal ? [["Refunded so far", `₹${Number(billDetail.refundedTotal).toFixed(2)}`]] : []),
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3 border-b border-border pb-2">
-                  <span className="text-muted-foreground">{k}</span>
-                  <span className="font-medium text-right break-all">{v}</span>
-                </div>
-              ))}
+
+              <dl className="divide-y divide-border rounded-md border border-border">
+                {([
+                  ["Method", String(billDetail.method || "—").toUpperCase()],
+                  ["Reference", billDetail.reference || "—"],
+                  ["Collected by", billDetail.collectedBy || "—"],
+                  ["Collected from", billDetail.collectedFrom || "Cashier POS"],
+                  ["Time", billDetail.time || "—"],
+                  ["Status", billDetail.status || "paid"],
+                  ...(billDetail.refundedTotal ? [["Refunded so far", money(billDetail.refundedTotal)]] : []),
+                ] as [string, string][]).map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-3 px-3 py-2 text-sm">
+                    <dt className="shrink-0 text-muted-foreground">{k}</dt>
+                    <dd className="min-w-0 break-all text-right font-medium">{v}</dd>
+                  </div>
+                ))}
+              </dl>
 
               {billDetail.orderId ? (
                 <>
@@ -642,6 +866,16 @@ export default function BillingPOS() {
               ) : (
                 <p className="text-xs text-muted-foreground">This bill has no linked order, so it cannot be refunded from here.</p>
               )}
+            </div>
+
+            <div className="shrink-0 border-t border-border p-4">
+              <button
+                type="button"
+                onClick={() => setBillDetail(null)}
+                className="min-h-12 w-full rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

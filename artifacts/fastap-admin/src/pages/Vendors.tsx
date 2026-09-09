@@ -1,355 +1,433 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { api, type CreateVendorData } from "@/lib/apiClient";
+import { api, type CreateVendorData, type Vendor } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { KpiCard } from "@/components/shared/KpiCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, MoreVertical, Eye, ShieldBan, ShieldCheck, Loader2, RefreshCcw, Download, Building2, CheckCircle, XCircle, TrendingUp } from "lucide-react";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PageHeader, Toolbar } from "@/components/shared/Page";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Search, Plus, MoreHorizontal, Eye, ShieldBan, ShieldCheck, Loader2,
+  RefreshCcw, Download, KeyRound, Snowflake, Archive, Check, X,
+} from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PageHeader } from "@/components/shared/Page";
-import { Checkbox } from "@/components/ui/checkbox";
 
-const VENDOR_TAGS: Record<string, { label: string; color: string }> = {
-  vip: { label: "VIP", color: "bg-warning-subtle text-warning border-warning-border" },
-  enterprise: { label: "Enterprise", color: "bg-muted text-muted-foreground border" },
-  high_risk: { label: "High Risk", color: "bg-danger-subtle text-danger border-danger-border" },
-  dormant: { label: "Dormant", color: "bg-muted text-muted-foreground border" },
+const PLANS = ["free", "starter", "pro", "enterprise"] as const;
+const TYPES = ["Restaurant", "Hotel", "Café", "Bar", "Resort", "Cloud Kitchen"];
+
+/** Type labels are free text on the way in, so compare case- and accent-insensitively. */
+function normalizeType(v: string) {
+  return v.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+}
+
+const isArchived = (v: Vendor) => Boolean(v.platformControls?.deletedAt);
+/** A registration that has never been approved is not a suspension — it is a queue item. */
+const isAwaiting = (v: Vendor) => !v.isActive && v.kycStatus === "pending" && !isArchived(v);
+const isTrading = (v: Vendor) => v.isActive && !isArchived(v);
+const isSuspended = (v: Vendor) => !v.isActive && !isAwaiting(v) && !isArchived(v);
+
+type StateKey = "all" | "trading" | "awaiting" | "suspended" | "archived";
+
+const STATE_MATCH: Record<StateKey, (v: Vendor) => boolean> = {
+  all: v => !isArchived(v),
+  trading: isTrading,
+  awaiting: isAwaiting,
+  suspended: isSuspended,
+  archived: isArchived,
 };
 
-function getHealthScore(vendor: any) {
-  let score = 50;
-  if (vendor.isActive) score += 20;
-  if ((vendor.totalOrders || 0) > 500) score += 20;
-  if ((vendor.totalOrders || 0) > 100) score += 10;
-  if (!vendor.isActive) score -= 30;
-  return Math.min(100, Math.max(10, score));
-}
-
-function getHealthColor(score: number) {
-  if (score >= 80) return "text-success";
-  if (score >= 60) return "text-warning";
-  return "text-danger";
-}
-
-// Type labels are free text on the way in, so compare them case- and accent-insensitively.
-function normalizeType(v: string) {
-  return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-}
-
-function getVendorTag(vendor: any) {
-  if (!vendor.isActive) return "dormant";
-  if (vendor.plan === "enterprise") return "enterprise";
-  if ((vendor.totalOrders || 0) > 1000) return "vip";
-  return null;
-}
-
 export default function Vendors() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [state, setState] = useState<StateKey>("all");
+  const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [selected, setSelected] = useState<number[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [planFilter, setPlanFilter] = useState("all");
-  const [showDeleted, setShowDeleted] = useState(false);
   const [form, setForm] = useState<CreateVendorData>({ name: "", email: "", ownerName: "", phone: "", businessType: "Restaurant", plan: "starter" });
+
   const { toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const qc = useQueryClient();
 
-  const { data: vendors = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["superadmin-vendors", showDeleted],
-    queryFn: () => api.vendors.list(showDeleted),
+  // Archived venues are fetched always, so the "Archived" tab can be counted and opened
+  // without a second round trip that used to make the headline numbers jump.
+  const { data: vendors = [], isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ["superadmin-vendors", true],
+    queryFn: () => api.vendors.list(true),
   });
 
-  const restoreMutation = useMutation({
-    mutationFn: (id: number) => api.vendors.restore(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-vendors"] }); toast({ title: "Vendor restored" }); },
-    onError: (e: any) => toast({ title: "Restore failed", description: e.message, variant: "destructive" }),
-  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["superadmin-vendors"] });
+  const onError = (e: Error) => toast({ title: "That did not go through", description: e.message, variant: "destructive" });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.vendors.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-vendors"] }); toast({ title: "Vendor archived" }); },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+  const toggleMutation = useMutation({ mutationFn: (id: number) => api.vendors.toggle(id), onSuccess: () => { invalidate(); toast({ title: "Trading status updated" }); }, onError });
+  const approveMutation = useMutation({
+    // KYC ids are `kyc_<restaurantId>`; the route strips the prefix, so the bare id works.
+    mutationFn: (id: number) => api.kyc.approve(String(id)),
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["kyc"] }); toast({ title: "Venue approved", description: "The owner can now sign in." }); },
+    onError,
   });
-
-  const toggleMutation = useMutation({
-    mutationFn: (id: number) => api.vendors.toggle(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-vendors"] }); toast({ title: "Vendor status updated" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => api.kyc.reject(String(id), reason),
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["kyc"] }); toast({ title: "Registration declined" }); },
+    onError,
   });
-
-  const freezeMutation = useMutation({
-    mutationFn: (vendorId: number) => api.vendors.freezePayouts(vendorId),
-    onSuccess: () => { toast({ title: "Payouts frozen for vendor" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: (vendorId: number) => api.vendors.resetPassword(vendorId),
-    onSuccess: (data) => toast({ title: "Password reset", description: `Temporary password: ${data.temporaryPassword}` }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
+  const planMutation = useMutation({ mutationFn: ({ id, plan }: { id: number; plan: string }) => api.vendors.updatePlan(id, plan), onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["subscriptions"] }); toast({ title: "Plan changed" }); }, onError });
+  const deleteMutation = useMutation({ mutationFn: (id: number) => api.vendors.delete(id), onSuccess: () => { invalidate(); toast({ title: "Venue archived" }); }, onError });
+  const restoreMutation = useMutation({ mutationFn: (id: number) => api.vendors.restore(id), onSuccess: () => { invalidate(); toast({ title: "Venue restored" }); }, onError });
+  const freezeMutation = useMutation({ mutationFn: (id: number) => api.vendors.freezePayouts(id), onSuccess: () => { invalidate(); toast({ title: "Payouts frozen" }); }, onError });
+  const resetPasswordMutation = useMutation({ mutationFn: (id: number) => api.vendors.resetPassword(id), onSuccess: d => toast({ title: "Password reset", description: `Temporary password: ${d.temporaryPassword}` }), onError });
   const createMutation = useMutation({
     mutationFn: (data: CreateVendorData) => api.vendors.create(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["superadmin-vendors"] });
+      invalidate();
       setAddOpen(false);
       setForm({ name: "", email: "", ownerName: "", phone: "", businessType: "Restaurant", plan: "starter" });
-      toast({ title: "Vendor created successfully" });
+      toast({ title: "Venue created" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError,
   });
-
   const bulkMutation = useMutation({
     mutationFn: (action: string) => api.vendors.bulkAction(selected, action),
-    onSuccess: (_, action) => { setSelected([]); qc.invalidateQueries({ queryKey: ["superadmin-vendors"] }); toast({ title: `Bulk ${action} applied to ${selected.length} vendors` }); },
-    onError: (e: any) => toast({ title: "Bulk action failed", description: e.message, variant: "destructive" }),
+    onSuccess: (_, action) => { setSelected([]); invalidate(); toast({ title: `${action.replace("_", " ")} applied to ${selected.length} venues` }); },
+    onError,
   });
 
-  const handleExportCSV = () => {
-    const headers = ["ID", "Business Name", "Owner", "Email", "Type", "Plan", "Status", "Orders", "Health Score", "Joined"];
-    const rows = filteredVendors.map(v => [v.id, v.name, v.ownerName, v.ownerEmail, v.businessType || "Restaurant", v.plan, v.isActive ? "Active" : "Suspended", v.totalOrders, getHealthScore(v), new Date(v.createdAt).toLocaleDateString()]);
-    // Business names routinely contain commas ("Bistro, Inc"), which silently shifted
-    // every later column in the exported file. Quote every cell instead.
+  const counts = useMemo(() => ({
+    all: vendors.filter(STATE_MATCH.all).length,
+    trading: vendors.filter(STATE_MATCH.trading).length,
+    awaiting: vendors.filter(STATE_MATCH.awaiting).length,
+    suspended: vendors.filter(STATE_MATCH.suspended).length,
+    archived: vendors.filter(STATE_MATCH.archived).length,
+  }), [vendors]);
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return vendors.filter(v => {
+      if (!STATE_MATCH[state](v)) return false;
+      if (planFilter !== "all" && v.plan !== planFilter) return false;
+      if (typeFilter !== "all" && normalizeType(v.businessType || "Restaurant") !== normalizeType(typeFilter)) return false;
+      if (!q) return true;
+      return v.name.toLowerCase().includes(q)
+        || (v.ownerEmail ?? "").toLowerCase().includes(q)
+        || (v.ownerName ?? "").toLowerCase().includes(q)
+        || String(v.id) === q;
+    });
+  }, [vendors, state, planFilter, typeFilter, search]);
+
+  const filtered = planFilter !== "all" || typeFilter !== "all" || search.trim() !== "";
+
+  const exportCsv = () => {
+    const headers = ["ID", "Venue", "Owner", "Email", "Type", "Plan", "State", "Orders", "Joined"];
+    const stateLabel = (v: Vendor) => isArchived(v) ? "Archived" : isAwaiting(v) ? "Awaiting approval" : v.isActive ? "Trading" : "Suspended";
+    // Venue names routinely contain commas ("Bistro, Inc"), which silently shifted every
+    // later column in the exported file. Quote every cell instead.
     const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csv = [headers, ...rows].map(r => r.map(cell).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "vendors.csv"; a.click();
+    const csv = [headers, ...rows.map(v => [v.id, v.name, v.ownerName, v.ownerEmail, v.businessType || "Restaurant", v.plan, stateLabel(v), v.totalOrders, new Date(v.createdAt).toLocaleDateString()])]
+      .map(r => r.map(cell).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "vendors.csv"; a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Vendor export downloaded" });
+    toast({ title: `${rows.length} venues exported` });
   };
 
-  const filteredVendors = vendors.filter(v => {
-    const matchSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) || (v.ownerEmail ?? "").toLowerCase().includes(searchTerm.toLowerCase()) || String(v.id).includes(searchTerm);
-    const matchStatus = statusFilter === "all" || (statusFilter === "active" ? v.isActive : !v.isActive);
-    // Business type is stored however it was entered — "restaurant", "Restaurant",
-    // "Cafe" and "Cafe" with an accent all occur — so an exact compare against the
-    // dropdown label hid most real rows.
-    const matchType = typeFilter === "all" || normalizeType(v.businessType || "Restaurant") === normalizeType(typeFilter);
-    const matchPlan = planFilter === "all" || v.plan === planFilter;
-    return matchSearch && matchStatus && matchType && matchPlan;
-  });
+  const askArchive = async (v: Vendor) => {
+    const ok = await confirm({
+      title: `Archive ${v.name}?`,
+      description: "The venue stops trading and drops off the list. Nothing is deleted — you can restore it from the Archived tab.",
+      destructive: true,
+      confirmLabel: "Archive venue",
+    });
+    if (ok) deleteMutation.mutate(v.id);
+  };
 
-  const toggleSelect = (id: number) => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  const toggleSelectAll = () => setSelected(selected.length === filteredVendors.length ? [] : filteredVendors.map(v => v.id));
+  const askSuspend = async (v: Vendor) => {
+    const ok = await confirm({
+      title: `Suspend ${v.name}?`,
+      description: "Staff are signed out and the venue stops taking orders immediately. You can reactivate it here at any time.",
+      destructive: true,
+      confirmLabel: "Suspend venue",
+    });
+    if (ok) toggleMutation.mutate(v.id);
+  };
 
-  // Archived vendors are only in the list when "Show archived" is on; counting them as
-  // "Suspended" made the headline numbers jump every time that button was pressed.
-  const liveVendors = vendors.filter(v => !(v as any).platformControls?.deletedAt);
-  const activeCount = liveVendors.filter(v => v.isActive).length;
-  const suspendedCount = liveVendors.filter(v => !v.isActive).length;
-  const enterpriseCount = liveVendors.filter(v => v.plan === "enterprise").length;
+  const askReject = async (v: Vendor) => {
+    const ok = await confirm({
+      title: `Decline ${v.name}'s registration?`,
+      description: "The owner is told their documents were not accepted and is asked to submit again.",
+      destructive: true,
+      confirmLabel: "Decline",
+    });
+    if (ok) rejectMutation.mutate({ id: v.id, reason: "Documents not accepted" });
+  };
+
+  const TABS: { key: StateKey; label: string }[] = [
+    { key: "all", label: "All venues" },
+    { key: "trading", label: "Trading" },
+    { key: "awaiting", label: "Awaiting approval" },
+    { key: "suspended", label: "Suspended" },
+    { key: "archived", label: "Archived" },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Vendors"
-        description="Every venue on the platform, its plan, and whether it is trading."
-        badge={<Badge variant="muted">{isLoading ? "Loading…" : `${liveVendors.length} on platform`}</Badge>}
+        description="Every venue on the platform, what it is paying for, and whether it is trading."
+        badge={<Badge variant="muted">{isLoading ? "Loading…" : `${counts.all} on platform`}</Badge>}
         actions={
           <>
-          <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Add Vendor</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Add New Vendor</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="space-y-2"><Label>Business Name *</Label><Input placeholder="The Grand Hotel" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
-                <div className="space-y-2"><Label>Owner Name</Label><Input placeholder="John Smith" value={form.ownerName} onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Owner Email *</Label><Input type="email" placeholder="owner@hotel.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Business Type</Label>
-                    <Select value={form.businessType} onValueChange={v => setForm(f => ({ ...f, businessType: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{["Restaurant", "Hotel", "Café", "Bar", "Resort", "Cloud Kitchen", "Lounge", "Food Court"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
+            <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCcw className={isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv}><Download className="mr-2 h-4 w-4" /> Export</Button>
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild><Button size="sm"><Plus className="mr-2 h-4 w-4" /> Add venue</Button></DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader><DialogTitle>Add a venue</DialogTitle></DialogHeader>
+                <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+                  <div className="space-y-2"><Label htmlFor="v-name">Business name *</Label><Input id="v-name" placeholder="The Grand Hotel" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
+                  <div className="space-y-2"><Label htmlFor="v-owner">Owner name</Label><Input id="v-owner" placeholder="John Smith" value={form.ownerName} onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))} /></div>
+                  <div className="space-y-2"><Label htmlFor="v-email">Owner email *</Label><Input id="v-email" type="email" placeholder="owner@hotel.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Business type</Label>
+                      <Select value={form.businessType} onValueChange={v => setForm(f => ({ ...f, businessType: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{["Restaurant", "Hotel", "Café", "Bar", "Resort", "Cloud Kitchen", "Lounge", "Food Court"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Plan</Label>
+                      <Select value={form.plan} onValueChange={v => setForm(f => ({ ...f, plan: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{PLANS.map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Plan</Label>
-                    <Select value={form.plan} onValueChange={v => setForm(f => ({ ...f, plan: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{["free", "starter", "pro", "enterprise"].map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2"><Label>Phone</Label><Input placeholder="+1 555 000 0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Create Vendor
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="space-y-2"><Label htmlFor="v-phone">Phone</Label><Input id="v-phone" placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Create venue
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </>
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Total Vendors" value={liveVendors.length} icon={<Building2 className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active" value={activeCount} icon={<CheckCircle className="h-4 w-4 text-success" />} />
-        <KpiCard title="Suspended" value={suspendedCount} icon={<XCircle className="h-4 w-4 text-danger" />} />
-        <KpiCard title="Enterprise" value={enterpriseCount} icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} />
+      {/* The state of the estate, as one row of controls rather than a row of tiles that
+          restate what the table already shows. Every number here is a filter. */}
+      <div className="flex flex-wrap gap-2 border-b pb-3">
+        {TABS.map(t => {
+          const on = state === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => { setState(t.key); setSelected([]); }}
+              aria-pressed={on}
+              className={on
+                ? "flex items-baseline gap-2 rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-sm font-medium text-foreground"
+                : "flex items-baseline gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"}
+            >
+              {t.label}
+              <span className="tabular-nums text-xs font-semibold">{counts[t.key]}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search vendors, email, ID…" className="pl-8" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+      {counts.awaiting > 0 && state !== "awaiting" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning-border bg-warning-subtle px-4 py-3">
+          <p className="text-sm text-warning">
+            <span className="font-semibold">{counts.awaiting} {counts.awaiting === 1 ? "venue is" : "venues are"} waiting to be approved.</span>{" "}
+            Their owners cannot sign in until you do.
+          </p>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setState("awaiting")}>Review them</Button>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+      )}
+
+      <Toolbar>
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search venue, owner, email or id…" className="pl-8" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search venues" />
+        </div>
+        <Select value={planFilter} onValueChange={setPlanFilter}>
+          <SelectTrigger className="w-[130px]" aria-label="Filter by plan"><SelectValue placeholder="Plan" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="suspended">Suspended</SelectItem>
+            <SelectItem value="all">Any plan</SelectItem>
+            {PLANS.map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectTrigger className="w-[140px]" aria-label="Filter by type"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {["Restaurant", "Hotel", "Café", "Bar", "Resort", "Cloud Kitchen"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            <SelectItem value="all">Any type</SelectItem>
+            {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={planFilter} onValueChange={setPlanFilter}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Plan" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Plans</SelectItem>
-            {["free", "starter", "pro", "enterprise"].map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Button variant={showDeleted ? "secondary" : "outline"} size="sm" onClick={() => setShowDeleted(v => !v)}>
-          {showDeleted ? "Hide archived" : "Show archived"}
-        </Button>
-        {(statusFilter !== "all" || typeFilter !== "all" || planFilter !== "all" || searchTerm) && (
-          <Button variant="ghost" size="sm" onClick={() => { setStatusFilter("all"); setTypeFilter("all"); setPlanFilter("all"); setSearchTerm(""); }}>Clear filters</Button>
+        {filtered && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setPlanFilter("all"); setTypeFilter("all"); }}>Clear</Button>
         )}
-        {selected.length > 0 && (
-          <div className="flex gap-2 ml-auto">
-            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("activate")}>Activate ({selected.length})</Button>
-            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("suspend")}>Suspend</Button>
-            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("freeze_payouts")}>Freeze Payouts</Button>
-          </div>
-        )}
-        <span className="text-sm text-muted-foreground ml-auto">{filteredVendors.length} results</span>
-      </div>
+        <span className="ml-auto text-sm text-muted-foreground tabular-nums">{rows.length} shown</span>
+      </Toolbar>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-      ) : (
-        <DataTable
-          data={filteredVendors}
-          pageSize={15}
-          error={isError}
-          onRetry={() => { void refetch(); }}
-          errorMessage="We could not load the vendor list."
-          emptyMessage="No vendors yet"
-          emptyDescription="Restaurants appear here once they register or you add them."
-          columns={[
-            {
+      {selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/50 px-4 py-2.5">
+          <span className="text-sm font-medium">{selected.length} selected</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("activate")}>Activate</Button>
+            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("suspend")}>Suspend</Button>
+            <Button size="sm" variant="outline" disabled={bulkMutation.isPending} onClick={() => bulkMutation.mutate("freeze_payouts")}>Freeze payouts</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected([])}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      <DataTable
+        data={rows}
+        pageSize={15}
+        loading={isLoading}
+        error={isError}
+        onRetry={() => { void refetch(); }}
+        errorMessage="We could not load the venue list."
+        keyExtractor={v => v.id}
+        emptyMessage={filtered ? "No venues match those filters" : state === "awaiting" ? "Nothing waiting for approval" : "No venues yet"}
+        emptyDescription={filtered ? "Clear the search or filters to see the rest." : "Venues appear here once they register or you add one."}
+        columns={[
+          {
             header: (
               <Checkbox
-                aria-label="Select all vendors"
-                checked={selected.length === filteredVendors.length && filteredVendors.length > 0}
-                onCheckedChange={toggleSelectAll}
+                aria-label="Select all venues"
+                checked={rows.length > 0 && selected.length === rows.length}
+                onCheckedChange={() => setSelected(selected.length === rows.length ? [] : rows.map(v => v.id))}
               />
             ),
-            cell: (row) => (
+            cell: v => (
               <Checkbox
-                aria-label={`Select ${row.name}`}
-                checked={selected.includes(row.id)}
-                onCheckedChange={() => toggleSelect(row.id)}
+                aria-label={`Select ${v.name}`}
+                checked={selected.includes(v.id)}
+                onCheckedChange={() => setSelected(p => p.includes(v.id) ? p.filter(x => x !== v.id) : [...p, v.id])}
                 onClick={e => e.stopPropagation()}
               />
             ),
           },
-            { header: "#", cell: (row) => <span className="text-xs text-muted-foreground font-mono">#{row.id}</span> },
-            {
-              header: "Business",
-              cell: (row) => {
-                const tag = getVendorTag(row);
-                const tagInfo = tag ? VENDOR_TAGS[tag] : null;
-                return (
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{row.name}</span>
-                      {tagInfo && <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${tagInfo.color}`}>{tagInfo.label}</span>}
-                    </div>
-                    <span className="text-xs text-muted-foreground">{row.businessType ?? "Restaurant"} · {row.ownerName}</span>
-                  </div>
-                );
-              }
-            },
-            { header: "Email", cell: (row) => <span className="text-xs text-muted-foreground">{row.ownerEmail}</span> },
-            { header: "Plan", cell: (row) => <Badge variant="outline" className="capitalize text-xs">{row.plan}</Badge> },
-            { header: "Status", cell: (row) => {
-              const deleted = Boolean((row as any).platformControls?.deletedAt);
-              // A not-yet-approved registration is "Pending Approval", not "Suspended".
-              const pending = !row.isActive && (row as any).kycStatus === "pending";
-              return <StatusBadge status={deleted ? "Deleted" : row.isActive ? "Active" : pending ? "Pending Approval" : "Suspended"} />;
-            } },
-            { header: "Health", cell: (row) => { const s = getHealthScore(row); return <span className={`font-bold text-sm ${getHealthColor(s)}`}>{s}</span>; } },
-            { header: "Orders", cell: (row) => <span className="font-medium">{row.totalOrders}</span> },
-            { header: "Joined", cell: (row) => <span className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleDateString()}</span> },
-            {
-              header: "Actions",
-              cell: (row) => (
+          {
+            header: "Venue",
+            sortable: true,
+            sortValue: v => v.name,
+            searchValue: v => v.name,
+            cell: v => (
+              <div className="min-w-0">
+                <Link href={`/vendors/${v.id}`} className="font-medium hover:text-primary hover:underline">{v.name}</Link>
+                <p className="truncate text-xs text-muted-foreground">
+                  #{v.id} · {v.businessType || "Restaurant"}{v.ownerName ? ` · ${v.ownerName}` : ""}
+                </p>
+              </div>
+            ),
+          },
+          { header: "Owner email", cell: v => <span className="text-xs text-muted-foreground">{v.ownerEmail || "—"}</span> },
+          {
+            header: "Plan",
+            sortable: true,
+            sortValue: v => v.plan,
+            cell: v => (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="rounded-md" aria-label={`Change plan for ${v.name}, currently ${v.plan}`}>
+                    <Badge variant="outline" className="capitalize hover:bg-muted">{v.plan}</Badge>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuLabel>Move to plan</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PLANS.map(p => (
+                    <DropdownMenuItem key={p} disabled={p === v.plan || planMutation.isPending} className="capitalize" onClick={() => planMutation.mutate({ id: v.id, plan: p })}>
+                      {p}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ),
+          },
+          {
+            header: "State",
+            sortable: true,
+            sortValue: v => isArchived(v) ? 3 : isAwaiting(v) ? 0 : v.isActive ? 1 : 2,
+            cell: v => (
+              <div className="flex items-center gap-1.5">
+                <StatusBadge status={isArchived(v) ? "Archived" : isAwaiting(v) ? "Awaiting approval" : v.isActive ? "Trading" : "Suspended"} />
+                {v.payoutsFrozen && <Badge variant="warning" title="Payouts are frozen for this venue"><Snowflake /> Frozen</Badge>}
+              </div>
+            ),
+          },
+          { header: "Orders", sortable: true, sortValue: v => v.totalOrders ?? 0, cell: v => <span className="tabular-nums">{(v.totalOrders ?? 0).toLocaleString()}</span> },
+          { header: "Joined", sortable: true, sortValue: v => new Date(v.createdAt), cell: v => <span className="text-xs text-muted-foreground tabular-nums">{new Date(v.createdAt).toLocaleDateString()}</span> },
+          {
+            header: "",
+            cell: v => (
+              <div className="flex items-center justify-end gap-1">
+                {/* The one decision this screen exists to make is surfaced as a real button
+                    rather than hidden two clicks deep in a kebab. */}
+                {isAwaiting(v) && (
+                  <>
+                    <Button size="sm" className="h-8" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(v.id)}>
+                      <Check className="mr-1 h-3.5 w-3.5" /> Approve
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8" onClick={() => askReject(v)}>
+                      <X className="mr-1 h-3.5 w-3.5" /> Decline
+                    </Button>
+                  </>
+                )}
+                {isArchived(v) && (
+                  <Button size="sm" variant="outline" className="h-8" disabled={restoreMutation.isPending} onClick={() => restoreMutation.mutate(v.id)}>
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" /> Restore
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${v.name}`}><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuItem asChild>
-                      <Link href={`/vendors/${row.id}`} className="cursor-pointer flex items-center"><Eye className="mr-2 h-4 w-4" /> View Profile</Link>
+                      <Link href={`/vendors/${v.id}`} className="flex cursor-pointer items-center"><Eye className="mr-2 h-4 w-4" /> Open profile</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {/* Freezing is one-way on the API side, so re-clicking it on an already
-                        frozen vendor did nothing but pop a success toast. */}
-                    <DropdownMenuItem disabled={Boolean((row as any).payoutsFrozen)} onClick={() => freezeMutation.mutate(row.id)}>
-                      {(row as any).payoutsFrozen ? "Payouts already frozen" : "Freeze Payout"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => resetPasswordMutation.mutate(row.id)}>Reset Password</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {(row as any).platformControls?.deletedAt ? (
-                      <DropdownMenuItem className="text-success cursor-pointer" onClick={() => restoreMutation.mutate(row.id)}>
-                        <ShieldCheck className="mr-2 h-4 w-4" /> Restore vendor
-                      </DropdownMenuItem>
-                    ) : (
+                    {!isArchived(v) && (
                       <>
-                        <DropdownMenuItem className={`cursor-pointer ${row.isActive ? "text-destructive" : "text-success"}`} onClick={() => toggleMutation.mutate(row.id)}>
-                          {row.isActive ? <><ShieldBan className="mr-2 h-4 w-4" /> Suspend</> : <><ShieldCheck className="mr-2 h-4 w-4" /> Activate</>}
+                        {v.isActive
+                          ? <DropdownMenuItem className="text-destructive" onClick={() => askSuspend(v)}><ShieldBan className="mr-2 h-4 w-4" /> Suspend</DropdownMenuItem>
+                          : <DropdownMenuItem onClick={() => toggleMutation.mutate(v.id)}><ShieldCheck className="mr-2 h-4 w-4" /> Reactivate</DropdownMenuItem>}
+                        {/* Freezing is one-way on the API side, so re-clicking it on an
+                            already frozen venue did nothing but pop a success toast. */}
+                        <DropdownMenuItem disabled={Boolean(v.payoutsFrozen)} onClick={() => freezeMutation.mutate(v.id)}>
+                          <Snowflake className="mr-2 h-4 w-4" /> {v.payoutsFrozen ? "Payouts already frozen" : "Freeze payouts"}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => deleteMutation.mutate(row.id)}>
-                          Archive vendor
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => resetPasswordMutation.mutate(v.id)}><KeyRound className="mr-2 h-4 w-4" /> Reset owner password</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive" onClick={() => askArchive(v)}><Archive className="mr-2 h-4 w-4" /> Archive venue</DropdownMenuItem>
                       </>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )
-            },
-          ]}
-        />
-      )}
+              </div>
+            ),
+          },
+        ]}
+      />
+      {confirmDialog}
     </div>
   );
 }

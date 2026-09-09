@@ -1046,6 +1046,8 @@ export default function MenuPage() {
         sortBy={sortBy}
         setSortBy={setSortBy}
         categories={categories}
+        activeCount={activeFilterCount}
+        onClear={clearAllFilters}
       />
 
       <ServiceHubSheet

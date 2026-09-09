@@ -10,10 +10,24 @@ import {
   type AdjustKind,
 } from "@/components/restaurant/BillAdjustments";
 import {
-  Plus, Filter, Search, CheckCircle, XCircle, Clock, ChefHat,
-  Truck, RefreshCw, Eye, Printer, Phone, AlertCircle, X, Loader2,
-  ArrowRightLeft, Split, Merge, Wallet, ClipboardList, StickyNote, AlertTriangle, UtensilsCrossed, ShoppingBag, Hotel, Bike } from "lucide-react";
+  Plus, Search, CheckCircle, XCircle, ChefHat, Truck, Printer, Phone, AlertCircle,
+  X, Loader2, ArrowRightLeft, Split, Merge, ClipboardList, StickyNote, AlertTriangle,
+  UtensilsCrossed, ShoppingBag, Hotel, Bike, ChevronLeft, Minus,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Order Management
+
+   The list a waiter works from. Three things it has to do standing up:
+   filter fast, open a tab without losing the list, and reach void / comp /
+   refund / move / split / merge / print without going hunting.
+
+   So: one toolbar that wraps rather than scrolls away, a card grid that packs
+   to whatever width is left rather than to the viewport, and a detail pane that
+   is a real second column from 1024px (a tablet in landscape) with its primary
+   action pinned to the bottom of it.
+   ──────────────────────────────────────────────────────────────────────────── */
 
 const STATUS_CFG: Record<LiveOrder["status"], { label: string; color: string; bg: string; next?: LiveOrder["status"] }> = {
   new: { label: "New", color: "text-warning", bg: "bg-warning-subtle", next: "accepted" },
@@ -39,7 +53,7 @@ function payMethodBadge(mode?: string) {
   // table and picks it then. Falling back to "Cash" here labelled every brand-new
   // order as paid by cash the moment it was placed.
   if (!mode) {
-    return <span className="text-2xs font-semibold px-1.5 py-0.5 rounded uppercase bg-muted text-muted-foreground">Unpaid</span>;
+    return <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs font-semibold uppercase text-muted-foreground">Unpaid</span>;
   }
   const m = mode.toLowerCase();
   const label = PAY_LABEL[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway" : (mode || "Cash"));
@@ -52,7 +66,7 @@ function payMethodBadge(mode?: string) {
     : m === "room_bill" ? "bg-info-subtle text-info"
     : m === "aggregator" ? "bg-muted text-muted-foreground"
     : "bg-muted text-muted-foreground";
-  return <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
+  return <span className={`rounded-md px-1.5 py-0.5 text-2xs font-semibold uppercase ${cls}`}>{label}</span>;
 }
 
 function getElapsed(date: Date) {
@@ -60,13 +74,18 @@ function getElapsed(date: Date) {
   return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
 }
 
+const money = (n: number) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
 const DEFAULT_STATUS = STATUS_CFG.new;
+
+const STATUS_TABS = ["all", "new", "accepted", "preparing", "ready", "served", "billed", "cancelled"] as const;
+const TYPE_TABS = ["all", "dine-in", "takeaway", "delivery", "room-service"] as const;
 
 export default function OrderManagement() {
   const { liveOrders, updateOrderStatus, restaurantId, refreshOrders, refreshTables, tables, currentStaff } = useRestaurant();
   const { confirm, confirmDialog } = useConfirm();
   const [filter, setFilter] = useState<"all" | LiveOrder["status"]>("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "dine-in" | "takeaway" | "room-service" | "delivery">("all");
+  const [typeFilter, setTypeFilter] = useState<(typeof TYPE_TABS)[number]>("all");
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<(LiveOrder & { tabOrders?: LiveOrder[]; roundCount?: number }) | null>(null);
   const [newOrderForm, setNewOrderForm] = useState(false);
@@ -339,444 +358,599 @@ export default function OrderManagement() {
     billed: liveOrders.filter(o => o.status === "billed").length,
     cancelled: liveOrders.filter(o => o.status === "cancelled").length,
   };
+  const activeCount = liveOrders.filter(o => !["billed", "cancelled"].includes(o.status)).length;
+  const filtersOn = filter !== "all" || typeFilter !== "all" || search.trim().length > 0;
+
+  const detailCfg = selectedOrder ? (STATUS_CFG[selectedOrder.status] ?? DEFAULT_STATUS) : DEFAULT_STATUS;
+  const selectField = "min-h-10 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const ghostBtn = "flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold hover-elevate active-elevate-2 disabled:opacity-40";
 
   return (
-    <div className="flex h-full">
-      {/* Main */}
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
-        {/* Header */}
-        <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div>
-            <h1 className="text-xl font-semibold">Order Management</h1>
-            <p className="text-xs text-muted-foreground">{liveOrders.filter(o => !["billed", "cancelled"].includes(o.status)).length} active orders</p>
-          </div>
-          <button onClick={() => setNewOrderForm(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold transition-colors shadow-sm">
-            <Plus className="h-4 w-4" /> New Order
-          </button>
-        </div>
-
-        {/* Status Filters */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {(["all", "new", "accepted", "preparing", "ready", "served", "billed", "cancelled"] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filter === s ? `${s !== "all" ? STATUS_CFG[s as LiveOrder["status"]]?.bg : "bg-primary/20"} border-primary/40 text-foreground` : "border-border bg-muted text-muted-foreground hover:border-border"}`}
-            >
-              {s === "all" ? "All" : STATUS_CFG[s as LiveOrder["status"]]?.label}
-              <span className={`h-4 min-w-4 px-1 rounded-full text-xs font-semibold flex items-center justify-center ${filter === s ? "bg-muted text-foreground" : "bg-muted text-muted-foreground"}`}>
-                {counts[s]}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Search & Type Filter */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
-              placeholder="Search order ID, table, waiter..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-1">
-            {(["all", "dine-in", "takeaway", "room-service"] as const).map(t => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={`shrink-0 px-2.5 py-2 rounded-lg text-xs border transition-colors ${typeFilter === t ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
-                {t === "all" ? "All" : (() => { const TabIcon = TYPE_ICON[t]; return <span className="inline-flex items-center gap-1.5">{TabIcon ? <TabIcon className="h-3.5 w-3.5" /> : null}<span className="capitalize">{t.replace("-", " ")}</span></span>; })()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Orders Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-          {tabGroups.map(order => {
-            const cfg = STATUS_CFG[order.status] ?? DEFAULT_STATUS;
-            const elapsed = Math.floor((Date.now() - new Date(order.placedAt).getTime()) / 60000);
-            const isUrgent = elapsed > 25 && !["served", "billed", "cancelled"].includes(order.status);
-            return (
-              <div
-                key={order.id}
-                className={`rounded-lg border p-4 cursor-pointer hover:border-primary/30 transition-colors ${isUrgent ? "border-danger-border bg-danger-subtle" : "border-border bg-card"}`}
-                onClick={() => setSelectedOrder(order)}
-              >
-                {/* Order Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {(() => { const TypeIcon = TYPE_ICON[order.type]; return TypeIcon ? <TypeIcon className="h-4 w-4 shrink-0 text-muted-foreground" /> : null; })()}
-                      <span className="font-semibold text-sm">{order.tableNo}</span>
-                      {order.roomNumber && <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-info-subtle text-info">Room {order.roomNumber}</span>}
-                      {payMethodBadge(order.paymentMethod)}
-                      <span className="text-xs text-muted-foreground">{order.id}</span>
-                      {order.roundCount > 1 && (
-                        <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary">{order.roundCount} rounds</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{order.customerName || order.waiter} · {order.guests} guests</p>
-                    {order.customerPhone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="h-3 w-3" />{order.customerPhone}</p>}
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
-                    <p className={`text-xs mt-1 ${isUrgent ? "text-danger font-semibold" : "text-muted-foreground"}`}>{getElapsed(order.placedAt)}</p>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-1.5 mb-3">
-                  {order.items.slice(0, 3).map((item, i) => {
-                    const { removes, prefs } = splitCustomizations(item.customizations);
-                    const adds = Array.isArray(item.addons) ? item.addons.map(a => a.name) : [];
-                    return (
-                      <div key={i} className="text-xs">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${item.status === "ready" ? "bg-success" : item.status === "preparing" ? "bg-info animate-pulse" : "bg-muted"}`} />
-                            <span className="text-foreground truncate">{item.qty}× {item.name}</span>
-                          </div>
-                          <span className="text-muted-foreground shrink-0">₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
-                        </div>
-                        {adds.length > 0 && <p className="text-2xs text-success ml-3.5 truncate">Add: {adds.join(", ")}</p>}
-                        {removes.length > 0 && <p className="text-2xs text-danger ml-3.5 truncate">Remove: {removes.join(", ")}</p>}
-                        {prefs.length > 0 && <p className="text-2xs text-info ml-3.5 truncate">{prefs.join(", ")}</p>}
-                      </div>
-                    );
-                  })}
-                  {order.items.length > 3 && <p className="text-xs text-muted-foreground">+{order.items.length - 3} more items</p>}
-                </div>
-
-                {order.specialReq && (
-                  <div className="flex items-center gap-1.5 text-xs text-warning bg-warning-subtle rounded-lg px-2 py-1 mb-3">
-                    <AlertCircle className="h-3 w-3" />
-                    {order.specialReq}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-border">
-                  <span className="font-semibold text-primary">₹{order.total}</span>
-                  <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
-                    {order.status === "new" && (
-                      <>
-                        <button onClick={() => advanceTab(order, "accepted")} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate border border-success-border">
-                          <CheckCircle className="h-3 w-3" /> Accept
-                        </button>
-                        <button onClick={() => cancelTab(order)} className="px-2.5 py-1.5 rounded-lg bg-danger-subtle text-danger text-xs font-semibold hover-elevate border border-danger-border">
-                          <XCircle className="h-3 w-3" />
-                        </button>
-                      </>
-                    )}
-                    {cfg.next && order.status !== "new" && (
-                      <button onClick={() => advanceTab(order, cfg.next!)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 border border-primary/30">
-                        {cfg.next === "preparing" ? <ChefHat className="h-3 w-3" /> : cfg.next === "ready" ? <CheckCircle className="h-3 w-3" /> : cfg.next === "served" ? <Truck className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
-                        {STATUS_CFG[cfg.next!]?.label}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {tabGroups.length === 0 && (
-            <div className="col-span-3 text-center py-16 text-muted-foreground">
-              <ClipboardList className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-              <p className="font-semibold">No orders found</p>
+    <div className="flex h-full min-h-0">
+      {/* ── Left: the list ───────────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="shrink-0 border-b border-border bg-card px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">Orders</h1>
+              <p className="text-xs text-muted-foreground">
+                {activeCount} in flight · {tabGroups.length} shown
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setNewOrderForm(true)}
+              className="flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-primary-border bg-primary px-4 text-sm font-semibold text-primary-foreground hover-elevate active-elevate-2"
+            >
+              <Plus className="h-4 w-4" aria-hidden /> New order
+            </button>
+          </div>
+
+          {/* One toolbar. Status on the top line because it is what gets used
+              most; search and type below it, both wrapping rather than pushing
+              the page sideways. */}
+          <div className="mt-3 flex min-w-0 max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1 no-scrollbar">
+            {STATUS_TABS.map(s => {
+              const on = filter === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setFilter(s)}
+                  aria-pressed={on}
+                  className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-semibold transition-colors hover-elevate active-elevate-2 ${
+                    on ? "border-primary-border bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"
+                  }`}
+                >
+                  {s === "all" ? "All" : STATUS_CFG[s].label}
+                  <span className={`text-2xs tabular-nums ${on ? "opacity-80" : "text-muted-foreground"}`}>{counts[s]}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                className="min-h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                placeholder="Table, order, waiter, guest, room"
+                aria-label="Search orders"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex min-w-0 gap-1.5 overflow-x-auto overscroll-x-contain no-scrollbar">
+              {TYPE_TABS.map(t => {
+                const on = typeFilter === t;
+                const TabIcon = TYPE_ICON[t];
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTypeFilter(t)}
+                    aria-pressed={on}
+                    title={t === "all" ? "All order types" : t.replace("-", " ")}
+                    className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold capitalize transition-colors hover-elevate active-elevate-2 ${
+                      on ? "border-primary-border bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {TabIcon ? <TabIcon className="h-4 w-4" aria-hidden /> : null}
+                    <span className={t === "all" ? "" : "hidden sm:inline"}>{t === "all" ? "All types" : t.replace("-", " ")}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {tabGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border px-6 py-16 text-center">
+              <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                <ClipboardList className="h-6 w-6" aria-hidden />
+              </span>
+              <h2 className="text-base font-semibold">{filtersOn ? "Nothing matches those filters" : "No orders yet today"}</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                {filtersOn
+                  ? "Widen the status or type filter, or clear the search."
+                  : "Orders placed at a table, from a room or through the guest menu land here."}
+              </p>
+              {filtersOn && (
+                <button
+                  type="button"
+                  onClick={() => { setFilter("all"); setTypeFilter("all"); setSearch(""); }}
+                  className="mt-4 inline-flex min-h-10 items-center rounded-md border border-border bg-card px-4 text-sm font-semibold hover-elevate active-elevate-2"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            /* Packs to the width actually left over once the detail pane is
+               open, rather than to the viewport — the pane changes the column
+               count, and a breakpoint cannot see that. */
+            <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(17rem,1fr))]">
+              {tabGroups.map(order => {
+                const cfg = STATUS_CFG[order.status] ?? DEFAULT_STATUS;
+                const elapsed = Math.floor((Date.now() - new Date(order.placedAt).getTime()) / 60000);
+                const isUrgent = elapsed > 25 && !["served", "billed", "cancelled"].includes(order.status);
+                const TypeIcon = TYPE_ICON[order.type];
+                const open = selectedOrder?.id === order.id;
+                return (
+                  <li
+                    key={order.id}
+                    className={`flex flex-col overflow-hidden rounded-md border ${
+                      open ? "border-primary-border bg-primary/5"
+                        : isUrgent ? "border-danger-border bg-danger-subtle"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      aria-expanded={open}
+                      className="flex-1 p-3 text-left transition-colors hover-elevate active-elevate-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {TypeIcon ? <TypeIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : null}
+                            <span className="truncate text-base font-semibold leading-tight">{order.tableNo}</span>
+                            <span className="shrink-0 text-2xs text-muted-foreground">#{order.id}</span>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {order.customerName || order.waiter} · {order.guests} guests
+                          </p>
+                          {order.customerPhone && (
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                              <Phone className="h-3 w-3" aria-hidden />{order.customerPhone}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className={`inline-block rounded-pill px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                          <p className={`mt-1 text-2xs tabular-nums ${isUrgent ? "font-semibold text-danger" : "text-muted-foreground"}`}>{getElapsed(order.placedAt)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-1">
+                        {payMethodBadge(order.paymentMethod)}
+                        {order.roomNumber && <span className="rounded-md bg-info-subtle px-1.5 py-0.5 text-2xs font-semibold text-info">Room {order.roomNumber}</span>}
+                        {order.roundCount > 1 && <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-2xs font-semibold text-primary">{order.roundCount} rounds</span>}
+                      </div>
+
+                      <ul className="mt-2.5 space-y-1">
+                        {order.items.slice(0, 3).map((item, i) => {
+                          const { removes, prefs } = splitCustomizations(item.customizations);
+                          const adds = Array.isArray(item.addons) ? item.addons.map(a => a.name) : [];
+                          return (
+                            <li key={i} className="text-xs">
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <span className={`h-1.5 w-1.5 shrink-0 rounded-pill ${item.status === "ready" ? "bg-success" : item.status === "preparing" ? "bg-info" : "bg-muted-foreground/40"}`} aria-hidden />
+                                  <span className="truncate">{item.qty}× {item.name}</span>
+                                </span>
+                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                  {money(item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty)}
+                                </span>
+                              </span>
+                              {adds.length > 0 && <span className="ml-3.5 block truncate text-2xs text-success">Add: {adds.join(", ")}</span>}
+                              {removes.length > 0 && <span className="ml-3.5 block truncate text-2xs text-danger">No: {removes.join(", ")}</span>}
+                              {prefs.length > 0 && <span className="ml-3.5 block truncate text-2xs text-info">{prefs.join(", ")}</span>}
+                            </li>
+                          );
+                        })}
+                        {order.items.length > 3 && <li className="text-2xs text-muted-foreground">+{order.items.length - 3} more</li>}
+                      </ul>
+
+                      {order.specialReq && (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-warning-border bg-warning-subtle px-2 py-1.5 text-2xs text-warning">
+                          <AlertCircle className="mt-px h-3 w-3 shrink-0" aria-hidden />
+                          <span className="min-w-0">{order.specialReq}</span>
+                        </p>
+                      )}
+                    </button>
+
+                    {/* Quick actions live outside the card button — nesting them
+                        inside would be invalid markup and unreachable by keyboard. */}
+                    <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
+                      <span className="text-base font-semibold tabular-nums">{money(order.total)}</span>
+                      <span className="flex gap-1.5">
+                        {order.status === "new" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => advanceTab(order, "accepted")}
+                              className="flex min-h-9 items-center gap-1 rounded-md border border-success-border bg-success-subtle px-2.5 text-xs font-semibold text-success hover-elevate active-elevate-2"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" aria-hidden /> Accept
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cancelTab(order)}
+                              aria-label={`Cancel order ${order.id}`}
+                              className="flex h-9 w-9 items-center justify-center rounded-md border border-danger-border bg-danger-subtle text-danger hover-elevate active-elevate-2"
+                            >
+                              <XCircle className="h-3.5 w-3.5" aria-hidden />
+                            </button>
+                          </>
+                        ) : cfg.next ? (
+                          <button
+                            type="button"
+                            onClick={() => advanceTab(order, cfg.next!)}
+                            className="flex min-h-9 items-center gap-1 rounded-md border border-primary-border bg-primary px-2.5 text-xs font-semibold text-primary-foreground hover-elevate active-elevate-2"
+                          >
+                            {cfg.next === "preparing" ? <ChefHat className="h-3.5 w-3.5" aria-hidden />
+                              : cfg.next === "served" ? <Truck className="h-3.5 w-3.5" aria-hidden />
+                              : <CheckCircle className="h-3.5 w-3.5" aria-hidden />}
+                            {STATUS_CFG[cfg.next].label}
+                          </button>
+                        ) : null}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>
 
-      {/* Order Detail Panel */}
-      {selectedOrder && (() => {
-        const detailCfg = STATUS_CFG[selectedOrder.status] ?? DEFAULT_STATUS;
-        return (
-        <>
-        {/* Below xl this was `hidden`, so tapping an order on a tablet did nothing at
-            all. It now opens as a sheet over the list, and remains the fixed sidebar on
-            a desktop. */}
+      {/* ── Right: the open tab ──────────────────────────────────────────────
+          A real second column from 1024px, so opening an order no longer costs
+          you the list. Below that it is a sheet, and its primary action sits in
+          a pinned footer rather than at the end of a long scroll. */}
+      {selectedOrder && (
         <button
           type="button"
           aria-label="Close order details"
           onClick={() => setSelectedOrder(null)}
-          className="xl:hidden fixed inset-0 z-30 bg-foreground/40"
+          className="fixed inset-0 z-30 bg-foreground/40 lg:hidden"
         />
-        <div className="flex fixed inset-y-0 right-0 z-40 w-full max-w-md xl:static xl:z-auto xl:w-80 xl:max-w-none border-l border-border flex-col bg-card">
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <h3 className="font-semibold">Order Details</h3>
-            <button onClick={() => setSelectedOrder(null)} className="text-muted-foreground hover:text-foreground" aria-label="Close order details"><X className="h-4 w-4" /></button>
+      )}
+      <aside
+        className={`${selectedOrder ? "flex" : "hidden lg:flex"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card lg:static lg:z-auto lg:w-[21rem] lg:max-w-none xl:w-[24rem]`}
+        aria-label="Order details"
+      >
+        {!selectedOrder ? (
+          <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
+            <ClipboardList className="mb-4 h-12 w-12" aria-hidden />
+            <p className="text-sm font-semibold text-foreground">No order open</p>
+            <p className="mt-1 text-sm">Pick an order on the left to see its lines, adjust it, or move the tab.</p>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="rounded-lg bg-muted p-3">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="font-semibold">{selectedOrder.tableNo}</p>
-                  <p className="text-xs text-muted-foreground">{selectedOrder.id}</p>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${detailCfg.bg} ${detailCfg.color}`}>
-                  {detailCfg.label}
-                </span>
+        ) : (
+          <>
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{selectedOrder.tableNo}</p>
+                <p className="text-xs text-muted-foreground">
+                  #{selectedOrder.id} · {getElapsed(selectedOrder.placedAt)}
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <div>Type: <span className="text-foreground capitalize">{selectedOrder.type}</span></div>
-                <div>Guests: <span className="text-foreground">{selectedOrder.guests}</span></div>
-                <div>Customer: <span className="text-foreground">{selectedOrder.customerName || "—"}</span></div>
-                <div>Mobile: <span className="text-foreground">{selectedOrder.customerPhone || "—"}</span></div>
-                <div>Table: <span className="text-foreground">{selectedOrder.tableNo}</span></div>
-                {selectedOrder.roomNumber && <div>Room: <span className="text-foreground">{selectedOrder.roomNumber}</span></div>}
-                <div className="flex items-center gap-1.5">Payment: {payMethodBadge(selectedOrder.paymentMethod)}</div>
-                {selectedOrder.paymentStatus && <div>Pay status: <span className="text-foreground capitalize">{selectedOrder.paymentStatus}</span></div>}
-                <div>Time: <span className="text-foreground">{getElapsed(selectedOrder.placedAt)}</span></div>
-              </div>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className={`rounded-pill px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ${detailCfg.bg} ${detailCfg.color}`}>{detailCfg.label}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  aria-label="Close order details"
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover-elevate"
+                >
+                  <span className="lg:hidden"><ChevronLeft className="h-5 w-5" aria-hidden /></span>
+                  <span className="hidden lg:block"><X className="h-5 w-5" aria-hidden /></span>
+                </button>
+              </span>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 custom-scrollbar">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-md border border-border bg-background p-3 text-xs">
+                {([
+                  ["Type", <span key="t" className="capitalize">{selectedOrder.type.replace("-", " ")}</span>],
+                  ["Guests", String(selectedOrder.guests)],
+                  ["Customer", selectedOrder.customerName || "—"],
+                  ["Mobile", selectedOrder.customerPhone || "—"],
+                  ...(selectedOrder.roomNumber ? [["Room", selectedOrder.roomNumber]] : []),
+                  ["Payment", payMethodBadge(selectedOrder.paymentMethod)],
+                  ...(selectedOrder.paymentStatus ? [["Pay status", <span key="p" className="capitalize">{selectedOrder.paymentStatus}</span>]] : []),
+                ] as [string, React.ReactNode][]).map(([k, v]) => (
+                  <div key={k} className="min-w-0">
+                    <dt className="text-2xs uppercase tracking-wide text-muted-foreground">{k}</dt>
+                    <dd className="mt-0.5 truncate">{v}</dd>
+                  </div>
+                ))}
+              </dl>
 
               {/* Full payment breakdown — how it was paid (UPI id / UTR), by whom and from which panel */}
               {(selectedOrder.upiId || selectedOrder.utr || selectedOrder.collectedBy || selectedOrder.collectedFrom) && (
-                <div className="mt-3 rounded-lg border border-border bg-card p-3 space-y-1.5">
-                  <p className="text-2xs font-semibold uppercase tracking-wider text-success">Payment received</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    {selectedOrder.upiId && <div>UPI ID: <span className="text-foreground break-all">{selectedOrder.upiId}</span></div>}
-                    {selectedOrder.utr && <div>UTR / Ref: <span className="text-foreground break-all">{selectedOrder.utr}</span></div>}
-                    {selectedOrder.collectedBy && <div>Collected by: <span className="text-foreground">{selectedOrder.collectedBy}</span></div>}
-                    {selectedOrder.collectedFrom && <div>From panel: <span className="text-foreground">{selectedOrder.collectedFrom}</span></div>}
-                  </div>
+                <section className="rounded-md border border-success-border bg-success-subtle p-3">
+                  <h2 className="text-2xs font-semibold uppercase tracking-wide text-success">Payment received</h2>
+                  <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                    {([
+                      ...(selectedOrder.upiId ? [["UPI ID", selectedOrder.upiId]] : []),
+                      ...(selectedOrder.utr ? [["UTR / ref", selectedOrder.utr]] : []),
+                      ...(selectedOrder.collectedBy ? [["Collected by", selectedOrder.collectedBy]] : []),
+                      ...(selectedOrder.collectedFrom ? [["From panel", selectedOrder.collectedFrom]] : []),
+                    ] as [string, string][]).map(([k, v]) => (
+                      <div key={k} className="min-w-0">
+                        <dt className="text-2xs text-muted-foreground">{k}</dt>
+                        <dd className="break-all">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+
+              {selectedOrder.specialReq && (
+                <p className="flex items-start gap-1.5 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+                  <AlertTriangle className="mt-px h-4 w-4 shrink-0" aria-hidden />
+                  <span className="min-w-0">{selectedOrder.specialReq}</span>
+                </p>
+              )}
+
+              <section>
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Lines</h2>
+                  {singleRound && selectedOrder.items.length > 1 && (
+                    <p className="text-2xs text-muted-foreground">Tick to split onto a new bill</p>
+                  )}
                 </div>
+                <ul className="divide-y divide-border rounded-md border border-border">
+                  {selectedOrder.items.map((item, i) => {
+                    const adjusted = item.voided || item.comped;
+                    const { removes, prefs } = splitCustomizations(item.customizations);
+                    return (
+                      <li key={i} className="p-2.5">
+                        <div className="flex items-start justify-between gap-2.5">
+                          {singleRound && !adjusted && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Move ${item.name} to a separate bill`}
+                              checked={splitPicks.includes(i)}
+                              onChange={e => setSplitPicks(p => e.target.checked ? [...p, i] : p.filter(x => x !== i))}
+                              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className={`flex flex-wrap items-center gap-1.5 text-sm font-medium ${adjusted ? "text-muted-foreground line-through" : ""}`}>
+                              {item.qty}× {item.name}
+                              {item.variant && <span className="rounded-md bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">{item.variant}</span>}
+                            </p>
+                            <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
+                            {Array.isArray(item.addons) && item.addons.length > 0 && (
+                              <p className="mt-0.5 text-xs text-success">Add: {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
+                            )}
+                            {removes.length > 0 && <p className="mt-0.5 text-xs text-danger">No: {removes.join(", ")}</p>}
+                            {prefs.length > 0 && <p className="mt-0.5 text-xs text-info">{prefs.join(" · ")}</p>}
+                            {item.notes && (
+                              <p className="mt-0.5 flex items-start gap-1 text-xs text-warning">
+                                <StickyNote className="mt-0.5 h-3 w-3 shrink-0" aria-hidden /> {item.notes}
+                              </p>
+                            )}
+                            <p className={`mt-0.5 text-2xs capitalize ${item.status === "ready" ? "text-success" : item.status === "preparing" ? "text-info" : "text-muted-foreground"}`}>{item.status}</p>
+                          </div>
+                          <span className={`shrink-0 text-sm font-semibold tabular-nums ${adjusted ? "text-muted-foreground line-through" : ""}`}>
+                            {money(item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty)}
+                          </span>
+                        </div>
+                        <LineAdjustControls
+                          disabled={adjusted || !singleRound || selectedOrder.status === "cancelled"}
+                          disabledHint={!adjusted && !singleRound ? "Open a single round to void or comp its lines." : undefined}
+                          onAdjust={(kind, reason) => adjustLine(i, item.name, kind, reason)}
+                          className="mt-2"
+                        />
+                      </li>
+                    );
+                  })}
+                  <li className="flex items-baseline justify-between gap-2 bg-background p-2.5">
+                    <span className="text-sm font-semibold">Total</span>
+                    <span className="text-lg font-semibold tabular-nums">{money(selectedOrder.total)}</span>
+                  </li>
+                </ul>
+              </section>
+
+              {singleRound && (
+                <AdjustmentHistory restaurantId={restaurantId} orderId={selectedOrderId} refreshKey={adjustSeq} />
+              )}
+
+              {/* A multi-round tab still gets a ticket and a bill — only per-line adjusting
+                  is ambiguous there, not printing. */}
+              <PrintControls restaurantId={restaurantId} orderId={selectedOrderId} />
+
+              {/* ── Floor operations: move the tab, split the bill, merge two tabs ── */}
+              {singleRound && !["billed", "cancelled"].includes(selectedOrder.status) && (
+                <section className="space-y-2.5 rounded-md border border-border p-3">
+                  <h2 className="text-xs uppercase tracking-wide text-muted-foreground">Floor</h2>
+
+                  <div className="flex gap-2">
+                    <select
+                      value={moveTarget}
+                      onChange={e => setMoveTarget(e.target.value)}
+                      aria-label="Move this tab to another table"
+                      className={selectField}
+                    >
+                      <option value="">Move tab to…</option>
+                      {tables
+                        .filter(t => t.number !== selectedOrder.tableNo)
+                        .map(t => <option key={t.id} value={t.number}>{t.number} · {t.status}</option>)}
+                    </select>
+                    <button type="button" onClick={moveTab} disabled={!moveTarget || floorBusy} className={ghostBtn}>
+                      <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden /> Move
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={splitTab}
+                    disabled={splitPicks.length === 0 || splitPicks.length === selectedOrder.items.length || floorBusy}
+                    className={`${ghostBtn} w-full`}
+                  >
+                    <Split className="h-3.5 w-3.5" aria-hidden />
+                    {splitPicks.length === 0
+                      ? "Split — tick lines above first"
+                      : splitPicks.length === selectedOrder.items.length
+                        ? "Leave at least one line on this bill"
+                        : `Split ${splitPicks.length} line${splitPicks.length > 1 ? "s" : ""} onto a new bill`}
+                  </button>
+
+                  <div className="flex gap-2">
+                    <select
+                      value={mergeFrom}
+                      onChange={e => setMergeFrom(e.target.value)}
+                      aria-label="Merge another open tab into this one"
+                      className={selectField}
+                    >
+                      <option value="">Merge another tab in…</option>
+                      {liveOrders
+                        .filter(o => o.id !== selectedOrder.id && !["billed", "cancelled"].includes(o.status) && o.paymentStatus !== "paid")
+                        .map(o => <option key={o.id} value={o.id}>{o.tableNo} · #{o.id} · ₹{o.total}</option>)}
+                    </select>
+                    <button type="button" onClick={mergeTab} disabled={!mergeFrom || floorBusy} className={ghostBtn}>
+                      <Merge className="h-3.5 w-3.5" aria-hidden /> Merge
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {singleRound && (selectedOrder.paymentStatus === "paid" || selectedOrder.status === "billed") && (
+                <RefundControls outstanding={selectedOrder.total} onRefund={refundOrder} />
               )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Items</p>
-                {singleRound && selectedOrder.items.length > 1 && (
-                  <span className="text-2xs text-muted-foreground">Tick lines to split them onto a separate bill</span>
-                )}
-              </div>
-              {selectedOrder.items.map((item, i) => {
-                const adjusted = item.voided || item.comped;
-                return (
-                <div key={i} className="py-2 border-b border-border">
-                  <div className="flex justify-between items-start gap-3">
-                    {singleRound && !adjusted && (
-                      <input
-                        type="checkbox"
-                        aria-label={`Move ${item.name} to a separate bill`}
-                        checked={splitPicks.includes(i)}
-                        onChange={e => setSplitPicks(p => e.target.checked ? [...p, i] : p.filter(x => x !== i))}
-                        className="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-medium flex items-center gap-2 flex-wrap ${adjusted ? "line-through text-muted-foreground" : ""}`}>
-                        {item.qty}× {item.name}
-                        {item.variant && <span className="text-2xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{item.variant}</span>}
-                      </p>
-                      <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
-                      {Array.isArray(item.addons) && item.addons.length > 0 && (
-                        <p className="text-xs text-success mt-0.5">Add: {item.addons.map(a => `${a.name}${a.price ? ` (₹${a.price})` : ""}`).join(", ")}</p>
-                      )}
-                      {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
-                        {removes.length > 0 && <p className="text-xs text-danger mt-0.5">Remove: {removes.join(", ")}</p>}
-                        {prefs.length > 0 && <p className="text-xs text-info mt-0.5">{prefs.join(" · ")}</p>}
-                      </>); })()}
-                      {item.notes && <p className="text-xs text-warning mt-0.5"><StickyNote className="h-3 w-3 inline mb-0.5" /> {item.notes}</p>}
-                      <span className={`text-xs ${item.status === "ready" ? "text-success" : item.status === "preparing" ? "text-info" : "text-muted-foreground"}`}>{item.status}</span>
-                    </div>
-                    <span className={`font-semibold shrink-0 ${adjusted ? "line-through text-muted-foreground" : "text-primary"}`}>₹{item.subtotal && item.subtotal > 0 ? item.subtotal : item.price * item.qty}</span>
-                  </div>
-                  <LineAdjustControls
-                    disabled={adjusted || !singleRound || selectedOrder.status === "cancelled"}
-                    disabledHint={!adjusted && !singleRound ? "Open a single round to void or comp its lines." : undefined}
-                    onAdjust={(kind, reason) => adjustLine(i, item.name, kind, reason)}
-                    className="mt-1.5"
-                  />
-                </div>
-                );
-              })}
-              <div className="flex justify-between font-semibold mt-2 pt-2">
-                <span>Total</span>
-                <span className="text-primary">₹{selectedOrder.total}</span>
-              </div>
-            </div>
-
-            {singleRound && (
-              <AdjustmentHistory restaurantId={restaurantId} orderId={selectedOrderId} refreshKey={adjustSeq} />
-            )}
-
-            {/* A multi-round tab still gets a ticket and a bill — only per-line adjusting
-                is ambiguous there, not printing. */}
-            <PrintControls restaurantId={restaurantId} orderId={selectedOrderId} />
-
-            {/* ── Floor operations: move the tab, split the bill, merge two tabs ── */}
-            {singleRound && !["billed", "cancelled"].includes(selectedOrder.status) && (
-              <div className="space-y-2.5 rounded-lg border border-border bg-card p-3">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Floor</p>
-
-                <div className="flex gap-2">
-                  <select
-                    value={moveTarget}
-                    onChange={e => setMoveTarget(e.target.value)}
-                    aria-label="Move this tab to another table"
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-muted px-2 py-1.5 text-xs"
-                  >
-                    <option value="">Move tab to…</option>
-                    {tables
-                      .filter(t => t.number !== selectedOrder.tableNo)
-                      .map(t => <option key={t.id} value={t.number}>{t.number} · {t.status}</option>)}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={moveTab}
-                    disabled={!moveTarget || floorBusy}
-                    className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover-elevate disabled:opacity-40"
-                  >
-                    <ArrowRightLeft className="h-3.5 w-3.5" /> Move
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={splitTab}
-                  disabled={splitPicks.length === 0 || splitPicks.length === selectedOrder.items.length || floorBusy}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-muted py-1.5 text-xs font-semibold hover-elevate disabled:opacity-40"
-                >
-                  <Split className="h-3.5 w-3.5" />
-                  {splitPicks.length === 0
-                    ? "Split — tick lines above first"
-                    : splitPicks.length === selectedOrder.items.length
-                      ? "Leave at least one line on this bill"
-                      : `Split ${splitPicks.length} line${splitPicks.length > 1 ? "s" : ""} onto a new bill`}
-                </button>
-
-                <div className="flex gap-2">
-                  <select
-                    value={mergeFrom}
-                    onChange={e => setMergeFrom(e.target.value)}
-                    aria-label="Merge another open tab into this one"
-                    className="min-w-0 flex-1 rounded-lg border border-border bg-muted px-2 py-1.5 text-xs"
-                  >
-                    <option value="">Merge another tab in…</option>
-                    {liveOrders
-                      .filter(o => o.id !== selectedOrder.id && !["billed", "cancelled"].includes(o.status) && o.paymentStatus !== "paid")
-                      .map(o => <option key={o.id} value={o.id}>{o.tableNo} · #{o.id} · ₹{o.total}</option>)}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={mergeTab}
-                    disabled={!mergeFrom || floorBusy}
-                    className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover-elevate disabled:opacity-40"
-                  >
-                    <Merge className="h-3.5 w-3.5" /> Merge
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {singleRound && (selectedOrder.paymentStatus === "paid" || selectedOrder.status === "billed") && (
-              <RefundControls outstanding={selectedOrder.total} onRefund={refundOrder} />
-            )}
-
-            {selectedOrder.specialReq && (
-              <div className="rounded-lg bg-warning-subtle border border-warning-border p-3 text-xs text-warning">
-                <AlertTriangle className="h-3.5 w-3.5 inline mb-0.5" /> {selectedOrder.specialReq}
-              </div>
-            )}
-
-            <div className="space-y-2">
+            {/* Pinned: the one thing this order needs next, plus print and cancel. */}
+            <div className="shrink-0 space-y-2 border-t border-border p-4">
               {detailCfg.next && (
                 <button
+                  type="button"
                   onClick={() => { advanceTab(selectedOrder, detailCfg.next!); setSelectedOrder(null); }}
-                  className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm"
+                  className="min-h-12 w-full rounded-md border border-primary-border bg-primary text-sm font-semibold text-primary-foreground hover-elevate active-elevate-2"
                 >
-                  Mark as {STATUS_CFG[detailCfg.next!]?.label ?? detailCfg.next}
+                  Mark as {STATUS_CFG[detailCfg.next].label}
                 </button>
               )}
-              <button onClick={() => window.print()} className="w-full py-2.5 rounded-lg border border-border hover:bg-muted text-sm font-semibold flex items-center justify-center gap-2">
-                <Printer className="h-4 w-4" /> Print KOT
-              </button>
-              {selectedOrder.status !== "cancelled" && (
-                <button onClick={() => { cancelTab(selectedOrder); setSelectedOrder(null); }} className="w-full py-2.5 rounded-lg border border-danger-border text-danger hover:bg-danger-subtle text-sm font-semibold">
-                  Cancel Order{(selectedOrder.roundCount ?? 1) > 1 ? ` · all ${selectedOrder.roundCount} rounds` : ""}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2"
+                >
+                  <Printer className="h-3.5 w-3.5" aria-hidden /> Print KOT
                 </button>
-              )}
+                {selectedOrder.status !== "cancelled" && (
+                  <button
+                    type="button"
+                    onClick={() => { cancelTab(selectedOrder); setSelectedOrder(null); }}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-danger-border bg-card text-xs font-semibold text-danger hover-elevate active-elevate-2"
+                  >
+                    <XCircle className="h-3.5 w-3.5" aria-hidden />
+                    Cancel{(selectedOrder.roundCount ?? 1) > 1 ? ` all ${selectedOrder.roundCount}` : ""}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-        </>
-        );
-      })()}
+          </>
+        )}
+      </aside>
 
+      {/* ── New order ────────────────────────────────────────────────────── */}
       {newOrderForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-          <div className="w-full max-w-md rounded-lg bg-card border border-border p-6 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">New Order</h3>
-              <button onClick={() => setNewOrderForm(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <input className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm" placeholder="Table / Counter" value={newOrder.tableName} onChange={e => setNewOrder(o => ({ ...o, tableName: e.target.value }))} />
-              <input className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm" placeholder="Customer name" value={newOrder.customerName} onChange={e => setNewOrder(o => ({ ...o, customerName: e.target.value }))} />
-              <select
-                className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm"
-                value={newOrder.type}
-                onChange={e => setNewOrder(o => ({ ...o, type: e.target.value }))}
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="New order"
+            className="flex max-h-[calc(100dvh-1rem)] w-full flex-col overflow-hidden rounded-t-md border border-border bg-card sm:max-h-[calc(100dvh-2rem)] sm:max-w-md sm:rounded-md"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold">New order</h2>
+              <button
+                type="button"
+                onClick={() => setNewOrderForm(false)}
+                aria-label="Close"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover-elevate"
               >
-                <option value="dine_in">Dine-in</option>
-                <option value="takeaway">Takeaway</option>
-                <option value="delivery">Delivery</option>
-                <option value="room_service">Room service</option>
-              </select>
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Table / counter</span>
+                  <input className={selectField} placeholder="Counter" value={newOrder.tableName} onChange={e => setNewOrder(o => ({ ...o, tableName: e.target.value }))} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Customer</span>
+                  <input className={selectField} placeholder="Walk-in" value={newOrder.customerName} onChange={e => setNewOrder(o => ({ ...o, customerName: e.target.value }))} />
+                </label>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted-foreground">Type</span>
+                <select className={selectField} value={newOrder.type} onChange={e => setNewOrder(o => ({ ...o, type: e.target.value }))}>
+                  <option value="dine_in">Dine-in</option>
+                  <option value="takeaway">Takeaway</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="room_service">Room service</option>
+                </select>
+              </label>
 
               <div className="flex gap-2">
-                <select
-                  className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm"
-                  value={linePick}
-                  onChange={e => setLinePick(e.target.value)}
-                >
+                <select className={selectField} value={linePick} onChange={e => setLinePick(e.target.value)} aria-label="Add a dish">
                   <option value="">Add a dish…</option>
                   {menuItems.map((m: any) => (
                     <option key={m.id} value={m.id}>{m.name} — ₹{m.discountedPrice || m.price}</option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  onClick={addLine}
-                  disabled={!linePick}
-                  className="px-4 rounded-lg bg-muted hover-elevate disabled:opacity-40 text-sm font-semibold"
-                >
-                  Add
-                </button>
+                <button type="button" onClick={addLine} disabled={!linePick} className={ghostBtn}>Add</button>
               </div>
 
               {newOrder.lines.length > 0 && (
-                <div className="rounded-lg border border-border divide-y divide-border">
+                <ul className="divide-y divide-border rounded-md border border-border">
                   {newOrder.lines.map(line => {
                     const mi = menuItemById(line.menuItemId);
                     const unit = parseFloat(String(mi?.discountedPrice || mi?.price || 0));
                     return (
-                      <div key={line.menuItemId} className="flex items-center gap-2 px-3 py-2">
-                        <span className="flex-1 text-sm truncate">{mi?.name ?? "Item"}</span>
-                        <button type="button" onClick={() => setLineQty(line.menuItemId, line.qty - 1)}
-                          className="h-7 w-7 rounded-lg bg-muted hover-elevate text-sm" aria-label="Reduce quantity">−</button>
-                        <span className="w-6 text-center text-sm tabular-nums">{line.qty}</span>
-                        <button type="button" onClick={() => setLineQty(line.menuItemId, line.qty + 1)}
-                          className="h-7 w-7 rounded-lg bg-muted hover-elevate text-sm" aria-label="Increase quantity">+</button>
-                        <span className="w-16 text-right text-sm tabular-nums text-muted-foreground">₹{(unit * line.qty).toFixed(2)}</span>
-                      </div>
+                      <li key={line.menuItemId} className="flex items-center gap-2 px-3 py-2">
+                        <span className="min-w-0 flex-1 truncate text-sm">{mi?.name ?? "Item"}</span>
+                        <button
+                          type="button"
+                          onClick={() => setLineQty(line.menuItemId, line.qty - 1)}
+                          aria-label={`One fewer ${mi?.name ?? "item"}`}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover-elevate active-elevate-2"
+                        >
+                          <Minus className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                        <span className="w-6 shrink-0 text-center text-sm tabular-nums">{line.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => setLineQty(line.menuItemId, line.qty + 1)}
+                          aria-label={`One more ${mi?.name ?? "item"}`}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover-elevate active-elevate-2"
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                        <span className="w-16 shrink-0 text-right text-sm tabular-nums text-muted-foreground">₹{(unit * line.qty).toFixed(2)}</span>
+                      </li>
                     );
                   })}
-                  <div className="flex justify-between px-3 py-2 text-sm font-semibold">
-                    <span>Subtotal</span>
-                    <span className="tabular-nums">₹{newOrderTotal.toFixed(2)}</span>
-                  </div>
-                </div>
+                </ul>
               )}
             </div>
-            <button disabled={creating || newOrder.lines.length === 0} onClick={submitNewOrder} className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
-              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-              {newOrder.lines.length > 0 ? `Create Order · ${newOrder.lines.length} item${newOrder.lines.length > 1 ? "s" : ""}` : "Create Order"}
-            </button>
+
+            <div className="shrink-0 border-t border-border p-4">
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">Subtotal</span>
+                <span className="text-xl font-semibold tabular-nums">₹{newOrderTotal.toFixed(2)}</span>
+              </div>
+              <button
+                type="button"
+                disabled={creating || newOrder.lines.length === 0}
+                onClick={submitNewOrder}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-primary-border bg-primary text-sm font-semibold text-primary-foreground hover-elevate active-elevate-2 disabled:opacity-50"
+              >
+                {creating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+                {newOrder.lines.length > 0 ? `Create order · ${newOrder.lines.length} item${newOrder.lines.length > 1 ? "s" : ""}` : "Create order"}
+              </button>
+            </div>
           </div>
         </div>
       )}

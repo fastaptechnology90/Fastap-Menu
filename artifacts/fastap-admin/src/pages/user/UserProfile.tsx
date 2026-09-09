@@ -1,16 +1,45 @@
 import { useState, useEffect } from "react";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { useUser } from "@/contexts/UserContext";
+import { useLocaleAccessibility } from "@/contexts/LocaleAccessibilityContext";
+import { usePwa } from "@/contexts/PwaContext";
 import { GuestHeader } from "@/components/user/GuestUI";
 import { useGuestBack } from "@/hooks/useGuestBack";
 import { useGuestNavigate } from "@/hooks/useGuestNavigate";
 import { publicApi } from "@/lib/api";
 import {
-  ChevronLeft, ChevronRight, Wallet, Star, Gift, Crown,
-  History, Heart, LogOut, Plus, ArrowUpRight, ArrowDownLeft,
-  Bell, Shield, Globe, Headphones, Award, Zap, Brain, Wifi, Smartphone, Monitor, Film,
-  Receipt, CalendarDays, Hourglass, Flower2, Martini, PartyPopper,
+  LANGUAGES, ACCESSIBILITY_FEATURES,
+  type LanguageId, type AccessibilityFeatureId, type AccessibilitySettings,
+} from "@/lib/localeAccessibilityCatalog";
+import {
+  ChevronRight, Wallet, Star, Gift, Crown, Globe, Accessibility,
+  History, Heart, LogOut, Plus, Download, Smartphone,
+  Bell, Headphones, Zap, Wifi, Hotel,
+  Receipt, CalendarDays, Hourglass, Volume2, Type, Contrast, Eye,
 } from "lucide-react";
+
+/**
+ * Language and accessibility used to be a screen of their own at `/user/language`, and
+ * push notifications and "install this app" a second one at `/user/pwa`. Neither is a
+ * place a diner goes; both are settings, and they now live in the settings tab here.
+ */
+const A11Y_KEYS: Record<AccessibilityFeatureId, keyof AccessibilitySettings> = {
+  voice_menu: "voiceMenu",
+  large_text: "largeText",
+  high_contrast: "highContrast",
+  screen_reader: "screenReader",
+};
+
+const A11Y_ICONS: Record<AccessibilityFeatureId, typeof Volume2> = {
+  voice_menu: Volume2, large_text: Type, high_contrast: Contrast, screen_reader: Eye,
+};
+
+const PUSH_PREF_ROWS = [
+  { key: "orderReady" as const, label: "Order ready alerts" },
+  { key: "waitlist" as const, label: "Waitlist called" },
+  { key: "offers" as const, label: "Offers & happy hour" },
+  { key: "loyalty" as const, label: "Loyalty rewards" },
+];
 
 /**
  * Tier names only.
@@ -61,7 +90,13 @@ export default function UserProfile() {
   const goGuest = useGuestNavigate();
   const goBack = useGuestBack();
   const { user, setUser, refreshUser, reorderFromOrder, favorites, repeatFavorite, venue } = useUser();
+  const { language, accessibility, setLanguage, toggleAccessibility } = useLocaleAccessibility();
+  const {
+    isStandalone, canInstall, isInstalled, pushPermission, pushPrefs,
+    installApp, enablePush, updatePushPrefs,
+  } = usePwa();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [settingsNote, setSettingsNote] = useState<{ text: string; ok: boolean } | null>(null);
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargeAmt, setRechargeAmt] = useState("");
   const [rechargeError, setRechargeError] = useState("");
@@ -71,6 +106,13 @@ export default function UserProfile() {
   const [recharging, setRecharging] = useState(false);
   const [walletError, setWalletError] = useState("");
   const [ladder, setLadder] = useState<LoyaltyLadder | null>(null);
+
+  // One line used to carry both confirmations and failures in success green, so
+  // "Permission denied" read as good news.
+  function note(text: string, ok = true) {
+    setSettingsNote({ text, ok });
+    setTimeout(() => setSettingsNote(null), 3000);
+  }
 
   // The tier ladder is the server's, not a constant in this file.
   useEffect(() => {
@@ -209,36 +251,23 @@ export default function UserProfile() {
                   {ladderProgress.remaining.toLocaleString("en-IN")} more points to reach <strong className="text-foreground">{ladderProgress.nextTier}</strong>
                 </p>
               )}
-              <button type="button" onClick={() => goGuest("/user/loyalty")} className="guest-btn-secondary mt-3 px-4 text-xs">
-                See the full ladder
-              </button>
             </div>
 
             {/* Quick Actions */}
             <div className="guest-card divide-y divide-border overflow-hidden p-0">
               {[
-                { icon: Brain, label: "AI Personalization", sub: "Menu, combos, dietary & spending AI", action: () => goGuest("/user/ai") },
-                { icon: Star, label: "Loyalty & Membership", sub: "Tiers, points & birthday rewards", action: () => goGuest("/user/loyalty") },
-                { icon: Wallet, label: "Customer Wallet", sub: "Recharge, cashback & transfer", action: () => goGuest("/user/wallet") },
+                // Every entry here is a screen that exists and does something. The list
+                // used to run to eighteen and half of them were scaffolding: an AI hub,
+                // a kiosk, a PWA diagnostics page, a prize wheel, a second wallet and a
+                // second loyalty screen that both restated what this page already shows.
                 { icon: Heart, label: "Browse Menu", sub: "Explore dishes & place an order", action: () => goGuest("/user/menu") },
-                { icon: Bell, label: "Orders & Tracking", sub: "View order history & live status", action: () => setActiveTab("orders") },
-                { icon: Headphones, label: "Live Support", sub: "Chat, WhatsApp, voice, tickets & emergency", action: () => goGuest("/user/support") },
-                { icon: Globe, label: "Language & Accessibility", sub: "Hindi, English, regional languages & a11y", action: () => goGuest("/user/language") },
-                { icon: Wifi, label: "Offline & Low Internet", sub: "Cached menu, order sync & data saver", action: () => goGuest("/user/offline") },
-                { icon: Smartphone, label: "PWA App Experience", sub: "Install app, push notifications & shortcuts", action: () => goGuest("/user/pwa") },
-                { icon: Monitor, label: "Smart Kiosk & Self Order", sub: "Self order, checkout, NFC, QR & tokens", action: () => goGuest("/user/kiosk") },
-                { icon: Film, label: "Digital Experience", sub: "Live offers, videos, promos, themes & FX", action: () => goGuest("/user/experience") },
-                { icon: Star, label: "Social & Reviews", sub: "Ratings, reviews, photos, share & referrals", action: () => goGuest("/user/reviews") },
-                // These six pages existed with no way in: the only links to them lived in
-                // a service sheet on the menu that nothing ever opened, so the running
-                // bill, reservations, the queue, the spa, the bar and events were all
-                // dead ends unless the guest typed the URL.
                 { icon: Receipt, label: "Table Bill & Service", sub: "Running bill, split it, call a waiter", action: () => goGuest("/user/dining") },
+                { icon: Bell, label: "Orders & Tracking", sub: "View order history & live status", action: () => setActiveTab("orders") },
                 { icon: CalendarDays, label: "Book a Table", sub: "Reserve a table, or a room, spa or event slot", action: () => goGuest("/user/reserve") },
                 { icon: Hourglass, label: "Join the Queue", sub: "Take a token and track your place", action: () => goGuest("/user/queue") },
-                { icon: Flower2, label: "Spa & Wellness", sub: "Treatments, therapists & memberships", action: () => goGuest("/user/spa") },
-                { icon: Martini, label: "Bar & Nightlife", sub: "Happy hour, tables, lounges & DJ nights", action: () => goGuest("/user/bar") },
-                { icon: PartyPopper, label: "Events & Banquets", sub: "Halls, catering, decor & quotations", action: () => goGuest("/user/events") },
+                { icon: Hotel, label: "Room Services", sub: "Room service, housekeeping & wake-up calls", action: () => goGuest("/user/hotel") },
+                { icon: Headphones, label: "Live Support", sub: "Chat, WhatsApp, voice, tickets & emergency", action: () => goGuest("/user/support") },
+                { icon: Wifi, label: "Offline & Low Internet", sub: "Cached menu, order sync & data saver", action: () => goGuest("/user/offline") },
               ].map(item => (
                 <button key={item.label} onClick={item.action} className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-all">
                   <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
@@ -281,18 +310,6 @@ export default function UserProfile() {
                 )}
               </div>
             </div>
-
-            <button onClick={() => goGuest("/user/loyalty")} className="w-full py-3 rounded-xl bg-warning-subtle border border-warning-border text-warning text-sm font-semibold hover:bg-warning-subtle">
-              Open Loyalty Hub — Tiers, Points & Rewards
-            </button>
-
-            <button onClick={() => goGuest("/user/wallet")} className="w-full py-3 rounded-xl bg-success-subtle border border-success-border text-success text-sm font-semibold hover:bg-success-subtle">
-              Open Full Wallet — Recharge, Transfer & Cashback
-            </button>
-
-            <button onClick={() => goGuest("/user/ai")} className="w-full py-3 rounded-xl bg-muted border border-primary text-primary text-sm font-semibold hover:bg-muted">
-              Open AI Hub — Personalized Menu, Combos & Spending Insights
-            </button>
 
             {/* Recharge */}
             <div className="rounded-2xl bg-card border border-border p-4">
@@ -445,27 +462,140 @@ export default function UserProfile() {
           </div>
         )}
 
-        {/* Settings Tab */}
+        {/* Settings Tab — language, accessibility and notifications used to be two
+            separate screens a diner never opened. They are settings, so they live here. */}
         {activeTab === "settings" && (
-          <div className="rounded-2xl bg-card border border-border divide-y divide-border">
-            {[
-              { icon: Shield, label: "Privacy & Security", sub: "Device management, sessions", action: () => goGuest("/user/security") },
-              { icon: Brain, label: "Future AI Roadmap", sub: "Voice ordering, virtual waiter & more", action: () => goGuest("/user/future-ai") },
-              { icon: Bell, label: "Notification Preferences", sub: "Push, SMS, WhatsApp", action: () => goGuest("/user/pwa") },
-              { icon: Globe, label: "Language & Region", sub: "English · India (IST)", action: () => goGuest("/user/language") },
-            ].map(item => (
-              <button key={item.label} onClick={"action" in item ? item.action : undefined} className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-all">
-                <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
-                  <item.icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.sub}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
+          <>
+            {settingsNote && (
+              <p
+                role={settingsNote.ok ? undefined : "alert"}
+                className={`rounded-xl border px-3 py-2 text-xs ${settingsNote.ok ? "border-success-border bg-success-subtle text-success" : "border-danger-border bg-danger-subtle text-danger"}`}
+              >
+                {settingsNote.text}
+              </p>
+            )}
+
+            <div className="guest-card p-4">
+              <p className="text-sm font-semibold flex items-center gap-2 mb-1">
+                <Globe className="h-4 w-4 text-primary" /> Language
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">The menu and the ordering screens follow this choice.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {LANGUAGES.map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => { setLanguage(l.id as LanguageId); note(`${l.native} selected`); }}
+                    aria-pressed={language === l.id}
+                    className={`rounded-xl border px-3 py-2.5 text-left text-sm transition-all ${language === l.id ? "border-primary bg-muted text-primary" : "border-border bg-muted text-muted-foreground"}`}
+                  >
+                    <span className="block font-medium">{l.native}</span>
+                    <span className="block text-2xs text-muted-foreground">{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="guest-card p-0 divide-y divide-border overflow-hidden">
+              <div className="p-4">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Accessibility className="h-4 w-4 text-primary" /> Accessibility
+                </p>
+              </div>
+              {ACCESSIBILITY_FEATURES.map(f => {
+                const key = A11Y_KEYS[f.id];
+                const Icon = A11Y_ICONS[f.id];
+                const on = accessibility[key];
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => { toggleAccessibility(key); note(`${f.label} ${on ? "turned off" : "turned on"}`); }}
+                    aria-pressed={on}
+                    className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-muted transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{f.label}</p>
+                        <p className="text-xs text-muted-foreground">{f.desc}</p>
+                      </div>
+                    </div>
+                    <div className={`w-11 h-6 rounded-full shrink-0 relative ${on ? "bg-primary" : "bg-muted border border-border"}`}>
+                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-[left] ${on ? "left-5" : "left-0.5"}`} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="guest-card p-4">
+              <p className="text-sm font-semibold flex items-center gap-2 mb-1">
+                <Bell className="h-4 w-4 text-primary" /> Notifications
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {pushPermission === "unsupported"
+                  ? "This browser cannot show notifications."
+                  : pushPermission === "granted"
+                    ? "Notifications are on for this device."
+                    : "Turn these on to hear when your order is ready or your table is called."}
+              </p>
+              {pushPermission !== "granted" && pushPermission !== "unsupported" && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await enablePush();
+                    note(ok ? "Notifications enabled" : "Permission denied — turn notifications on in your browser settings", ok);
+                  }}
+                  className="guest-btn-secondary w-full py-2.5 text-sm mb-3"
+                >
+                  Enable notifications
+                </button>
+              )}
+              <div className="divide-y divide-border">
+                {PUSH_PREF_ROWS.map(r => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => updatePushPrefs({ [r.key]: !pushPrefs[r.key] })}
+                    aria-pressed={pushPrefs[r.key]}
+                    className="w-full flex items-center justify-between py-3 text-left text-sm"
+                  >
+                    {r.label}
+                    <div className={`w-11 h-6 rounded-full shrink-0 relative ${pushPrefs[r.key] ? "bg-primary" : "bg-muted border border-border"}`}>
+                      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-[left] ${pushPrefs[r.key] ? "left-5" : "left-0.5"}`} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="guest-card p-4">
+              <p className="text-sm font-semibold flex items-center gap-2 mb-1">
+                <Smartphone className="h-4 w-4 text-primary" /> Add to home screen
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {isInstalled || isStandalone
+                  ? "This is already running as an installed app."
+                  : "Keep the menu one tap away, and it still opens on a weak connection."}
+              </p>
+              {!isInstalled && !isStandalone && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!canInstall) { note("Use your browser menu → Add to Home Screen", false); return; }
+                    const ok = await installApp();
+                    note(ok ? "App installed" : "Install cancelled", ok);
+                  }}
+                  className="guest-btn-secondary w-full py-2.5 text-sm flex items-center justify-center gap-2"
+                >
+                  <Download className="h-4 w-4" /> Add to home screen
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

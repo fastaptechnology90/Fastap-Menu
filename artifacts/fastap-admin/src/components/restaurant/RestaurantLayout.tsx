@@ -126,7 +126,16 @@ export function RestaurantLayout({ children }: { children: React.ReactNode }) {
   }
 
   const sidebarWide = sidebarOpen;
+  /**
+   * Service screens run edge to edge and do their own scrolling.
+   *
+   * The kitchen board and the till are two-pane layouts with pinned headers and a
+   * pinned total: they need the full height of the viewport and they manage their
+   * own padding. Wrapping them in the page's 16/24px gutter and a second scroll
+   * container is what put the Collect button below the fold on a tablet.
+   */
   const isKitchenDisplay = location.startsWith("/restaurant/kitchen");
+  const isFullBleed = isKitchenDisplay || location.startsWith("/restaurant/billing");
 
   return (
     <div className="restaurant-panel flex h-screen overflow-hidden">
@@ -263,7 +272,7 @@ export function RestaurantLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className={`flex-1 min-h-0 ${isKitchenDisplay ? "overflow-hidden p-0" : "overflow-y-auto p-4 lg:p-6"}`}>
+        <main className={`flex-1 min-h-0 ${isFullBleed ? "overflow-hidden p-0" : "overflow-y-auto p-4 lg:p-6"}`}>
           {children}
         </main>
       </div>

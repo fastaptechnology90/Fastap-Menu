@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
-import { useAppLocation } from "@/hooks/useAppLocation";
 import { useGuestBack } from "@/hooks/useGuestBack";
-import { useUser } from "@/contexts/UserContext";
-import { withGuestQuery } from "@/lib/guestDemo";
 import { Icon } from "@/components/shared/Icon";
-import { UtensilsCrossed, ShoppingCart, Headphones, User, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export function GuestBackButton({
   fallback,
@@ -127,59 +124,16 @@ export function GuestCard({
   );
 }
 
-const NAV_ITEMS = [
-  { path: "/user/menu", label: "Menu", Icon: UtensilsCrossed, match: (p: string) => p.startsWith("/user/menu") },
-  { path: "/user/cart", label: "Cart", Icon: ShoppingCart, match: (p: string) => p === "/user/cart" },
-  { path: "/user/support", label: "Support", Icon: Headphones, match: (p: string) => p.startsWith("/user/support") },
-  { path: "/user/profile", label: "Profile", Icon: User, match: (p: string) => p.startsWith("/user/profile") },
-];
-
-const HIDE_NAV_PATHS = [
-  "/user/auth", "/user/kiosk", "/user/menu", "/user/cart",
-  "/user/payment", "/user/pwa", "/user/offline", "/user/language", "/user/ai",
-];
-
-export function GuestBottomNav() {
-  const [location, navigate] = useAppLocation();
-  const { cartCount, venue, activeTable } = useUser();
-
-  // Guard must match the guest area only. "/user" or "/user/…" — NOT the admin "/users"
-  // page, which also begins with "/user" and was wrongly showing this bottom nav.
-  const inGuestArea = location === "/user" || location.startsWith("/user/");
-  if (
-    !inGuestArea
-    || HIDE_NAV_PATHS.some(p => location.startsWith(p))
-    || location.startsWith("/user/order/")
-  ) {
-    return null;
-  }
-
-  return (
-    <nav className="guest-bottom-nav" aria-label="Guest navigation">
-      <div className="guest-bottom-nav-inner">
-        {NAV_ITEMS.map(item => {
-          const active = item.match(location);
-          const NavIcon = item.Icon;
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(withGuestQuery(item.path, venue, activeTable))}
-              className={`guest-nav-item relative ${active ? "guest-nav-item-active" : ""}`}
-            >
-              <NavIcon className={`h-[22px] w-[22px] ${active ? "text-primary" : ""}`} strokeWidth={active ? 2.25 : 2} />
-              {item.label === "Cart" && cartCount > 0 && (
-                <span className="absolute -top-0.5 right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-2xs font-semibold flex items-center justify-center">
-                  {cartCount > 9 ? "9+" : cartCount}
-                </span>
-              )}
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
+/**
+ * The app's bottom navigation.
+ *
+ * It used to offer Menu / Cart / Support / Profile and then hide itself on the menu and
+ * the cart — the two screens it pointed at — so a diner effectively never saw a tab bar.
+ * The four destinations are now Home / Menu / Cart / Bookings and it stays on screen
+ * across the ordering journey. The implementation moved to `GuestShell`; this export is
+ * kept so the single mount point in the router does not have to know.
+ */
+export { GuestTabBar as GuestBottomNav } from "@/components/user/GuestShell";
 
 export function GuestLogo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const sizes = { sm: "h-7 w-7", md: "h-9 w-9", lg: "h-11 w-11" };
