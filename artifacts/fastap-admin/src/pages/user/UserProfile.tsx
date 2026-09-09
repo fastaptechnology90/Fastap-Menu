@@ -12,12 +12,28 @@ import {
   Receipt, CalendarDays, Hourglass, Flower2, Martini, PartyPopper,
 } from "lucide-react";
 
-const TIER_CONFIG = {
-  silver: { label: "Silver", color: "from-slate-400 to-slate-300", icon: "🥈", nextTier: "Gold", nextAt: 2000, perks: ["5% cashback", "Priority queue", "Birthday reward"] },
-  gold: { label: "Gold", color: "from-yellow-500 to-amber-400", icon: "🥇", nextTier: "Platinum", nextAt: 5000, perks: ["10% cashback", "Free delivery", "Monthly voucher", "VIP seating"] },
-  platinum: { label: "Platinum", color: "from-violet-400 to-purple-300", icon: "💎", nextTier: "Diamond", nextAt: 12000, perks: ["15% cashback", "Chef's table", "Concierge service", "Free dessert"] },
-  diamond: { label: "Diamond", color: "from-cyan-400 to-blue-400", icon: "💠", nextTier: "VIP Elite", nextAt: 25000, perks: ["20% cashback", "Private dining", "Personal chef", "Unlimited upgrades"] },
-  "vip-elite": { label: "VIP Elite", color: "from-orange-400 to-rose-400", icon: "👑", nextTier: null, nextAt: null, perks: ["25% cashback", "All perks unlocked", "Dedicated manager", "Complimentary stays"] },
+/**
+ * Tier names only.
+ *
+ * This map used to carry a perk list and a points threshold for each tier — and both
+ * were invented, and both disagreed with the server. It told a Diamond member they had
+ * a "Personal chef" and "Unlimited upgrades", and that Diamond began at 25,000 points
+ * while `/user/loyalty` and `GET /public/me/loyalty` both said 2,500. Two screens, two
+ * ladders, neither the venue's. The real ladder is loaded below.
+ */
+const TIER_LABEL: Record<string, string> = {
+  silver: "Silver",
+  gold: "Gold",
+  platinum: "Platinum",
+  diamond: "Diamond",
+  "vip-elite": "VIP Elite",
+};
+
+type LoyaltyLadder = {
+  tier?: string;
+  points?: number;
+  cashbackPercent?: number;
+  progress?: { percent: number; remaining: number; nextTier: string | null };
 };
 
 type OrderHistoryRow = {
@@ -54,6 +70,13 @@ export default function UserProfile() {
   const [historyError, setHistoryError] = useState("");
   const [recharging, setRecharging] = useState(false);
   const [walletError, setWalletError] = useState("");
+  const [ladder, setLadder] = useState<LoyaltyLadder | null>(null);
+
+  // The tier ladder is the server's, not a constant in this file.
+  useEffect(() => {
+    if (!user) return;
+    publicApi.loyalty().then(setLadder).catch(() => setLadder(null));
+  }, [user]);
 
   useEffect(() => {
     publicApi.myOrders().then(list => {
@@ -90,10 +113,10 @@ export default function UserProfile() {
 
   if (!user) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white pb-24">
+      <div className="guest-page thin-scroll min-h-screen text-foreground pb-24">
         <GuestHeader title="My profile" onBack={goBack} />
         <div className="px-4 py-12 text-center">
-          <p className="text-white/50 text-sm mb-6">Sign in to view your profile, orders, and wallet.</p>
+          <p className="text-muted-foreground text-sm mb-6">Sign in to view your profile, orders, and wallet.</p>
           <button type="button" onClick={() => navigate("/user/auth")} className="guest-btn-primary px-8 py-3 text-sm">
             Guest Sign In
           </button>
@@ -106,38 +129,39 @@ export default function UserProfile() {
   // The tier string comes straight from the API. Indexing a fixed map with it and then
   // reading .color/.icon/.perks white-screened the whole profile for any tier name the
   // map does not know.
-  const tierCfg = TIER_CONFIG[profile.tier] ?? TIER_CONFIG.silver;
-  const progressToNext = tierCfg.nextAt ? Math.min(100, (profile.points / tierCfg.nextAt) * 100) : 100;
+  const tierLabel = TIER_LABEL[profile.tier] ?? profile.tier ?? "Member";
+  const ladderProgress = ladder?.progress ?? null;
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-24">
+    <div className="guest-page thin-scroll min-h-screen pb-24">
       <GuestHeader title="My profile" subtitle={`${(profile as { guestTypeLabel?: string }).guestTypeLabel ?? "Guest"} · ${profile.mobile}`} onBack={goBack} />
 
-      {/* Loyalty Card */}
-      <div className={`mx-4 mt-4 rounded-2xl bg-gradient-to-br ${tierCfg.color} p-5 text-white relative overflow-hidden`}>
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -translate-y-8 translate-x-8" />
-        <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full bg-white/10 translate-y-6 -translate-x-4" />
-        <div className="relative">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-white/70 text-xs mb-0.5">Loyalty member</p>
-              <h2 className="text-xl font-extrabold">{profile.name}</h2>
-              <p className="text-white/70 text-sm">{profile.mobile}</p>
-            </div>
-            <div className="text-4xl">{tierCfg.icon}</div>
+      {/* Loyalty card — was a per-tier gradient with two decorative blobs. */}
+      <div className="mx-4 mt-4 guest-card p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground mb-0.5">Loyalty member</p>
+            <h2 className="text-xl font-semibold truncate">{profile.name}</h2>
+            <p className="text-sm text-muted-foreground">{profile.mobile}</p>
           </div>
-          <div className="flex items-center gap-2 mb-3">
-            <Crown className="h-4 w-4 text-white/80" />
-            <span className="text-sm font-bold uppercase tracking-wider">{tierCfg.label} Member</span>
+          <span className="guest-pill shrink-0"><Crown className="h-3.5 w-3.5" /> {tierLabel}</span>
+        </div>
+        <div>
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span className="tabular-nums">{profile.points.toLocaleString("en-IN")} points</span>
+            {ladderProgress?.nextTier && (
+              <span className="tabular-nums">{ladderProgress.remaining.toLocaleString("en-IN")} to {ladderProgress.nextTier}</span>
+            )}
           </div>
-          <div>
-            <div className="flex justify-between text-xs text-white/70 mb-1">
-              <span>{profile.points.toLocaleString()} points</span>
-              {tierCfg.nextAt && <span>{(tierCfg.nextAt - profile.points).toLocaleString()} to {tierCfg.nextTier}</span>}
-            </div>
-            <div className="h-2 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full rounded-full bg-white/80 transition-all" style={{ width: `${progressToNext}%` }} />
-            </div>
+          <div
+            className="h-2 rounded-full bg-muted overflow-hidden"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={ladderProgress?.percent ?? 100}
+            aria-label={ladderProgress?.nextTier ? `Progress to ${ladderProgress.nextTier}` : "Top tier reached"}
+          >
+            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${ladderProgress?.percent ?? 100}%` }} />
           </div>
         </div>
       </div>
@@ -145,22 +169,22 @@ export default function UserProfile() {
       {/* Stats Row */}
       <div className="mx-4 mt-3 grid grid-cols-3 gap-3">
         {[
-          { label: "Loyalty Points", value: profile.points.toLocaleString(), icon: Star, color: "text-yellow-400" },
-          { label: "Wallet Balance", value: `₹${profile.walletBalance}`, icon: Wallet, color: "text-emerald-400" },
-          { label: "Total Orders", value: profile.totalOrders, icon: History, color: "text-blue-400" },
+          { label: "Loyalty Points", value: profile.points.toLocaleString(), icon: Star, color: "text-warning" },
+          { label: "Wallet Balance", value: `₹${profile.walletBalance}`, icon: Wallet, color: "text-success" },
+          { label: "Total Orders", value: profile.totalOrders, icon: History, color: "text-info" },
         ].map(s => (
           <div key={s.label} className="guest-card p-3 text-center">
             <s.icon className={`h-5 w-5 ${s.color} mx-auto mb-1`} />
-            <p className="text-base font-extrabold">{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5 leading-tight">{s.label}</p>
+            <p className="text-base font-semibold">{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="mx-4 mt-4 flex gap-1 bg-white/5 p-1 rounded-xl">
+      <div className="mx-4 mt-4 flex gap-1 bg-muted p-1 rounded-xl">
         {(["overview", "wallet", "orders", "settings"] as Tab[]).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === tab ? "bg-orange-500 text-white shadow" : "text-white/50 hover:text-white"}`}>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === tab ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-primary-foreground"}`}>
             {tab}
           </button>
         ))}
@@ -170,26 +194,28 @@ export default function UserProfile() {
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <>
-            {/* Membership Perks */}
+            {/* What the tier actually gets you. The perk list this replaced promised a
+                personal chef, concierge service and complimentary stays. */}
             <div className="guest-card p-4">
-              <p className="font-display text-sm font-semibold mb-3">{tierCfg.label} Member Perks</p>
-              <div className="space-y-2">
-                {tierCfg.perks.map(perk => (
-                  <div key={perk} className="flex items-center gap-2 text-sm text-white/70">
-                    <Zap className="h-3.5 w-3.5 text-orange-400 shrink-0" />
-                    {perk}
-                  </div>
-                ))}
+              <p className="text-sm font-semibold mb-3">Your {tierLabel} tier</p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Zap className="h-3.5 w-3.5 text-primary shrink-0" />
+                {ladder?.cashbackPercent != null
+                  ? `${ladder.cashbackPercent}% cashback on every order, into your cashback wallet`
+                  : "Cashback on every order, into your cashback wallet"}
               </div>
-              {tierCfg.nextTier && (
-                <div className="mt-3 bg-orange-500/10 border border-orange-500/20 rounded-xl p-3">
-                  <p className="text-xs text-orange-300">Earn {(tierCfg.nextAt! - profile.points).toLocaleString()} more points to reach <strong>{tierCfg.nextTier}</strong></p>
-                </div>
+              {ladderProgress?.nextTier && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  {ladderProgress.remaining.toLocaleString("en-IN")} more points to reach <strong className="text-foreground">{ladderProgress.nextTier}</strong>
+                </p>
               )}
+              <button type="button" onClick={() => goGuest("/user/loyalty")} className="guest-btn-secondary mt-3 px-4 text-xs">
+                See the full ladder
+              </button>
             </div>
 
             {/* Quick Actions */}
-            <div className="guest-card divide-y divide-white/5 overflow-hidden p-0">
+            <div className="guest-card divide-y divide-border overflow-hidden p-0">
               {[
                 { icon: Brain, label: "AI Personalization", sub: "Menu, combos, dietary & spending AI", action: () => goGuest("/user/ai") },
                 { icon: Star, label: "Loyalty & Membership", sub: "Tiers, points & birthday rewards", action: () => goGuest("/user/loyalty") },
@@ -214,22 +240,22 @@ export default function UserProfile() {
                 { icon: Martini, label: "Bar & Nightlife", sub: "Happy hour, tables, lounges & DJ nights", action: () => goGuest("/user/bar") },
                 { icon: PartyPopper, label: "Events & Banquets", sub: "Halls, catering, decor & quotations", action: () => goGuest("/user/events") },
               ].map(item => (
-                <button key={item.label} onClick={item.action} className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-all">
-                  <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center">
-                    <item.icon className="h-4 w-4 text-orange-400" />
+                <button key={item.label} onClick={item.action} className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-all">
+                  <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
+                    <item.icon className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex-1 text-left">
                     <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-xs text-white/30">{item.sub}</p>
+                    <p className="text-xs text-muted-foreground">{item.sub}</p>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-white/20" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </button>
               ))}
             </div>
 
             {/* Sign-out clears this device even if the server call fails — leaving
                 the session on screen would be worse than a stale server session. */}
-            <button onClick={async () => { await publicApi.auth.logout().catch(() => undefined); setUser(null); navigate("/user/auth"); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-all">
+            <button onClick={async () => { await publicApi.auth.logout().catch(() => undefined); setUser(null); navigate("/user/auth"); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-danger-border text-danger text-sm font-semibold hover:bg-danger-subtle transition-all">
               <LogOut className="h-4 w-4" />
               Sign Out
             </button>
@@ -239,10 +265,10 @@ export default function UserProfile() {
         {/* Wallet Tab */}
         {activeTab === "wallet" && (
           <>
-            <div className="rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-5 text-center">
-              <p className="text-xs text-white/50 mb-1">Total Balance</p>
-              <p className="text-4xl font-extrabold text-emerald-400">₹{(profile.walletTotal ?? profile.walletBalance + profile.cashbackBalance).toLocaleString()}</p>
-              <div className="flex justify-center gap-4 mt-3 text-xs text-white/50 flex-wrap">
+            <div className="rounded-2xl border border-success-border p-5 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Total Balance</p>
+              <p className="text-4xl font-semibold text-success">₹{(profile.walletTotal ?? profile.walletBalance + profile.cashbackBalance).toLocaleString()}</p>
+              <div className="flex justify-center gap-4 mt-3 text-xs text-muted-foreground flex-wrap">
                 <span>Recharge: ₹{profile.walletBalances?.main ?? profile.walletBalance}</span>
                 <span>Cashback: ₹{profile.walletBalances?.cashback ?? profile.cashbackBalance}</span>
                 {profile.walletBalances && (
@@ -256,31 +282,31 @@ export default function UserProfile() {
               </div>
             </div>
 
-            <button onClick={() => goGuest("/user/loyalty")} className="w-full py-3 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm font-semibold hover:bg-amber-500/30">
+            <button onClick={() => goGuest("/user/loyalty")} className="w-full py-3 rounded-xl bg-warning-subtle border border-warning-border text-warning text-sm font-semibold hover:bg-warning-subtle">
               Open Loyalty Hub — Tiers, Points & Rewards
             </button>
 
-            <button onClick={() => goGuest("/user/wallet")} className="w-full py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-semibold hover:bg-emerald-500/30">
+            <button onClick={() => goGuest("/user/wallet")} className="w-full py-3 rounded-xl bg-success-subtle border border-success-border text-success text-sm font-semibold hover:bg-success-subtle">
               Open Full Wallet — Recharge, Transfer & Cashback
             </button>
 
-            <button onClick={() => goGuest("/user/ai")} className="w-full py-3 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-300 text-sm font-semibold hover:bg-violet-500/30">
+            <button onClick={() => goGuest("/user/ai")} className="w-full py-3 rounded-xl bg-muted border border-primary text-primary text-sm font-semibold hover:bg-muted">
               Open AI Hub — Personalized Menu, Combos & Spending Insights
             </button>
 
             {/* Recharge */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-4">
+            <div className="rounded-2xl bg-card border border-border p-4">
               <p className="text-sm font-semibold mb-3">Recharge Wallet</p>
               <div className="flex gap-2 mb-3">
                 {[100, 200, 500, 1000].map(amt => (
-                  <button key={amt} onClick={() => setRechargeAmt(String(amt))} className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${rechargeAmt === String(amt) ? "bg-orange-500/20 border-orange-500/40 text-orange-300" : "border-white/10 bg-white/5 text-white/50"}`}>
+                  <button key={amt} onClick={() => setRechargeAmt(String(amt))} className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${rechargeAmt === String(amt) ? "bg-muted border-primary text-primary" : "border-border bg-muted text-muted-foreground"}`}>
                     ₹{amt}
                   </button>
                 ))}
               </div>
               <div className="flex gap-2">
                 <input
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-500/40"
+                  className="flex-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
                   placeholder="Custom amount"
                   value={rechargeAmt}
                   onChange={e => setRechargeAmt(e.target.value)}
@@ -311,32 +337,32 @@ export default function UserProfile() {
                     await refreshUser();
                     setRechargeAmt("");
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/30 disabled:opacity-50"
+                  className="px-4 py-2.5 rounded-xl bg-success-subtle border border-success-border text-success text-sm font-semibold hover:bg-success-subtle disabled:opacity-50"
                 >
                   {recharging ? "Adding…" : "Add Money"}
                 </button>
               </div>
-              {rechargeError && <p role="alert" className="mt-2 text-xs text-red-400">{rechargeError}</p>}
+              {rechargeError && <p role="alert" className="mt-2 text-xs text-danger">{rechargeError}</p>}
             </div>
 
             {/* Transactions */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/8 divide-y divide-white/5">
+            <div className="rounded-2xl bg-card border border-border divide-y divide-border">
               <div className="p-4"><p className="text-sm font-semibold">Recent Transactions</p></div>
               {walletTx.length === 0 && (
                 walletError
-                  ? <p role="alert" className="p-6 text-center text-sm text-red-300">{walletError}</p>
-                  : <p className="p-6 text-center text-sm text-white/40">No transactions yet.</p>
+                  ? <p role="alert" className="p-6 text-center text-sm text-danger">{walletError}</p>
+                  : <p className="p-6 text-center text-sm text-muted-foreground">No transactions yet.</p>
               )}
               {walletTx.map((t, i) => (
                 <div key={i} className="flex items-center gap-3 p-4">
-                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${t.type === "credit" ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                    <t.icon className={`h-4 w-4 ${t.type === "credit" ? "text-emerald-400" : "text-red-400"}`} />
+                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${t.type === "credit" ? "bg-success-subtle" : "bg-danger-subtle"}`}>
+                    <t.icon className={`h-4 w-4 ${t.type === "credit" ? "text-success" : "text-danger"}`} />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm">{t.label}</p>
-                    <p className="text-xs text-white/30">{t.date}</p>
+                    <p className="text-xs text-muted-foreground">{t.date}</p>
                   </div>
-                  <span className={`text-sm font-bold ${t.type === "credit" ? "text-emerald-400" : "text-red-400"}`}>
+                  <span className={`text-sm font-semibold ${t.type === "credit" ? "text-success" : "text-danger"}`}>
                     {t.type === "credit" ? "+" : "-"}₹{t.amount}
                   </span>
                 </div>
@@ -347,31 +373,31 @@ export default function UserProfile() {
 
         {/* Orders Tab */}
         {activeTab === "orders" && (
-          <div className="rounded-2xl bg-white/[0.03] border border-white/8 divide-y divide-white/5">
+          <div className="rounded-2xl bg-card border border-border divide-y divide-border">
             <div className="p-4"><p className="text-sm font-semibold">Order History</p></div>
             {ordersHistory.length === 0 && (
               historyError
-                ? <p role="alert" className="p-6 text-center text-sm text-red-300">{historyError} Pull down to refresh, or try again in a moment.</p>
-                : <p className="p-6 text-center text-sm text-white/40">No orders yet. Place one from the menu.</p>
+                ? <p role="alert" className="p-6 text-center text-sm text-danger">{historyError} Pull down to refresh, or try again in a moment.</p>
+                : <p className="p-6 text-center text-sm text-muted-foreground">No orders yet. Place one from the menu.</p>
             )}
             {ordersHistory.map(order => (
               <div key={order.id} className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="text-sm font-semibold">{order.restaurant}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{order.items}</p>
-                    <p className="text-xs text-white/30 mt-0.5">{order.date}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{order.items}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{order.date}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-orange-400">₹{order.total}</p>
-                    <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{order.status}</span>
+                    <p className="text-sm font-semibold text-primary">₹{order.total}</p>
+                    <span className="text-xs bg-success-subtle text-success px-2 py-0.5 rounded-full">{order.status}</span>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => goGuest(`/user/order/${order.id.replace(/^ORD-/, "")}`)}
-                  className="text-xs text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/10 transition-all"
+                  className="text-xs text-success border border-success-border px-3 py-1.5 rounded-lg hover:bg-success-subtle transition-all"
                 >
                   Track Live
                 </button>
@@ -409,7 +435,7 @@ export default function UserProfile() {
                       navigate("/user/cart");
                     } else navigate("/user/menu");
                   }}
-                  className="text-xs text-orange-400 border border-orange-500/30 px-3 py-1.5 rounded-lg hover:bg-orange-500/10 transition-all"
+                  className="text-xs text-primary border border-primary px-3 py-1.5 rounded-lg hover:bg-muted transition-all"
                 >
                   One-click Reorder
                 </button>
@@ -421,22 +447,22 @@ export default function UserProfile() {
 
         {/* Settings Tab */}
         {activeTab === "settings" && (
-          <div className="rounded-2xl bg-white/[0.03] border border-white/8 divide-y divide-white/5">
+          <div className="rounded-2xl bg-card border border-border divide-y divide-border">
             {[
               { icon: Shield, label: "Privacy & Security", sub: "Device management, sessions", action: () => goGuest("/user/security") },
               { icon: Brain, label: "Future AI Roadmap", sub: "Voice ordering, virtual waiter & more", action: () => goGuest("/user/future-ai") },
               { icon: Bell, label: "Notification Preferences", sub: "Push, SMS, WhatsApp", action: () => goGuest("/user/pwa") },
               { icon: Globe, label: "Language & Region", sub: "English · India (IST)", action: () => goGuest("/user/language") },
             ].map(item => (
-              <button key={item.label} onClick={"action" in item ? item.action : undefined} className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-all">
-                <div className="h-9 w-9 rounded-xl bg-white/5 flex items-center justify-center">
-                  <item.icon className="h-4 w-4 text-orange-400" />
+              <button key={item.label} onClick={"action" in item ? item.action : undefined} className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-all">
+                <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
+                  <item.icon className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-white/30">{item.sub}</p>
+                  <p className="text-xs text-muted-foreground">{item.sub}</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-white/20" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             ))}
           </div>

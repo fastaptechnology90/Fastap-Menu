@@ -52,13 +52,13 @@ export const SHARE_TEMPLATES = [
   { id: "offer", label: "Share Offer", emoji: "🎉" },
 ];
 
-export const REFERRAL_CONFIG = {
-  rewardLabel: "₹100 wallet credit",
-  friendRewardLabel: "10% off first order",
-  minOrderForReward: 299,
-  codePrefix: "SPICE",
-};
-
+/**
+ * The referral rewards that lived here — "100 wallet credit", "10% off first order",
+ * a 299 minimum — were constants no venue set and nothing honours: no checkout reads a
+ * referral code and nothing credits a wallet on signup. The share endpoint returns a
+ * code, a link and two counters, and the page shows a reward only if the venue sends
+ * one.
+ */
 export type GuestReview = typeof DEMO_REVIEWS[number];
 export type FoodPhoto = typeof DEMO_FOOD_PHOTOS[number];
 

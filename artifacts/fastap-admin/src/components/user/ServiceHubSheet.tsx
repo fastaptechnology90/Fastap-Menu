@@ -60,7 +60,7 @@ export function ServiceHubSheet({
     <div className="guest-sheet-overlay" onClick={onClose}>
       <div className="guest-sheet" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-bold text-base">Explore services</h3>
+          <h3 className="font-display font-semibold text-base">Explore services</h3>
           <button type="button" onClick={onClose} className="menu-icon-btn">
             <X className="h-5 w-5" />
           </button>
@@ -76,7 +76,7 @@ export function ServiceHubSheet({
               <span className="service-grid-item__icon">
                 <Icon name={link.icon} size={22} />
               </span>
-              <span className="text-[11px] font-medium text-white/80 leading-tight">{link.label}</span>
+              <span className="text-2xs font-medium text-foreground leading-tight">{link.label}</span>
             </button>
           ))}
         </div>

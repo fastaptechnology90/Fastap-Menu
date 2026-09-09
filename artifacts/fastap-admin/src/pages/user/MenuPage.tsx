@@ -6,6 +6,7 @@ import { useOffline } from "@/contexts/OfflineContext";
 import { usePwa } from "@/contexts/PwaContext";
 import { publicApi } from "@/lib/api";
 import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
+import { useWaiterCalls, WaiterCallBanner, SERVICE_REQUEST_ICONS } from "@/components/user/WaiterCallStatus";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { GuestEmpty } from "@/components/user/GuestApiState";
 import { resolveGuestSlug } from "@/lib/guestDemo";
@@ -17,21 +18,13 @@ import { AppImage } from "@/components/shared/AppImage";
 import { Preview360Viewer } from "@/components/user/Preview360Viewer";
 import { Icon } from "@/components/shared/Icon";
 import {
-  Search, ShoppingCart, Bell, Star, Info,
+  Search, ShoppingCart, Bell, Star, Info, Check,
+  ChefHat, Flame, Dumbbell, Wheat, Timer, Sparkles,
   Plus, Minus, X,
   SlidersHorizontal, Camera, Phone, RotateCw, Play, Image as ImageIcon, Grid3x3,
 } from "lucide-react";
 
 type CategoryGroup = "all" | "food" | "beverage" | "special";
-
-const CATEGORY_ICONS: Record<string, string> = {
-  breakfast: "🌅", lunch: "🍱", dinner: "🌙", snacks: "🥨", starters: "🥗",
-  "main-course": "🍛", desserts: "🍰", "kids-menu": "👶", "healthy-menu": "🥗", "diet-menu": "⚖️",
-  "soft-drinks": "🥤", coffee: "☕", tea: "🍵", mocktails: "🍹", cocktails: "🍸",
-  "premium-liquor": "🥃", "wine-menu": "🍷", "beer-menu": "🍺",
-  "festival-menu": "🎉", "seasonal-menu": "🍂", "chef-special": "👨‍🍳", "happy-hour-menu": "⏰",
-  "midnight-menu": "🌃", "poolside-menu": "🏊", "spa-wellness-menu": "💆", "banquet-menu": "🎊",
-};
 
 interface CustomizationOpts {
   extraCheese?: { label: string; price: number };
@@ -52,6 +45,8 @@ interface MenuDisplayItem {
   rating: number;
   reviews: number;
   cookTime: string;
+  /** Minutes the kitchen records for this dish, when it records one. */
+  prepTime?: number;
   calories: number;
   protein: number;
   carbs: number;
@@ -144,6 +139,7 @@ function mapApiItem(i: Record<string, unknown>, categorySlug: string, categoryGr
     // in the detail sheet. That number came from nowhere: the guest was told how long
     // their food would take by a literal in the source.
     cookTime: i.prepTime ? `${i.prepTime} min` : "",
+    prepTime: typeof i.prepTime === "number" ? i.prepTime : undefined,
     calories: (i.calories as number) || 0,
     protein: (i.protein as number) || 0,
     carbs: (i.carbs as number) || 0,
@@ -161,17 +157,6 @@ function mapApiItem(i: Record<string, unknown>, categorySlug: string, categoryGr
     customizations,
     customizationOptions: custOpts,
   };
-}
-
-function categoryIcon(name: string, slug?: string): string {
-  const key = (slug || name).toLowerCase().replace(/\s+/g, "-");
-  for (const [k, icon] of Object.entries(CATEGORY_ICONS)) {
-    if (key.includes(k)) return icon;
-  }
-  if (/dessert|sweet/i.test(name)) return "🍰";
-  if (/drink|beverage|coffee|bar/i.test(name)) return "☕";
-  if (/starter|appet/i.test(name)) return "🥗";
-  return "🍽️";
 }
 
 interface ItemDetailProps {
@@ -225,9 +210,9 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
   const has360 = Boolean(item.preview360Url);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="w-full sm:max-w-md bg-guest-elevated rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto">
-        <div className="relative h-52 bg-gradient-to-br from-orange-900/30 to-slate-900">
+        <div className="relative h-52">
           {mediaTab === "photo" ? (
             <AppImage src={item.imageUrl} alt={item.name} fallbackId={item.id} category={item.category} className="h-full w-full" iconFallback="restaurant_menu" />
           ) : mediaTab === "video" && item.videoUrl ? (
@@ -236,7 +221,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
             <Preview360Viewer src={item.preview360Url} alt={`${item.name} 360`} />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <Camera className="h-16 w-16 text-white/10" />
+              <Camera className="h-16 w-16 text-muted-foreground" />
             </div>
           )}
           <div className="absolute top-3 left-3 flex gap-1">
@@ -248,21 +233,21 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               <button
                 key={tab.id}
                 onClick={() => setMediaTab(tab.id)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${mediaTab === tab.id ? "bg-orange-500 text-white" : "bg-black/50 text-white/70"}`}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${mediaTab === tab.id ? "bg-primary text-primary-foreground" : "bg-foreground/40 text-muted-foreground"}`}
               >
                 <tab.icon className="h-3 w-3" />{tab.label}
               </button>
             ))}
           </div>
           <div className="absolute top-3 right-3">
-            <button onClick={onClose} className="h-8 w-8 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70">
+            <button onClick={onClose} className="h-8 w-8 rounded-full bg-foreground/40 flex items-center justify-center hover:bg-foreground/40">
               <X className="h-4 w-4" />
             </button>
           </div>
           <div className="absolute bottom-3 left-3 flex gap-1.5 flex-wrap">
             {item.badges.map(b => (
-              <span key={b} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${b === "bestseller" ? "bg-orange-500 text-white" : b === "trending" ? "bg-pink-500 text-white" : b === "chef-recommended" ? "bg-amber-500 text-white" : b === "chef-special" ? "bg-violet-500 text-white" : "bg-emerald-500 text-white"}`}>
-                {b === "bestseller" ? "🏆 Bestseller" : b === "trending" ? "🔥 Trending" : b === "chef-recommended" ? "⭐ Chef Recommended" : b === "chef-special" ? "👨‍🍳 Chef Special" : "✨ New"}
+              <span key={b} className={`px-2 py-0.5 rounded-full text-xs font-semibold ${b === "bestseller" ? "bg-primary text-primary-foreground" : b === "trending" ? "bg-primary text-primary-foreground" : b === "chef-recommended" ? "bg-primary text-primary-foreground" : b === "chef-special" ? "bg-primary text-primary-foreground" : "bg-primary text-primary-foreground"}`}>
+                {b === "bestseller" ? "Bestseller" : b === "trending" ? "Trending" : b === "chef-recommended" ? "Chef recommended" : b === "chef-special" ? "Chef special" : "New"}
               </span>
             ))}
           </div>
@@ -271,71 +256,71 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
         <div className="p-5 space-y-5">
           <div>
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-xl font-bold">{item.name}</h3>
+              <h3 className="text-xl font-semibold">{item.name}</h3>
               {item.rating > 0 && (
               <div className="flex items-center gap-1 shrink-0">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Star className="h-4 w-4 fill-warning text-warning" />
                 <span className="text-sm font-semibold">{item.rating}</span>
-                <span className="text-xs text-white/30">({item.reviews} orders)</span>
+                <span className="text-xs text-muted-foreground">({item.reviews} orders)</span>
               </div>
               )}
             </div>
-            <p className="text-sm text-white/55 mt-1.5 leading-relaxed">{item.desc}</p>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{item.desc}</p>
             {item.prepMethod && (
-              <p className="text-xs text-orange-300/80 mt-2">👨‍🍳 {item.prepMethod}</p>
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5"><ChefHat className="h-3.5 w-3.5 text-primary shrink-0" />{item.prepMethod}</p>
             )}
           </div>
 
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: "Calories", value: item.calories ? `${item.calories}` : "—", unit: "kcal", icon: "🔥" },
-              { label: "Protein", value: item.protein ? `${item.protein}` : "—", unit: "g", icon: "💪" },
-              { label: "Carbs", value: item.carbs ? `${item.carbs}` : "—", unit: "g", icon: "🌾" },
-              { label: "Cook Time", value: item.cookTime ? item.cookTime.replace(" min", "") : "—", unit: item.cookTime ? "min" : "", icon: "⏱️" },
+              { label: "Calories", value: item.calories ? `${item.calories}` : "—", unit: "kcal", icon: Flame },
+              { label: "Protein", value: item.protein ? `${item.protein}` : "—", unit: "g", icon: Dumbbell },
+              { label: "Carbs", value: item.carbs ? `${item.carbs}` : "—", unit: "g", icon: Wheat },
+              { label: "Cook time", value: item.cookTime ? item.cookTime.replace(" min", "") : "—", unit: item.cookTime ? "min" : "", icon: Timer },
             ].map(info => (
-              <div key={info.label} className="rounded-xl bg-white/5 p-2.5 text-center">
-                <div className="text-sm">{info.icon}</div>
-                <div className="text-xs font-bold mt-0.5">{info.value}<span className="text-white/30 font-normal">{info.unit !== "min" ? info.unit : ""}</span></div>
-                <div className="text-[10px] text-white/30">{info.label}</div>
+              <div key={info.label} className="rounded-xl bg-muted p-2.5 text-center">
+                <info.icon className="h-4 w-4 mx-auto text-muted-foreground" />
+                <div className="text-xs font-semibold mt-0.5">{info.value}<span className="text-muted-foreground font-normal">{info.unit !== "min" ? info.unit : ""}</span></div>
+                <div className="text-2xs text-muted-foreground">{info.label}</div>
               </div>
             ))}
           </div>
 
           <div>
-            <p className="text-xs text-white/40 mb-1.5">Spice Level</p>
+            <p className="text-xs text-muted-foreground mb-1.5">Spice Level</p>
             <div className="flex gap-1 items-center">
               {[1, 2, 3].map(level => (
-                <div key={level} className={`h-2.5 w-8 rounded-full ${level <= item.spice ? "bg-red-500" : "bg-white/10"}`} />
+                <div key={level} className={`h-2.5 w-8 rounded-full ${level <= item.spice ? "bg-danger" : "bg-muted"}`} />
               ))}
-              <span className="text-xs text-white/30 ml-2">{item.spice === 0 ? "Mild" : item.spice === 1 ? "Medium" : item.spice === 2 ? "Spicy" : "Very Spicy"}</span>
+              <span className="text-xs text-muted-foreground ml-2">{item.spice === 0 ? "Mild" : item.spice === 1 ? "Medium" : item.spice === 2 ? "Spicy" : "Very Spicy"}</span>
             </div>
           </div>
 
           {item.dietaryTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {item.dietaryTags.map(tag => (
-                <span key={tag} className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs text-emerald-400 capitalize">{tag}</span>
+                <span key={tag} className="px-2 py-0.5 bg-success-subtle border border-success-border rounded-full text-xs text-success capitalize">{tag}</span>
               ))}
             </div>
           )}
 
           {item.ingredients.length > 0 && (
             <div>
-              <p className="text-xs text-white/40 mb-2">Ingredients</p>
+              <p className="text-xs text-muted-foreground mb-2">Ingredients</p>
               <div className="flex flex-wrap gap-1.5">
                 {item.ingredients.map(ing => (
-                  <span key={ing} className="px-2 py-1 bg-white/5 rounded-full text-xs text-white/60">{ing}</span>
+                  <span key={ing} className="px-2 py-1 bg-muted rounded-full text-xs text-muted-foreground">{ing}</span>
                 ))}
               </div>
             </div>
           )}
 
           {item.allergens.length > 0 && (
-            <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3">
-              <Info className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 bg-warning-subtle border border-warning-border rounded-xl p-3">
+              <Info className="h-4 w-4 text-warning shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-yellow-400">Contains allergens</p>
-                <p className="text-xs text-white/50 mt-0.5">{item.allergens.join(", ")}</p>
+                <p className="text-xs font-semibold text-warning">Contains allergens</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{item.allergens.join(", ")}</p>
               </div>
             </div>
           )}
@@ -348,7 +333,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
                   <button
                     key={p.name}
                     onClick={() => setPortion(portion === p.name ? "" : p.name)}
-                    className={`px-3 py-1.5 rounded-full text-xs border transition-all ${portion === p.name ? "bg-orange-500/20 border-orange-500/50 text-orange-300" : "bg-white/5 border-white/10 text-white/60"}`}
+                    className={`px-3 py-1.5 rounded-full text-xs border transition-all ${portion === p.name ? "bg-muted border-primary text-primary" : "bg-muted border-border text-muted-foreground"}`}
                   >
                     {p.name} ₹{p.price}
                   </button>
@@ -361,17 +346,17 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
             {opts.extraCheese && (
               <button
                 onClick={() => setExtraCheese(v => !v)}
-                className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-all ${extraCheese ? "bg-orange-500/20 border-orange-500/50 text-orange-300" : "bg-white/5 border-white/10 text-white/60"}`}
+                className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-all ${extraCheese ? "bg-muted border-primary text-primary" : "bg-muted border-border text-muted-foreground"}`}
               >
-                🧀 {opts.extraCheese.label}{opts.extraCheese.price ? ` +₹${opts.extraCheese.price}` : ""}
+                {opts.extraCheese.label}{opts.extraCheese.price ? ` +₹${opts.extraCheese.price}` : ""}
               </button>
             )}
             {opts.extraSpicy && (
               <button
                 onClick={() => setExtraSpicy(v => !v)}
-                className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-all ${extraSpicy ? "bg-red-500/20 border-red-500/50 text-red-300" : "bg-white/5 border-white/10 text-white/60"}`}
+                className={`flex-1 px-3 py-2 rounded-xl text-xs border transition-all ${extraSpicy ? "bg-danger-subtle border-danger-border text-danger" : "bg-muted border-border text-muted-foreground"}`}
               >
-                🌶️ {opts.extraSpicy.label}
+                {opts.extraSpicy.label}
               </button>
             )}
           </div>
@@ -381,7 +366,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               <p className="text-sm font-semibold mb-2">Remove Ingredients</p>
               <div className="flex flex-wrap gap-2">
                 {removeOptions.map(c => (
-                  <button key={c} onClick={() => toggleCustom(c)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedCustom.includes(c) ? "bg-orange-500/20 border-orange-500/50 text-orange-300" : "bg-white/5 border-white/10 text-white/60"}`}>
+                  <button key={c} onClick={() => toggleCustom(c)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedCustom.includes(c) ? "bg-muted border-primary text-primary" : "bg-muted border-border text-muted-foreground"}`}>
                     {c}
                   </button>
                 ))}
@@ -394,9 +379,9 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               <p className="text-sm font-semibold mb-2">Toppings</p>
               <div className="space-y-2">
                 {toppings.map(t => (
-                  <button key={t.name} onClick={() => toggleAddon(t)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === t.name) ? "bg-orange-500/10 border-orange-500/40 text-white" : "bg-white/5 border-white/10 text-white/60"}`}>
+                  <button key={t.name} onClick={() => toggleAddon(t)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === t.name) ? "bg-muted border-primary text-foreground" : "bg-muted border-border text-muted-foreground"}`}>
                     <span>{t.name}</span>
-                    <span className="text-orange-400 font-semibold">+₹{t.price}</span>
+                    <span className="text-primary font-semibold">+₹{t.price}</span>
                   </button>
                 ))}
               </div>
@@ -408,9 +393,9 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               <p className="text-sm font-semibold mb-2">Combo Upgrades</p>
               <div className="space-y-2">
                 {comboUpgrades.map(c => (
-                  <button key={c.name} onClick={() => toggleAddon(c)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === c.name) ? "bg-violet-500/10 border-violet-500/40 text-white" : "bg-white/5 border-white/10 text-white/60"}`}>
+                  <button key={c.name} onClick={() => toggleAddon(c)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === c.name) ? "bg-muted border-primary text-foreground" : "bg-muted border-border text-muted-foreground"}`}>
                     <span>{c.name}</span>
-                    <span className="text-violet-400 font-semibold">+₹{c.price}</span>
+                    <span className="text-primary font-semibold">+₹{c.price}</span>
                   </button>
                 ))}
               </div>
@@ -422,9 +407,9 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               <p className="text-sm font-semibold mb-2">Add-ons</p>
               <div className="space-y-2">
                 {item.addons.map(a => (
-                  <button key={a.name} onClick={() => toggleAddon(a)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === a.name) ? "bg-orange-500/10 border-orange-500/40 text-white" : "bg-white/5 border-white/10 text-white/60"}`}>
+                  <button key={a.name} onClick={() => toggleAddon(a)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm ${selectedAddons.find(x => x.name === a.name) ? "bg-muted border-primary text-foreground" : "bg-muted border-border text-muted-foreground"}`}>
                     <span>{a.name}</span>
-                    <span className="text-orange-400 font-semibold">+₹{a.price}</span>
+                    <span className="text-primary font-semibold">+₹{a.price}</span>
                   </button>
                 ))}
               </div>
@@ -434,7 +419,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
           <div>
             <p className="text-sm font-semibold mb-2">Cooking Instructions</p>
             <textarea
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white/80 placeholder:text-white/30 focus:outline-none focus:border-orange-500/40 resize-none"
+              className="w-full bg-muted border border-border rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
               rows={2}
               placeholder="Allergy notes, doneness, spice preferences..."
               value={instructions}
@@ -444,23 +429,23 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
 
           <div className="flex items-center gap-3 pt-2">
             {readOnly ? (
-              <div className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-center text-sm font-semibold text-white/50">
-                🔒 Demo menu — view only
+              <div className="flex-1 py-3 rounded-xl bg-muted border border-border text-center text-sm font-semibold text-muted-foreground">
+                Demo menu — view only
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 bg-white/5 rounded-xl p-1">
-                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center">
+                <div className="flex items-center gap-3 bg-muted rounded-xl p-1">
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="h-9 w-9 rounded-lg bg-muted hover:bg-muted flex items-center justify-center">
                     <Minus className="h-4 w-4" />
                   </button>
-                  <span className="w-6 text-center font-bold">{qty}</span>
-                  <button onClick={() => setQty(q => q + 1)} className="h-9 w-9 rounded-lg bg-orange-500 hover:bg-orange-400 flex items-center justify-center">
+                  <span className="w-6 text-center font-semibold">{qty}</span>
+                  <button onClick={() => setQty(q => q + 1)} className="h-9 w-9 rounded-lg bg-primary hover:bg-primary/90 flex items-center justify-center">
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
                 <button
                   onClick={() => { onAdd(allCustomizations, selectedAddons, instructions, unitPrice, portion || undefined); onClose(); }}
-                  className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm transition-all flex items-center justify-center gap-2"
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Add to Order · ₹{total}
@@ -535,11 +520,14 @@ export default function MenuPage() {
   const [showWaiterPanel, setShowWaiterPanel] = useState(false);
   const [waiterSent, setWaiterSent] = useState<string | null>(null);
   const [waiterError, setWaiterError] = useState<string | null>(null);
+  // Whether anybody has picked the table's calls up. Polled only while the service
+  // sheet is open, so a guest reading the menu is not making a request every 15s.
+  const { calls: waiterCalls, refresh: refreshWaiterCalls } = useWaiterCalls(venue.restaurantId, activeTable, showWaiterPanel);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "price-asc" | "price-desc" | "rating" | "popular">("default");
   const [menuItems, setMenuItems] = useState<MenuDisplayItem[]>([]);
-  const [categories, setCategories] = useState<{ id: string; label: string; icon: string; group: string }[]>([{ id: "all", label: "All", icon: "🍽️", group: "all" }]);
+  const [categories, setCategories] = useState<{ id: string; label: string; icon: string; group: string }[]>([{ id: "all", label: "All", icon: "", group: "all" }]);
   const [featuredItems, setFeaturedItems] = useState<MenuDisplayItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuError, setMenuError] = useState("");
@@ -595,7 +583,7 @@ export default function MenuPage() {
           setMenuError("connection");
         }
         setMenuItems([]);
-        setCategories([{ id: "all", label: "All", icon: "🍽️", group: "all" }]);
+        setCategories([{ id: "all", label: "All", icon: "", group: "all" }]);
         setFeaturedItems([]);
       }).finally(() => setLoading(false));
 
@@ -607,11 +595,11 @@ export default function MenuPage() {
       if (table?.name) setActiveTable(table.name);
       const cats = Array.isArray(data.categories) ? data.categories : [];
       const catTabs = [
-        { id: "all", label: "All", icon: "🍽️", group: "all" },
+        { id: "all", label: "All", icon: "", group: "all" },
         ...cats.map((c: Record<string, unknown>) => ({
           id: String(c.slug || c.id),
           label: String(c.name),
-          icon: categoryIcon(String(c.name), String(c.slug || "")),
+          icon: "",
           group: String(c.categoryGroup || "food"),
         })),
       ];
@@ -682,6 +670,8 @@ export default function MenuPage() {
       variant,
       specialInstructions: instructions,
       course,
+      allergens: item.allergens,
+      prepTime: item.prepTime,
     });
   }
 
@@ -703,6 +693,7 @@ export default function MenuPage() {
       return;
     }
     setWaiterSent(request);
+    refreshWaiterCalls();
     setTimeout(() => setWaiterSent(null), 3000);
     setShowWaiterPanel(false);
   }
@@ -745,7 +736,7 @@ export default function MenuPage() {
     setSortBy("default");
   }
 
-  const WAITER_REQUESTS = TABLE_INTERACTION_REQUESTS.map(r => ({ icon: r.icon, label: r.label, type: r.type }));
+  const WAITER_REQUESTS = TABLE_INTERACTION_REQUESTS.map(r => ({ label: r.label, type: r.type }));
 
   return (
     <div className="menu-page thin-scroll">
@@ -789,12 +780,12 @@ export default function MenuPage() {
       {!venue.hours.isOpen && venue.hours.hoursPublished && (
         /* Nothing anywhere told a guest the venue was shut. The kitchen's own opening
            hours were in the database and unread, so a 4 a.m. order was taken in silence. */
-        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3" role="status">
-          <Info className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-warning-border bg-warning-subtle p-3" role="status">
+          <Info className="h-4 w-4 shrink-0 text-warning mt-0.5" />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-amber-300">Kitchen closed</p>
-            <p className="text-xs text-white/60 mt-0.5">{venue.hours.message}</p>
-            <p className="text-[11px] text-white/40 mt-1">You can browse the menu — ordering opens at {venue.hours.openTime}.</p>
+            <p className="text-xs font-semibold text-warning">Kitchen closed</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{venue.hours.message}</p>
+            <p className="text-2xs text-muted-foreground mt-1">You can browse the menu — ordering opens at {venue.hours.openTime}.</p>
           </div>
         </div>
       )}
@@ -819,10 +810,10 @@ export default function MenuPage() {
           {promo && (
             <div className="menu-app__promo">
               <div>
-                <p className="text-[11px] font-semibold text-orange-300">{promo.title}</p>
-                {promo.detail && <p className="text-sm font-bold mt-0.5">{promo.detail}</p>}
+                <p className="text-2xs font-semibold text-primary">{promo.title}</p>
+                {promo.detail && <p className="text-sm font-semibold mt-0.5">{promo.detail}</p>}
               </div>
-              <Icon name="local_offer" size={26} className="text-orange-400 shrink-0" />
+              <Icon name="local_offer" size={26} className="text-primary shrink-0" />
             </div>
           )}
 
@@ -856,9 +847,9 @@ export default function MenuPage() {
               {featuredItems.length > 0 && !search && (
                 <section className="mb-4">
                   <div className="flex items-center gap-2 mb-2 px-0.5">
-                    <span className="text-base">✨</span>
-                    <h2 className="text-sm font-extrabold tracking-tight">Chef's Specials</h2>
-                    <span className="text-[11px] text-white/40">Must-try picks</span>
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <h2 className="text-sm font-semibold tracking-tight">Chef's Specials</h2>
+                    <span className="text-2xs text-muted-foreground">Must-try picks</span>
                   </div>
                   <div className="flex gap-3 overflow-x-auto thin-scroll pb-1 -mx-1 px-1 snap-x">
                     {featuredItems.slice(0, 4).map(item => (
@@ -866,15 +857,15 @@ export default function MenuPage() {
                         key={`special-${item.id}`}
                         type="button"
                         onClick={() => { setSelectedItem(item); announce(`${item.name} selected`); }}
-                        className="snap-start shrink-0 w-40 text-left rounded-2xl overflow-hidden border border-amber-400/40 bg-gradient-to-b from-amber-500/15 to-transparent active:scale-[0.98] transition-transform"
+                        className="snap-start shrink-0 w-40 text-left rounded-2xl overflow-hidden border border-warning-border active:scale-[0.98] transition-transform"
                       >
-                        <div className="relative h-24 w-full bg-white/5">
+                        <div className="relative h-24 w-full bg-muted">
                           <AppImage src={item.imageUrl} alt={item.name} fallbackId={item.id} category={item.category} className="h-full w-full" iconFallback="restaurant_menu" />
-                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow z-10">⭐ Special</span>
+                          <span className="absolute top-1.5 left-1.5 text-2xs font-semibold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground shadow z-10">Special</span>
                         </div>
                         <div className="p-2">
-                          <p className="text-xs font-bold leading-tight truncate">{item.name}</p>
-                          <p className="text-[13px] font-extrabold text-amber-300 mt-0.5">₹{item.price}</p>
+                          <p className="text-xs font-semibold leading-tight truncate">{item.name}</p>
+                          <p className="text-[13px] font-semibold text-warning mt-0.5">₹{item.price}</p>
                         </div>
                       </button>
                     ))}
@@ -886,7 +877,7 @@ export default function MenuPage() {
                 {search ? (
                   <>
                     {" · "}
-                    <button type="button" onClick={() => setSearch("")} className="text-orange-400">clear search</button>
+                    <button type="button" onClick={() => setSearch("")} className="text-primary">clear search</button>
                   </>
                 ) : null}
               </p>
@@ -903,21 +894,21 @@ export default function MenuPage() {
                       <button
                         key={ord.id}
                         onClick={() => navigate(`/user/order/${ord.id}`)}
-                        className="w-full flex items-center gap-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 px-4 py-3 text-left active:scale-[0.99] transition-transform"
+                        className="w-full flex items-center gap-3 rounded-2xl bg-success-subtle border border-success-border px-4 py-3 text-left active:scale-[0.99] transition-transform"
                       >
                         <span className="relative flex h-2.5 w-2.5 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-emerald-300">{activeOrders.length > 1 ? `Order ${i + 1}` : "Your order"} · {label}</p>
-                          <p className="text-xs text-white/50 truncate">{ord.items.length} item{ord.items.length !== 1 ? "s" : ""} · ₹{ord.total} · {ord.waiterName ? `waiter: ${ord.waiterName}` : "waiter being assigned"}</p>
+                          <p className="text-sm font-semibold text-success">{activeOrders.length > 1 ? `Order ${i + 1}` : "Your order"} · {label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{ord.items.length} item{ord.items.length !== 1 ? "s" : ""} · ₹{ord.total} · {ord.waiterName ? `waiter: ${ord.waiterName}` : "waiter being assigned"}</p>
                         </div>
-                        <span className="text-emerald-300 text-sm font-bold shrink-0">Track →</span>
+                        <span className="text-success text-sm font-semibold shrink-0">Track →</span>
                       </button>
                     );
                   })}
-                  <p className="text-[11px] text-white/40 px-1">Want more? Add items with <b className="text-emerald-300">+</b>, then tap <b className="text-amber-300">Place Order</b> — it goes to your table as a new order.</p>
+                  <p className="text-2xs text-muted-foreground px-1">Want more? Add items with <b className="text-success">+</b>, then tap <b className="text-warning">Place Order</b> — it goes to your table as a new order.</p>
                 </div>
               )}
               <div className="menu-app__grid">
@@ -959,38 +950,51 @@ export default function MenuPage() {
 
       {/* Waiter notification toast */}
       {waiterError && (
-        <div role="alert" className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-red-500/90 text-white text-sm font-semibold shadow-lg">
+        <div role="alert" className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-danger-subtle text-foreground text-sm font-semibold shadow-lg">
           {waiterError}
         </div>
       )}
       {waiterSent && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-5 py-3 rounded-xl shadow-2xl font-semibold text-sm flex items-center gap-2 animate-bounce">
-          ✅ {waiterSent} — Waiter notified!
+        <div role="status" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] bg-card border border-border px-4 py-2.5 rounded-md shadow-lg text-sm flex items-center gap-2">
+          <Check className="h-4 w-4 text-success shrink-0" />
+          {/* Was "Waiter notified!", which claims a person has seen it. The request is
+              with the floor; whether anyone picked it up is shown in the panel. */}
+          <span>{waiterSent} — sent to the floor</span>
         </div>
       )}
 
       {/* Waiter Panel */}
       {showWaiterPanel && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end">
           <div className="w-full bg-guest-elevated rounded-t-2xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold">Request Service</h3>
-              <button onClick={() => setShowWaiterPanel(false)}><X className="h-5 w-5 text-white/50" /></button>
+              <h3 className="font-semibold">Request Service</h3>
+              <button onClick={() => setShowWaiterPanel(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
             </div>
-            <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-4">
-              <Phone className="h-4 w-4 text-blue-400" />
+            <div className="flex items-center gap-2.5 rounded-md bg-muted border border-border p-3 mb-3">
+              <Phone className="h-4 w-4 text-primary shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-blue-300">{activeOrder?.waiterName ? "Your Waiter" : "Table Service"}</p>
-                <p className="text-xs text-white/50">{activeOrder?.waiterName ? `${activeOrder.waiterName} is serving your table` : "Tap a request below — a waiter will be notified for your table."}</p>
+                <p className="text-xs font-medium">{activeOrder?.waiterName ? "Your waiter" : "Table service"}</p>
+                <p className="text-xs text-muted-foreground">{activeOrder?.waiterName ? `${activeOrder.waiterName} is serving your table` : "Tap a request below and it goes to the floor for your table."}</p>
               </div>
             </div>
+            {waiterCalls.length > 0 && (
+              <div className="mb-3"><WaiterCallBanner calls={waiterCalls} /></div>
+            )}
             <div className="grid grid-cols-3 gap-2">
-              {WAITER_REQUESTS.map(r => (
-                <button key={r.label} onClick={() => callWaiter(r.label, r.type)} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-orange-500/10 border border-white/10 hover:border-orange-500/30 transition-all">
-                  <span className="text-2xl">{r.icon}</span>
-                  <span className="text-xs text-white/70 text-center leading-tight">{r.label}</span>
-                </button>
-              ))}
+              {WAITER_REQUESTS.map(r => {
+                const RequestIcon = SERVICE_REQUEST_ICONS[r.type] ?? Bell;
+                return (
+                  <button
+                    key={r.label}
+                    onClick={() => callWaiter(r.label, r.type)}
+                    className="flex flex-col items-center justify-center gap-2 p-3 min-h-[80px] rounded-md bg-muted border border-border hover:bg-accent transition-colors"
+                  >
+                    <RequestIcon className="h-5 w-5 text-primary" />
+                    <span className="text-xs text-center leading-tight">{r.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -998,8 +1002,8 @@ export default function MenuPage() {
 
       {isDemo ? (
         <footer className="menu-app__cart">
-          <div className="max-w-lg mx-auto text-center text-xs font-semibold text-white/50 py-1">
-            🔒 This is a demo menu — for viewing only. Ordering is disabled.
+          <div className="max-w-lg mx-auto text-center text-xs font-semibold text-muted-foreground py-1">
+            This is a demo menu — for viewing only. Ordering is disabled.
           </div>
         </footer>
       ) : (
@@ -1011,7 +1015,7 @@ export default function MenuPage() {
               className="guest-btn-secondary h-12 w-12 shrink-0 p-0"
               aria-label="Call waiter"
             >
-              <Bell className="h-5 w-5 text-orange-400" />
+              <Bell className="h-5 w-5 text-primary" />
             </button>
             <button
               type="button"
@@ -1020,11 +1024,11 @@ export default function MenuPage() {
               title={venueClosed ? venue.hours.message : undefined}
               className="guest-btn-primary flex-1 h-12 justify-between px-4 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
             >
-              <span className="flex items-center gap-2 text-sm font-bold">
+              <span className="flex items-center gap-2 text-sm font-semibold">
                 <ShoppingCart className="h-4 w-4" />
                 {venueClosed ? `Opens ${venue.hours.openTime}` : `${cartCount} ${cartCount === 1 ? "item" : "items"}`}
               </span>
-              <span className="text-sm font-bold">₹{cartTotal}</span>
+              <span className="text-sm font-semibold">₹{cartTotal}</span>
             </button>
           </div>
         </footer>

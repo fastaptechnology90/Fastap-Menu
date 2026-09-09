@@ -14,6 +14,7 @@ import {
   ChevronLeft, Wallet, ArrowRightLeft, History, TrendingUp, Plus,
   CheckCircle, CreditCard, Smartphone, Building2, ChevronDown,
 } from "lucide-react";
+import { GuestIcon } from "@/components/user/GuestIcon";
 
 type Tab = "wallets" | "recharge" | "history" | "cashback" | "transfer";
 
@@ -29,13 +30,21 @@ const EMPTY_CASHBACK_SUMMARY = {
   recentEarned: [] as { orderId: string; amount: number; percent: number; date: string }[],
 };
 
+/**
+ * The six wallet buckets, drawn as one family.
+ *
+ * Each was a two-stop gradient in its own hue — emerald/teal, amber/orange, blue/cyan,
+ * violet/purple, pink/rose, orange/amber — so the wallet screen ran six accent colours
+ * at once and none of them meant anything. Semantic colour is for state; these are
+ * categories, so they share the card surface and are told apart by their label.
+ */
 const COLOR_MAP: Record<string, string> = {
-  emerald: "from-emerald-600/20 to-teal-600/10 border-emerald-500/30 text-emerald-400",
-  amber: "from-amber-600/20 to-orange-600/10 border-amber-500/30 text-amber-400",
-  blue: "from-blue-600/20 to-cyan-600/10 border-blue-500/30 text-blue-400",
-  violet: "from-violet-600/20 to-purple-600/10 border-violet-500/30 text-violet-400",
-  pink: "from-pink-600/20 to-rose-600/10 border-pink-500/30 text-pink-400",
-  orange: "from-orange-600/20 to-amber-600/10 border-orange-500/30 text-orange-400",
+  emerald: "border-success-border text-success",
+  amber: "border-warning-border text-warning",
+  blue: "border-info-border text-info",
+  violet: "border-border text-muted-foreground",
+  pink: "border-border text-muted-foreground",
+  orange: "border-primary text-primary",
 };
 
 export default function CustomerWalletPage() {
@@ -147,24 +156,24 @@ export default function CustomerWalletPage() {
   ];
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-24">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-24">
       <div className="guest-header">
         <div className="px-4 py-3 flex items-center gap-3">
           <GuestBackButton />
           <div className="flex-1">
-            <p className="text-xs text-white/40">Customer Wallet</p>
-            <h1 className="text-base font-bold">My Wallets</h1>
+            <p className="text-xs text-muted-foreground">Customer Wallet</p>
+            <h1 className="text-base font-semibold">My Wallets</h1>
           </div>
         </div>
 
-        <div className="mx-4 mb-3 rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-4 text-center">
-          <p className="text-xs text-white/50">Total Balance</p>
-          <p className="text-3xl font-extrabold text-emerald-400">₹{totalBalance(balances).toLocaleString()}</p>
-          <p className="text-xs text-white/40 mt-1">{WALLET_TYPES.length} wallet types</p>
+        <div className="mx-4 mb-3 rounded-2xl border border-success-border p-4 text-center">
+          <p className="text-xs text-muted-foreground">Total Balance</p>
+          <p className="text-3xl font-semibold text-success">₹{totalBalance(balances).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-1">{WALLET_TYPES.length} wallet types</p>
         </div>
 
         {successMsg && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
+          <div className="mx-4 mb-2 rounded-lg border border-success-border bg-success-subtle px-3 py-2 text-xs text-success flex items-center gap-2">
             <CheckCircle className="h-4 w-4" /> {successMsg}
           </div>
         )}
@@ -173,7 +182,7 @@ export default function CustomerWalletPage() {
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium ${
-                tab === t.id ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-200" : "bg-white/5 border border-white/10 text-white/60"
+                tab === t.id ? "bg-success-subtle border border-success-border text-success" : "bg-muted border border-border text-muted-foreground"
               }`}>
               <t.icon className="h-3.5 w-3.5" /> {t.label}
             </button>
@@ -192,24 +201,24 @@ export default function CustomerWalletPage() {
               const bal = balances[w.id];
               const grad = COLOR_MAP[w.color] ?? COLOR_MAP.emerald;
               return (
-                <div key={w.id} className={`rounded-xl bg-gradient-to-br border p-4 ${grad.split(" ").slice(0, 3).join(" ")}`}>
+                <div key={w.id} className={`rounded-xl border p-4 ${grad.split(" ").slice(0, 3).join(" ")}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{w.icon}</span>
+                      <GuestIcon id={w.id} className="h-5 w-5" />
                       <div>
                         <h3 className="font-semibold">{w.label}</h3>
-                        <p className="text-xs text-white/50 mt-0.5">{w.desc}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{w.desc}</p>
                       </div>
                     </div>
-                    <p className={`text-xl font-bold ${grad.split(" ").pop()}`}>₹{bal.toLocaleString()}</p>
+                    <p className={`text-xl font-semibold ${grad.split(" ").pop()}`}>₹{bal.toLocaleString()}</p>
                   </div>
                   {w.rechargeable && (
-                    <button onClick={() => setTab("recharge")} className="mt-3 text-xs text-emerald-300 underline">
+                    <button onClick={() => setTab("recharge")} className="mt-3 text-xs text-success underline">
                       Recharge this wallet →
                     </button>
                   )}
                   {!w.rechargeable && bal > 0 && TRANSFER_RULES[w.id]?.includes("main") && (
-                    <button onClick={() => { setTransferFrom(w.id); setTab("transfer"); }} className="mt-3 text-xs text-white/50 underline">
+                    <button onClick={() => { setTransferFrom(w.id); setTab("transfer"); }} className="mt-3 text-xs text-muted-foreground underline">
                       Transfer to recharge wallet →
                     </button>
                   )}
@@ -222,20 +231,20 @@ export default function CustomerWalletPage() {
         {/* Recharge */}
         {!loading && !apiError && tab === "recharge" && (
           <>
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div className="rounded-xl bg-muted border border-border p-4">
               <p className="text-sm font-semibold mb-1">Recharge Wallet</p>
-              <p className="text-xs text-white/50 mb-4">Add money via UPI, card or net banking</p>
+              <p className="text-xs text-muted-foreground mb-4">Add money via UPI, card or net banking</p>
               <div className="flex gap-2 mb-3 flex-wrap">
                 {RECHARGE_PRESETS.map(amt => (
                   <button key={amt} onClick={() => setRechargeAmt(String(amt))}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold border ${rechargeAmt === String(amt) ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300" : "border-white/10 bg-white/5"}`}>
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border ${rechargeAmt === String(amt) ? "bg-success-subtle border-success-border text-success" : "border-border bg-muted"}`}>
                     ₹{amt}
                   </button>
                 ))}
               </div>
               <input type="number" placeholder="Custom amount" value={rechargeAmt} onChange={e => setRechargeAmt(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm mb-3" />
-              <p className="text-xs text-white/40 mb-2">Payment method</p>
+                className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-sm mb-3" />
+              <p className="text-xs text-muted-foreground mb-2">Payment method</p>
               <div className="flex gap-2 mb-4">
                 {[
                   { id: "upi", label: "UPI", icon: Smartphone },
@@ -243,13 +252,13 @@ export default function CustomerWalletPage() {
                   { id: "netbanking", label: "Net Banking", icon: Building2 },
                 ].map(m => (
                   <button key={m.id} onClick={() => setPayMethod(m.id)}
-                    className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border text-xs ${payMethod === m.id ? "border-emerald-500 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}>
+                    className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl border text-xs ${payMethod === m.id ? "border-success-border bg-success-subtle" : "border-border bg-muted"}`}>
                     <m.icon className="h-4 w-4" /> {m.label}
                   </button>
                 ))}
               </div>
               <button onClick={handleRecharge} disabled={submitting || !rechargeAmt}
-                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 font-semibold disabled:opacity-50">
+                className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold disabled:opacity-50">
                 {submitting ? "Processing..." : `Add ₹${rechargeAmt || "0"} to Wallet`}
               </button>
             </div>
@@ -261,30 +270,30 @@ export default function CustomerWalletPage() {
           <>
             <div className="flex items-center gap-2">
               <select value={historyFilter} onChange={e => setHistoryFilter(e.target.value as WalletTypeId | "all")}
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm">
+                className="flex-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm">
                 <option value="all">All wallets</option>
                 {WALLET_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}
               </select>
-              <ChevronDown className="h-4 w-4 text-white/30 -ml-8 pointer-events-none" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground -ml-8 pointer-events-none" />
             </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 divide-y divide-white/5">
+            <div className="rounded-xl bg-muted border border-border divide-y divide-border">
               {filteredTx.length === 0 ? (
-                <p className="p-6 text-center text-sm text-white/40">No transactions yet</p>
+                <p className="p-6 text-center text-sm text-muted-foreground">No transactions yet</p>
               ) : filteredTx.map((t, i) => {
                 const amt = parseFloat(String(t.amount));
                 const isCredit = amt >= 0;
                 return (
                   <div key={t.id ?? i} className="flex items-center gap-3 p-4">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isCredit ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                      <span className="text-lg">{WALLET_TYPES.find(w => w.id === (t.walletType ?? "main"))?.icon ?? "💳"}</span>
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${isCredit ? "bg-success-subtle" : "bg-danger-subtle"}`}>
+                      
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm truncate">{t.description || t.type}</p>
-                      <p className="text-xs text-white/40">
+                      <p className="text-xs text-muted-foreground">
                         {walletTypeLabel((t.walletType ?? "main") as WalletTypeId)} · {new Date(t.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    <span className={`text-sm font-bold shrink-0 ${isCredit ? "text-emerald-400" : "text-red-400"}`}>
+                    <span className={`text-sm font-semibold shrink-0 ${isCredit ? "text-success" : "text-danger"}`}>
                       {isCredit ? "+" : ""}₹{Math.abs(amt).toLocaleString()}
                     </span>
                   </div>
@@ -299,35 +308,35 @@ export default function CustomerWalletPage() {
           <>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Cashback Balance", value: balances.cashback, color: "text-amber-400" },
-                { label: "Total Earned", value: cashbackSummary.totalEarned, color: "text-emerald-400" },
-                { label: "Total Used", value: cashbackSummary.totalUsed, color: "text-red-400" },
-                { label: "This Month", value: cashbackSummary.thisMonthEarned, color: "text-violet-400" },
+                { label: "Cashback Balance", value: balances.cashback, color: "text-warning" },
+                { label: "Total Earned", value: cashbackSummary.totalEarned, color: "text-success" },
+                { label: "Total Used", value: cashbackSummary.totalUsed, color: "text-danger" },
+                { label: "This Month", value: cashbackSummary.thisMonthEarned, color: "text-primary" },
               ].map(s => (
-                <div key={s.label} className="rounded-xl bg-white/5 border border-white/10 p-4 text-center">
-                  <p className="text-xs text-white/40">{s.label}</p>
-                  <p className={`text-xl font-bold mt-1 ${s.color}`}>₹{s.value.toLocaleString()}</p>
+                <div key={s.label} className="rounded-xl bg-muted border border-border p-4 text-center">
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                  <p className={`text-xl font-semibold mt-1 ${s.color}`}>₹{s.value.toLocaleString()}</p>
                 </div>
               ))}
             </div>
             {cashbackSummary.pendingCashback > 0 && (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
+              <div className="rounded-xl bg-warning-subtle border border-warning-border p-3 text-sm text-warning">
                 ₹{cashbackSummary.pendingCashback} pending cashback from recent orders
               </div>
             )}
-            <div className="rounded-xl bg-white/5 border border-white/10">
-              <div className="p-4 border-b border-white/5">
+            <div className="rounded-xl bg-muted border border-border">
+              <div className="p-4 border-b border-border">
                 <p className="text-sm font-semibold">Recent Cashback Earned</p>
               </div>
               {(cashbackSummary.recentEarned ?? []).length === 0 ? (
-                <p className="p-4 text-sm text-white/40">No cashback earned yet</p>
+                <p className="p-4 text-sm text-muted-foreground">No cashback earned yet</p>
               ) : cashbackSummary.recentEarned.map((c: any, i: number) => (
-                <div key={i} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0">
+                <div key={i} className="flex items-center justify-between p-4 border-b border-border last:border-0">
                   <div>
                     <p className="text-sm">{c.orderId}</p>
-                    <p className="text-xs text-white/40">{new Date(c.date).toLocaleDateString()} · {c.percent}% cashback</p>
+                    <p className="text-xs text-muted-foreground">{new Date(c.date).toLocaleDateString()} · {c.percent}% cashback</p>
                   </div>
-                  <span className="text-emerald-400 font-bold">+₹{c.amount}</span>
+                  <span className="text-success font-semibold">+₹{c.amount}</span>
                 </div>
               ))}
             </div>
@@ -336,52 +345,52 @@ export default function CustomerWalletPage() {
 
         {/* Wallet Transfer */}
         {!loading && !apiError && tab === "transfer" && (
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-4">
+          <div className="rounded-xl bg-muted border border-border p-4 space-y-4">
             <p className="text-sm font-semibold">Transfer Between Wallets</p>
-            <p className="text-xs text-white/50">Move balance between your wallet types</p>
+            <p className="text-xs text-muted-foreground">Move balance between your wallet types</p>
 
             <div>
-              <label className="text-xs text-white/40">From</label>
+              <label className="text-xs text-muted-foreground">From</label>
               <select value={transferFrom} onChange={e => setTransferFrom(e.target.value as WalletTypeId)}
-                className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm">
+                className="w-full mt-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm">
                 {WALLET_TYPES.filter(w => w.id !== "main" && (TRANSFER_RULES[w.id]?.length ?? 0) > 0).map(w => (
-                  <option key={w.id} value={w.id}>{w.icon} {w.label} (₹{balances[w.id]})</option>
+                  <option key={w.id} value={w.id}>{w.label} (₹{balances[w.id]})</option>
                 ))}
-                <option value="main">💳 Recharge Wallet (₹{balances.main})</option>
+                <option value="main">Recharge wallet (₹{balances.main})</option>
               </select>
             </div>
 
             <div>
-              <label className="text-xs text-white/40">To</label>
+              <label className="text-xs text-muted-foreground">To</label>
               <select value={transferTo} onChange={e => setTransferTo(e.target.value as WalletTypeId)}
-                className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm">
+                className="w-full mt-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm">
                 {transferTargets.map(id => {
                   const w = WALLET_TYPES.find(x => x.id === id)!;
-                  return <option key={id} value={id}>{w.icon} {w.label}</option>;
+                  return <option key={id} value={id}>{w.label}</option>;
                 })}
               </select>
             </div>
 
             <div>
-              <label className="text-xs text-white/40">Amount (max ₹{balances[transferFrom]})</label>
+              <label className="text-xs text-muted-foreground">Amount (max ₹{balances[transferFrom]})</label>
               <input type="number" value={transferAmt} onChange={e => setTransferAmt(e.target.value)}
                 max={balances[transferFrom]} placeholder="Enter amount"
-                className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm" />
+                className="w-full mt-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm" />
             </div>
 
             {!canTransfer(transferFrom, transferTo) && (
-              <p className="text-xs text-red-400">This transfer is not allowed</p>
+              <p className="text-xs text-danger">This transfer is not allowed</p>
             )}
 
             <button onClick={handleTransfer}
               disabled={submitting || !transferAmt || !canTransfer(transferFrom, transferTo) || parseFloat(transferAmt) > balances[transferFrom]}
-              className="w-full py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-semibold disabled:opacity-50">
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold disabled:opacity-50">
               {submitting ? "Transferring..." : `Transfer ₹${transferAmt || "0"}`}
             </button>
 
-            <div className="rounded-lg bg-white/5 p-3">
-              <p className="text-xs text-white/40 mb-2">Allowed transfers</p>
-              <ul className="text-xs text-white/50 space-y-1">
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-xs text-muted-foreground mb-2">Allowed transfers</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
                 <li>Cashback, Refund, Reward, Gift, Membership → Recharge wallet</li>
                 <li>Reward → Gift wallet</li>
                 <li>Recharge → other wallets (top-up credits)</li>

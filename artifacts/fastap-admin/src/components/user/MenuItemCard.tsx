@@ -1,6 +1,6 @@
 import { AppImage } from "@/components/shared/AppImage";
 import { Icon } from "@/components/shared/Icon";
-import { Clock, Plus, Star, Volume2 } from "lucide-react";
+import { Clock, Plus, Star, Volume2, AlertTriangle } from "lucide-react";
 
 export interface MenuItemCardData {
   id: string;
@@ -72,14 +72,14 @@ export function MenuItemCard({
             <div className="flex-1 min-w-0">
               <h3 className="font-display font-semibold text-[15px] leading-snug truncate">{item.name}</h3>
               {item.desc && (
-                <p className="text-xs text-white/45 mt-0.5 line-clamp-1">{item.desc}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{item.desc}</p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-white/40 mb-2">
+          <div className="flex items-center gap-2 text-2xs text-muted-foreground mb-2">
             <span className="inline-flex items-center gap-0.5">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <Star className="h-3 w-3 fill-warning text-warning" />
               {item.rating.toFixed(1)}
             </span>
             <span>·</span>
@@ -97,7 +97,7 @@ export function MenuItemCard({
         </button>
 
         <div className="flex items-center justify-between gap-2 mt-auto">
-          <span className="text-lg font-bold text-orange-400">₹{item.price}</span>
+          <span className="text-lg font-semibold text-primary">₹{item.price}</span>
           <div className="flex items-center gap-1.5">
             {showVoice && onSpeak && (
               <button

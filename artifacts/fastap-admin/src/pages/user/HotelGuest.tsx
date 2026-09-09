@@ -13,6 +13,7 @@ import {
   ChevronLeft, CheckCircle, Moon, Sun, Tv, Wind, Blinds,
   Lightbulb, BellOff, Sparkles, UtensilsCrossed, RefreshCw,
 } from "lucide-react";
+import { GuestIcon } from "@/components/user/GuestIcon";
 
 type Tab = "services" | "controls";
 
@@ -202,18 +203,18 @@ export default function HotelGuest() {
 
   if (sent) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center gap-4 px-8 text-center relative">
+      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center gap-4 px-8 text-center relative">
         <GuestBackButton className="absolute top-4 left-4" />
-        <CheckCircle className="h-14 w-14 text-emerald-400" />
-        <h2 className="text-xl font-bold">{sent} Requested</h2>
-        <p className="text-white/50">Room {roomNumber} — our team has been notified.</p>
+        <CheckCircle className="h-14 w-14 text-success" />
+        <h2 className="text-xl font-semibold">{sent} Requested</h2>
+        <p className="text-muted-foreground">Room {roomNumber} — our team has been notified.</p>
         {sentAssignee && (
-          <p className="text-sm text-emerald-400">Assigned to {sentAssignee} automatically</p>
+          <p className="text-sm text-success">Assigned to {sentAssignee} automatically</p>
         )}
-        <button onClick={() => { setSent(null); setSentAssignee(null); setNotes(""); }} className="mt-2 px-6 py-3 rounded-xl bg-white/10 font-semibold text-sm">
+        <button onClick={() => { setSent(null); setSentAssignee(null); setNotes(""); }} className="mt-2 px-6 py-3 rounded-xl bg-muted font-semibold text-sm">
           New Request
         </button>
-        <button onClick={() => navigate(`/user/menu?slug=${slug}&room=${roomNumber}`)} className="px-6 py-3 rounded-xl bg-orange-500 font-semibold text-sm">
+        <button onClick={() => navigate(`/user/menu?slug=${slug}&room=${roomNumber}`)} className="px-6 py-3 rounded-xl bg-primary font-semibold text-sm">
           Back to Menu
         </button>
       </div>
@@ -223,16 +224,16 @@ export default function HotelGuest() {
   const selected = serviceCatalog.find(r => r.id === selectedService);
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-10">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-10">
       <div className="guest-header px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
           <GuestBackButton />
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold truncate">Hotel Guest Services</h1>
-            <p className="text-xs text-white/40 truncate">{activeRestaurant}</p>
+            <h1 className="font-semibold truncate">Hotel Guest Services</h1>
+            <p className="text-xs text-muted-foreground truncate">{activeRestaurant}</p>
           </div>
           {controlsError && (
-            <span className="text-[10px] px-2 py-1 rounded-full bg-amber-500/20 text-amber-300">Offline controls</span>
+            <span className="text-2xs px-2 py-1 rounded-full bg-warning-subtle text-warning">Offline controls</span>
           )}
         </div>
         <div className="flex gap-2">
@@ -240,7 +241,7 @@ export default function HotelGuest() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium capitalize ${tab === t ? "bg-blue-500 text-white" : "bg-white/5 text-white/60"}`}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium capitalize ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
             >
               {t === "services" ? "Room Services" : "Smart Controls"}
             </button>
@@ -249,7 +250,7 @@ export default function HotelGuest() {
       </div>
 
       {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-emerald-500 text-sm font-medium shadow-lg">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-primary text-sm font-medium shadow-lg">
           {toast}
         </div>
       )}
@@ -257,13 +258,13 @@ export default function HotelGuest() {
       <div className="px-4 py-4 space-y-4">
         <div className="flex gap-2 items-center">
           <input
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
+            className="flex-1 bg-muted border border-border rounded-xl px-4 py-3 text-sm"
             placeholder="Room number"
             value={roomNumber}
             onChange={e => setRoomNumber(e.target.value)}
           />
           {tab === "controls" && (
-            <button onClick={fetchControls} disabled={loadingControls} className="h-11 w-11 rounded-xl bg-white/10 flex items-center justify-center">
+            <button onClick={fetchControls} disabled={loadingControls} className="h-11 w-11 rounded-xl bg-muted flex items-center justify-center">
               <RefreshCw className={`h-4 w-4 ${loadingControls ? "animate-spin" : ""}`} />
             </button>
           )}
@@ -271,29 +272,29 @@ export default function HotelGuest() {
 
         {tab === "services" ? (
           <>
-            <p className="text-xs text-white/40 uppercase tracking-wide">Request a service</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Request a service</p>
             <div className="grid grid-cols-3 gap-2">
               {serviceCatalog.length === 0 ? (
-                <p className="text-sm text-white/40 text-center py-6">{catalogError ?? "No hotel services configured."}</p>
+                <p className="text-sm text-muted-foreground text-center py-6">{catalogError ?? "No hotel services configured."}</p>
               ) : serviceCatalog.map(r => (
                 <button
                   key={r.id}
                   onClick={() => setSelectedService(r.id)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center text-xs ${selectedService === r.id ? "bg-blue-500/20 border-blue-500/50" : "bg-white/5 border-white/10"}`}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center text-xs ${selectedService === r.id ? "bg-info-subtle border-info-border" : "bg-muted border-border"}`}
                 >
-                  <span className="text-xl">{r.icon}</span>
+                  <GuestIcon id={r.id} className="h-5 w-5 text-primary" />
                   <span className="font-medium leading-tight">{r.label.replace(" Request", "")}</span>
                 </button>
               ))}
             </div>
 
             {selected && (
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+              <div className="rounded-xl bg-muted border border-border p-4 space-y-3">
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{selected.icon}</span>
+                  <GuestIcon id={selected.id} className="h-5 w-5 text-primary" />
                   <div>
                     <h3 className="font-semibold">{selected.label}</h3>
-                    <p className="text-sm text-white/50">{selected.desc}</p>
+                    <p className="text-sm text-muted-foreground">{selected.desc}</p>
                   </div>
                 </div>
 
@@ -301,7 +302,7 @@ export default function HotelGuest() {
                   <button
                     onClick={() => navigate(`/user/menu?slug=${slug}&room=${encodeURIComponent(roomNumber)}`)}
                     disabled={!roomNumber}
-                    className="w-full py-3 rounded-xl bg-orange-500 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="w-full py-3 rounded-xl bg-primary font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                   >
                     <UtensilsCrossed className="h-4 w-4" />
                     Browse Room Service Menu
@@ -310,30 +311,30 @@ export default function HotelGuest() {
                   <>
                     {selected.id === "wake_up" && (
                       <div>
-                        <label className="text-xs text-white/50 mb-1 block">Wake-up time</label>
+                        <label className="text-xs text-muted-foreground mb-1 block">Wake-up time</label>
                         <input
                           type="time"
                           value={wakeTime}
                           onChange={e => setWakeTime(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm"
+                          className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-sm"
                         />
                       </div>
                     )}
                     <textarea
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm min-h-[80px]"
+                      className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-sm min-h-[80px]"
                       placeholder="Special instructions (optional)..."
                       value={notes}
                       onChange={e => setNotes(e.target.value)}
                     />
                     {requestError && (
-                      <p role="alert" className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                      <p role="alert" className="text-xs text-danger bg-danger-subtle border border-danger-border rounded-xl px-3 py-2">
                         {requestError}
                       </p>
                     )}
                     <button
                       onClick={submitService}
                       disabled={!roomNumber || submittingService}
-                      className="w-full py-3 rounded-xl bg-blue-500 font-semibold text-sm disabled:opacity-40"
+                      className="w-full py-3 rounded-xl bg-primary font-semibold text-sm disabled:opacity-40"
                     >
                       {submittingService ? "Sending…" : `Submit ${selected.label}`}
                     </button>
@@ -346,62 +347,62 @@ export default function HotelGuest() {
           <>
             {/* Cleaning status */}
             <div className={`rounded-xl border p-4 flex items-center gap-3 ${
-              controls.cleaningStatus === "clean" ? "bg-emerald-500/10 border-emerald-500/30" :
-              controls.cleaningStatus === "in_progress" ? "bg-blue-500/10 border-blue-500/30" :
-              controls.cleaningStatus === "scheduled" ? "bg-amber-500/10 border-amber-500/30" :
-              "bg-red-500/10 border-red-500/30"
+              controls.cleaningStatus === "clean" ? "bg-success-subtle border-success-border" :
+              controls.cleaningStatus === "in_progress" ? "bg-info-subtle border-info-border" :
+              controls.cleaningStatus === "scheduled" ? "bg-warning-subtle border-warning-border" :
+              "bg-danger-subtle border-danger-border"
             }`}>
               <Sparkles className="h-5 w-5 shrink-0" />
               <div>
-                <p className="text-xs text-white/50 uppercase">Room cleaning status</p>
+                <p className="text-xs text-muted-foreground uppercase">Room cleaning status</p>
                 <p className="font-semibold">{CLEANING_STATUS_LABELS[controls.cleaningStatus]}</p>
               </div>
             </div>
 
             {/* DND */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4 flex items-center justify-between">
+            <div className="rounded-xl bg-muted border border-border p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <BellOff className="h-5 w-5 text-purple-400" />
+                <BellOff className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-semibold">Do Not Disturb</p>
-                  <p className="text-xs text-white/50">{controls.dnd ? "Staff will not knock" : "Normal service mode"}</p>
+                  <p className="text-xs text-muted-foreground">{controls.dnd ? "Staff will not knock" : "Normal service mode"}</p>
                 </div>
               </div>
               <button
                 onClick={() => patchControls({ dnd: !controls.dnd })}
-                className={`w-14 h-8 rounded-full transition-colors ${controls.dnd ? "bg-purple-500" : "bg-white/20"}`}
+                className={`w-14 h-8 rounded-full transition-colors ${controls.dnd ? "bg-primary" : "bg-muted"}`}
               >
-                <div className={`h-6 w-6 rounded-full bg-white shadow transition-transform mx-1 ${controls.dnd ? "translate-x-6" : ""}`} />
+                <div className={`h-6 w-6 rounded-full bg-card shadow transition-transform mx-1 ${controls.dnd ? "translate-x-6" : ""}`} />
               </button>
             </div>
 
             {/* AC */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="rounded-xl bg-muted border border-border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Wind className="h-5 w-5 text-cyan-400" />
+                  <Wind className="h-5 w-5 text-info" />
                   <span className="font-semibold">Air Conditioning</span>
                 </div>
                 <button
                   onClick={() => patchControls({ ac: { ...controls.ac, on: !controls.ac.on } })}
-                  className={`w-14 h-8 rounded-full transition-colors ${controls.ac.on ? "bg-cyan-500" : "bg-white/20"}`}
+                  className={`w-14 h-8 rounded-full transition-colors ${controls.ac.on ? "bg-primary" : "bg-muted"}`}
                 >
-                  <div className={`h-6 w-6 rounded-full bg-white shadow transition-transform mx-1 ${controls.ac.on ? "translate-x-6" : ""}`} />
+                  <div className={`h-6 w-6 rounded-full bg-card shadow transition-transform mx-1 ${controls.ac.on ? "translate-x-6" : ""}`} />
                 </button>
               </div>
               {controls.ac.on && (
                 <>
                   <div className="flex items-center justify-between">
-                    <button onClick={() => patchControls({ ac: { ...controls.ac, temp: Math.max(16, controls.ac.temp - 1) } })} className="h-10 w-10 rounded-xl bg-white/10 text-lg font-bold">−</button>
-                    <span className="text-3xl font-bold">{controls.ac.temp}°C</span>
-                    <button onClick={() => patchControls({ ac: { ...controls.ac, temp: Math.min(30, controls.ac.temp + 1) } })} className="h-10 w-10 rounded-xl bg-white/10 text-lg font-bold">+</button>
+                    <button onClick={() => patchControls({ ac: { ...controls.ac, temp: Math.max(16, controls.ac.temp - 1) } })} className="h-10 w-10 rounded-xl bg-muted text-lg font-semibold">−</button>
+                    <span className="text-3xl font-semibold">{controls.ac.temp}°C</span>
+                    <button onClick={() => patchControls({ ac: { ...controls.ac, temp: Math.min(30, controls.ac.temp + 1) } })} className="h-10 w-10 rounded-xl bg-muted text-lg font-semibold">+</button>
                   </div>
                   <div className="flex gap-2">
                     {(["cool", "heat", "fan"] as const).map(mode => (
                       <button
                         key={mode}
                         onClick={() => patchControls({ ac: { ...controls.ac, mode } })}
-                        className={`flex-1 py-2 rounded-lg text-xs capitalize ${controls.ac.mode === mode ? "bg-cyan-500/30 border border-cyan-500/50" : "bg-white/5"}`}
+                        className={`flex-1 py-2 rounded-lg text-xs capitalize ${controls.ac.mode === mode ? "bg-info-subtle border border-info-border" : "bg-muted"}`}
                       >
                         {mode}
                       </button>
@@ -412,22 +413,22 @@ export default function HotelGuest() {
             </div>
 
             {/* Lights */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="rounded-xl bg-muted border border-border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-yellow-400" />
+                  <Lightbulb className="h-5 w-5 text-warning" />
                   <span className="font-semibold">Smart Lights</span>
                 </div>
                 <button
                   onClick={() => patchControls({ lights: { ...controls.lights, on: !controls.lights.on } })}
-                  className={`w-14 h-8 rounded-full transition-colors ${controls.lights.on ? "bg-yellow-500" : "bg-white/20"}`}
+                  className={`w-14 h-8 rounded-full transition-colors ${controls.lights.on ? "bg-primary" : "bg-muted"}`}
                 >
-                  <div className={`h-6 w-6 rounded-full bg-white shadow transition-transform mx-1 ${controls.lights.on ? "translate-x-6" : ""}`} />
+                  <div className={`h-6 w-6 rounded-full bg-card shadow transition-transform mx-1 ${controls.lights.on ? "translate-x-6" : ""}`} />
                 </button>
               </div>
               {controls.lights.on && (
                 <div>
-                  <div className="flex justify-between text-xs text-white/50 mb-1">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <Sun className="h-3 w-3" />
                     <span>{controls.lights.brightness}%</span>
                     <Moon className="h-3 w-3" />
@@ -445,11 +446,11 @@ export default function HotelGuest() {
             </div>
 
             {/* Curtains */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="rounded-xl bg-muted border border-border p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <Blinds className="h-5 w-5 text-indigo-400" />
+                <Blinds className="h-5 w-5 text-info" />
                 <span className="font-semibold">Curtains</span>
-                <span className="ml-auto text-sm text-white/50">{controls.curtains.open}% open</span>
+                <span className="ml-auto text-sm text-muted-foreground">{controls.curtains.open}% open</span>
               </div>
               <input
                 type="range"
@@ -460,43 +461,43 @@ export default function HotelGuest() {
                 className="w-full accent-indigo-400"
               />
               <div className="flex gap-2">
-                <button onClick={() => patchControls({ curtains: { open: 0 } })} className="flex-1 py-2 rounded-lg bg-white/5 text-xs">Close</button>
-                <button onClick={() => patchControls({ curtains: { open: 50 } })} className="flex-1 py-2 rounded-lg bg-white/5 text-xs">Half</button>
-                <button onClick={() => patchControls({ curtains: { open: 100 } })} className="flex-1 py-2 rounded-lg bg-white/5 text-xs">Open</button>
+                <button onClick={() => patchControls({ curtains: { open: 0 } })} className="flex-1 py-2 rounded-lg bg-muted text-xs">Close</button>
+                <button onClick={() => patchControls({ curtains: { open: 50 } })} className="flex-1 py-2 rounded-lg bg-muted text-xs">Half</button>
+                <button onClick={() => patchControls({ curtains: { open: 100 } })} className="flex-1 py-2 rounded-lg bg-muted text-xs">Open</button>
               </div>
             </div>
 
             {/* TV */}
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <div className="rounded-xl bg-muted border border-border p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Tv className="h-5 w-5 text-pink-400" />
+                  <Tv className="h-5 w-5 text-primary" />
                   <span className="font-semibold">TV Control</span>
                 </div>
                 <button
                   onClick={() => patchControls({ tv: { ...controls.tv, on: !controls.tv.on } })}
-                  className={`w-14 h-8 rounded-full transition-colors ${controls.tv.on ? "bg-pink-500" : "bg-white/20"}`}
+                  className={`w-14 h-8 rounded-full transition-colors ${controls.tv.on ? "bg-primary" : "bg-muted"}`}
                 >
-                  <div className={`h-6 w-6 rounded-full bg-white shadow transition-transform mx-1 ${controls.tv.on ? "translate-x-6" : ""}`} />
+                  <div className={`h-6 w-6 rounded-full bg-card shadow transition-transform mx-1 ${controls.tv.on ? "translate-x-6" : ""}`} />
                 </button>
               </div>
               {controls.tv.on && (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     {tvChannels.length === 0 ? (
-                      <p className="text-xs text-white/40">No TV channels configured.</p>
+                      <p className="text-xs text-muted-foreground">No TV channels configured.</p>
                     ) : tvChannels.map(ch => (
                       <button
                         key={ch.id}
                         onClick={() => patchControls({ tv: { ...controls.tv, channel: ch.id } })}
-                        className={`py-2 px-3 rounded-lg text-xs text-left ${controls.tv.channel === ch.id ? "bg-pink-500/30 border border-pink-500/50" : "bg-white/5"}`}
+                        className={`py-2 px-3 rounded-lg text-xs text-left ${controls.tv.channel === ch.id ? "bg-muted border border-primary" : "bg-muted"}`}
                       >
                         CH {ch.id}: {ch.name}
                       </button>
                     ))}
                   </div>
                   <div>
-                    <div className="flex justify-between text-xs text-white/50 mb-1">
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
                       <span>Volume</span>
                       <span>{controls.tv.volume}%</span>
                     </div>

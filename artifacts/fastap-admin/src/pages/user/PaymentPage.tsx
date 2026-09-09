@@ -6,7 +6,7 @@ import { withGuestQuery } from "@/lib/guestDemo";
 import { useUser } from "@/contexts/UserContext";
 import { publicApi } from "@/lib/api";
 import {
-  PAYMENT_MODES, TIP_PRESETS, computeBillQuote, validateSplitPayments,
+  PAYMENT_MODES, tipPresetsFor, computeBillQuote, validateSplitPayments,
   paymentModeLabel, type PaymentModeId, type SplitPaymentLine,
 } from "@/lib/paymentCatalog";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,8 @@ export default function PaymentPage() {
 
   const subtotal = cartTotal;
   const [discount, setDiscount] = useState(0);
+  // A tip is a share of what is being paid, so the presets scale with the bill.
+  const billBeforeTip = Math.max(0, subtotal - discount);
   const [tip, setTip] = useState(0);
   const [customTip, setCustomTip] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentModeId>("upi");
@@ -230,17 +232,17 @@ export default function PaymentPage() {
 
   if (unpaid) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center px-6 text-center gap-4 relative">
+      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center px-6 text-center gap-4 relative">
         <GuestBackButton className="absolute top-4 left-4" />
-        <AlertCircle className="h-16 w-16 text-amber-400" />
-        <h2 className="text-2xl font-bold">Order placed — payment pending</h2>
-        <p className="text-white/60 max-w-sm">
+        <AlertCircle className="h-16 w-16 text-warning" />
+        <h2 className="text-2xl font-semibold">Order placed — payment pending</h2>
+        <p className="text-muted-foreground max-w-sm">
           Your order is confirmed and the kitchen has it. {unpaid.reason}
         </p>
-        <p className="text-white/40 text-sm">Please settle ₹{payAmount.toLocaleString("en-IN")} at the counter.</p>
+        <p className="text-muted-foreground text-sm">Please settle ₹{payAmount.toLocaleString("en-IN")} at the counter.</p>
         <button
           onClick={() => navigate(withGuestQuery(`/user/order/${unpaid.orderId}`, venue, activeTable))}
-          className="mt-4 px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 font-semibold text-sm"
+          className="mt-4 px-5 py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm"
         >
           Track order
         </button>
@@ -250,21 +252,21 @@ export default function PaymentPage() {
 
   if (success) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-white flex flex-col items-center justify-center px-6 text-center gap-4 relative">
+      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center px-6 text-center gap-4 relative">
         <GuestBackButton className="absolute top-4 left-4" />
-        <CheckCircle className="h-16 w-16 text-emerald-400" />
-        <h2 className="text-2xl font-bold">Payment Successful</h2>
-        <p className="text-white/50">₹{payAmount.toLocaleString()} via {paymentModeLabel(paymentMethod)}</p>
-        {success.invoiceNumber && <p className="text-sm text-emerald-300 font-mono">{success.invoiceNumber}</p>}
+        <CheckCircle className="h-16 w-16 text-success" />
+        <h2 className="text-2xl font-semibold">Payment Successful</h2>
+        <p className="text-muted-foreground">₹{payAmount.toLocaleString()} via {paymentModeLabel(paymentMethod)}</p>
+        {success.invoiceNumber && <p className="text-sm text-success font-mono">{success.invoiceNumber}</p>}
         <div className="flex gap-3 mt-4">
-          <button onClick={() => downloadInvoice("gst")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-sm">
+          <button onClick={() => downloadInvoice("gst")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted border border-border text-sm">
             <FileText className="h-4 w-4" /> GST Invoice
           </button>
-          <button onClick={() => downloadInvoice("pdf")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-300 text-sm">
+          <button onClick={() => downloadInvoice("pdf")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted border border-primary text-primary text-sm">
             <Download className="h-4 w-4" /> PDF Invoice
           </button>
         </div>
-        <button onClick={() => navigate(withGuestQuery(`/user/order/${success.orderId}`, venue, activeTable))} className="mt-4 text-orange-400 underline text-sm">
+        <button onClick={() => navigate(withGuestQuery(`/user/order/${success.orderId}`, venue, activeTable))} className="mt-4 text-primary underline text-sm">
           Track order
         </button>
       </div>
@@ -272,61 +274,62 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-32">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-32">
       <div className="guest-header px-4 py-3 flex items-center gap-3">
         <GuestBackButton onClick={goBack} />
         <div>
-          <p className="text-xs text-white/40">Payment System</p>
-          <h1 className="text-base font-bold">Checkout & Billing</h1>
+          <p className="text-xs text-muted-foreground">Payment System</p>
+          <h1 className="text-base font-semibold">Checkout & Billing</h1>
         </div>
       </div>
 
       <div className="px-4 pt-4 space-y-4">
         {gatewayReady && (
-          <div className={`rounded-xl border px-3 py-2 text-xs ${isDemoGateway ? "border-amber-500/30 bg-amber-500/10 text-amber-200" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"}`}>
+          <div className={`rounded-xl border px-3 py-2 text-xs ${isDemoGateway ? "border-warning-border bg-warning-subtle text-warning" : "border-success-border bg-success-subtle text-success"}`}>
             {isDemoGateway
               ? `Demo payments via ${activeGateway ?? "gateway"} — add API keys in Super Admin for live processing.`
               : `Secured by ${activeGateway ?? "payment gateway"}`}
           </div>
         )}
         {!gatewayReady && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <div className="rounded-xl border border-danger-border bg-danger-subtle px-3 py-2 text-xs text-danger">
             No payment gateway enabled. Cash payments only, or enable Razorpay in Super Admin → Integrations.
           </div>
         )}
         {/* Bill with GST breakdown */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-orange-400" /> Bill Summary</p>
+        <div className="rounded-2xl bg-muted border border-border p-4">
+          <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-primary" /> Bill Summary</p>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-white/50">Subtotal</span><span>₹{quote.subtotal}</span></div>
-            {quote.discount > 0 && <div className="flex justify-between text-emerald-400"><span>Discount</span><span>-₹{quote.discount}</span></div>}
-            <div className="flex justify-between"><span className="text-white/50">Taxable</span><span>₹{quote.taxableAmount}</span></div>
-            <div className="flex justify-between"><span className="text-white/50">CGST (2.5%)</span><span>₹{quote.gst.cgst}</span></div>
-            <div className="flex justify-between"><span className="text-white/50">SGST (2.5%)</span><span>₹{quote.gst.sgst}</span></div>
-            {quote.tip > 0 && <div className="flex justify-between"><span className="text-white/50">Tip</span><span>₹{quote.tip}</span></div>}
-            <div className="flex justify-between font-bold text-lg pt-2 border-t border-white/10">
-              <span>Total</span><span className="text-orange-400">₹{quote.grandTotal}</span>
+            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₹{quote.subtotal}</span></div>
+            {quote.discount > 0 && <div className="flex justify-between text-success"><span>Discount</span><span>-₹{quote.discount}</span></div>}
+            <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span>₹{quote.taxableAmount}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">CGST (2.5%)</span><span>₹{quote.gst.cgst}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">SGST (2.5%)</span><span>₹{quote.gst.sgst}</span></div>
+            {quote.tip > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Tip</span><span>₹{quote.tip}</span></div>}
+            <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border">
+              <span>Total</span><span className="text-primary">₹{quote.grandTotal}</span>
             </div>
           </div>
         </div>
 
         {/* Tip Management */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <p className="text-sm font-semibold mb-3">Tip Management 🙏</p>
+        <div className="rounded-2xl bg-muted border border-border p-4">
+          <p className="text-sm font-semibold mb-3">Tip</p>
           <div className="flex flex-wrap gap-2 mb-2">
-            {TIP_PRESETS.map(t => (
-              <button key={t} onClick={() => { setTip(t); setCustomTip(""); }}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold border ${tip === t && !customTip ? "bg-orange-500/20 border-orange-500/40 text-orange-300" : "border-white/10 bg-white/5"}`}>
-                {t === 0 ? "None" : `₹${t}`}
+            {tipPresetsFor(billBeforeTip).map(({ percent, amount }) => (
+              <button key={percent} onClick={() => { setTip(amount); setCustomTip(""); }}
+                aria-pressed={tip === amount && !customTip}
+                className={`min-h-11 px-3 py-2 rounded-md text-xs font-medium border ${tip === amount && !customTip ? "bg-primary text-primary-foreground border-primary" : "border-border bg-muted"}`}>
+                {percent === 0 ? "No tip" : <>{percent}%<span className="ml-1 opacity-70 tabular-nums">₹{amount}</span></>}
               </button>
             ))}
           </div>
           <input type="number" placeholder="Custom tip amount" value={customTip} onChange={e => setCustomTip(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
+            className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-sm" />
         </div>
 
         {/* Advanced Billing tabs */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div className="rounded-2xl bg-muted border border-border p-4">
           <p className="text-sm font-semibold mb-3">Advanced Billing</p>
           <div className="flex gap-1 mb-3 overflow-x-auto">
             {([
@@ -336,7 +339,7 @@ export default function PaymentPage() {
               { id: "advance" as const, label: "Advance", icon: Clock },
             ]).map(t => (
               <button key={t.id} onClick={() => setBillingTab(t.id)}
-                className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-xs border ${billingTab === t.id ? "bg-violet-500/20 border-violet-500/40" : "border-white/10"}`}>
+                className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-xs border ${billingTab === t.id ? "bg-muted border-primary" : "border-border"}`}>
                 <t.icon className="h-3 w-3" /> {t.label}
               </button>
             ))}
@@ -345,15 +348,15 @@ export default function PaymentPage() {
           {billingTab === "split" && (
             <div className="space-y-3">
               <div className="flex gap-2">
-                <button onClick={() => setSplitMode("equal")} className={`flex-1 py-2 rounded-xl text-xs border ${splitMode === "equal" ? "bg-violet-500/20 border-violet-500/40" : "border-white/10"}`}>Equal split</button>
-                <button onClick={() => setSplitMode("multi")} className={`flex-1 py-2 rounded-xl text-xs border ${splitMode === "multi" ? "bg-violet-500/20 border-violet-500/40" : "border-white/10"}`}>Multi-method split</button>
+                <button onClick={() => setSplitMode("equal")} className={`flex-1 py-2 rounded-xl text-xs border ${splitMode === "equal" ? "bg-muted border-primary" : "border-border"}`}>Equal split</button>
+                <button onClick={() => setSplitMode("multi")} className={`flex-1 py-2 rounded-xl text-xs border ${splitMode === "multi" ? "bg-muted border-primary" : "border-border"}`}>Multi-method split</button>
               </div>
               {splitMode === "equal" ? (
                 <div className="flex items-center gap-3">
-                  <Users className="h-4 w-4 text-violet-400" />
-                  <button onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="h-8 w-8 rounded-lg bg-white/10">−</button>
-                  <span className="flex-1 text-center font-bold">{splitCount} people · ₹{quote.splitPerPerson}/each</span>
-                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-white/10">+</button>
+                  <Users className="h-4 w-4 text-primary" />
+                  <button onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="h-8 w-8 rounded-lg bg-muted">−</button>
+                  <span className="flex-1 text-center font-semibold">{splitCount} people · ₹{quote.splitPerPerson}/each</span>
+                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-muted">+</button>
                 </div>
               ) : (
                 splitLines.map((line, i) => (
@@ -362,14 +365,14 @@ export default function PaymentPage() {
                       const next = [...splitLines];
                       next[i] = { ...next[i], method: e.target.value as PaymentModeId };
                       setSplitLines(next);
-                    }} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+                    }} className="flex-1 bg-muted border border-border rounded-xl px-3 py-2 text-sm">
                       {PAYMENT_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
                     <input type="number" value={line.amount || ""} onChange={e => {
                       const next = [...splitLines];
                       next[i] = { ...next[i], amount: parseFloat(e.target.value) || 0 };
                       setSplitLines(next);
-                    }} className="w-24 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" placeholder="₹" />
+                    }} className="w-24 bg-muted border border-border rounded-xl px-3 py-2 text-sm" placeholder="₹" />
                   </div>
                 ))
               )}
@@ -378,29 +381,29 @@ export default function PaymentPage() {
 
           {billingTab === "partial" && (
             <div>
-              <label className="text-xs text-white/40">Pay now (remaining due later)</label>
+              <label className="text-xs text-muted-foreground">Pay now (remaining due later)</label>
               <input type="number" max={quote.grandTotal - 1} value={partialPayNow} onChange={e => setPartialPayNow(e.target.value)}
-                placeholder={`Max ₹${quote.grandTotal - 1}`} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm" />
+                placeholder={`Max ₹${quote.grandTotal - 1}`} className="w-full mt-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm" />
               {quote.partialRemaining != null && (
-                <p className="text-xs text-amber-300 mt-2">Pay now: ₹{quote.partialPayNow} · Remaining: ₹{quote.partialRemaining}</p>
+                <p className="text-xs text-warning mt-2">Pay now: ₹{quote.partialPayNow} · Remaining: ₹{quote.partialRemaining}</p>
               )}
             </div>
           )}
 
           {billingTab === "advance" && (
             <div>
-              <label className="text-xs text-white/40">Advance payment (balance on delivery)</label>
+              <label className="text-xs text-muted-foreground">Advance payment (balance on delivery)</label>
               <input type="number" max={quote.grandTotal - 1} value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)}
-                placeholder="Advance amount" className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm" />
+                placeholder="Advance amount" className="w-full mt-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm" />
               {quote.balanceDue != null && (
-                <p className="text-xs text-violet-300 mt-2">Advance: ₹{quote.advanceAmount} · Balance due: ₹{quote.balanceDue}</p>
+                <p className="text-xs text-primary mt-2">Advance: ₹{quote.advanceAmount} · Balance due: ₹{quote.balanceDue}</p>
               )}
             </div>
           )}
         </div>
 
         {/* All 7 Payment Modes */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+        <div className="rounded-2xl bg-muted border border-border p-4">
           <p className="text-sm font-semibold mb-3">Payment Mode</p>
           <div className="space-y-2">
             {PAYMENT_MODES.map(m => {
@@ -410,13 +413,13 @@ export default function PaymentPage() {
               const walletSub = m.id === "wallet" && user?.walletTotal != null ? `Balance: ₹${user.walletTotal}` : m.desc;
               return (
                 <button key={m.id} disabled={disabled} onClick={() => { if (!disabled) { setPaymentMethod(m.id); if (m.id === "qr") setShowQr(true); else setShowQr(false); } }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === m.id ? "bg-orange-500/10 border-orange-500/40" : "border-white/10 bg-white/5"} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
-                  <Icon className={`h-5 w-5 ${paymentMethod === m.id ? "text-orange-400" : "text-white/40"}`} />
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === m.id ? "bg-muted border-primary" : "border-border bg-muted"} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
+                  <Icon className={`h-5 w-5 ${paymentMethod === m.id ? "text-primary" : "text-muted-foreground"}`} />
                   <div className="text-left flex-1">
                     <p className="text-sm font-semibold">{m.label}</p>
-                    <p className="text-xs text-white/40">{walletSub}</p>
+                    <p className="text-xs text-muted-foreground">{walletSub}</p>
                   </div>
-                  <div className={`h-4 w-4 rounded-full border-2 ${paymentMethod === m.id ? "border-orange-500 bg-orange-500" : "border-white/20"}`} />
+                  <div className={`h-4 w-4 rounded-full border-2 ${paymentMethod === m.id ? "border-primary bg-primary" : "border-border"}`} />
                 </button>
               );
             })}
@@ -426,20 +429,20 @@ export default function PaymentPage() {
             // "Scan to pay ₹…". It was decorative — no scanner could read it, and a
             // guest holding up their phone in front of a waiter got nothing. A real QR
             // belongs here once a gateway is connected and can mint a payment intent.
-            <div className="mt-3 p-4 rounded-xl border border-white/10 bg-white/5 text-center">
-              <p className="text-sm text-white/70">Scan-to-pay is not available yet.</p>
-              <p className="text-xs text-white/40 mt-1">Please pay at the counter — your order is confirmed either way.</p>
+            <div className="mt-3 p-4 rounded-xl border border-border bg-muted text-center">
+              <p className="text-sm text-muted-foreground">Scan-to-pay is not available yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Please pay at the counter — your order is confirmed either way.</p>
             </div>
           )}
           {paymentMethod === "nfc" && smartEntry?.detection?.entryMethod === "nfc" && (
-            <p className="mt-2 text-xs text-cyan-300">NFC tap detected — hold device near reader</p>
+            <p className="mt-2 text-xs text-info">NFC tap detected — hold device near reader</p>
           )}
         </div>
       </div>
 
       <div className="guest-bottom-bar">
         <button onClick={handlePay} disabled={submitting || onlineMethodsBlocked}
-          className="w-full py-4 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-60 font-bold text-base">
+          className="w-full py-4 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-60 font-semibold text-base">
           {submitting ? "Processing…" : `Pay ₹${payAmount} · ${paymentModeLabel(paymentMethod)}`}
         </button>
       </div>

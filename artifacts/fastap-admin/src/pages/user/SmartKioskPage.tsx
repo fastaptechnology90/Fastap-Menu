@@ -14,6 +14,7 @@ import {
   ChevronLeft, Monitor, ShoppingCart, CreditCard, Nfc, QrCode,
   Ticket, Plus, Minus, CheckCircle, Loader, RefreshCw,
 } from "lucide-react";
+import { GuestIcon } from "@/components/user/GuestIcon";
 
 type Tab = "order" | "checkout" | "nfc" | "qr" | "token";
 
@@ -178,20 +179,20 @@ export default function SmartKioskPage() {
   ];
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-28 select-none">
-      <div className="guest-header border-b border-violet-500/20">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-28 select-none">
+      <div className="guest-header border-b border-primary">
         <div className="px-4 py-3 flex items-center gap-3">
           <GuestBackButton />
           <div className="flex-1">
-            <p className="text-xs text-violet-300/60">Smart Kiosk & Self Ordering</p>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <Monitor className="h-5 w-5 text-violet-400" /> Self-Service Kiosk
+            <p className="text-xs text-primary">Smart Kiosk & Self Ordering</p>
+            <h1 className="text-lg font-semibold flex items-center gap-2">
+              <Monitor className="h-5 w-5 text-primary" /> Self-Service Kiosk
             </h1>
           </div>
           {cart.length > 0 && (
-            <button onClick={() => setTab("checkout")} className="relative h-10 w-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
-              <ShoppingCart className="h-5 w-5 text-violet-300" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-orange-500 text-[10px] font-bold flex items-center justify-center">
+            <button onClick={() => setTab("checkout")} className="relative h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-2xs font-semibold flex items-center justify-center">
                 {cart.reduce((s, i) => s + i.quantity, 0)}
               </span>
             </button>
@@ -199,7 +200,7 @@ export default function SmartKioskPage() {
         </div>
 
         {toast && (
-          <div className="mx-4 mb-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 flex items-center gap-2">
+          <div className="mx-4 mb-2 rounded-lg border border-success-border bg-success-subtle px-3 py-2 text-xs text-success flex items-center gap-2">
             <CheckCircle className="h-4 w-4" /> {toast}
           </div>
         )}
@@ -208,7 +209,7 @@ export default function SmartKioskPage() {
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold ${
-                tab === t.id ? "bg-violet-500/30 border border-violet-500/50 text-violet-200" : "bg-white/5 border border-white/10 text-white/50"
+                tab === t.id ? "bg-muted border border-primary text-primary" : "bg-muted border border-border text-muted-foreground"
               }`}>
               <t.icon className="h-4 w-4" /> {t.label}
             </button>
@@ -230,17 +231,17 @@ export default function SmartKioskPage() {
               const t = Object.entries(TAB_MAP).find(([, v]) => v === f.id)?.[0] as Tab | undefined;
               if (t) setTab(t);
             }}
-              className={`rounded-xl border p-3 text-left ${TAB_MAP[tab] === f.id ? "border-violet-500/40 bg-violet-500/10" : "border-white/10 bg-white/5"}`}>
-              <span className="text-xl">{f.icon}</span>
+              className={`rounded-xl border p-3 text-left ${TAB_MAP[tab] === f.id ? "border-primary bg-muted" : "border-border bg-muted"}`}>
+              <GuestIcon id={f.id} className="h-5 w-5 text-primary" />
               <p className="text-xs font-semibold mt-1">{f.label}</p>
             </button>
           ))}
         </div>
 
         {config?.welcomeMessage && tab === "order" && (
-          <div className="rounded-xl bg-violet-500/15 border border-violet-500/30 p-4 text-center">
-            <p className="text-lg font-bold text-violet-200">{config.welcomeMessage}</p>
-            <p className="text-xs text-white/40 mt-1">Tap items to add · Self checkout when ready</p>
+          <div className="rounded-xl bg-muted border border-primary p-4 text-center">
+            <p className="text-lg font-semibold text-primary">{config.welcomeMessage}</p>
+            <p className="text-xs text-muted-foreground mt-1">Tap items to add · Self checkout when ready</p>
           </div>
         )}
 
@@ -254,15 +255,15 @@ export default function SmartKioskPage() {
               const veg = vegFromTags(item.dietaryTags);
               return (
               <button key={item.id} onClick={() => addItem(item)}
-                className="rounded-2xl bg-white/5 border border-white/10 p-4 text-left hover:border-violet-500/40 active:scale-95 transition-all min-h-[120px]">
-                <p className="font-bold text-sm leading-tight">{item.name}</p>
-                <p className="text-[10px] text-white/40 mt-1">{item.category}</p>
-                <p className="text-lg font-extrabold text-orange-400 mt-2">₹{item.price}</p>
+                className="rounded-2xl bg-muted border border-border p-4 text-left hover:border-primary active:scale-95 transition-all min-h-[120px]">
+                <p className="font-semibold text-sm leading-tight">{item.name}</p>
+                <p className="text-2xs text-muted-foreground mt-1">{item.category}</p>
+                <p className="text-lg font-semibold text-primary mt-2">₹{item.price}</p>
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[10px] text-white/30">
-                    {veg === null ? "" : veg ? "🟢 Veg" : "🔴 Non-Veg"}
+                  <span className="text-2xs text-muted-foreground">
+                    {veg === null ? "" : veg ? "Veg" : "Non-veg"}
                   </span>
-                  <Plus className="h-5 w-5 text-violet-400" />
+                  <Plus className="h-5 w-5 text-primary" />
                 </div>
               </button>
               );
@@ -274,49 +275,49 @@ export default function SmartKioskPage() {
         {/* Self Checkout */}
         {tab === "checkout" && (
           <>
-            <p className="text-sm text-white/50">{KIOSK_FEATURES[1].desc}</p>
+            <p className="text-sm text-muted-foreground">{KIOSK_FEATURES[1].desc}</p>
             {cart.length === 0 ? (
-              <div className="text-center py-12 text-white/40">
+              <div className="text-center py-12 text-muted-foreground">
                 <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-30" />
                 <p>Cart empty — add items from Order tab</p>
-                <button onClick={() => setTab("order")} className="mt-4 px-6 py-3 rounded-xl bg-violet-500 font-semibold text-sm">Browse Menu</button>
+                <button onClick={() => setTab("order")} className="mt-4 px-6 py-3 rounded-xl bg-primary font-semibold text-sm">Browse Menu</button>
               </div>
             ) : (
               <>
-                <div className="rounded-xl bg-white/5 border border-white/10 divide-y divide-white/5">
+                <div className="rounded-xl bg-muted border border-border divide-y divide-border">
                   {cart.map(item => (
                     <div key={item.menuItemId} className="p-4 flex items-center justify-between">
                       <div>
                         <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-orange-400">₹{item.price * item.quantity}</p>
+                        <p className="text-sm text-primary">₹{item.price * item.quantity}</p>
                       </div>
-                      <div className="flex items-center gap-3 bg-white/5 rounded-xl p-1">
-                        <button onClick={() => updateQty(item.menuItemId, -1)} className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center"><Minus className="h-4 w-4" /></button>
-                        <span className="w-6 text-center font-bold">{item.quantity}</span>
-                        <button onClick={() => updateQty(item.menuItemId, 1)} className="h-9 w-9 rounded-lg bg-violet-500 flex items-center justify-center"><Plus className="h-4 w-4" /></button>
+                      <div className="flex items-center gap-3 bg-muted rounded-xl p-1">
+                        <button onClick={() => updateQty(item.menuItemId, -1)} className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center"><Minus className="h-4 w-4" /></button>
+                        <span className="w-6 text-center font-semibold">{item.quantity}</span>
+                        <button onClick={() => updateQty(item.menuItemId, 1)} className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center"><Plus className="h-4 w-4" /></button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between text-white/60"><span>Subtotal</span><span>₹{bill.subtotal}</span></div>
-                  <div className="flex justify-between text-white/60"><span>GST (5%)</span><span>₹{bill.gst.totalGst}</span></div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t border-white/10"><span>Total</span><span className="text-orange-400">₹{bill.grandTotal}</span></div>
+                <div className="rounded-xl bg-muted border border-border p-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>₹{bill.subtotal}</span></div>
+                  <div className="flex justify-between text-muted-foreground"><span>GST (5%)</span><span>₹{bill.gst.totalGst}</span></div>
+                  <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border"><span>Total</span><span className="text-primary">₹{bill.grandTotal}</span></div>
                 </div>
 
                 <p className="text-sm font-semibold">Payment method</p>
                 <div className="grid grid-cols-3 gap-2">
                   {KIOSK_PAYMENT_MODES.map(m => (
                     <button key={m.id} onClick={() => setPaymentMethod(m.id)}
-                      className={`p-3 rounded-xl border text-center text-xs font-semibold ${paymentMethod === m.id ? "border-violet-500/50 bg-violet-500/20 text-violet-200" : "border-white/10 bg-white/5"}`}>
-                      <span className="text-lg block">{m.icon}</span>{m.label}
+                      className={`p-3 rounded-xl border text-center text-xs font-semibold ${paymentMethod === m.id ? "border-primary bg-muted text-primary" : "border-border bg-muted"}`}>
+                      <GuestIcon id={m.id} className="h-4 w-4 mx-auto mb-1" />{m.label}
                     </button>
                   ))}
                 </div>
 
                 <button onClick={handleCheckout} disabled={submitting}
-                  className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-500 font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-50">
+                  className="w-full py-4 rounded-2xl bg-primary hover:bg-primary/90 font-semibold text-lg flex items-center justify-center gap-2 disabled:opacity-50">
                   {submitting ? <Loader className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
                   Complete Self Checkout · ₹{bill.grandTotal}
                 </button>
@@ -328,28 +329,28 @@ export default function SmartKioskPage() {
         {/* NFC Tap Ordering */}
         {tab === "nfc" && (
           <>
-            <p className="text-sm text-white/50">{KIOSK_FEATURES[2].desc}</p>
-            <div className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all ${nfcPulse ? "border-emerald-400 bg-emerald-500/20 scale-105" : "border-violet-500/40 bg-violet-500/5"}`}>
-              <Nfc className={`h-16 w-16 mx-auto mb-3 ${nfcPulse ? "text-emerald-400" : "text-violet-400"}`} />
-              <p className="font-bold text-lg">Tap NFC Tag Here</p>
-              <p className="text-xs text-white/40 mt-1">Hold phone near kiosk NFC reader</p>
+            <p className="text-sm text-muted-foreground">{KIOSK_FEATURES[2].desc}</p>
+            <div className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all ${nfcPulse ? "border-success-border bg-success-subtle scale-105" : "border-primary bg-muted"}`}>
+              <Nfc className={`h-16 w-16 mx-auto mb-3 ${nfcPulse ? "text-success" : "text-primary"}`} />
+              <p className="font-semibold text-lg">Tap NFC Tag Here</p>
+              <p className="text-xs text-muted-foreground mt-1">Hold phone near kiosk NFC reader</p>
             </div>
             {nfcTags.length > 0 ? (
               <div className="space-y-2">
                 {nfcTags.map(tag => (
                   <button key={tag.id} onClick={() => handleNfcTap(tag.id)}
-                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/30 text-left">
-                    <Nfc className="h-6 w-6 text-emerald-400" />
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-muted border border-border hover:border-success-border text-left">
+                    <Nfc className="h-6 w-6 text-success" />
                     <div className="flex-1">
                       <p className="font-semibold">{tag.label}</p>
-                      <p className="text-xs text-white/40">{tag.item}{tag.price > 0 ? ` · ₹${tag.price}` : " · Pay"}</p>
+                      <p className="text-xs text-muted-foreground">{tag.item}{tag.price > 0 ? ` · ₹${tag.price}` : " · Pay"}</p>
                     </div>
-                    <span className="text-xs text-emerald-400">Simulate tap</span>
+                    <span className="text-xs text-success">Simulate tap</span>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="text-center text-xs text-white/30 py-2">
+              <p className="text-center text-xs text-muted-foreground py-2">
                 Hold your phone near the kiosk reader to tap and order. Quick-tap shortcuts appear here when the kiosk has NFC tags configured.
               </p>
             )}
@@ -359,19 +360,19 @@ export default function SmartKioskPage() {
         {/* QR Self Payment */}
         {tab === "qr" && (
           <>
-            <p className="text-sm text-white/50">{KIOSK_FEATURES[3].desc}</p>
+            <p className="text-sm text-muted-foreground">{KIOSK_FEATURES[3].desc}</p>
             {cart.length === 0 ? (
-              <p className="text-center text-white/40 py-8">Add items first, then scan QR to pay ₹{bill.grandTotal || "—"}</p>
+              <p className="text-center text-muted-foreground py-8">Add items first, then scan QR to pay ₹{bill.grandTotal || "—"}</p>
             ) : (
-              <div className="rounded-2xl bg-white p-6 text-center">
+              <div className="rounded-2xl bg-card p-6 text-center">
                 {qrData?.qrImageUrl ? (
                   <img src={qrData.qrImageUrl} alt="UPI QR Code" className="mx-auto w-48 h-48" />
                 ) : (
-                  <div className="mx-auto w-48 h-48 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 text-sm">QR Code</div>
+                  <div className="mx-auto w-48 h-48 bg-muted rounded-md flex items-center justify-center text-muted-foreground text-sm">QR Code</div>
                 )}
-                <p className="text-gray-800 font-bold mt-3 text-lg">₹{bill.grandTotal}</p>
-                <p className="text-gray-500 text-xs mt-1">{qrData?.upiId ?? "UPI ID unavailable — please pay at the counter"}</p>
-                <p className="text-gray-400 text-[10px] mt-2">Scan with PhonePe, GPay, Paytm or any UPI app</p>
+                <p className="text-muted-foreground font-semibold mt-3 text-lg">₹{bill.grandTotal}</p>
+                <p className="text-muted-foreground text-xs mt-1">{qrData?.upiId ?? "UPI ID unavailable — please pay at the counter"}</p>
+                <p className="text-muted-foreground text-2xs mt-2">Scan with PhonePe, GPay, Paytm or any UPI app</p>
               </div>
             )}
             {/* Nothing here verifies the transfer — no payment app calls back. The order
@@ -379,48 +380,48 @@ export default function SmartKioskPage() {
                 claiming the bill is settled. */}
             <button onClick={() => { setPaymentMethod("qr"); handleCheckout(); }}
               disabled={cart.length === 0 || submitting || !qrData?.qrImageUrl}
-              className="w-full py-4 rounded-2xl bg-emerald-600 font-bold disabled:opacity-40">
+              className="w-full py-4 rounded-2xl bg-primary font-semibold disabled:opacity-40">
               Send order to the kitchen
             </button>
-            <p className="text-xs text-white/40 text-center">Keep your UPI receipt — the counter confirms payment when you collect.</p>
+            <p className="text-xs text-muted-foreground text-center">Keep your UPI receipt — the counter confirms payment when you collect.</p>
           </>
         )}
 
         {/* Token Display */}
         {tab === "token" && (
           <>
-            <p className="text-sm text-white/50">{KIOSK_FEATURES[4].desc}</p>
+            <p className="text-sm text-muted-foreground">{KIOSK_FEATURES[4].desc}</p>
 
             {activeToken && (
-              <div className="rounded-2xl bg-gradient-to-br from-violet-600/30 to-orange-600/20 border-2 border-violet-500/50 p-6 text-center">
-                <p className="text-xs text-violet-300 uppercase tracking-widest">Your Token</p>
-                <p className="text-6xl font-black text-white my-3">{activeToken.tokenNumber}</p>
-                <p className="text-sm text-emerald-400 capitalize">{activeToken.status} · ~{activeToken.estimatedMinutes} min</p>
-                <p className="text-xs text-white/40 mt-2">₹{activeToken.total} · {activeToken.paymentMethod} — confirm payment at the counter</p>
+              <div className="rounded-2xl border-2 border-primary p-6 text-center">
+                <p className="text-xs text-primary uppercase tracking-widest">Your Token</p>
+                <p className="text-6xl font-semibold text-foreground my-3">{activeToken.tokenNumber}</p>
+                <p className="text-sm text-success capitalize">{activeToken.status} · ~{activeToken.estimatedMinutes} min</p>
+                <p className="text-xs text-muted-foreground mt-2">₹{activeToken.total} · {activeToken.paymentMethod} — confirm payment at the counter</p>
               </div>
             )}
 
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div className="rounded-xl bg-muted border border-border p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-semibold">Live Token Board</p>
-                <button onClick={load} className="text-violet-400"><RefreshCw className="h-4 w-4" /></button>
+                <button onClick={load} className="text-primary"><RefreshCw className="h-4 w-4" /></button>
               </div>
               <div className="space-y-2">
                 {tokenBoard.length === 0 ? (
                   <GuestEmpty message="No tokens on the board." />
                 ) : tokenBoard.map((t: { token?: string; tokenNumber?: string; status: string; order?: string; orderSummary?: string }) => (
                   <div key={t.token ?? t.tokenNumber} className={`flex items-center justify-between p-3 rounded-xl border ${
-                    t.status === "ready" ? "border-emerald-500/40 bg-emerald-500/10" :
-                    t.status === "preparing" ? "border-amber-500/40 bg-amber-500/10" :
-                    "border-white/10 bg-white/5"
+                    t.status === "ready" ? "border-success-border bg-success-subtle" :
+                    t.status === "preparing" ? "border-warning-border bg-warning-subtle" :
+                    "border-border bg-muted"
                   }`}>
                     <div>
-                      <p className="text-xl font-black">{t.token ?? t.tokenNumber}</p>
-                      <p className="text-[10px] text-white/40 truncate max-w-[180px]">{t.order ?? t.orderSummary}</p>
+                      <p className="text-xl font-semibold">{t.token ?? t.tokenNumber}</p>
+                      <p className="text-2xs text-muted-foreground truncate max-w-[180px]">{t.order ?? t.orderSummary}</p>
                     </div>
-                    <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${
-                      t.status === "ready" ? "text-emerald-400 bg-emerald-500/20" :
-                      t.status === "preparing" ? "text-amber-400 bg-amber-500/20" : "text-white/50 bg-white/10"
+                    <span className={`text-xs font-semibold uppercase px-2 py-1 rounded-full ${
+                      t.status === "ready" ? "text-success bg-success-subtle" :
+                      t.status === "preparing" ? "text-warning bg-warning-subtle" : "text-muted-foreground bg-muted"
                     }`}>{t.status}</span>
                   </div>
                 ))}
@@ -433,8 +434,8 @@ export default function SmartKioskPage() {
       </div>
 
       {cart.length > 0 && tab === "order" && !loading && !apiError && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#0b1120]/95 backdrop-blur border-t border-violet-500/20 px-4 py-3">
-          <button onClick={() => setTab("checkout")} className="w-full py-4 rounded-2xl bg-violet-600 font-bold text-lg flex items-center justify-center gap-2">
+        <div className="fixed bottom-0 left-0 right-0 bg-[#0b1120]/95 backdrop-blur border-t border-primary px-4 py-3">
+          <button onClick={() => setTab("checkout")} className="w-full py-4 rounded-2xl bg-primary font-semibold text-lg flex items-center justify-center gap-2">
             <ShoppingCart className="h-5 w-5" /> Checkout · ₹{bill.grandTotal} ({cart.reduce((s, i) => s + i.quantity, 0)} items)
           </button>
         </div>

@@ -7,16 +7,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
 import { publicApi } from "@/lib/api";
 import {
-  HAPPY_HOUR, COCKTAIL_BASES, COCKTAIL_MIXERS, COCKTAIL_GARNISHES, COCKTAIL_STYLES,
-  BAR_TIME_SLOTS, buildCocktailPrice, isHappyHourActive,
+  COCKTAIL_MIXERS, COCKTAIL_GARNISHES, COCKTAIL_STYLES,
 } from "@/lib/barNightlifeCatalog";
 import {
-  ChevronLeft, Clock, Music, Wine, Crown, Calendar, Users, CheckCircle,
-  ShoppingCart, Sparkles, MapPin,
+  Clock, Music, Wine, Crown, Calendar, Users, CheckCircle2,
+  ShoppingCart, Sparkles, MapPin, Info, Martini, GlassWater,
 } from "lucide-react";
 
 /** A row from the venue's bar catalog. The shape is the venue's to decide, but naming
  *  it stops every picker below from walking an untyped value. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BarCatalogRow = Record<string, any>;
 
 type Tab = "happy-hour" | "cocktail" | "dj" | "table" | "lounge";
@@ -35,8 +35,11 @@ export default function BarNightlifePage() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [hhActive, setHhActive] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [happyHourItems, setHappyHourItems] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [barCatalog, setBarCatalog] = useState<any>(null);
+  const [hhNotice, setHhNotice] = useState<string | null>(null);
 
   // Table reservation
   const [tableId, setTableId] = useState("");
@@ -44,6 +47,7 @@ export default function BarNightlifePage() {
   const [tableTime, setTableTime] = useState("");
   const [tableGuests, setTableGuests] = useState(2);
   const [tableSlots, setTableSlots] = useState<{ time: string; available: boolean }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tableBooked, setTableBooked] = useState<any>(null);
 
   // Lounge booking
@@ -51,28 +55,41 @@ export default function BarNightlifePage() {
   const [loungeDate, setLoungeDate] = useState("");
   const [loungeTime, setLoungeTime] = useState("21:00");
   const [loungeGuests, setLoungeGuests] = useState(4);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [loungeBooked, setLoungeBooked] = useState<any>(null);
 
   // DJ booking
   const [djEventId, setDjEventId] = useState("");
   const [djDate, setDjDate] = useState("");
   const [djGuests, setDjGuests] = useState(2);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [djBooked, setDjBooked] = useState<any>(null);
 
   // Cocktail builder
-  const [baseId, setBaseId] = useState("rum");
+  const [baseId, setBaseId] = useState("");
   const [mixerId, setMixerId] = useState("soda");
   const [styleId, setStyleId] = useState("regular");
   const [garnishIds, setGarnishIds] = useState<string[]>([]);
-  const [cocktailQuote, setCocktailQuote] = useState<any>(null);
 
-  // Shapes the venue's bar catalog returns. Typed here so the pickers below are not
-  // walking untyped values.
+  /**
+   * Everything on this screen comes from the venue's own bar catalog, or it is not shown.
+   *
+   * Every one of these lists used to fall back to a constant in
+   * `lib/barNightlifeCatalog.ts` when the venue had published nothing — which is every
+   * venue today. So a restaurant with no bar programme advertised "Happy Hour, Mon-Fri
+   * 16:00-19:00, 20% off", six spirits, six lounges with 5,000-15,000 minimum spends and
+   * named DJ nights, and quoted custom cocktails off a hardcoded 320 base price that
+   * appears nowhere in the product. `GET /public/bar/catalog/:id` answers `configured:
+   * false` with a notice; the page now says that instead of inventing a bar.
+   */
   const barTables: BarCatalogRow[] = barCatalog?.barTables ?? [];
   const loungeZones: BarCatalogRow[] = barCatalog?.loungeZones ?? [];
   const djEvents: BarCatalogRow[] = barCatalog?.djEvents ?? [];
-  const happyHourConfig = barCatalog?.happyHour ?? HAPPY_HOUR;
-  const cocktailBases: BarCatalogRow[] = barCatalog?.cocktailBases ?? COCKTAIL_BASES;
+  const cocktailBases: BarCatalogRow[] = barCatalog?.cocktailBases ?? [];
+  const barTimeSlots: string[] = barCatalog?.timeSlots ?? [];
+  const happyHourConfig: BarCatalogRow | null = barCatalog?.happyHour ?? null;
+  const barNotice: string | null = barCatalog?.notice ?? null;
+
   const [submitting, setSubmitting] = useState(false);
   const [cartToast, setCartToast] = useState<string | null>(null);
 
@@ -102,10 +119,12 @@ export default function BarNightlifePage() {
       ]);
       setHhActive(Boolean(hh.isActive ?? catalog.isHappyHourNow));
       setHappyHourItems(hh.items ?? []);
+      setHhNotice(hh.notice ?? null);
       setBarCatalog(catalog);
-      if (!tableId && Array.isArray(catalog.barTables) && catalog.barTables[0]) setTableId(catalog.barTables[0].id);
-      if (!loungeId && Array.isArray(catalog.loungeZones) && catalog.loungeZones[0]) setLoungeId(catalog.loungeZones[0].id);
-      if (!djEventId && Array.isArray(catalog.djEvents) && catalog.djEvents[0]) setDjEventId(catalog.djEvents[0].id);
+      if (Array.isArray(catalog.barTables) && catalog.barTables[0]) setTableId(t => t || catalog.barTables[0].id);
+      if (Array.isArray(catalog.loungeZones) && catalog.loungeZones[0]) setLoungeId(l => l || catalog.loungeZones[0].id);
+      if (Array.isArray(catalog.djEvents) && catalog.djEvents[0]) setDjEventId(d => d || catalog.djEvents[0].id);
+      if (Array.isArray(catalog.cocktailBases) && catalog.cocktailBases[0]) setBaseId(b => b || catalog.cocktailBases[0].id);
     } catch (e) {
       setApiError(e instanceof Error ? e.message : "Could not load bar data.");
       setHappyHourItems([]);
@@ -133,18 +152,11 @@ export default function BarNightlifePage() {
 
   useEffect(() => { fetchTableSlots(); }, [fetchTableSlots]);
 
-  useEffect(() => {
-    const base = cocktailBases.find(b => b.id === baseId) ?? cocktailBases[0];
-    const basePrice = 320 + base.price;
-    const price = buildCocktailPrice(basePrice, styleId, garnishIds, COCKTAIL_GARNISHES);
-    const finalPrice = hhActive ? Math.round(price * (1 - happyHourConfig.discountPercent / 100)) : price;
-    setCocktailQuote({ basePrice: price, finalPrice, happyHourApplied: hhActive, discount: hhActive ? happyHourConfig.discountPercent : 0 });
-  }, [baseId, styleId, garnishIds, hhActive, happyHourConfig.discountPercent]);
-
   function toggleGarnish(id: string) {
     setGarnishIds(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function addHappyHourToCart(item: any) {
     const price = item.happyHourPrice ?? item.price;
     addToCart({
@@ -223,7 +235,7 @@ export default function BarNightlifePage() {
       });
       setTableBooked(res);
     } catch {
-      toast({ title: "Error", description: "Table reservation failed.", variant: "destructive" });
+      toast({ title: "Could not reserve", description: "That bar table was not booked. Try another time.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -244,7 +256,7 @@ export default function BarNightlifePage() {
       });
       setLoungeBooked(res);
     } catch {
-      toast({ title: "Error", description: "Lounge booking failed.", variant: "destructive" });
+      toast({ title: "Could not book", description: "That lounge was not booked. Try another date.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -263,63 +275,78 @@ export default function BarNightlifePage() {
       });
       setDjBooked(res);
     } catch {
-      toast({ title: "Error", description: "DJ booking failed.", variant: "destructive" });
+      toast({ title: "Could not book", description: "That event was not booked. Try again in a moment.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   }
 
-  const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: "happy-hour", label: "Happy Hour", icon: "⏰" },
-    { id: "cocktail", label: "Cocktails", icon: "🍸" },
-    { id: "dj", label: "DJ Events", icon: "🎧" },
-    { id: "table", label: "Bar Tables", icon: "🪑" },
-    { id: "lounge", label: "Premium Lounge", icon: "👑" },
+  const TABS: { id: Tab; label: string; icon: typeof Clock }[] = [
+    { id: "happy-hour", label: "Happy hour", icon: Clock },
+    { id: "cocktail", label: "Cocktails", icon: Martini },
+    { id: "dj", label: "Events", icon: Music },
+    { id: "table", label: "Bar tables", icon: MapPin },
+    { id: "lounge", label: "Lounges", icon: Crown },
   ];
 
-  const selectedLounge = loungeZones.find(l => l.id === loungeId) ?? loungeZones[0];
-  const selectedDj = djEvents.find(d => d.id === djEventId) ?? djEvents[0];
-  const selectedTable = barTables.find(t => t.id === tableId) ?? barTables[0];
+  // Every one of these was read straight through (`selectedTable.capacity`) with no
+  // guard. The venue publishes none of them today, so the list is empty, and opening
+  // the Bar tables or Lounges tab threw and blanked the whole screen.
+  const selectedLounge = loungeZones.find(l => l.id === loungeId) ?? loungeZones[0] ?? null;
+  const selectedDj = djEvents.find(d => d.id === djEventId) ?? djEvents[0] ?? null;
+  const selectedTable = barTables.find(t => t.id === tableId) ?? barTables[0] ?? null;
+
+  function NotConfigured({ what }: { what: string }) {
+    return (
+      <div className="guest-section-card flex gap-3">
+        <Info className="h-4 w-4 text-info shrink-0 mt-0.5" />
+        <p className="text-sm text-muted-foreground">
+          {barNotice ?? `${activeRestaurant || "This venue"} has not published ${what}.`}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-24">
+    <div className="guest-page thin-scroll min-h-screen pb-24">
       <div className="guest-header">
         <div className="px-4 py-3 flex items-center gap-3">
           <GuestBackButton />
-          <div className="flex-1">
-            <p className="text-xs text-white/40">Bar & Nightlife</p>
-            <h1 className="text-base font-bold">{activeRestaurant || venue.restaurantName || "Bar"}</h1>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Bar &amp; nightlife</p>
+            <h1 className="text-base font-semibold truncate">{activeRestaurant || venue.restaurantName || "Bar"}</h1>
           </div>
-          <button onClick={() => navigate("/user/cart")} className="h-9 w-9 rounded-full bg-orange-500/20 flex items-center justify-center relative">
-            <ShoppingCart className="h-4 w-4 text-orange-400" />
+          <button onClick={() => navigate("/user/cart")} aria-label="Open cart" className="guest-btn-secondary h-11 w-11 p-0">
+            <ShoppingCart className="h-4 w-4" />
           </button>
         </div>
 
-        {hhActive && !apiError && barCatalog && (
-          <div className="mx-4 mb-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 px-4 py-2 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <span className="text-sm font-medium text-amber-200">Happy Hour LIVE — {happyHourConfig.discountPercent}% off bar menu</span>
+        {hhActive && !apiError && happyHourConfig && (
+          <div className="mx-4 mb-2 rounded-md bg-success-subtle border border-success-border px-4 py-2 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-success shrink-0" />
+            <span className="text-sm font-medium text-success">
+              Happy hour on now{happyHourConfig.discountPercent ? ` — ${happyHourConfig.discountPercent}% off the bar menu` : ""}
+            </span>
           </div>
         )}
 
         <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 scrollbar-hide">
-          {tabs.map(t => (
+          {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all ${
-                tab === t.id ? "bg-violet-500/20 border border-violet-500/40 text-violet-200" : "bg-white/5 border border-white/10 text-white/60"
-              }`}
+              aria-pressed={tab === t.id}
+              className={`guest-pill ${tab === t.id ? "guest-pill-active" : ""}`}
             >
-              <span>{t.icon}</span>{t.label}
+              <t.icon className="h-3.5 w-3.5" />{t.label}
             </button>
           ))}
         </div>
       </div>
 
       {cartToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-emerald-500/90 text-white text-sm px-4 py-2 rounded-full flex items-center gap-2 shadow-lg">
-          <CheckCircle className="h-4 w-4" /> {cartToast}
+        <div role="status" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] bg-card border border-border text-sm px-4 py-2.5 rounded-md flex items-center gap-2 shadow-lg">
+          <CheckCircle2 className="h-4 w-4 text-success shrink-0" /> {cartToast}
         </div>
       )}
 
@@ -328,38 +355,58 @@ export default function BarNightlifePage() {
         {!loading && apiError && (
           <GuestError message={apiError} onRetry={loadBarData} />
         )}
+
         {!loading && !apiError && tab === "happy-hour" && (
           <>
-            <div className="rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-600/10 border border-amber-500/20 p-4">
-              <div className="flex items-start gap-3">
-                <div className="text-3xl">{happyHourConfig.icon ?? "🍹"}</div>
-                <div>
-                  <h2 className="font-bold text-lg">{happyHourConfig.label}</h2>
-                  <p className="text-sm text-white/60">{happyHourConfig.days} · {happyHourConfig.start} – {happyHourConfig.end}</p>
-                  {happyHourConfig.desc && <p className="text-sm text-amber-200/80 mt-1">{happyHourConfig.desc}</p>}
+            {happyHourConfig ? (
+              <div className="guest-section-card">
+                <div className="flex items-start gap-3">
+                  <GlassWater className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <h2 className="font-semibold text-lg">{happyHourConfig.label ?? "Happy hour"}</h2>
+                    {(happyHourConfig.days || happyHourConfig.start) && (
+                      <p className="text-sm text-muted-foreground">
+                        {[happyHourConfig.days, happyHourConfig.start && `${happyHourConfig.start} – ${happyHourConfig.end}`].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    {happyHourConfig.desc && <p className="text-sm text-muted-foreground mt-1">{happyHourConfig.desc}</p>}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="guest-section-card flex gap-3">
+                <Info className="h-4 w-4 text-info shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  {hhNotice ?? `${activeRestaurant || "This venue"} is not running a happy hour.`}
+                </p>
+              </div>
+            )}
             <div className="space-y-3">
               {happyHourItems.length === 0 ? (
-                <GuestEmpty message="No happy hour items available." />
+                <GuestEmpty
+                  icon={Wine}
+                  title="Nothing on offer right now"
+                  message="Drinks on the main menu can still be ordered from your table."
+                  actionLabel="Open the menu"
+                  onAction={() => navigate(`/user/menu?slug=${slug}`)}
+                />
               ) : happyHourItems.map(item => {
                 const orig = item.originalPrice ?? item.price;
-                const hhPrice = item.happyHourPrice ?? Math.round(parseFloat(String(orig)) * (1 - happyHourConfig.discountPercent / 100));
+                const hhPrice = item.happyHourPrice ?? orig;
+                const discounted = Number(hhPrice) < Number(orig);
                 return (
-                  <div key={item.id} className="rounded-xl bg-white/5 border border-white/10 p-4 flex gap-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{item.name}</h3>
-                      {item.description && <p className="text-xs text-white/50 mt-0.5">{item.description}</p>}
+                  <div key={item.id} className="guest-card p-4 flex gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium">{item.name}</h3>
+                      {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="text-lg font-bold text-amber-400">₹{hhPrice}</span>
-                        <span className="text-sm text-white/40 line-through">₹{orig}</span>
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">-{happyHourConfig.discountPercent}%</span>
+                        <span className="text-lg font-semibold tabular-nums">₹{hhPrice}</span>
+                        {discounted && <span className="text-sm text-muted-foreground line-through tabular-nums">₹{orig}</span>}
                       </div>
                     </div>
                     <button
                       onClick={() => addHappyHourToCart({ ...item, happyHourPrice: hhPrice })}
-                      className="self-center px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-sm font-medium"
+                      className="guest-btn-primary self-center px-4 text-sm shrink-0"
                     >
                       Add
                     </button>
@@ -370,262 +417,279 @@ export default function BarNightlifePage() {
           </>
         )}
 
-        {/* Cocktail Customization */}
+        {/* Cocktail builder — only when the venue has published its own spirits */}
         {!loading && !apiError && tab === "cocktail" && (
-          <>
-            <div className="rounded-2xl bg-violet-500/10 border border-violet-500/20 p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Wine className="h-5 w-5 text-violet-400" />
-                <h2 className="font-bold">Build Your Cocktail</h2>
-              </div>
-              <p className="text-sm text-white/50">Choose spirit, mixer, strength & garnishes</p>
-            </div>
-
-            <section>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Base Spirit</p>
-              <div className="grid grid-cols-3 gap-2">
-                {cocktailBases.map(b => (
-                  <button key={b.id} onClick={() => setBaseId(b.id)}
-                    className={`p-3 rounded-xl border text-center text-sm ${baseId === b.id ? "border-violet-500 bg-violet-500/20" : "border-white/10 bg-white/5"}`}>
-                    <div className="text-xl mb-1">{b.icon}</div>{b.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Mixer</p>
-              <div className="flex flex-wrap gap-2">
-                {COCKTAIL_MIXERS.map(m => (
-                  <button key={m.id} onClick={() => setMixerId(m.id)}
-                    className={`px-3 py-2 rounded-full text-xs border ${mixerId === m.id ? "border-violet-500 bg-violet-500/20" : "border-white/10 bg-white/5"}`}>
-                    {m.label}{m.price > 0 ? ` +₹${m.price}` : ""}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Strength</p>
-              <div className="flex gap-2">
-                {COCKTAIL_STYLES.map(s => (
-                  <button key={s.id} onClick={() => setStyleId(s.id)}
-                    className={`flex-1 py-2 rounded-xl text-sm border ${styleId === s.id ? "border-violet-500 bg-violet-500/20" : "border-white/10 bg-white/5"}`}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Garnishes</p>
-              <div className="flex flex-wrap gap-2">
-                {COCKTAIL_GARNISHES.map(g => (
-                  <button key={g.id} onClick={() => toggleGarnish(g.id)}
-                    className={`px-3 py-2 rounded-full text-xs border ${garnishIds.includes(g.id) ? "border-emerald-500 bg-emerald-500/20" : "border-white/10 bg-white/5"}`}>
-                    {g.label}{g.price > 0 ? ` +₹${g.price}` : ""}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-white/50">Your cocktail</p>
-                  {/* An indicative figure: a custom mix is not a menu row, so the bar prices it. */}
-                  <p className="text-2xl font-bold text-violet-300">about ₹{cocktailQuote?.finalPrice ?? "—"}</p>
-                  {cocktailQuote?.happyHourApplied && (
-                    <p className="text-xs text-amber-400">Happy hour applied (−{cocktailQuote.discount}%)</p>
-                  )}
+          cocktailBases.length === 0 ? (
+            <NotConfigured what="a cocktail list" />
+          ) : (
+            <>
+              <div className="guest-section-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <Wine className="h-5 w-5 text-primary" />
+                  <h2 className="font-semibold">Build your cocktail</h2>
                 </div>
-                <button onClick={sendCocktailToBar} disabled={submitting} className="px-5 py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-medium flex items-center gap-2 disabled:opacity-50">
-                  <ShoppingCart className="h-4 w-4" /> {submitting ? "Sending…" : "Send to the bar"}
+                <p className="text-sm text-muted-foreground">Spirit, mixer, strength and garnish. The bar confirms the price when they bring it over.</p>
+              </div>
+
+              <section>
+                <p className="guest-section-label mb-2">Base spirit</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {cocktailBases.map(b => (
+                    <button key={b.id} onClick={() => setBaseId(b.id)} aria-pressed={baseId === b.id}
+                      className={`guest-card guest-card-interactive p-3 text-center text-sm min-h-[64px] ${baseId === b.id ? "ring-1 ring-primary" : ""}`}>
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Mixer, strength and garnish are preparation choices, not a price list.
+                  They used to carry rupee amounts (+₹20 cranberry, +₹15 spicy rim) that
+                  no venue had ever set and no bill ever charged. */}
+              <section>
+                <p className="guest-section-label mb-2">Mixer</p>
+                <div className="flex flex-wrap gap-2">
+                  {COCKTAIL_MIXERS.map(m => (
+                    <button key={m.id} onClick={() => setMixerId(m.id)} aria-pressed={mixerId === m.id}
+                      className={`guest-pill ${mixerId === m.id ? "guest-pill-active" : ""}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <p className="guest-section-label mb-2">Strength</p>
+                <div className="flex gap-2">
+                  {COCKTAIL_STYLES.map(s => (
+                    <button key={s.id} onClick={() => setStyleId(s.id)} aria-pressed={styleId === s.id}
+                      className={`guest-pill flex-1 justify-center py-2.5 ${styleId === s.id ? "guest-pill-active" : ""}`}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <p className="guest-section-label mb-2">Garnish</p>
+                <div className="flex flex-wrap gap-2">
+                  {COCKTAIL_GARNISHES.map(g => (
+                    <button key={g.id} onClick={() => toggleGarnish(g.id)} aria-pressed={garnishIds.includes(g.id)}
+                      className={`guest-pill ${garnishIds.includes(g.id) ? "guest-pill-active" : ""}`}>
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <div className="guest-section-card flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {/* The old screen showed "about ₹355" off a hardcoded ₹320 base. No
+                      venue had set that, and the bill would not have matched it. */}
+                  The bar prices a custom mix and tells you before it is made.
+                </p>
+                <button onClick={sendCocktailToBar} disabled={submitting} className="guest-btn-primary px-5 shrink-0 disabled:opacity-50">
+                  {submitting ? "Sending…" : "Send to the bar"}
                 </button>
               </div>
-            </div>
-          </>
+            </>
+          )
         )}
 
-        {/* DJ Event Booking */}
+        {/* Events */}
         {!loading && !apiError && tab === "dj" && (
-          <>
-            {djBooked ? (
-              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-6 text-center">
-                <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-3" />
-                <h2 className="text-xl font-bold mb-1">DJ Event Booked!</h2>
-                <p className="text-white/60 text-sm">{djBooked.djEvent?.name ?? selectedDj.name}</p>
-                <p className="text-emerald-300 mt-2">{djBooked.guestCount} guests · Cover ₹{(djBooked.djEvent?.cover ?? selectedDj.cover) * djGuests}</p>
-                <button onClick={() => setDjBooked(null)} className="mt-4 text-sm text-white/50 underline">Book another</button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {djEvents.map(ev => (
-                    <button key={ev.id} onClick={() => setDjEventId(ev.id)}
-                      className={`w-full text-left rounded-xl border p-4 transition-all ${djEventId === ev.id ? "border-violet-500 bg-violet-500/10" : "border-white/10 bg-white/5"}`}>
-                      <div className="flex items-start gap-3">
-                        <Music className="h-5 w-5 text-violet-400 mt-0.5" />
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{ev.name}</h3>
-                          <p className="text-xs text-white/50">{ev.genre} · {ev.day} {ev.time}</p>
-                          <p className="text-sm text-white/60 mt-1">{ev.desc}</p>
-                          <p className="text-sm font-medium text-violet-300 mt-2">{ev.cover === 0 ? "Free entry" : `₹${ev.cover} cover / person`}</p>
-                        </div>
+          djBooked ? (
+            <div className="guest-section-card text-center py-8">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" strokeWidth={1.5} />
+              <h2 className="text-xl font-semibold mb-1">Event booked</h2>
+              <p className="text-muted-foreground text-sm">{djBooked.djEvent?.name ?? selectedDj?.name}</p>
+              <p className="text-sm mt-2 tabular-nums">
+                {djBooked.guestCount} guests
+                {typeof (djBooked.djEvent?.cover ?? selectedDj?.cover) === "number" && ` · cover ₹${(djBooked.djEvent?.cover ?? selectedDj?.cover) * djGuests}`}
+              </p>
+              <button onClick={() => setDjBooked(null)} className="guest-btn-secondary mt-4 px-5 text-sm">Book another</button>
+            </div>
+          ) : djEvents.length === 0 ? (
+            <NotConfigured what="an events programme" />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {djEvents.map(ev => (
+                  <button key={ev.id} onClick={() => setDjEventId(ev.id)} aria-pressed={djEventId === ev.id}
+                    className={`guest-card guest-card-interactive w-full text-left p-4 ${djEventId === ev.id ? "ring-1 ring-primary" : ""}`}>
+                    <div className="flex items-start gap-3">
+                      <Music className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium">{ev.name}</h3>
+                        <p className="text-xs text-muted-foreground">{[ev.genre, ev.day, ev.time].filter(Boolean).join(" · ")}</p>
+                        {ev.desc && <p className="text-sm text-muted-foreground mt-1">{ev.desc}</p>}
+                        <p className="text-sm font-medium text-primary mt-2">{!ev.cover ? "Free entry" : `₹${ev.cover} cover / person`}</p>
                       </div>
-                    </button>
-                  ))}
-                </div>
-                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
-                  <div>
-                    <label className="text-xs text-white/40">Preferred date (optional)</label>
-                    <input type="date" value={djDate} onChange={e => setDjDate(e.target.value)}
-                      className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-white/40">Guest count</label>
-                    <input type="number" min={1} max={20} value={djGuests} onChange={e => setDjGuests(parseInt(e.target.value) || 2)}
-                      className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                  <button onClick={bookDj} disabled={submitting}
-                    className="w-full py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-medium disabled:opacity-50">
-                    {submitting ? "Booking..." : `Book — ₹${selectedDj.cover * djGuests} total cover`}
+                    </div>
                   </button>
+                ))}
+              </div>
+              <div className="guest-section-card space-y-3">
+                <div>
+                  <label htmlFor="dj-date" className="text-xs text-muted-foreground">Preferred date (optional)</label>
+                  <input id="dj-date" type="date" value={djDate} onChange={e => setDjDate(e.target.value)} className="guest-input mt-1 [color-scheme:dark]" />
                 </div>
-              </>
-            )}
-          </>
+                <div>
+                  <label htmlFor="dj-guests" className="text-xs text-muted-foreground">Guests</label>
+                  <input id="dj-guests" type="number" min={1} max={20} value={djGuests} onChange={e => setDjGuests(parseInt(e.target.value) || 2)} className="guest-input mt-1" />
+                </div>
+                <button onClick={bookDj} disabled={submitting} className="guest-btn-primary w-full py-3 disabled:opacity-50">
+                  {submitting ? "Booking…" : selectedDj?.cover ? `Book — ₹${selectedDj.cover * djGuests} cover` : "Book"}
+                </button>
+              </div>
+            </>
+          )
         )}
 
-        {/* Bar Table Reservations */}
+        {/* Bar table reservations */}
         {!loading && !apiError && tab === "table" && (
-          <>
-            {tableBooked ? (
-              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-6 text-center">
-                <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-3" />
-                <h2 className="text-xl font-bold">Table Reserved!</h2>
-                <p className="text-emerald-300 font-mono mt-2">{tableBooked.bookingToken}</p>
-                <p className="text-sm text-white/60 mt-2">{tableBooked.table?.name} · {tableBooked.date} at {tableBooked.time}</p>
-                <p className="text-xs text-white/40 mt-1">{tableBooked.guestCount} guests · Deposit ₹300 pending</p>
-                <button onClick={() => setTableBooked(null)} className="mt-4 text-sm text-white/50 underline">Book another table</button>
+          tableBooked ? (
+            <div className="guest-section-card text-center py-8">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" strokeWidth={1.5} />
+              <h2 className="text-xl font-semibold">Table reserved</h2>
+              <p className="font-mono mt-2 text-primary">{tableBooked.bookingToken}</p>
+              <p className="text-sm text-muted-foreground mt-2">{tableBooked.table?.name} · {tableBooked.date} at {tableBooked.time}</p>
+              {/* The deposit line used to read a flat "Deposit ₹300 pending" whatever the
+                  venue charged. It now shows only what came back from the booking. */}
+              <p className="text-xs text-muted-foreground mt-1">
+                {tableBooked.guestCount} guests{tableBooked.depositAmount ? ` · deposit ₹${tableBooked.depositAmount} pending` : ""}
+              </p>
+              <button onClick={() => setTableBooked(null)} className="guest-btn-secondary mt-4 px-5 text-sm">Book another table</button>
+            </div>
+          ) : barTables.length === 0 || !selectedTable ? (
+            <NotConfigured what="bookable bar tables" />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-2">
+                {barTables.map(t => (
+                  <button key={t.id} onClick={() => setTableId(t.id)} aria-pressed={tableId === t.id}
+                    className={`guest-card guest-card-interactive text-left p-3 flex items-center gap-3 ${tableId === t.id ? "ring-1 ring-primary" : ""}`}>
+                    <MapPin className="h-4 w-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.zone} · up to {t.capacity} guests</p>
+                    </div>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 gap-2">
-                  {barTables.map(t => (
-                    <button key={t.id} onClick={() => setTableId(t.id)}
-                      className={`text-left rounded-xl border p-3 flex items-center gap-3 ${tableId === t.id ? "border-violet-500 bg-violet-500/10" : "border-white/10 bg-white/5"}`}>
-                      <MapPin className="h-4 w-4 text-violet-400" />
-                      <div>
-                        <p className="font-medium">{t.name}</p>
-                        <p className="text-xs text-white/50">{t.zone} · up to {t.capacity} guests</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-white/40 flex items-center gap-1"><Calendar className="h-3 w-3" /> Date</label>
-                      <input type="date" value={tableDate} onChange={e => setTableDate(e.target.value)}
-                        className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-white/40 flex items-center gap-1"><Users className="h-3 w-3" /> Guests</label>
-                      <input type="number" min={1} max={selectedTable.capacity} value={tableGuests}
-                        onChange={e => setTableGuests(Math.min(selectedTable.capacity, parseInt(e.target.value) || 2))}
-                        className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
-                    </div>
+              <div className="guest-section-card space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="bt-date" className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Date</label>
+                    <input id="bt-date" type="date" value={tableDate} onChange={e => setTableDate(e.target.value)} className="guest-input mt-1 [color-scheme:dark]" />
                   </div>
-                  {tableDate && (
-                    <div>
-                      <label className="text-xs text-white/40 flex items-center gap-1 mb-2"><Clock className="h-3 w-3" /> Time slot</label>
+                  <div>
+                    <label htmlFor="bt-guests" className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Guests</label>
+                    <input id="bt-guests" type="number" min={1} max={selectedTable.capacity} value={tableGuests}
+                      onChange={e => setTableGuests(Math.min(selectedTable.capacity, parseInt(e.target.value) || 2))}
+                      className="guest-input mt-1" />
+                  </div>
+                </div>
+                {tableDate && (
+                  <div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mb-2"><Clock className="h-3 w-3" /> Time</p>
+                    {/* No local fallback list: an empty answer means the venue has no
+                        sittings that day, and offering times it cannot honour is worse. */}
+                    {(tableSlots.length ? tableSlots : barTimeSlots.map(t => ({ time: t, available: true }))).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No sittings published for that date. Try another day.</p>
+                    ) : (
                       <div className="flex flex-wrap gap-2">
-                        {(tableSlots.length ? tableSlots : BAR_TIME_SLOTS.map(t => ({ time: t, available: true }))).map(s => (
-                          <button key={s.time} disabled={!s.available} onClick={() => setTableTime(s.time)}
-                            className={`px-3 py-2 rounded-lg text-sm border ${tableTime === s.time ? "border-violet-500 bg-violet-500/20" : s.available ? "border-white/10 bg-white/5" : "border-white/5 bg-white/5 opacity-40 cursor-not-allowed"}`}>
+                        {(tableSlots.length ? tableSlots : barTimeSlots.map(t => ({ time: t, available: true }))).map(s => (
+                          <button key={s.time} disabled={!s.available} onClick={() => setTableTime(s.time)} aria-pressed={tableTime === s.time}
+                            className={`guest-pill ${tableTime === s.time ? "guest-pill-active" : ""} ${!s.available ? "opacity-40 cursor-not-allowed" : ""}`}>
                             {s.time}
                           </button>
                         ))}
                       </div>
-                    </div>
-                  )}
-                  <button onClick={bookTable} disabled={submitting || !tableDate || !tableTime}
-                    className="w-full py-3 rounded-xl bg-violet-500 hover:bg-violet-600 font-medium disabled:opacity-50">
-                    {submitting ? "Reserving..." : `Reserve ${selectedTable.name}`}
-                  </button>
-                </div>
-              </>
-            )}
-          </>
+                    )}
+                  </div>
+                )}
+                <button onClick={bookTable} disabled={submitting || !tableDate || !tableTime} className="guest-btn-primary w-full py-3 disabled:opacity-50">
+                  {submitting ? "Reserving…" : `Reserve ${selectedTable.name}`}
+                </button>
+              </div>
+            </>
+          )
         )}
 
-        {/* Premium Lounge Booking */}
+        {/* Lounges */}
         {!loading && !apiError && tab === "lounge" && (
-          <>
-            {loungeBooked ? (
-              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-6 text-center">
-                <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-3" />
-                <h2 className="text-xl font-bold">Lounge Booked!</h2>
-                <p className="text-emerald-300 font-mono mt-2">{loungeBooked.bookingToken}</p>
-                <p className="text-sm text-white/60 mt-2">{loungeBooked.lounge?.name ?? selectedLounge.name}</p>
-                <p className="text-xs text-white/40 mt-1">Deposit ₹{loungeBooked.lounge?.deposit ?? selectedLounge.deposit} · Min spend ₹{loungeBooked.lounge?.minSpend ?? selectedLounge.minSpend}</p>
-                <button onClick={() => setLoungeBooked(null)} className="mt-4 text-sm text-white/50 underline">Book another lounge</button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {loungeZones.map(l => (
-                    <button key={l.id} onClick={() => { setLoungeId(l.id); setLoungeGuests(Math.min(loungeGuests, l.capacity)); }}
-                      className={`w-full text-left rounded-xl border p-4 ${loungeId === l.id ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-white/5"}`}>
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">{l.icon}</span>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{l.name}</h3>
-                            <Crown className="h-4 w-4 text-amber-400" />
-                          </div>
-                          <p className="text-xs text-white/50 mt-0.5">Up to {l.capacity} guests · Min spend ₹{l.minSpend.toLocaleString()}</p>
+          loungeBooked ? (
+            <div className="guest-section-card text-center py-8">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" strokeWidth={1.5} />
+              <h2 className="text-xl font-semibold">Lounge booked</h2>
+              <p className="font-mono mt-2 text-primary">{loungeBooked.bookingToken}</p>
+              <p className="text-sm text-muted-foreground mt-2">{loungeBooked.lounge?.name ?? selectedLounge?.name}</p>
+              {(loungeBooked.lounge?.deposit ?? selectedLounge?.deposit) != null && (
+                <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                  Deposit ₹{loungeBooked.lounge?.deposit ?? selectedLounge?.deposit}
+                  {(loungeBooked.lounge?.minSpend ?? selectedLounge?.minSpend) != null && ` · min spend ₹${loungeBooked.lounge?.minSpend ?? selectedLounge?.minSpend}`}
+                </p>
+              )}
+              <button onClick={() => setLoungeBooked(null)} className="guest-btn-secondary mt-4 px-5 text-sm">Book another lounge</button>
+            </div>
+          ) : loungeZones.length === 0 || !selectedLounge ? (
+            <NotConfigured what="private lounges" />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {loungeZones.map(l => (
+                  <button key={l.id} onClick={() => { setLoungeId(l.id); setLoungeGuests(Math.min(loungeGuests, l.capacity)); }} aria-pressed={loungeId === l.id}
+                    className={`guest-card guest-card-interactive w-full text-left p-4 ${loungeId === l.id ? "ring-1 ring-primary" : ""}`}>
+                    <div className="flex items-start gap-3">
+                      <Crown className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium">{l.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Up to {l.capacity} guests{l.minSpend != null ? ` · min spend ₹${Number(l.minSpend).toLocaleString("en-IN")}` : ""}
+                        </p>
+                        {Array.isArray(l.features) && (
                           <ul className="flex flex-wrap gap-1 mt-2">
                             {(l.features as string[]).map((f: string) => (
-                              <li key={f} className="text-[10px] bg-white/5 px-2 py-0.5 rounded-full text-white/60">{f}</li>
+                              <li key={f} className="guest-pill text-2xs px-2 py-0.5">{f}</li>
                             ))}
                           </ul>
-                          <p className="text-sm text-amber-300 mt-2">Deposit ₹{l.deposit.toLocaleString()}</p>
-                        </div>
+                        )}
+                        {l.deposit != null && <p className="text-sm text-primary mt-2 tabular-nums">Deposit ₹{Number(l.deposit).toLocaleString("en-IN")}</p>}
                       </div>
-                    </button>
-                  ))}
-                </div>
-                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-white/40">Date</label>
-                      <input type="date" value={loungeDate} onChange={e => setLoungeDate(e.target.value)}
-                        className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
                     </div>
-                    <div>
-                      <label className="text-xs text-white/40">Time</label>
-                      <select value={loungeTime} onChange={e => setLoungeTime(e.target.value)}
-                        className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm">
-                        {BAR_TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="guest-section-card space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="lz-date" className="text-xs text-muted-foreground">Date</label>
+                    <input id="lz-date" type="date" value={loungeDate} onChange={e => setLoungeDate(e.target.value)} className="guest-input mt-1 [color-scheme:dark]" />
                   </div>
                   <div>
-                    <label className="text-xs text-white/40">Guests (max {selectedLounge.capacity})</label>
-                    <input type="number" min={1} max={selectedLounge.capacity} value={loungeGuests}
-                      onChange={e => setLoungeGuests(Math.min(selectedLounge.capacity, parseInt(e.target.value) || 2))}
-                      className="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                    <label htmlFor="lz-time" className="text-xs text-muted-foreground">Time</label>
+                    {barTimeSlots.length ? (
+                      <select id="lz-time" value={loungeTime} onChange={e => setLoungeTime(e.target.value)} className="guest-input mt-1">
+                        {barTimeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    ) : (
+                      <input id="lz-time" type="time" value={loungeTime} onChange={e => setLoungeTime(e.target.value)} className="guest-input mt-1 [color-scheme:dark]" />
+                    )}
                   </div>
-                  <button onClick={bookLounge} disabled={submitting || !loungeDate}
-                    className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 font-medium disabled:opacity-50">
-                    {submitting ? "Booking..." : `Book ${selectedLounge.name} — ₹${selectedLounge.deposit} deposit`}
-                  </button>
                 </div>
-              </>
-            )}
-          </>
+                <div>
+                  <label htmlFor="lz-guests" className="text-xs text-muted-foreground">Guests (max {selectedLounge.capacity})</label>
+                  <input id="lz-guests" type="number" min={1} max={selectedLounge.capacity} value={loungeGuests}
+                    onChange={e => setLoungeGuests(Math.min(selectedLounge.capacity, parseInt(e.target.value) || 2))}
+                    className="guest-input mt-1" />
+                </div>
+                <button onClick={bookLounge} disabled={submitting || !loungeDate} className="guest-btn-primary w-full py-3 disabled:opacity-50">
+                  {submitting ? "Booking…" : `Book ${selectedLounge.name}`}
+                </button>
+              </div>
+            </>
+          )
         )}
       </div>
     </div>

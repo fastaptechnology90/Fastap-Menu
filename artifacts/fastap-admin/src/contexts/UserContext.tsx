@@ -43,6 +43,18 @@ export interface CartItem {
   variant?: string;
   specialInstructions?: string;
   course: "starter" | "main" | "dessert" | "beverage";
+  /**
+   * What the dish contains, and roughly how long it takes.
+   *
+   * Both are on `menu_items` and neither reached the cart, so the last screen before
+   * an order was placed — the one carrying the "list all allergens and severity" box —
+   * could not say what was already in the basket, and nothing told the guest whether
+   * their round was five minutes away or twenty-five. Carried on the line so the cart
+   * does not have to fetch the menu again. Nothing is sent to the server from here:
+   * the order route prices and reads every line from `menuItemId`.
+   */
+  allergens?: string[];
+  prepTime?: number;
 }
 
 export interface Order {

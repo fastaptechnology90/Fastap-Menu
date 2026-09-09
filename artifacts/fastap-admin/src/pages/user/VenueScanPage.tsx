@@ -42,13 +42,13 @@ type ScanPayload = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  Available: "text-emerald-400 bg-emerald-500/15",
-  free: "text-emerald-400 bg-emerald-500/15",
-  vacant: "text-emerald-400 bg-emerald-500/15",
-  Occupied: "text-orange-400 bg-orange-500/15",
-  occupied: "text-orange-400 bg-orange-500/15",
-  Reserved: "text-blue-400 bg-blue-500/15",
-  reserved: "text-blue-400 bg-blue-500/15",
+  Available: "text-success bg-success-subtle",
+  free: "text-success bg-success-subtle",
+  vacant: "text-success bg-success-subtle",
+  Occupied: "text-primary bg-muted",
+  occupied: "text-primary bg-muted",
+  Reserved: "text-info bg-info-subtle",
+  reserved: "text-info bg-info-subtle",
 };
 
 export default function VenueScanPage() {
@@ -105,21 +105,21 @@ export default function VenueScanPage() {
 
   if (loading) {
     return (
-      <div className="guest-page min-h-screen text-white flex flex-col items-center justify-center gap-3">
-        <Loader2 className="h-10 w-10 animate-spin text-orange-400" />
-        <p className="text-sm text-white/50">Loading scan details…</p>
+      <div className="guest-page min-h-screen text-foreground flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading scan details…</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="guest-page min-h-screen text-white px-6 py-12 text-center space-y-4">
-        <p className="text-red-400">{error ?? "Scan failed"}</p>
+      <div className="guest-page min-h-screen text-foreground px-6 py-12 text-center space-y-4">
+        <p className="text-danger">{error ?? "Scan failed"}</p>
         <button onClick={() => setShowScanner(true)} className="guest-btn-primary px-6 py-3 text-sm">
           <Camera className="h-4 w-4" /> Scan QR with camera
         </button>
-        <button onClick={() => navigate("/")} className="text-sm text-white/40 block mx-auto">Back home</button>
+        <button onClick={() => navigate("/")} className="text-sm text-muted-foreground block mx-auto">Back home</button>
       </div>
     );
   }
@@ -131,17 +131,17 @@ export default function VenueScanPage() {
   const isRoom = data.type === "room" ? data.room : undefined;
   const isVenue = data.type === "venue";
   const statusLabel = isTable ? data.table!.statusLabel : isRoom ? data.room!.statusLabel : "Open to browse";
-  const statusClass = STATUS_COLOR[statusLabel] ?? STATUS_COLOR[data.table?.status ?? data.room?.status ?? ""] ?? "text-white/60 bg-white/10";
+  const statusClass = STATUS_COLOR[statusLabel] ?? STATUS_COLOR[data.table?.status ?? data.room?.status ?? ""] ?? "text-muted-foreground bg-muted";
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-white pb-10">
+    <div className="guest-page thin-scroll min-h-screen text-foreground pb-10">
       <div className="guest-header px-4 py-4 text-center">
-        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/20 border border-orange-500/30 mb-3">
-          {isRoom ? <BedDouble className="h-7 w-7 text-blue-400" /> : <QrCode className="h-7 w-7 text-orange-400" />}
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-muted border border-primary mb-3">
+          {isRoom ? <BedDouble className="h-7 w-7 text-info" /> : <QrCode className="h-7 w-7 text-primary" />}
         </div>
-        <p className="text-xs text-white/40 uppercase tracking-widest">QR Scan detected</p>
-        <h1 className="text-2xl font-bold mt-1">{data.restaurant.name}</h1>
-        <p className="text-sm text-white/50 mt-1">
+        <p className="text-xs text-muted-foreground uppercase tracking-widest">QR Scan detected</p>
+        <h1 className="text-2xl font-semibold mt-1">{data.restaurant.name}</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           {isTable ? `Table ${data.table!.name}`
             : isRoom ? `Room ${data.room!.number}`
             : data.restaurant.address || "Browse the menu or order takeaway"}
@@ -153,26 +153,26 @@ export default function VenueScanPage() {
           <div className="flex items-center justify-between">
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>{statusLabel}</span>
             {isTable?.bookable || isRoom?.bookable ? (
-              <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Bookable</span>
+              <span className="text-xs text-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Bookable</span>
             ) : (
-              <span className="text-xs text-white/40">View &amp; order available</span>
+              <span className="text-xs text-muted-foreground">View &amp; order available</span>
             )}
           </div>
 
           {isTable && (
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-[10px] text-white/40 uppercase">Zone</p><p className="font-semibold flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-orange-400" />{data.table!.areaName || data.table!.zone || "Main"}</p></div>
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-[10px] text-white/40 uppercase">Capacity</p><p className="font-semibold flex items-center gap-1"><Users className="h-3.5 w-3.5 text-orange-400" />{data.table!.capacity} guests</p></div>
-              <div className="bg-white/5 rounded-xl p-3 col-span-2"><p className="text-[10px] text-white/40 uppercase">Table type</p><p className="font-semibold">{data.table!.tableType.replace(/_/g, " ")}{data.table!.isVip ? " · VIP" : ""}</p></div>
+              <div className="bg-muted rounded-xl p-3"><p className="text-2xs text-muted-foreground uppercase">Zone</p><p className="font-semibold flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-primary" />{data.table!.areaName || data.table!.zone || "Main"}</p></div>
+              <div className="bg-muted rounded-xl p-3"><p className="text-2xs text-muted-foreground uppercase">Capacity</p><p className="font-semibold flex items-center gap-1"><Users className="h-3.5 w-3.5 text-primary" />{data.table!.capacity} guests</p></div>
+              <div className="bg-muted rounded-xl p-3 col-span-2"><p className="text-2xs text-muted-foreground uppercase">Table type</p><p className="font-semibold">{data.table!.tableType.replace(/_/g, " ")}{data.table!.isVip ? " · VIP" : ""}</p></div>
             </div>
           )}
 
           {isRoom && (
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-[10px] text-white/40 uppercase">Room type</p><p className="font-semibold capitalize">{data.room!.type}</p></div>
-              <div className="bg-white/5 rounded-xl p-3"><p className="text-[10px] text-white/40 uppercase">Floor</p><p className="font-semibold">{data.room!.floor}</p></div>
+              <div className="bg-muted rounded-xl p-3"><p className="text-2xs text-muted-foreground uppercase">Room type</p><p className="font-semibold capitalize">{data.room!.type}</p></div>
+              <div className="bg-muted rounded-xl p-3"><p className="text-2xs text-muted-foreground uppercase">Floor</p><p className="font-semibold">{data.room!.floor}</p></div>
               {data.room!.guestName && (
-                <div className="bg-white/5 rounded-xl p-3 col-span-2"><p className="text-[10px] text-white/40 uppercase">Guest</p><p className="font-semibold">{data.room!.guestName}</p></div>
+                <div className="bg-muted rounded-xl p-3 col-span-2"><p className="text-2xs text-muted-foreground uppercase">Guest</p><p className="font-semibold">{data.room!.guestName}</p></div>
               )}
             </div>
           )}
@@ -180,14 +180,14 @@ export default function VenueScanPage() {
 
         <div className="space-y-2">
           {(isTable?.bookable || isRoom?.bookable) && (
-            <button onClick={() => go(data.actions.reserve)} className="w-full guest-btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2">
+            <button onClick={() => go(data.actions.reserve)} className="w-full guest-btn-primary py-3.5 text-sm font-semibold flex items-center justify-center gap-2">
               <Calendar className="h-5 w-5" /> Book {isTable ? "this table" : "this room"}
               <ArrowRight className="h-4 w-4" />
             </button>
           )}
           {isVenue && (
             <>
-              <button onClick={() => go(data.actions.menu)} className="w-full guest-btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2">
+              <button onClick={() => go(data.actions.menu)} className="w-full guest-btn-primary py-3.5 text-sm font-semibold flex items-center justify-center gap-2">
                 <UtensilsCrossed className="h-5 w-5" /> See the menu
                 <ArrowRight className="h-4 w-4" />
               </button>
@@ -197,13 +197,13 @@ export default function VenueScanPage() {
                 </button>
               )}
               {/* Said plainly, because ordering to a table needs the table's own code. */}
-              <p className="text-center text-xs text-white/35 pt-1">
+              <p className="text-center text-xs text-muted-foreground pt-1">
                 Sitting at a table? Scan the code on the table itself so your order reaches it.
               </p>
             </>
           )}
           {(isTable?.canOrder || isRoom?.canOrder) && (
-            <button onClick={() => go(isRoom ? data.actions.hotel : data.actions.menu)} className="w-full py-3.5 rounded-xl bg-blue-500 hover:bg-blue-400 font-bold text-sm flex items-center justify-center gap-2">
+            <button onClick={() => go(isRoom ? data.actions.hotel : data.actions.menu)} className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
               <UtensilsCrossed className="h-5 w-5" />
               {isRoom ? "Room service & hotel menu" : "Order from menu"}
             </button>
@@ -215,7 +215,7 @@ export default function VenueScanPage() {
           )}
         </div>
 
-        <button onClick={() => setShowScanner(true)} className="w-full py-3 rounded-xl border border-dashed border-white/20 text-sm text-white/60 flex items-center justify-center gap-2">
+        <button onClick={() => setShowScanner(true)} className="w-full py-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground flex items-center justify-center gap-2">
           <Camera className="h-4 w-4" /> Scan another table or room
         </button>
       </div>

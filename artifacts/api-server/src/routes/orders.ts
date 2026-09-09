@@ -10,6 +10,7 @@ import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/
 import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, taxRatesFor, taxForOrderItems, computeBasketTax, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 import { canTransition } from "../lib/order-status.js";
+import { venueHours, closedResponse } from "../lib/venue-hours.js";
 import {
   isRestaurantPublished,
   getPublicationStatus,
@@ -272,6 +273,18 @@ router.post("/public/orders", async (req, res): Promise<void> => {
       publicationStatus: status,
     });
     return;
+  }
+
+  // Trading hours, on the one route that matters most. The kiosk and room service
+  // already checked them; the main guest order route did not, so a 4 a.m. order still
+  // reached a kitchen with nobody in it. A scheduled order is exempt — booking ahead
+  // for tomorrow lunch is the whole point of one.
+  if (!scheduledAt) {
+    const hours = venueHours(venue);
+    if (!hours.isOpen) {
+      res.status(409).json(closedResponse(hours));
+      return;
+    }
   }
 
   const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, restaurantId));

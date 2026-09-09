@@ -21,7 +21,7 @@ export function GuestBackButton({
       type="button"
       onClick={onClick ?? goBack}
       aria-label="Go back"
-      className={`h-9 w-9 shrink-0 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all ${className}`}
+      className={`h-9 w-9 shrink-0 rounded-xl bg-muted border border-border flex items-center justify-center hover:bg-muted active:scale-95 transition-all ${className}`}
     >
       <ArrowLeft className="h-5 w-5" />
     </button>
@@ -38,7 +38,7 @@ export function GuestPage({
   withNav?: boolean;
 }) {
   return (
-    <div className={`guest-page thin-scroll min-h-screen text-white ${withNav ? "pb-24" : ""} ${className}`}>
+    <div className={`guest-page thin-scroll min-h-screen text-foreground ${withNav ? "pb-24" : ""} ${className}`}>
       {children}
     </div>
   );
@@ -63,8 +63,8 @@ export function GuestHeader({
         <div className="flex items-center gap-3">
           {onBack && <GuestBackButton onClick={onBack} />}
           <div className="flex-1 min-w-0">
-            {subtitle && <p className="text-[11px] text-white/40 truncate">{subtitle}</p>}
-            {title && <h1 className="font-display font-bold text-base truncate">{title}</h1>}
+            {subtitle && <p className="text-2xs text-muted-foreground truncate">{subtitle}</p>}
+            {title && <h1 className="font-display font-semibold text-base truncate">{title}</h1>}
           </div>
           {actions}
         </div>
@@ -166,9 +166,9 @@ export function GuestBottomNav() {
               onClick={() => navigate(withGuestQuery(item.path, venue, activeTable))}
               className={`guest-nav-item relative ${active ? "guest-nav-item-active" : ""}`}
             >
-              <NavIcon className={`h-[22px] w-[22px] ${active ? "text-orange-400" : ""}`} strokeWidth={active ? 2.25 : 2} />
+              <NavIcon className={`h-[22px] w-[22px] ${active ? "text-primary" : ""}`} strokeWidth={active ? 2.25 : 2} />
               {item.label === "Cart" && cartCount > 0 && (
-                <span className="absolute -top-0.5 right-1 h-4 min-w-4 px-1 rounded-full bg-orange-500 text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute -top-0.5 right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-2xs font-semibold flex items-center justify-center">
                   {cartCount > 9 ? "9+" : cartCount}
                 </span>
               )}
