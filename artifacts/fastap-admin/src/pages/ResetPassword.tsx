@@ -4,6 +4,8 @@ import { KeyRound, Loader2, CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { restaurantAuth } from "@/lib/api";
 import { PanelLogo } from "@/components/shared/PanelLogo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /**
  * Opened from the reset link in the email: /reset-password?token=...&staff=1
@@ -40,42 +42,44 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#0b1220] p-4 text-white">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111827] p-7">
-        <div className="flex justify-center mb-5"><PanelLogo panel="admin" showLabel label="Fastap OS" /></div>
+    <div className="admin-panel flex min-h-screen w-full items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md rounded-md border bg-card p-6 shadow-sm sm:p-7">
+        <div className="mb-5 flex justify-center"><PanelLogo panel="admin" showLabel label="Fastap OS" /></div>
         {done ? (
-          <div className="text-center space-y-4 py-4">
-            <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-400" />
-            <h1 className="text-lg font-bold">Password updated</h1>
-            <p className="text-sm text-white/60">You can now sign in with your new password.</p>
-            <button onClick={() => navigate(loginPath)} className="w-full py-3 rounded-xl bg-amber-500 text-black font-bold text-sm hover:bg-amber-400">Go to login</button>
+          <div className="space-y-4 py-4 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
+            <h1 className="text-lg font-semibold">Password updated</h1>
+            <p className="text-sm text-muted-foreground">You can now sign in with your new password.</p>
+            <Button className="w-full" onClick={() => navigate(loginPath)}>Go to login</Button>
           </div>
         ) : (
           <>
-            <h1 className="text-lg font-bold flex items-center gap-2 mb-1"><KeyRound className="h-5 w-5" /> Set a new password</h1>
-            <p className="text-sm text-white/50 mb-5">Choose a strong password for your account.</p>
+            <h1 className="mb-1 flex items-center gap-2 text-lg font-semibold"><KeyRound className="h-5 w-5" /> Set a new password</h1>
+            <p className="mb-5 text-sm text-muted-foreground">Choose a strong password for your account.</p>
             <div className="space-y-3">
-              <input
+              <Input
                 type="password"
                 autoFocus
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="New password (min 8 chars)"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/30"
+                placeholder="New password (min 8 characters)"
+                aria-label="New password"
+                aria-invalid={!!error || undefined}
               />
-              <input
+              <Input
                 type="password"
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") void submit(); }}
                 placeholder="Confirm new password"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/30"
+                aria-label="Confirm new password"
+                aria-invalid={!!error || undefined}
               />
-              {error && <p className="text-xs text-red-400">{error}</p>}
-              <button onClick={() => void submit()} disabled={loading} className="w-full py-3 rounded-xl bg-amber-500 text-black font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-amber-400">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />} Update password
-              </button>
-              <button onClick={() => navigate(loginPath)} className="w-full text-center text-sm text-white/40 hover:text-white pt-1">Back to login</button>
+              {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+              <Button className="w-full" onClick={() => void submit()} disabled={loading}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />} Update password
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={() => navigate(loginPath)}>Back to login</Button>
             </div>
           </>
         )}

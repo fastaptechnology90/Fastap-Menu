@@ -20,23 +20,21 @@ export default function AIInsights() {
 
   return (
     <PageShell
-      title="AI Business Insights"
-      description="Predictive churn risk, upsell signals, and platform health intelligence powered by live data."
+      title="Business Insights"
+      description="Churn signals, upsell prompts and vendor health, derived from live order and plan data."
       icon={<Brain className="h-6 w-6" />}
-      accent="violet"
-      badge="AI Engine"
       loading={isLoading}
       onRefresh={() => refetch()}
       refreshing={isFetching}
     >
       <div className="admin-stat-grid">
-        <KpiCard title="Active Insights" value={insights.length} accent="violet" icon={<Sparkles className="h-4 w-4 text-violet-500" />} />
-        <KpiCard title="Churn Risk" value={data?.churnRisk?.length ?? 0} accent="amber" icon={<AlertTriangle className="h-4 w-4 text-amber-500" />} subtitle="Vendors at risk" />
-        <KpiCard title="Projected Revenue" value={forecastSummary ? fmtINR(forecastSummary.projectedRevenue) : "—"} accent="emerald" icon={<TrendingUp className="h-4 w-4 text-emerald-500" />} subtitle="End of forecast horizon" />
+        <KpiCard title="Active insights" value={insights.length} icon={<Sparkles />} />
+        <KpiCard title="Churn risk" value={data?.churnRisk?.length ?? 0} icon={<AlertTriangle />} subtitle="Vendors flagged" />
+        <KpiCard title="Projected takings" value={forecastSummary ? fmtINR(forecastSummary.projectedRevenue) : "—"} icon={<TrendingUp />} subtitle="Straight-line, six months out" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <PanelCard title="Revenue Forecast" description="Projected platform revenue" className="lg:col-span-2">
+        <PanelCard title="Projected takings" description="A straight-line projection, not a measurement" className="lg:col-span-2">
           <div className="h-[200px]">
             {forecastSeries.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -54,14 +52,14 @@ export default function AIInsights() {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState icon={<TrendingUp className="h-6 w-6" />} title="Building forecast" description="More order data needed for projections." />
+              <EmptyState icon={<TrendingUp className="h-6 w-6" />} title="Not enough history" description="A projection needs at least one closed month of trading." />
             )}
           </div>
         </PanelCard>
 
-        <PanelCard title="Intelligence Feed" description="Actionable recommendations" className="lg:col-span-3">
+        <PanelCard title="Signals" description="What the platform rules currently flag" className="lg:col-span-3">
           {insights.length === 0 ? (
-            <EmptyState icon={<Brain className="h-6 w-6" />} title="All clear" description="No critical insights right now." />
+            <EmptyState icon={<Brain className="h-6 w-6" />} title="Nothing flagged" description="No vendor currently trips a churn, upsell or health rule." />
           ) : (
             <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
               {insights.map((ins: any, i: number) => (

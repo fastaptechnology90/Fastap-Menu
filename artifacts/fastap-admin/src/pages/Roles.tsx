@@ -8,6 +8,7 @@ import { Shield, Users, Wallet, Settings, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { ROLE_PERMISSIONS } from "@/lib/adminRbac";
+import { PageHeader } from "@/components/shared/Page";
 
 const ICONS: Record<string, typeof Shield> = {
   "Super Admin": Shield,
@@ -94,13 +95,11 @@ export default function Roles() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Roles &amp; RBAC</h2>
-        <p className="text-muted-foreground">
-          Module access for the platform's own admin roles. Restaurant staff roles are separate and are managed inside each restaurant.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Roles & RBAC"
+        description="Module access for the platform's own admin roles. Restaurant staff roles are separate and are managed inside each restaurant."
+      />
       <div className="grid gap-4 md:grid-cols-4">
         {roles.map((role: any) => {
           const Icon = ICONS[role.name] ?? Users;

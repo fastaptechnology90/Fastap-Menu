@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, MessageSquare, Phone, Send, RefreshCw, Loader2, Megaphone, Radio, PhoneCall, AlertTriangle } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 // The log returns status lowercase ("delivered"); the send response uses title case.
 const norm = (s?: string) => String(s ?? "").toLowerCase().trim();
@@ -49,94 +50,94 @@ export default function Communications() {
   const callLogs = comms.filter((c: any) => norm(c.channel) === "call").length;
 
   const typeColor: Record<string, string> = {
-    Broadcast: "bg-blue-500/10 text-blue-400",
-    "Renewal Reminder": "bg-yellow-500/10 text-yellow-400",
-    "Downtime Alert": "bg-red-500/10 text-red-400",
-    "Maintenance Notice": "bg-orange-500/10 text-orange-400",
-    "Marketing Campaign": "bg-purple-500/10 text-purple-400",
+    Broadcast: "bg-info-subtle text-info",
+    "Renewal Reminder": "bg-warning-subtle text-warning",
+    "Downtime Alert": "bg-danger-subtle text-danger",
+    "Maintenance Notice": "bg-warning-subtle text-warning",
+    "Marketing Campaign": "bg-muted text-muted-foreground",
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vendor Communication Center</h2>
-          <p className="text-muted-foreground">Draft and record broadcasts, renewal reminders, and marketing campaigns.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Vendor Communication Center"
+        description="Draft and record broadcasts, renewal reminders, and marketing campaigns."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Megaphone className="mr-2 h-4 w-4" /> New Communication</Button>
+            <Button><Megaphone className="mr-2 h-4 w-4" /> New Communication</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
-              <DialogHeader><DialogTitle>Send Communication</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); sendMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["Broadcast", "Renewal Reminder", "Downtime Alert", "Maintenance Notice", "Marketing Campaign"].map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Channel</Label>
-                    <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="sms">SMS</SelectItem>
-                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                        <SelectItem value="push">Push</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                  <Select value={form.target} onValueChange={v => setForm(f => ({ ...f, target: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Vendors</SelectItem>
-                      <SelectItem value="active">Active Vendors</SelectItem>
-                      <SelectItem value="trial">Trial Vendors</SelectItem>
-                      <SelectItem value="expiring">Expiring Subscriptions</SelectItem>
-                      <SelectItem value="enterprise">Enterprise Only</SelectItem>
-                      <SelectItem value="dormant">Dormant Vendors</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Input placeholder="Message subject..." value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Message</Label>
-                  <Textarea placeholder="Write your message..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} required />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  This saves the message against the chosen audience. It is not dispatched — no provider is connected yet.
-                </p>
-                <Button type="submit" className="w-full" disabled={sendMutation.isPending}>
-                  {sendMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  Record for {form.target === "all" ? "all vendors" : form.target}
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Send Communication</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); sendMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Broadcast", "Renewal Reminder", "Downtime Alert", "Maintenance Notice", "Marketing Campaign"].map(t => (
+            <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Channel</Label>
+            <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="email">Email</SelectItem>
+            <SelectItem value="sms">SMS</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="push">Push</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Target Audience</Label>
+            <Select value={form.target} onValueChange={v => setForm(f => ({ ...f, target: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="all">All Vendors</SelectItem>
+            <SelectItem value="active">Active Vendors</SelectItem>
+            <SelectItem value="trial">Trial Vendors</SelectItem>
+            <SelectItem value="expiring">Expiring Subscriptions</SelectItem>
+            <SelectItem value="enterprise">Enterprise Only</SelectItem>
+            <SelectItem value="dormant">Dormant Vendors</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Subject</Label>
+            <Input placeholder="Message subject..." value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+            <Label>Message</Label>
+            <Textarea placeholder="Write your message..." value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} rows={4} required />
+            </div>
+            <p className="text-xs text-muted-foreground">
+            This saves the message against the chosen audience. It is not dispatched — no provider is connected yet.
+            </p>
+            <Button type="submit" className="w-full" disabled={sendMutation.isPending}>
+            {sendMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Record for {form.target === "all" ? "all vendors" : form.target}
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
-      <Card className="border-amber-500/30 bg-amber-500/5">
+      <Card className="border-warning-border bg-warning-subtle">
         <CardContent className="flex items-start gap-3 py-4">
-          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
           <div className="text-sm">
             <p className="font-medium">Messages are recorded here, not delivered.</p>
             <p className="text-muted-foreground text-xs mt-0.5">
@@ -148,10 +149,10 @@ export default function Communications() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Email Drafts" value={emailsSent} icon={<Mail className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="SMS Drafts" value={smsSent} icon={<Phone className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="WhatsApp Drafts" value={whatsappSent} icon={<MessageSquare className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Call Logs" value={callLogs} icon={<PhoneCall className="h-4 w-4 text-purple-500" />} />
+        <KpiCard title="Email Drafts" value={emailsSent} icon={<Mail className="h-4 w-4 text-info" />} />
+        <KpiCard title="SMS Drafts" value={smsSent} icon={<Phone className="h-4 w-4 text-warning" />} />
+        <KpiCard title="WhatsApp Drafts" value={whatsappSent} icon={<MessageSquare className="h-4 w-4 text-success" />} />
+        <KpiCard title="Call Logs" value={callLogs} icon={<PhoneCall className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
       <Tabs defaultValue="all">

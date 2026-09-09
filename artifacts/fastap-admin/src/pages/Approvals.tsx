@@ -34,9 +34,9 @@ export default function Approvals() {
       refreshing={isFetching}
     >
       <div className="admin-stat-grid">
-        <KpiCard title="Pending" value={pending.length} accent="amber" icon={<ShieldCheck className="h-4 w-4 text-amber-500" />} subtitle="Awaiting review" />
-        <KpiCard title="Approved" value={items.filter((a: any) => a.status === "approved").length} accent="emerald" icon={<CheckCircle className="h-4 w-4 text-emerald-500" />} />
-        <KpiCard title="Rejected" value={items.filter((a: any) => a.status === "rejected").length} accent="rose" icon={<XCircle className="h-4 w-4 text-rose-500" />} />
+        <KpiCard title="Pending" value={pending.length} accent="amber" icon={<ShieldCheck className="h-4 w-4 text-warning" />} subtitle="Awaiting review" />
+        <KpiCard title="Approved" value={items.filter((a: any) => a.status === "approved").length} accent="emerald" icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Rejected" value={items.filter((a: any) => a.status === "rejected").length} accent="rose" icon={<XCircle className="h-4 w-4 text-danger" />} />
       </div>
       <PanelCard title="Approval Queue" description="L1 → L2 → L3 escalation chain for sensitive operations">
         <div className="admin-data-table-wrap">
@@ -56,8 +56,8 @@ export default function Approvals() {
             { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
             { header: "Actions", cell: (row: any) => row.status === "pending" ? (
               <div className="flex gap-1">
-                <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => updateMutation.mutate({ id: row.id, status: "approved" })}>Approve</Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs text-rose-500 border-rose-500/30" onClick={() => updateMutation.mutate({ id: row.id, status: "rejected" })}>Reject</Button>
+                <Button size="sm" className="h-7 text-xs bg-success hover:bg-success" onClick={() => updateMutation.mutate({ id: row.id, status: "approved" })}>Approve</Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs text-danger border-danger-border" onClick={() => updateMutation.mutate({ id: row.id, status: "rejected" })}>Reject</Button>
               </div>
             ) : null },
           ]} />

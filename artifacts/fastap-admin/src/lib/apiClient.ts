@@ -22,7 +22,21 @@ async function request<T>(path: string, options?: RequestInit, skipAuthRedirect 
     error.status = res.status;
     throw error;
   }
-  return res.json();
+  if (res.status === 204) return undefined as T;
+  const body = await res.json().catch(() => null);
+  // A handful of handlers used to answer HTTP 200 with `{"error":"Not found"}` in the
+  // body, and the page then painted a success toast for an action that changed nothing.
+  // The routes now return a real status, but a 2xx whose entire payload is an error
+  // string is never a success, so treat it as the failure it is rather than trusting
+  // the status line alone.
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const keys = Object.keys(body as Record<string, unknown>);
+    const message = (body as { error?: unknown }).error;
+    if (keys.length === 1 && keys[0] === "error" && typeof message === "string" && message) {
+      throw new Error(message);
+    }
+  }
+  return body as T;
 }
 
 export type RolePermissionsConfig = {
@@ -77,7 +91,15 @@ export const api = {
       if (params?.to) q.set("to", params.to);
       if (params?.restaurantId) q.set("restaurantId", String(params.restaurantId));
       const qs = q.toString();
-      return request<{ from: string | null; to: string | null; revenue: number; totalOrders: number }>(`/superadmin/revenue${qs ? `?${qs}` : ""}`);
+      // `revenue` is the sum of the three parts below. The parts are typed because a
+      // headline of ₹470,465 against "262 orders" is unreadable without them: nearly
+      // 80% of it is event advances, and `totalOrders` counts every order placed in
+      // the range, paid or not.
+      return request<{
+        from: string | null; to: string | null;
+        revenue: number; orderRevenue: number; spaRevenue: number; banquetRevenue: number;
+        totalOrders: number;
+      }>(`/superadmin/revenue${qs ? `?${qs}` : ""}`);
     },
     restaurantRevenues: () => request<{ restaurants: { id: number; name: string; isActive: boolean; orderRevenue: number; spaRevenue: number; banquetRevenue: number; totalRevenue: number; paidOrders: number }[]; grandTotal: number; count: number }>("/superadmin/restaurant-revenues"),
   },

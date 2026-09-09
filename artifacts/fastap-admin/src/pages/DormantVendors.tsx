@@ -38,7 +38,7 @@ export default function DormantVendors() {
       refreshing={isFetching}
       actions={<Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="rounded-xl"><Save className="mr-2 h-4 w-4" /> Save Rules</Button>}
     >
-      <KpiCard title="Dormant Vendors" value={vendors.length} accent="amber" icon={<Moon className="h-4 w-4 text-amber-500" />} subtitle="No orders in 30 days" />
+      <KpiCard title="Dormant Vendors" value={vendors.length} accent="amber" icon={<Moon className="h-4 w-4 text-warning" />} subtitle="No orders in 30 days" />
       <div className="grid gap-4 lg:grid-cols-3">
         <PanelCard title="Automation Rules" className="lg:col-span-1">
           <div className="space-y-4">
@@ -59,7 +59,7 @@ export default function DormantVendors() {
             <DataTable data={vendors} columns={[
               { header: "Vendor", cell: (row: any) => <Link href={`/vendors/${row.id}`} className="font-semibold hover:text-primary">{row.name}</Link> },
               { header: "Plan", cell: (row: any) => <Badge variant="outline" className="capitalize text-xs">{row.plan}</Badge> },
-              { header: "Days Inactive", cell: (row: any) => <span className="text-amber-600 font-medium">{row.daysInactive}d</span> },
+              { header: "Days Inactive", cell: (row: any) => <span className="text-warning font-medium">{row.daysInactive}d</span> },
               { header: "Signals", cell: (row: any) => <span className="text-xs text-muted-foreground">{(row.signals ?? []).join(", ")}</span> },
             ]} />
           </div>

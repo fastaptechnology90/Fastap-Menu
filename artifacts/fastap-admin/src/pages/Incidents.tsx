@@ -46,7 +46,7 @@ export default function Incidents() {
       actions={<Button onClick={() => setOpen(true)} className="rounded-xl"><Plus className="mr-2 h-4 w-4" /> Report</Button>}
     >
       <div className="admin-stat-grid max-w-2xl">
-        <KpiCard title="Open" value={openCount} accent="rose" icon={<AlertOctagon className="h-4 w-4 text-rose-500" />} />
+        <KpiCard title="Open" value={openCount} accent="rose" icon={<AlertOctagon className="h-4 w-4 text-danger" />} />
         <KpiCard title="Resolved" value={items.filter((i: any) => i.status === "resolved").length} accent="emerald" />
       </div>
       <PanelCard title="Incident Log">
@@ -64,7 +64,7 @@ export default function Incidents() {
         </div>
       </PanelCard>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-md">
           <DialogHeader><DialogTitle>Report Incident</DialogTitle></DialogHeader>
           <Input placeholder="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           <Textarea placeholder="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />

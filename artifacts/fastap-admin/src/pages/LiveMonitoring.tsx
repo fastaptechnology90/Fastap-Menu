@@ -8,6 +8,7 @@ import { Activity, CreditCard } from "lucide-react";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Payment-method chip — so you can tell how each payment came in (UPI / Cash / Gateway…).
 function PayMode({ mode }: { mode?: string }) {
@@ -17,12 +18,12 @@ function PayMode({ mode }: { mode?: string }) {
     : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway"
     : m === "aggregator" ? "Aggregator" : m === "wallet" ? "Wallet"
     : (m === "room_bill" || m === "room") ? "Room Bill" : m === "netbanking" ? "Netbanking" : mode;
-  const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-500"
-    : m === "cash" ? "bg-amber-500/15 text-amber-500"
-    : m === "card" ? "bg-blue-500/15 text-blue-500"
-    : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-500"
-    : m === "aggregator" ? "bg-pink-500/15 text-pink-500"
-    : (m === "room_bill" || m === "room") ? "bg-cyan-500/15 text-cyan-500"
+  const cls = m === "upi" ? "bg-success-subtle text-success"
+    : m === "cash" ? "bg-warning-subtle text-warning"
+    : m === "card" ? "bg-info-subtle text-info"
+    : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-muted text-muted-foreground"
+    : m === "aggregator" ? "bg-muted text-muted-foreground"
+    : (m === "room_bill" || m === "room") ? "bg-info-subtle text-info"
     : "bg-muted text-muted-foreground";
   return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
 }
@@ -57,37 +58,36 @@ function payLabel(mode?: string) {
 /** Detail popup for a live order / payment — shows exactly how it was paid. */
 function LiveDetailModal({ item, onClose }: { item: any; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border bg-background shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <div className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" /><h3 className="font-bold">Payment details</h3></div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
-        </div>
-        <div className="p-5 space-y-3 text-sm">
-          <div className="text-center py-2">
-            <p className="text-3xl font-extrabold">{fmtINRFull(item.amount)}</p>
-            <p className="text-xs text-muted-foreground mt-1 font-mono">{item.id}</p>
+    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payment details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div className="py-2 text-center">
+            <p className="text-2xl font-semibold tabular-nums tracking-tight">{fmtINRFull(item.amount)}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{item.id}</p>
             <div className="mt-2"><StatusBadge status={item.status} /></div>
           </div>
           {[
-            ["Vendor / Hotel", item.vendor],
+            ["Vendor / hotel", item.vendor],
             ["Payment method", payLabel(item.mode)],
             ["UPI ID", item.upiId || "—"],
-            ["UTR / Reference", item.reference || item.utr || "—"],
+            ["UTR / reference", item.reference || item.utr || "—"],
             ["Collected by", item.collectedBy || "—"],
             ["Collected from", item.collectedFrom || "—"],
             ["Customer", item.customerName || "—"],
-            ["Table / Room", item.tableName || item.roomNumber || "—"],
+            ["Table / room", item.tableName || item.roomNumber || "—"],
             ["Time", item.at ? new Date(item.at).toLocaleString("en-IN") : "—"],
           ].map(([k, v]) => (
-            <div key={k as string} className="flex justify-between gap-3 border-b border-border/50 pb-2">
+            <div key={k as string} className="flex justify-between gap-3 border-b pb-2 last:border-0">
               <span className="text-muted-foreground">{k}</span>
-              <span className="font-medium text-right break-all">{(v as string) ?? "—"}</span>
+              <span className="break-all text-right font-medium">{(v as string) ?? "—"}</span>
             </div>
           ))}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -132,13 +132,13 @@ export default function LiveMonitoring() {
         <FeedSection title="Live Payments" items={data?.payments ?? []} onItemClick={setSelected} render={p => (
           <>
             <div><span className="font-mono text-xs">{p.id}</span><p className="text-xs text-muted-foreground flex items-center gap-1.5">{p.vendor} <PayMode mode={p.mode} /></p></div>
-            <div className="text-right"><p className="font-semibold text-emerald-500">{fmtINRFull(p.amount)}</p><StatusBadge status={p.status} /></div>
+            <div className="text-right"><p className="font-semibold text-success">{fmtINRFull(p.amount)}</p><StatusBadge status={p.status} /></div>
           </>
         )} />
         <FeedSection title="Live Refunds" items={data?.refunds ?? []} render={r => (
           <>
             <div><span className="text-xs">{r.vendor}</span><p className="text-xs text-muted-foreground">{rel(r.at)}</p></div>
-            <div className="text-right"><p className="font-semibold text-rose-500">{fmtINRFull(r.amount)}</p></div>
+            <div className="text-right"><p className="font-semibold text-danger">{fmtINRFull(r.amount)}</p></div>
           </>
         )} />
         <FeedSection title="Settlements" items={data?.settlements ?? []} render={s => (

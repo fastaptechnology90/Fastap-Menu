@@ -8,26 +8,32 @@ import { DataTable } from "@/components/shared/DataTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Table, File, Loader2, CheckCircle, Clock, Shield } from "lucide-react";
+import {
+  Download, Table, File, Loader2, CheckCircle, Clock, Shield,
+  Building2, CreditCard, ScrollText, BarChart3, Undo2, Wallet, RotateCcw,
+  Receipt, Percent, BadgeCheck, ShieldAlert, LifeBuoy,
+} from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 // `supported` mirrors what generateExportCsv on the API actually builds a file for.
 // Every other module falls through to a generic vendor-name list on the server, so
 // offering it here would hand the operator a file that does not hold the data its
 // label promises. Those stay listed but disabled until the API grows a real exporter.
 const EXPORT_MODULES = [
-  { id: "vendors", label: "Vendors", icon: "👥", supported: true, description: "Vendor records with plan, status, and signup date" },
-  { id: "payments", label: "Payments", icon: "💳", supported: true, description: "Order-level transaction history with amount, method, and status" },
-  { id: "audit-logs", label: "Audit Logs", icon: "🔍", supported: true, description: "Complete audit trail of admin actions" },
-  { id: "analytics", label: "Analytics Report", icon: "📈", supported: true, description: "Order-level data behind the revenue and growth reports" },
-  { id: "refunds", label: "Refunds", icon: "↩️", supported: false, description: "All refund requests and their resolution status" },
-  { id: "settlements", label: "Settlements", icon: "💰", supported: false, description: "Settlement batches with gross, deductions, and net payout" },
-  { id: "subscriptions", label: "Subscriptions", icon: "📦", supported: false, description: "Vendor subscription records and renewal dates" },
-  { id: "invoices", label: "Invoices", icon: "🧾", supported: false, description: "All generated invoices with payment status" },
-  { id: "taxes", label: "Taxes", icon: "📊", supported: false, description: "GST, TDS/TCS records and tax summaries" },
-  { id: "kyc", label: "KYC Records", icon: "🪪", supported: false, description: "Vendor verification documents and status" },
-  { id: "fraud", label: "Fraud Alerts", icon: "🚨", supported: false, description: "Fraud detection alerts and risk scores" },
-  { id: "support", label: "Support Tickets", icon: "🎫", supported: false, description: "All support tickets with resolution data" },
+  { id: "vendors", label: "Vendors", icon: Building2, supported: true, description: "Vendor records with plan, status, and signup date" },
+  { id: "payments", label: "Payments", icon: CreditCard, supported: true, description: "Order-level transaction history with amount, method, and status" },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, supported: true, description: "Complete audit trail of admin actions" },
+  { id: "analytics", label: "Analytics Report", icon: BarChart3, supported: true, description: "Order-level data behind the revenue and growth reports" },
+  { id: "refunds", label: "Refunds", icon: Undo2, supported: false, description: "All refund requests and their resolution status" },
+  { id: "settlements", label: "Settlements", icon: Wallet, supported: false, description: "Settlement batches with gross, deductions, and net payout" },
+  { id: "subscriptions", label: "Subscriptions", icon: RotateCcw, supported: false, description: "Vendor subscription records and renewal dates" },
+  { id: "invoices", label: "Invoices", icon: Receipt, supported: false, description: "All generated invoices with payment status" },
+  { id: "taxes", label: "Taxes", icon: Percent, supported: false, description: "GST, TDS/TCS records and tax summaries" },
+  { id: "kyc", label: "KYC Records", icon: BadgeCheck, supported: false, description: "Vendor verification documents and status" },
+  { id: "fraud", label: "Fraud Alerts", icon: ShieldAlert, supported: false, description: "Fraud detection alerts and risk scores" },
+  { id: "support", label: "Support Tickets", icon: LifeBuoy, supported: false, description: "All support tickets with resolution data" },
 ];
+
 
 export default function ExportCenter() {
   const { toast } = useToast();
@@ -64,19 +70,17 @@ export default function ExportCenter() {
   const totalSize = exportHistory.reduce((s: number, e: any) => s + (e.sizeMb || 0), 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Export Center</h2>
-          <p className="text-muted-foreground">Export platform data as CSV, with an audited request history.</p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Export Center"
+        description="Export platform data as CSV, with an audited request history."
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Exports" value={exportHistory.length} icon={<Download className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Completed" value={completedExports} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Processing" value={pendingExports} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Total Size" value={`${totalSize.toFixed(1)} MB`} icon={<File className="h-4 w-4 text-blue-500" />} />
+        <KpiCard title="Completed" value={completedExports} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Processing" value={pendingExports} icon={<Clock className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Total Size" value={`${totalSize.toFixed(1)} MB`} icon={<File className="h-4 w-4 text-info" />} />
       </div>
 
       <Tabs defaultValue="export">
@@ -110,7 +114,9 @@ export default function ExportCenter() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{mod.icon}</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                        <mod.icon className="h-5 w-5" />
+                      </span>
                       <CardTitle className="text-base">{mod.label}</CardTitle>
                     </div>
                     <Badge variant={mod.supported ? "outline" : "secondary"} className="text-xs uppercase">
@@ -198,7 +204,7 @@ export default function ExportCenter() {
                         <p className="text-xs text-muted-foreground">{exp.records?.toLocaleString()} records · {exp.requestedBy}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs text-red-400" onClick={() => api.exportCenter.reject(exp.id).then(() => { qc.invalidateQueries({ queryKey: ["export-history"] }); toast({ title: "Export rejected" }); }).catch(() => toast({ title: "Failed", variant: "destructive" }))}>Reject</Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs text-danger" onClick={() => api.exportCenter.reject(exp.id).then(() => { qc.invalidateQueries({ queryKey: ["export-history"] }); toast({ title: "Export rejected" }); }).catch(() => toast({ title: "Failed", variant: "destructive" }))}>Reject</Button>
                         <Button size="sm" className="h-7 text-xs" onClick={() => api.exportCenter.approve(exp.id).then(() => { qc.invalidateQueries({ queryKey: ["export-history"] }); toast({ title: "Export approved" }); }).catch(() => toast({ title: "Failed", variant: "destructive" }))}>Approve</Button>
                       </div>
                     </div>

@@ -13,6 +13,7 @@ import { RefreshCw, Loader2, CheckCircle, AlertTriangle, XCircle, GitMerge, Down
 import { Input } from "@/components/ui/input";
 import { fmtINR, fmtINRFull } from "@/lib/format";
 import { downloadCsv } from "@/lib/download";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Reconciliation() {
   const { toast } = useToast();
@@ -64,45 +65,45 @@ export default function Reconciliation() {
   };
 
   const statusColor: Record<string, string> = {
-    Matched: "text-green-400",
-    Mismatch: "text-red-400",
-    Missing: "text-orange-400",
-    Duplicate: "text-purple-400",
+    Matched: "text-success",
+    Mismatch: "text-danger",
+    Missing: "text-warning",
+    Duplicate: "text-muted-foreground",
   };
   const payColor = (mode?: string) => {
     const m = (mode || "").toLowerCase();
-    if (m.includes("upi")) return "bg-emerald-500/15 text-emerald-400";
-    if (m.includes("card")) return "bg-blue-500/15 text-blue-400";
-    if (m.includes("gateway") || m.includes("razor") || m.includes("online")) return "bg-violet-500/15 text-violet-400";
-    if (m.includes("cash")) return "bg-amber-500/15 text-amber-400";
-    if (m.includes("wallet")) return "bg-pink-500/15 text-pink-400";
+    if (m.includes("upi")) return "bg-success-subtle text-success";
+    if (m.includes("card")) return "bg-info-subtle text-info";
+    if (m.includes("gateway") || m.includes("razor") || m.includes("online")) return "bg-muted text-muted-foreground";
+    if (m.includes("cash")) return "bg-warning-subtle text-warning";
+    if (m.includes("wallet")) return "bg-muted text-muted-foreground";
     return "bg-muted text-muted-foreground";
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Financial Reconciliation Engine</h2>
-          <p className="text-muted-foreground">Gateway vs bank matching, settlement mismatches, duplicate detection.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Financial Reconciliation Engine"
+        description="Gateway vs bank matching, settlement mismatches, duplicate detection."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Button variant="outline" onClick={exportReport}><Download className="mr-2 h-4 w-4" /> Export Report</Button>
-          <Button onClick={() => runReconciliation.mutate()} disabled={runReconciliation.isPending}>
+            </Button>
+            <Button variant="outline" onClick={exportReport}><Download className="mr-2 h-4 w-4" /> Export Report</Button>
+            <Button onClick={() => runReconciliation.mutate()} disabled={runReconciliation.isPending}>
             {runReconciliation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
             Run Auto Reconciliation
-          </Button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-5">
-        <KpiCard title="Matched" value={summary.matched} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Mismatched" value={summary.mismatched} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Missing" value={summary.missing} icon={<XCircle className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="Duplicates" value={summary.duplicates} icon={<GitMerge className="h-4 w-4 text-purple-500" />} />
+        <KpiCard title="Matched" value={summary.matched} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Mismatched" value={summary.mismatched} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Missing" value={summary.missing} icon={<XCircle className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Duplicates" value={summary.duplicates} icon={<GitMerge className="h-4 w-4 text-muted-foreground" />} />
         <KpiCard title="Total Reviewed" value={fmtINR(summary.totalAmount)} icon={<CheckCircle className="h-4 w-4 text-primary" />} />
       </div>
 
@@ -120,7 +121,7 @@ export default function Reconciliation() {
                 <span className="text-sm">{item.label}</span>
                 <div className="flex items-center gap-2">
                   <span className="font-bold">{item.value}</span>
-                  {item.status === "ok" ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                  {item.status === "ok" ? <CheckCircle className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-warning" />}
                 </div>
               </div>
             ))}
@@ -135,12 +136,12 @@ export default function Reconciliation() {
           <CardContent>
             <div className="space-y-3">
               {(recon?.leakageAlerts || []).map((alert: any, i: number) => (
-                <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alert.severity === "high" ? "border-red-500/30 bg-red-500/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
-                  <AlertTriangle className={`h-4 w-4 mt-0.5 ${alert.severity === "high" ? "text-red-400" : "text-yellow-400"}`} />
+                <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alert.severity === "high" ? "border-danger-border bg-danger-subtle" : "border-warning-border bg-warning-subtle"}`}>
+                  <AlertTriangle className={`h-4 w-4 mt-0.5 ${alert.severity === "high" ? "text-danger" : "text-warning"}`} />
                   <div className="flex-1">
                     <p className="text-sm font-medium">{alert.type || alert.vendorName || "Revenue leakage"}</p>
                     <p className="text-xs text-muted-foreground">{alert.description || alert.message}</p>
-                    <p className="text-xs font-bold text-red-400 mt-1">Potential loss: {fmtINRFull(alert.amount ?? 0)}</p>
+                    <p className="text-xs font-bold text-danger mt-1">Potential loss: {fmtINRFull(alert.amount ?? 0)}</p>
                   </div>
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setInvestigate(alert)}>Investigate</Button>
                 </div>
@@ -181,7 +182,7 @@ export default function Reconciliation() {
                   { header: "Payment Method", cell: (row: any) => <span className={`text-xs font-semibold uppercase px-2 py-0.5 rounded ${payColor(row.paymentMode)}`}>{row.paymentMode}</span> },
                   { header: "Gateway Amt", cell: (row: any) => <span className="font-medium">{fmtINRFull(row.gatewayAmount ?? 0)}</span> },
                   { header: "Bank Amt", cell: (row: any) => <span className="font-medium">{fmtINRFull(row.bankAmount ?? 0)}</span> },
-                  { header: "Status", cell: () => <span className="inline-flex items-center gap-1 text-green-400 text-xs font-medium"><CheckCircle className="h-3.5 w-3.5" /> Matched</span> },
+                  { header: "Status", cell: () => <span className="inline-flex items-center gap-1 text-success text-xs font-medium"><CheckCircle className="h-3.5 w-3.5" /> Matched</span> },
                   { header: "Date", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.date}</span> },
                 ]} />
               )}
@@ -209,7 +210,7 @@ export default function Reconciliation() {
                   { header: "Gateway Amt", cell: (row: any) => <span className="font-medium">{fmtINRFull(row.gatewayAmount ?? 0)}</span> },
                   { header: "Bank Amt", cell: (row: any) => <span className="font-medium">{fmtINRFull(row.bankAmount ?? 0)}</span> },
                   { header: "Difference", cell: (row: any) => (
-                    <span className={`font-bold ${row.difference < 0 ? "text-red-400" : "text-green-400"}`}>
+                    <span className={`font-bold ${row.difference < 0 ? "text-danger" : "text-success"}`}>
                       {row.difference < 0 ? "-" : "+"}{fmtINRFull(Math.abs(row.difference ?? 0))}
                     </span>
                   )},
@@ -233,8 +234,8 @@ export default function Reconciliation() {
                 <DataTable data={recon?.history || []} pageSize={10} columns={[
                   { header: "Run ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
                   { header: "Triggered By", cell: (row: any) => <span className="font-medium">{row.by || "—"}</span> },
-                  { header: "Matched", cell: (row: any) => <span className="text-green-400 font-medium">{row.matched ?? 0}</span> },
-                  { header: "Issues", cell: (row: any) => <span className={row.issues > 0 ? "text-red-400 font-bold" : "text-muted-foreground"}>{row.issues ?? 0}</span> },
+                  { header: "Matched", cell: (row: any) => <span className="text-success font-medium">{row.matched ?? 0}</span> },
+                  { header: "Issues", cell: (row: any) => <span className={row.issues > 0 ? "text-danger font-bold" : "text-muted-foreground"}>{row.issues ?? 0}</span> },
                   { header: "Run At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.runAt).toLocaleString()}</span> },
                   { header: "Status", cell: () => <Badge className="text-xs">Completed</Badge> },
                 ]} />
@@ -252,7 +253,7 @@ export default function Reconciliation() {
               <div className="flex justify-between"><span className="text-muted-foreground">Alert ID</span><span className="font-mono text-xs">{investigate.id}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Vendor</span><span className="font-medium">{investigate.vendorName || "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span>{investigate.type || investigate.discrepancyType || "Revenue Leakage"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Potential Loss</span><span className="font-bold text-red-400">{fmtINRFull(investigate.amount ?? 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Potential Loss</span><span className="font-bold text-danger">{fmtINRFull(investigate.amount ?? 0)}</span></div>
               <div className="pt-1">
                 <p className="text-muted-foreground mb-1">Description</p>
                 <p className="rounded-md border p-3 text-xs">{investigate.description || investigate.message || "No additional details available for this alert."}</p>

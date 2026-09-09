@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Search, Download, CheckCircle, XCircle, RefreshCcw, Loader2, Eye, PauseCircle, RotateCcw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function Payments() {
   const qc = useQueryClient();
@@ -91,12 +92,12 @@ export default function Payments() {
       : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway"
       : m === "aggregator" ? "Aggregator" : m === "wallet" ? "Wallet"
       : (m === "room_bill" || m === "room") ? "Room Bill" : m === "netbanking" ? "Netbanking" : (mode || "—");
-    const cls = m === "upi" ? "bg-emerald-500/15 text-emerald-500"
-      : m === "cash" ? "bg-amber-500/15 text-amber-500"
-      : m === "card" ? "bg-blue-500/15 text-blue-500"
-      : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-violet-500/15 text-violet-500"
-      : m === "aggregator" ? "bg-pink-500/15 text-pink-500"
-      : (m === "room_bill" || m === "room") ? "bg-cyan-500/15 text-cyan-500"
+    const cls = m === "upi" ? "bg-success-subtle text-success"
+      : m === "cash" ? "bg-warning-subtle text-warning"
+      : m === "card" ? "bg-info-subtle text-info"
+      : (m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "bg-muted text-muted-foreground"
+      : m === "aggregator" ? "bg-muted text-muted-foreground"
+      : (m === "room_bill" || m === "room") ? "bg-info-subtle text-info"
       : "bg-muted text-muted-foreground";
     return <span className={`text-xs font-semibold px-2 py-0.5 rounded uppercase ${cls}`}>{label}</span>;
   };
@@ -122,23 +123,24 @@ export default function Payments() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Payment Gateway Management</h2>
-          <p className="text-muted-foreground">{isLoading ? "Loading…" : `${payments.length} transactions`}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-          <Button variant="outline" onClick={exportCsv}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Payments"
+        description="Every transaction the platform has seen, with its gateway reference and settlement state."
+        badge={<Badge variant="muted">{isLoading ? "Loading…" : `${payments.length} transactions`}</Badge>}
+        actions={
+          <>
+            <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={() => refetch()} disabled={isLoading}>
+              <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Success Rate" value={`${successRate}%`} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Failed Rate" value={`${failedRate}%`} icon={<XCircle className="h-4 w-4 text-red-500" />} />
+        <KpiCard title="Success Rate" value={`${successRate}%`} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Failed Rate" value={`${failedRate}%`} icon={<XCircle className="h-4 w-4 text-danger" />} />
         <KpiCard title="Paid Volume" value={fmtINR(totalGross)} />
         <KpiCard title="Total Txns" value={payments.length.toLocaleString()} />
       </div>
@@ -193,7 +195,7 @@ export default function Payments() {
                 { header: "Vendor", cell: (row: Payment) => <span className="font-medium">{row.vendorName}</span> },
                 { header: "Gross", cell: (row: Payment) => <span className="font-medium">{fmtINRFull(row.grossAmount)}</span> },
                 { header: "Commission", cell: (row: Payment) => <span className="text-muted-foreground text-sm">-{fmtINRFull(row.commission)}</span> },
-                { header: "Net", cell: (row: Payment) => <span className="font-bold text-green-400">{fmtINRFull(row.netPayout)}</span> },
+                { header: "Net", cell: (row: Payment) => <span className="font-bold text-success">{fmtINRFull(row.netPayout)}</span> },
                 { header: "Mode", cell: (row: Payment) => modeBadge(row.paymentMode) },
                 { header: "Date", cell: (row: Payment) => <span className="text-xs text-muted-foreground">{new Date(row.dateTime).toLocaleDateString()}</span> },
                 { header: "Status", cell: (row: Payment) => <StatusBadge status={row.status} /> },

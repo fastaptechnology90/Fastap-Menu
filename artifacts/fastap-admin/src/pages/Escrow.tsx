@@ -13,6 +13,7 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { Wallet, ShieldAlert, ArrowRightLeft, Lock, Loader2, Plus } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/Page";
 
 const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -50,28 +51,31 @@ export default function Escrow() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Escrow Wallet</h2><p className="text-muted-foreground">Manage centralized platform funds and reserves.</p></div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="text-yellow-500 border-yellow-500/30" onClick={() => setReserveDialog(true)}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Escrow Wallet"
+        description="Manage centralized platform funds and reserves."
+        actions={
+          <>
+            <Button variant="outline" className="text-warning border-warning-border" onClick={() => setReserveDialog(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Reserve
-          </Button>
-          <Button variant="outline" className="text-red-500 border-red-500/30" onClick={() => setFreezeDialog(true)}>
+            </Button>
+            <Button variant="outline" className="text-danger border-danger-border" onClick={() => setFreezeDialog(true)}>
             <ShieldAlert className="mr-2 h-4 w-4" /> Freeze Account
-          </Button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
       {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : (
         <>
           <div className="grid gap-4 md:grid-cols-4">
             <KpiCard title="Total Escrow" value={fmt(metrics?.totalEscrow ?? 0)} icon={<Wallet className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Active Holds" value={fmt(metrics?.activeHolds ?? 0)} icon={<Lock className="h-4 w-4 text-yellow-500" />} />
-            <KpiCard title="Pending Releases" value={fmt(metrics?.pendingReleases ?? 0)} icon={<ArrowRightLeft className="h-4 w-4 text-green-500" />} />
+            <KpiCard title="Active Holds" value={fmt(metrics?.activeHolds ?? 0)} icon={<Lock className="h-4 w-4 text-warning" />} />
+            <KpiCard title="Pending Releases" value={fmt(metrics?.pendingReleases ?? 0)} icon={<ArrowRightLeft className="h-4 w-4 text-success" />} />
             {/* Surfaces what "Add Reserve" actually writes — it used to land in settings and
                 show up on no screen at all. */}
-            <KpiCard title="Reserve Balance" value={fmt((metrics as any)?.reserveBalance ?? 0)} icon={<ShieldAlert className="h-4 w-4 text-red-500" />} />
+            <KpiCard title="Reserve Balance" value={fmt((metrics as any)?.reserveBalance ?? 0)} icon={<ShieldAlert className="h-4 w-4 text-danger" />} />
           </div>
           <Card>
             <CardHeader><CardTitle>Escrow Ledger</CardTitle></CardHeader>
@@ -79,7 +83,7 @@ export default function Escrow() {
               <DataTable data={ledger} pageSize={10} columns={[
                 { header: "Entry ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
                 { header: "Vendor", accessorKey: "vendorName" },
-                { header: "Type", cell: (row: any) => <span className={`text-xs font-medium ${row.type === "Release" ? "text-green-500" : row.type === "Dispute Lock" ? "text-red-500" : "text-muted-foreground"}`}>{row.type}</span> },
+                { header: "Type", cell: (row: any) => <span className={`text-xs font-medium ${row.type === "Release" ? "text-success" : row.type === "Dispute Lock" ? "text-danger" : "text-muted-foreground"}`}>{row.type}</span> },
                 { header: "Amount", cell: (row: any) => <span className="font-medium">{fmt(row.amount)}</span> },
                 { header: "Gross Sales", cell: (row: any) => <span className="font-bold">{fmt(row.balance)}</span> },
                 { header: "Date", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.date}</span> },

@@ -8,6 +8,7 @@ import { DataTable } from "@/components/shared/DataTable";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, TrendingUp, Bell } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function SLAMonitoring() {
   const { toast } = useToast();
@@ -26,10 +27,10 @@ export default function SLAMonitoring() {
   });
 
   const slaTypes = [
-    { name: "Support SLA", target: "< 4 hours", current: sla?.supportAvg || "—", compliance: sla?.supportCompliance || 0, icon: <Clock className="h-4 w-4 text-blue-500" /> },
-    { name: "Refund SLA", target: "< 24 hours", current: sla?.refundAvg || "—", compliance: sla?.refundCompliance || 0, icon: <Clock className="h-4 w-4 text-green-500" /> },
-    { name: "Settlement SLA", target: "< 48 hours", current: sla?.settlementAvg || "—", compliance: sla?.settlementCompliance || 0, icon: <Clock className="h-4 w-4 text-orange-500" /> },
-    { name: "Downtime SLA", target: "99.9% uptime", current: sla?.uptimeActual || "—", compliance: sla?.uptimeCompliance || 0, icon: <CheckCircle className="h-4 w-4 text-purple-500" /> },
+    { name: "Support SLA", target: "< 4 hours", current: sla?.supportAvg || "—", compliance: sla?.supportCompliance || 0, icon: <Clock className="h-4 w-4 text-info" /> },
+    { name: "Refund SLA", target: "< 24 hours", current: sla?.refundAvg || "—", compliance: sla?.refundCompliance || 0, icon: <Clock className="h-4 w-4 text-success" /> },
+    { name: "Settlement SLA", target: "< 48 hours", current: sla?.settlementAvg || "—", compliance: sla?.settlementCompliance || 0, icon: <Clock className="h-4 w-4 text-warning" /> },
+    { name: "Downtime SLA", target: "99.9% uptime", current: sla?.uptimeActual || "—", compliance: sla?.uptimeCompliance || 0, icon: <CheckCircle className="h-4 w-4 text-muted-foreground" /> },
   ];
 
   const breaches = sla?.breaches || [];
@@ -39,27 +40,29 @@ export default function SLAMonitoring() {
   const avgCompliance = slaTypes.reduce((s, t) => s + t.compliance, 0) / slaTypes.length;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">SLA Monitoring System</h2>
-          <p className="text-muted-foreground">Track refund SLA, support SLA, settlement SLA, and uptime SLA in real-time.</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="SLA Monitoring System"
+        description="Track refund SLA, support SLA, settlement SLA, and uptime SLA in real-time."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Overall Compliance" value={`${avgCompliance.toFixed(1)}%`} icon={<TrendingUp className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Active Warnings" value={warnings.length} icon={<Bell className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="SLA Breaches" value={totalBreaches} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Critical Breaches" value={criticalBreaches} icon={<XCircle className="h-4 w-4 text-red-600" />} />
+        <KpiCard title="Overall Compliance" value={`${avgCompliance.toFixed(1)}%`} icon={<TrendingUp className="h-4 w-4 text-success" />} />
+        <KpiCard title="Active Warnings" value={warnings.length} icon={<Bell className="h-4 w-4 text-warning" />} />
+        <KpiCard title="SLA Breaches" value={totalBreaches} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Critical Breaches" value={criticalBreaches} icon={<XCircle className="h-4 w-4 text-danger" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {slaTypes.map((slaType, i) => (
-          <Card key={i} className={`${slaType.compliance < 90 ? "border-red-500/30" : slaType.compliance < 95 ? "border-yellow-500/30" : ""}`}>
+          <Card key={i} className={`${slaType.compliance < 90 ? "border-danger-border" : slaType.compliance < 95 ? "border-warning-border" : ""}`}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 {slaType.icon}
@@ -78,9 +81,9 @@ export default function SLAMonitoring() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Compliance</span>
-                  <span className={`font-bold ${slaType.compliance >= 95 ? "text-green-400" : slaType.compliance >= 90 ? "text-yellow-400" : "text-red-400"}`}>{slaType.compliance}%</span>
+                  <span className={`font-bold ${slaType.compliance >= 95 ? "text-success" : slaType.compliance >= 90 ? "text-warning" : "text-danger"}`}>{slaType.compliance}%</span>
                 </div>
-                <Progress value={slaType.compliance} className={`h-2 mt-2 ${slaType.compliance < 90 ? "[&>div]:bg-red-500" : slaType.compliance < 95 ? "[&>div]:bg-yellow-500" : ""}`} />
+                <Progress value={slaType.compliance} className={`h-2 mt-2 ${slaType.compliance < 90 ? "[&>div]:bg-danger" : slaType.compliance < 95 ? "[&>div]:bg-warning" : ""}`} />
               </div>
             </CardContent>
           </Card>
@@ -90,7 +93,7 @@ export default function SLAMonitoring() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-red-500" /> SLA Breaches</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-danger" /> SLA Breaches</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -98,20 +101,20 @@ export default function SLAMonitoring() {
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {breaches.map((breach: any) => (
-                  <div key={breach.id} className={`flex items-start gap-3 p-3 rounded-lg border ${breach.severity === "critical" ? "border-red-500/30 bg-red-500/5" : "border-orange-500/30 bg-orange-500/5"}`}>
-                    <XCircle className={`h-4 w-4 mt-0.5 ${breach.severity === "critical" ? "text-red-400" : "text-orange-400"}`} />
+                  <div key={breach.id} className={`flex items-start gap-3 p-3 rounded-lg border ${breach.severity === "critical" ? "border-danger-border bg-danger-subtle" : "border-warning-border bg-warning-subtle"}`}>
+                    <XCircle className={`h-4 w-4 mt-0.5 ${breach.severity === "critical" ? "text-danger" : "text-warning"}`} />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-sm font-medium">{breach.slaType}</p>
                         <Badge variant="destructive" className="text-xs">{breach.severity}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">{breach.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Breached by: <span className="font-medium text-red-400">{breach.overduBy}</span> | {new Date(breach.breachedAt).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Breached by: <span className="font-medium text-danger">{breach.overduBy}</span> | {new Date(breach.breachedAt).toLocaleString()}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0" disabled={escalateMutation.isPending} onClick={() => escalateMutation.mutate(breach.id)}>Escalate</Button>
                   </div>
                 ))}
-                {breaches.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-green-400">No SLA breaches detected</p>}
+                {breaches.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-success">No SLA breaches detected</p>}
               </div>
             )}
           </CardContent>
@@ -119,7 +122,7 @@ export default function SLAMonitoring() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><Bell className="h-4 w-4 text-yellow-500" /> SLA Warnings</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><Bell className="h-4 w-4 text-warning" /> SLA Warnings</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -127,16 +130,16 @@ export default function SLAMonitoring() {
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {warnings.map((warn: any) => (
-                  <div key={warn.id} className="flex items-start gap-3 p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-400" />
+                  <div key={warn.id} className="flex items-start gap-3 p-3 rounded-lg border border-warning-border bg-warning-subtle">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 text-warning" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{warn.slaType}</p>
                       <p className="text-xs text-muted-foreground">{warn.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">SLA deadline in: <span className="font-medium text-yellow-400">{warn.timeLeft}</span></p>
+                      <p className="text-xs text-muted-foreground mt-1">SLA deadline in: <span className="font-medium text-warning">{warn.timeLeft}</span></p>
                     </div>
                   </div>
                 ))}
-                {warnings.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-green-400">No SLA warnings</p>}
+                {warnings.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-success">No SLA warnings</p>}
               </div>
             )}
           </CardContent>
@@ -154,8 +157,8 @@ export default function SLAMonitoring() {
               { header: "SLA Type", cell: (row: any) => <span className="font-medium">{row.slaType}</span> },
               { header: "Vendor / Ticket", cell: (row: any) => <span className="text-sm">{row.reference}</span> },
               { header: "Target", cell: (row: any) => <span className="text-muted-foreground text-sm">{row.target}</span> },
-              { header: "Actual", cell: (row: any) => <span className="text-red-400 font-medium">{row.actual}</span> },
-              { header: "Overdue By", cell: (row: any) => <span className="text-red-400 font-bold">{row.overdueBy}</span> },
+              { header: "Actual", cell: (row: any) => <span className="text-danger font-medium">{row.actual}</span> },
+              { header: "Overdue By", cell: (row: any) => <span className="text-danger font-bold">{row.overdueBy}</span> },
               { header: "Severity", cell: (row: any) => <Badge variant={row.severity === "critical" ? "destructive" : "outline"} className="text-xs">{row.severity}</Badge> },
               { header: "Breached At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.breachedAt).toLocaleDateString()}</span> },
             ]} />

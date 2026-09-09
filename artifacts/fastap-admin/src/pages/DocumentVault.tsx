@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { FolderOpen, FileText, Shield, AlertTriangle, Download, Search, RefreshCw, Loader2, Eye, Clock } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function DocumentVault() {
   const { toast } = useToast();
@@ -46,37 +47,39 @@ export default function DocumentVault() {
   const expiredDocs = documents.filter((d: any) => d.expiryDate && new Date(d.expiryDate) < new Date());
 
   const docTypeIcon: Record<string, React.ReactNode> = {
-    GST: <Shield className="h-4 w-4 text-blue-400" />,
-    PAN: <FileText className="h-4 w-4 text-green-400" />,
-    Agreement: <FileText className="h-4 w-4 text-purple-400" />,
-    License: <Shield className="h-4 w-4 text-orange-400" />,
-    FSSAI: <Shield className="h-4 w-4 text-yellow-400" />,
-    "Bank Proof": <FileText className="h-4 w-4 text-pink-400" />,
+    GST: <Shield className="h-4 w-4 text-info" />,
+    PAN: <FileText className="h-4 w-4 text-success" />,
+    Agreement: <FileText className="h-4 w-4 text-muted-foreground" />,
+    License: <Shield className="h-4 w-4 text-warning" />,
+    FSSAI: <Shield className="h-4 w-4 text-warning" />,
+    "Bank Proof": <FileText className="h-4 w-4 text-muted-foreground" />,
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Document Vault</h2>
-          <p className="text-muted-foreground">Secure storage for GST, PAN, agreements, licenses, and KYC proofs with expiry alerts.</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Document Vault"
+        description="Secure storage for GST, PAN, agreements, licenses, and KYC proofs with expiry alerts."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Documents" value={documents.length} icon={<FolderOpen className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Expiring Soon" value={expiringDocs.length} icon={<Clock className="h-4 w-4 text-yellow-500" />} subtitle="within 30 days" />
-        <KpiCard title="Expired" value={expiredDocs.length} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Verified" value={documents.filter((d: any) => d.status === "Verified").length} icon={<Shield className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Expiring Soon" value={expiringDocs.length} icon={<Clock className="h-4 w-4 text-warning" />} subtitle="within 30 days" />
+        <KpiCard title="Expired" value={expiredDocs.length} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Verified" value={documents.filter((d: any) => d.status === "Verified").length} icon={<Shield className="h-4 w-4 text-success" />} />
       </div>
 
       {expiringDocs.length > 0 && (
-        <Card className="border-yellow-500/30 bg-yellow-500/5">
+        <Card className="border-warning-border bg-warning-subtle">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4 text-yellow-500" /> Expiring Documents (next 30 days)</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /> Expiring Documents (next 30 days)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
@@ -87,7 +90,7 @@ export default function DocumentVault() {
                     {docTypeIcon[doc.docType] || <FileText className="h-4 w-4 text-muted-foreground" />}
                     <div>
                       <p className="text-xs font-medium">{doc.vendorName} — {doc.docType}</p>
-                      <p className="text-xs text-yellow-400 font-medium">Expires in {daysLeft} days</p>
+                      <p className="text-xs text-warning font-medium">Expires in {daysLeft} days</p>
                     </div>
                     <Button variant="ghost" size="sm" className="h-6 text-xs ml-2" onClick={() => api.documents.remind(doc.id).then(() => toast({ title: `Renewal reminder sent to ${doc.vendorName}` })).catch(() => toast({ title: "Failed", variant: "destructive" }))}>Remind</Button>
                   </div>
@@ -132,7 +135,7 @@ export default function DocumentVault() {
               { header: "Expiry", cell: (row: any) => {
                 if (!row.expiryDate) return <span className="text-xs text-muted-foreground">No expiry</span>;
                 const daysLeft = Math.ceil((new Date(row.expiryDate).getTime() - Date.now()) / 86400000);
-                return <span className={`text-xs font-medium ${daysLeft < 0 ? "text-red-400" : daysLeft <= 30 ? "text-yellow-400" : "text-muted-foreground"}`}>{row.expiryDate}</span>;
+                return <span className={`text-xs font-medium ${daysLeft < 0 ? "text-danger" : daysLeft <= 30 ? "text-warning" : "text-muted-foreground"}`}>{row.expiryDate}</span>;
               }},
               { header: "Status", cell: (row: any) => (
                 <Badge variant={row.status === "Verified" ? "default" : /expired|rejected/i.test(String(row.status)) ? "destructive" : "secondary"} className="text-xs">{humanStatus(row.status)}</Badge>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Globe, Palette, CheckCircle, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function WhiteLabel() {
   const qc = useQueryClient();
@@ -45,13 +46,18 @@ export default function WhiteLabel() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">White Label Management</h2><p className="text-muted-foreground">Platform branding stored in system settings.</p></div>
-        <Button onClick={() => saveMutation.mutate({ domain, primaryColor, appName })} disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="White Label Management"
+        description="Platform branding stored in system settings."
+        actions={
+          <>
+            <Button onClick={() => saveMutation.mutate({ domain, primaryColor, appName })} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -90,7 +96,7 @@ export default function WhiteLabel() {
               Add TXT <code className="text-[11px]">_fastap.{domain || "yourdomain.com"}</code> → <code className="text-[11px]">fastap-verify</code>
             </p>
             {domainVerified && (
-              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-md text-sm text-green-500 flex items-center gap-2">
+              <div className="p-3 bg-success-subtle border border-success-border rounded-md text-sm text-success flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" /> Domain verified in platform settings
               </div>
             )}

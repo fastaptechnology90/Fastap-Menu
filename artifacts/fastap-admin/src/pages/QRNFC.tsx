@@ -13,6 +13,7 @@ import { QrCode, Nfc, Download, RefreshCw, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { downloadCsv } from "@/lib/download";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function QRNFC() {
   const qc = useQueryClient();
@@ -71,19 +72,22 @@ export default function QRNFC() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">QR & NFC Management</h2><p className="text-muted-foreground">Platform-wide QR codes — bulk generate and track scans.</p></div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportList}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
-          <Button onClick={() => setBulkOpen(true)}><Plus className="mr-2 h-4 w-4" /> Bulk Generate</Button>
-          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}><RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} /> Refresh</Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="QR & NFC Management"
+        description="Platform-wide QR codes — bulk generate and track scans."
+        actions={
+          <>
+            <Button variant="outline" onClick={exportList}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+            <Button onClick={() => setBulkOpen(true)}><Plus className="mr-2 h-4 w-4" /> Bulk Generate</Button>
+            <Button variant="outline" onClick={() => refetch()} disabled={isLoading}><RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} /> Refresh</Button>
+          </>
+        }
+      />
       <div className="grid gap-4 md:grid-cols-3">
         <KpiCard title="Total Scans" value={totalScans.toLocaleString()} icon={<QrCode className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active Codes" value={activeCount} icon={<QrCode className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="NFC Tags" value={nfcCount} icon={<Nfc className="h-4 w-4 text-blue-500" />} />
+        <KpiCard title="Active Codes" value={activeCount} icon={<QrCode className="h-4 w-4 text-success" />} />
+        <KpiCard title="NFC Tags" value={nfcCount} icon={<Nfc className="h-4 w-4 text-info" />} />
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -98,7 +102,7 @@ export default function QRNFC() {
               { header: "Location", cell: (row: any) => <span className="text-sm">{row.label}</span> },
               { header: "Type", cell: (row: any) => (
                 <div className="flex items-center gap-1">
-                  {row.type === "nfc" ? <Nfc className="h-3.5 w-3.5 text-blue-500" /> : <QrCode className="h-3.5 w-3.5" />}
+                  {row.type === "nfc" ? <Nfc className="h-3.5 w-3.5 text-info" /> : <QrCode className="h-3.5 w-3.5" />}
                   <span className="text-xs uppercase">{row.type}</span>
                 </div>
               )},

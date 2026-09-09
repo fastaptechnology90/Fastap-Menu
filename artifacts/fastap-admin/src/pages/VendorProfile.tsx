@@ -15,13 +15,14 @@ import { DataTable } from "@/components/shared/DataTable";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
-import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart, Eye } from "lucide-react";
+import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart, Eye, Wrench, Rocket} from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { FeatureControlPanel } from "@/components/features/FeatureControlPanel";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function VendorProfile() {
   const { confirm, confirmDialog } = useConfirm();
@@ -385,22 +386,19 @@ export default function VendorProfile() {
   const NOTES = vendorNotes;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-2">
-        <Link href="/vendors"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Vendors</Button></Link>
-      </div>
-
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-2xl font-bold tracking-tight">{vendor.name}</h2>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={<Link href="/vendors"><Button variant="ghost" size="sm" className="-ml-2 h-7"><ArrowLeft className="mr-1 h-4 w-4" /> Vendors</Button></Link>}
+        title={vendor.name}
+        description={`ID #${vendor.id} · ${vendor.businessType || "Restaurant"} · joined ${new Date(vendor.createdAt).toLocaleDateString("en-IN")}`}
+        badge={
+          <>
             <StatusBadge status={vendor.isActive ? "Active" : "Suspended"} />
             <Badge variant="outline" className="capitalize">{vendor.plan}</Badge>
-            {vendor.plan === "enterprise" && <Badge className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30">Enterprise</Badge>}
-          </div>
-          <p className="text-muted-foreground">ID: #{vendor.id} · {vendor.businessType || "Restaurant"} · Joined {new Date(vendor.createdAt).toLocaleDateString()}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+          </>
+        }
+        actions={
+          <>
           <Button variant="outline" size="sm" onClick={() => forceLogoutMutation.mutate()} disabled={forceLogoutMutation.isPending}><LogOut className="mr-2 h-3.5 w-3.5" /> Force Logout</Button>
           <Button variant="outline" size="sm" disabled={resetPasswordMutation.isPending} onClick={() => resetPasswordMutation.mutate()}><Key className="mr-2 h-3.5 w-3.5" /> Reset Password</Button>
           <AsyncButton
@@ -417,39 +415,40 @@ export default function VendorProfile() {
               await deleteVendorMutation.mutateAsync();
             }}
           ><Trash2 className="mr-2 h-3.5 w-3.5" /> Delete</AsyncButton>
-          <Button variant="outline" size="sm" className="text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/10"
+          <Button variant="outline" size="sm" className="text-warning border-warning-border hover:bg-warning-subtle"
             onClick={() => freezePayoutMutation.mutate()} disabled={freezePayoutMutation.isPending || (vendor as any).payoutsFrozen}>
             <PauseCircle className="mr-2 h-3.5 w-3.5" /> {(vendor as any).payoutsFrozen ? "Payouts Frozen" : "Freeze Payout"}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className={vendor.isActive ? "text-red-500 border-red-500/20 hover:bg-red-500/10" : "text-green-500 border-green-500/20 hover:bg-green-500/10"}
+            className={vendor.isActive ? "text-danger border-danger-border hover:bg-danger-subtle" : "text-success border-success-border hover:bg-success-subtle"}
             onClick={() => toggleMutation.mutate()}
             disabled={toggleMutation.isPending}
           >
             {toggleMutation.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : vendor.isActive ? <ShieldBan className="mr-2 h-3.5 w-3.5" /> : <CheckCircle className="mr-2 h-3.5 w-3.5" />}
             {vendor.isActive ? "Suspend" : "Activate"}
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* KPI row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Health Score</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Health score</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className={`text-3xl font-bold ${healthScore >= 80 ? "text-green-400" : healthScore >= 60 ? "text-yellow-400" : "text-red-400"}`}>{healthScore}</div>
-              <Progress value={healthScore} className={`flex-1 h-2.5 ${healthScore < 60 ? "[&>div]:bg-red-500" : healthScore < 80 ? "[&>div]:bg-yellow-500" : "[&>div]:bg-green-500"}`} />
+              <div className={`text-2xl font-semibold tabular-nums ${healthScore >= 80 ? "text-success" : healthScore >= 60 ? "text-warning" : "text-danger"}`}>{healthScore}</div>
+              <Progress value={healthScore} className={`flex-1 h-2.5 ${healthScore < 60 ? "[&>div]:bg-danger" : healthScore < 80 ? "[&>div]:bg-warning" : "[&>div]:bg-success"}`} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{healthScore >= 80 ? "Healthy" : healthScore >= 60 ? "Risk" : "Critical"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{healthScore >= 80 ? "Healthy" : healthScore >= 60 ? "Risk" : "Critical"} · from order volume and plan tier</p>
           </CardContent>
         </Card>
-        <KpiCard title="MRR" value={`₹${mrr.toLocaleString("en-IN")}/mo`} icon={<CreditCard className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Total Revenue" value={`₹${totalRevenue.toLocaleString("en-IN")}`} icon={<CreditCard className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="Total Orders" value={vendor.totalOrders.toLocaleString()} icon={<Package className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Open Tickets" value={openTickets} icon={<AlertTriangle className={`h-4 w-4 ${openTickets > 0 ? "text-red-500" : "text-muted-foreground"}`} />} />
+        <KpiCard title="Plan value" value={`₹${mrr.toLocaleString("en-IN")}/mo`} icon={<CreditCard />} subtitle="Contracted, not collected" />
+        <KpiCard title="Venue sales" value={`₹${totalRevenue.toLocaleString("en-IN")}`} icon={<CreditCard />} subtitle="Paid orders, lifetime" />
+        <KpiCard title="Orders" value={vendor.totalOrders.toLocaleString()} icon={<Package />} />
+        <KpiCard title="Open tickets" value={openTickets} icon={<AlertTriangle />} />
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
@@ -553,10 +552,10 @@ export default function VendorProfile() {
         {/* FINANCIALS TAB */}
         <TabsContent value="financials" className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
-            <KpiCard title="Gross Revenue" value={fmt(totalRevenue)} icon={<CreditCard className="h-4 w-4 text-green-500" />} />
-            <KpiCard title="Commission Paid" value={fmt(totalCommission)} icon={<CreditCard className="h-4 w-4 text-orange-500" />} />
-            <KpiCard title="Net Payout" value={fmt(totalRevenue - totalCommission)} icon={<CreditCard className="h-4 w-4 text-blue-500" />} />
-            <KpiCard title="Total Refunds" value={vendorRefunds.length} icon={<CreditCard className="h-4 w-4 text-red-500" />} />
+            <KpiCard title="Gross Revenue" value={fmt(totalRevenue)} icon={<CreditCard className="h-4 w-4 text-success" />} />
+            <KpiCard title="Commission Paid" value={fmt(totalCommission)} icon={<CreditCard className="h-4 w-4 text-warning" />} />
+            <KpiCard title="Net Payout" value={fmt(totalRevenue - totalCommission)} icon={<CreditCard className="h-4 w-4 text-info" />} />
+            <KpiCard title="Total Refunds" value={vendorRefunds.length} icon={<CreditCard className="h-4 w-4 text-danger" />} />
           </div>
           <Card>
             <CardHeader><CardTitle>Wallet & Reserve</CardTitle></CardHeader>
@@ -622,7 +621,7 @@ export default function VendorProfile() {
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" size="sm" onClick={() => subscriptionMutation.mutate("pause")} disabled={subscriptionMutation.isPending}>Pause Subscription</Button>
                 <Button variant="outline" size="sm" onClick={() => subscriptionMutation.mutate("renew")} disabled={subscriptionMutation.isPending}>Renew Manually</Button>
-                <Button variant="outline" size="sm" className="text-red-400" onClick={() => subscriptionMutation.mutate("cancel")} disabled={subscriptionMutation.isPending}>Cancel Subscription</Button>
+                <Button variant="outline" size="sm" className="text-danger" onClick={() => subscriptionMutation.mutate("cancel")} disabled={subscriptionMutation.isPending}>Cancel Subscription</Button>
               </div>
             </CardContent>
           </Card>
@@ -679,7 +678,7 @@ export default function VendorProfile() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={row.isPlaceholder}
                       title={row.isPlaceholder ? "This is the vendor's registered address, not a saved branch — add it as a branch first" : "Edit branch"}
                       onClick={() => { setEditBranch({ id: row.id, name: row.name, address: row.location || "" }); setEditBranchOpen(true); }}>Edit</Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" disabled={row.isPlaceholder || disableBranchMutation.isPending}
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-danger" disabled={row.isPlaceholder || disableBranchMutation.isPending}
                       title={row.isPlaceholder ? "This is the vendor's registered address, not a saved branch" : "Disable branch"}
                       onClick={() => disableBranchMutation.mutate(row.id)}>Disable</Button>
                   </div>
@@ -700,8 +699,8 @@ export default function VendorProfile() {
                 <DataTable data={vendorTx} pageSize={10} columns={[
                   { header: "TXN ID", cell: (row) => <span className="font-mono text-xs">{row.id}</span> },
                   { header: "Gross", cell: (row) => <span className="font-medium">{fmt(row.grossAmount)}</span> },
-                  { header: "Commission", cell: (row) => <span className="text-orange-400">-{fmt(row.commission)}</span> },
-                  { header: "Net", cell: (row) => <span className="text-green-400 font-bold">{fmt(row.netPayout)}</span> },
+                  { header: "Commission", cell: (row) => <span className="text-warning">-{fmt(row.commission)}</span> },
+                  { header: "Net", cell: (row) => <span className="text-success font-bold">{fmt(row.netPayout)}</span> },
                   { header: "Mode", accessorKey: "paymentMode" },
                   { header: "Date", cell: (row) => <span className="text-xs text-muted-foreground">{new Date(row.dateTime).toLocaleDateString()}</span> },
                   { header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
@@ -722,7 +721,7 @@ export default function VendorProfile() {
                 <DataTable data={vendorRefunds} pageSize={10} columns={[
                   { header: "Refund ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
                   { header: "Customer", accessorKey: "customerName" },
-                  { header: "Amount", cell: (row: any) => <span className="text-red-400 font-medium">-{fmt(row.amount || 0)}</span> },
+                  { header: "Amount", cell: (row: any) => <span className="text-danger font-medium">-{fmt(row.amount || 0)}</span> },
                   { header: "Reason", accessorKey: "reason" },
                   { header: "Type", cell: (row: any) => <Badge variant="outline" className="text-xs">{row.type}</Badge> },
                   { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
@@ -749,7 +748,7 @@ export default function VendorProfile() {
                 { header: "Last Login", cell: (row: any) => <span className="text-xs text-muted-foreground">{row.lastLogin ? new Date(row.lastLogin).toLocaleString() : "Never"}</span> },
                 { header: "Status", cell: (row: any) => <StatusBadge status={row.status} /> },
                 { header: "Actions", cell: (row: any) => (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" onClick={() => deleteStaffMutation.mutate(row.id)}>Remove</Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-danger" onClick={() => deleteStaffMutation.mutate(row.id)}>Remove</Button>
                 )},
               ]} />
             </CardContent>
@@ -777,7 +776,7 @@ export default function VendorProfile() {
                 { header: "Actions", cell: (row: any) => (
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={!row.url} title={row.url ? "Open menu link" : "This code has no menu URL"} onClick={() => row.url && window.open(row.url, "_blank")}><Download className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-red-400" onClick={() => deleteQrMutation.mutate(row.id)}>Disable</Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-danger" onClick={() => deleteQrMutation.mutate(row.id)}>Disable</Button>
                   </div>
                 )},
               ]} />
@@ -807,7 +806,7 @@ export default function VendorProfile() {
                         <Button variant="ghost" size="icon" className="h-7 w-7" title="View document" onClick={() => setPreviewDoc(doc)}><Eye className="h-3.5 w-3.5" /></Button>
                       )}
                       {doc.id && doc.status !== "Verified" && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" title="Approve this document" disabled={docApproveMutation.isPending} onClick={() => docApproveMutation.mutate(doc.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-success" title="Approve this document" disabled={docApproveMutation.isPending} onClick={() => docApproveMutation.mutate(doc.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Download" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -815,9 +814,9 @@ export default function VendorProfile() {
                 ))}
               </div>
               <div className="flex gap-2 mt-4 flex-wrap">
-                <Button variant="outline" size="sm" onClick={() => kycApproveMutation.mutate()} disabled={!vendorKyc}><CheckCircle className="mr-2 h-3.5 w-3.5 text-green-400" /> Approve KYC</Button>
+                <Button variant="outline" size="sm" onClick={() => kycApproveMutation.mutate()} disabled={!vendorKyc}><CheckCircle className="mr-2 h-3.5 w-3.5 text-success" /> Approve KYC</Button>
                 <Button variant="outline" size="sm" onClick={() => kycRequestMutation.mutate()} disabled={!vendorKyc}><Shield className="mr-2 h-3.5 w-3.5" /> Request Re-upload (all)</Button>
-                <Button variant="outline" size="sm" className="text-amber-500 border-amber-500/30" disabled={reuploadUnapprovedMutation.isPending || !(vendorDocuments as any[]).some(d => d?.id && d.status !== "Verified")} onClick={() => reuploadUnapprovedMutation.mutate()}><RefreshCw className="mr-2 h-3.5 w-3.5" /> Re-upload Unapproved Only</Button>
+                <Button variant="outline" size="sm" className="text-warning border-warning-border" disabled={reuploadUnapprovedMutation.isPending || !(vendorDocuments as any[]).some(d => d?.id && d.status !== "Verified")} onClick={() => reuploadUnapprovedMutation.mutate()}><RefreshCw className="mr-2 h-3.5 w-3.5" /> Re-upload Unapproved Only</Button>
               </div>
             </CardContent>
           </Card>
@@ -850,7 +849,7 @@ export default function VendorProfile() {
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(totalRevenue)}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Orders</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{vendor.totalOrders?.toLocaleString() ?? 0}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Avg Order Value</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{fmt(vendor.totalOrders > 0 ? Math.round(totalRevenue / Math.max(vendor.totalOrders, 1)) : 0)}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Health Score</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${healthScore >= 80 ? "text-green-500" : healthScore >= 60 ? "text-yellow-500" : "text-red-500"}`}>{healthScore}/100</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Health Score</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${healthScore >= 80 ? "text-success" : healthScore >= 60 ? "text-warning" : "text-danger"}`}>{healthScore}/100</div></CardContent></Card>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
@@ -858,8 +857,8 @@ export default function VendorProfile() {
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { label: "Paid Transactions", value: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0, color: "text-green-500" },
-                    { label: "Refund Rate", value: vendorTx.length ? Math.round((vendorRefunds.length / vendorTx.length) * 100) : 0, color: "text-yellow-500" },
+                    { label: "Paid Transactions", value: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0, color: "text-success" },
+                    { label: "Refund Rate", value: vendorTx.length ? Math.round((vendorRefunds.length / vendorTx.length) * 100) : 0, color: "text-warning" },
                   ].map((item, i) => (
                     <div key={i}>
                       <div className="flex justify-between text-sm mb-1"><span className="text-muted-foreground">{item.label}</span><span className={`font-bold ${item.color}`}>{item.value}%</span></div>
@@ -910,11 +909,13 @@ export default function VendorProfile() {
             <CardContent>
               <div className="space-y-3">
                 {[
-                  ...vendorLogs.slice(0, 20).map(l => ({ action: l.action, by: l.user, date: new Date(l.dateTime).toLocaleString(), icon: "🔧" })),
-                  { action: "Vendor registered", by: "System", date: new Date(vendor.createdAt).toLocaleString(), icon: "🚀" },
-                ].map((event, i) => (
+                  ...vendorLogs.slice(0, 20).map(l => ({ action: l.action, by: l.user, date: new Date(l.dateTime).toLocaleString("en-IN"), Icon: Wrench })),
+                  { action: "Vendor registered", by: "System", date: new Date(vendor.createdAt).toLocaleString("en-IN"), Icon: Rocket },
+                ].map(({ Icon, ...event }, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <span className="text-lg">{event.icon}</span>
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                      <Icon className="h-4 w-4" />
+                    </span>
                     <div className="flex-1 border-b pb-3 last:border-0">
                       <p className="text-sm font-medium">{event.action}</p>
                       <p className="text-xs text-muted-foreground">By {event.by} · {event.date}</p>
@@ -976,8 +977,8 @@ export default function VendorProfile() {
             if (isImg && !broken) return <img src={url} alt="document" className="max-h-[60vh] w-full rounded border object-contain bg-black/20" />;
             if (isPdf) return <iframe src={url} title="document" className="w-full h-[60vh] rounded border bg-white" />;
             return (
-              <div className="rounded border border-dashed border-yellow-500/40 bg-yellow-500/5 p-4 text-center">
-                <p className="text-xs font-medium text-yellow-600">Preview not available</p>
+              <div className="rounded border border-dashed border-warning-border bg-warning-subtle p-4 text-center">
+                <p className="text-xs font-medium text-warning">Preview not available</p>
                 <p className="text-[11px] text-muted-foreground mt-1">The uploaded file looks empty or corrupt — ask the vendor to re-upload.</p>
               </div>
             );

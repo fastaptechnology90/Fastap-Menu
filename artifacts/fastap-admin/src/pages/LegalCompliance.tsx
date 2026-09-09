@@ -60,11 +60,11 @@ export default function LegalCompliance() {
         )}
       </PanelCard>
       <Dialog open={holdOpen} onOpenChange={setHoldOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-md">
           <DialogHeader><DialogTitle>Apply Legal Hold</DialogTitle></DialogHeader>
           {/* There is no release endpoint — POST /superadmin/legal/hold is the only route —
               so this is one-way from the panel and the operator is told before committing. */}
-          <p className="text-xs text-amber-600 dark:text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded-lg px-3 py-2">
+          <p className="text-xs text-warning dark:text-warning border border-warning-border bg-warning-subtle rounded-lg px-3 py-2">
             This cannot be undone from the admin panel: there is no release-hold action yet, and
             the flag stays on the vendor record until it is cleared directly in the database.
           </p>

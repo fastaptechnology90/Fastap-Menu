@@ -15,6 +15,7 @@ import { fmtINRFull } from "@/lib/format";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { statusIs, statusLabel } from "@/pages/statusValue";
+import { PageHeader } from "@/components/shared/Page";
 
 /** The API returns the stored status verbatim — `pending`, not `Pending`. */
 const isPending = (refund: Refund) => statusIs(refund.status, "pending");
@@ -83,12 +84,15 @@ export default function Refunds() {
   const partialInvalid = !partialAmount || Number.isNaN(partialValue) || partialValue <= 0 || partialValue > partialDialog.max;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div><h2 className="text-2xl font-bold tracking-tight">Refund Management</h2><p className="text-muted-foreground">Approve, reject, partial refund, retry, cancel, and escalate requests.</p></div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Refund Management"
+        description="Approve, reject, partial refund, retry, cancel, and escalate requests."
+      />
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Pending" value={pendingRefunds.length} icon={<Eye className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Approved" value={refunds.filter(r => statusIs(r.status, "approved")).length} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Pending Amount" value={fmtINRFull(totalPending)} icon={<XCircle className="h-4 w-4 text-orange-500" />} />
+        <KpiCard title="Pending" value={pendingRefunds.length} icon={<Eye className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Approved" value={refunds.filter(r => statusIs(r.status, "approved")).length} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Pending Amount" value={fmtINRFull(totalPending)} icon={<XCircle className="h-4 w-4 text-warning" />} />
       </div>
       <Card>
         <CardHeader className="pb-3">
@@ -114,7 +118,7 @@ export default function Refunds() {
               { header: "Actions", cell: (row: Refund) => (
                 <div className="flex items-center gap-1 flex-wrap">
                   <AsyncButton
-                    size="sm" variant="outline" className="text-green-500 border-green-500/30 h-7 text-xs"
+                    size="sm" variant="outline" className="text-success border-success-border h-7 text-xs"
                     disabled={!isPending(row) || !isActionable(row)}
                     errorMessage="Failed to approve refund"
                     onClick={async () => {
@@ -127,11 +131,11 @@ export default function Refunds() {
                       await approveMutation.mutateAsync(row.id);
                     }}
                   >Approve</AsyncButton>
-                  <Button size="sm" variant="outline" className="text-red-500 border-red-500/30 h-7 text-xs" disabled={!isPending(row) || !isActionable(row)} onClick={() => { setRejectDialog({ open: true, id: row.id, amount: row.amount }); setRejectReason(""); }}>Reject</Button>
+                  <Button size="sm" variant="outline" className="text-danger border-danger-border h-7 text-xs" disabled={!isPending(row) || !isActionable(row)} onClick={() => { setRejectDialog({ open: true, id: row.id, amount: row.amount }); setRejectReason(""); }}>Reject</Button>
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!isAdjustable(row) || !isActionable(row)} onClick={() => { setPartialDialog({ open: true, id: row.id, max: row.amount }); setPartialAmount(String(row.amount)); }}>Partial</Button>
                   <AsyncButton size="sm" variant="ghost" className="h-7 text-xs" title="Retry" disabled={!isActionable(row)} errorMessage="Retry failed" onClick={() => retryMutation.mutateAsync(row.id)}><RotateCcw className="h-3 w-3" /></AsyncButton>
                   <AsyncButton
-                    size="sm" variant="ghost" className="h-7 text-xs text-red-400" title="Cancel"
+                    size="sm" variant="ghost" className="h-7 text-xs text-danger" title="Cancel"
                     disabled={!isActionable(row)}
                     errorMessage="Cancel failed"
                     onClick={async () => {
@@ -146,7 +150,7 @@ export default function Refunds() {
                       await cancelMutation.mutateAsync(row.id);
                     }}
                   ><Ban className="h-3 w-3" /></AsyncButton>
-                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs text-orange-500" title="Escalate" disabled={!isActionable(row)} errorMessage="Escalation failed" onClick={() => escalateMutation.mutateAsync(row.id)}><ArrowUpRight className="h-3 w-3" /></AsyncButton>
+                  <AsyncButton size="sm" variant="ghost" className="h-7 text-xs text-warning" title="Escalate" disabled={!isActionable(row)} errorMessage="Escalation failed" onClick={() => escalateMutation.mutateAsync(row.id)}><ArrowUpRight className="h-3 w-3" /></AsyncButton>
                 </div>
               )},
             ]}

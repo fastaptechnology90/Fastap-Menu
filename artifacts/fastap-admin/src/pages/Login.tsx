@@ -76,18 +76,18 @@ export default function Login() {
     <div className="min-h-screen w-full flex bg-background">
       <div className="hidden lg:flex flex-col flex-1 p-12 justify-between relative overflow-hidden">
         <img src={IMAGES.adminMission} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-blue-950/90 to-slate-900/85" />
+        <div className="absolute inset-0 bg-black/70" />
         <div className="relative">
           <PanelLogo panel="admin" size="lg" showLabel label="Fastap OS" />
-          <p className="text-blue-300 text-sm mt-2">Smart Hospitality Operating System</p>
+          <p className="mt-2 text-sm text-white/70">Smart Hospitality Operating System</p>
         </div>
 
         <div className="relative space-y-8">
           <div>
-            <h1 className="text-4xl font-bold text-white leading-tight mb-4">
+            <h1 className="mb-4 text-3xl font-semibold leading-tight tracking-tight text-white">
               Super Admin<br />Command Center
             </h1>
-            <p className="text-blue-200 text-lg leading-relaxed">
+            <p className="text-lg leading-relaxed text-white/70">
               Manage the entire Fastap ecosystem — vendors, payments, compliance, and infrastructure — from one powerful dashboard.
             </p>
           </div>
@@ -98,20 +98,20 @@ export default function Login() {
               { icon: "bar_chart", title: "Financial Control", desc: "Settlements, escrow, commissions, and fraud detection" },
               { icon: "shield", title: "Platform Security", desc: "RBAC, KYC compliance, audit logs, and real-time monitoring" },
             ].map(({ icon, title, desc }) => (
-              <div key={title} className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center flex-shrink-0">
-                  <Icon name={icon} size={22} className="text-blue-300" />
+              <div key={title} className="flex items-start gap-4 rounded-md border border-white/15 bg-white/10 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/10">
+                  <Icon name={icon} size={22} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white font-semibold text-sm">{title}</p>
-                  <p className="text-blue-300 text-xs mt-0.5">{desc}</p>
+                  <p className="text-sm font-semibold text-white">{title}</p>
+                  <p className="mt-0.5 text-xs text-white/70">{desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="relative text-blue-400 text-xs">
+        <p className="relative text-xs text-white/60">
           © 2026 Fastap Smart Hospitality OS. All rights reserved.
         </p>
       </div>
@@ -123,11 +123,11 @@ export default function Login() {
           </div>
 
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Welcome back</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>
             <p className="text-muted-foreground mt-2">Sign in to the Super Admin Panel</p>
           </div>
 
-          <Card className="border-border/50 shadow-xl">
+          <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Icon name="lock" size={18} />
@@ -137,7 +137,7 @@ export default function Login() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 {verified === "ok" && (
-                  <Alert className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400">
+                  <Alert className="border-success-border text-success dark:text-success">
                     <CheckCircle2 className="h-4 w-4" />
                     <AlertDescription>
                       Email confirmed. You can sign in now.

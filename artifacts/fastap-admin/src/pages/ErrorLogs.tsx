@@ -11,6 +11,7 @@ import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCsv } from "@/lib/download";
 import { AlertTriangle, RefreshCw, Loader2, Search, Download, XCircle, CreditCard, Key, Smartphone, FileText, RotateCcw } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 export default function ErrorLogs() {
   const { toast } = useToast();
@@ -68,26 +69,26 @@ export default function ErrorLogs() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Error Logs Center</h2>
-          <p className="text-muted-foreground">Payment failures, API errors, login failures, QR errors, settlement failures.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Error Logs Center"
+        description="Payment failures, API errors, login failures, QR errors, settlement failures."
+        actions={
+          <>
+            <Button variant="outline" onClick={handleExport}><Download className="mr-2 h-4 w-4" /> Export</Button>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-5">
-        <KpiCard title="Critical Errors" value={criticalErrors} icon={<XCircle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Payment Failures" value={paymentErrors} icon={<CreditCard className="h-4 w-4 text-orange-500" />} />
-        <KpiCard title="API Failures" value={apiErrors} icon={<Key className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="Login Failures" value={loginErrors} icon={<AlertTriangle className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="QR Failures" value={qrErrors} icon={<Smartphone className="h-4 w-4 text-purple-500" />} />
+        <KpiCard title="Critical Errors" value={criticalErrors} icon={<XCircle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Payment Failures" value={paymentErrors} icon={<CreditCard className="h-4 w-4 text-warning" />} />
+        <KpiCard title="API Failures" value={apiErrors} icon={<Key className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Login Failures" value={loginErrors} icon={<AlertTriangle className="h-4 w-4 text-info" />} />
+        <KpiCard title="QR Failures" value={qrErrors} icon={<Smartphone className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
       <Card>
@@ -136,7 +137,7 @@ export default function ErrorLogs() {
                   <Button variant="ghost" size="sm" className="h-7 text-xs" disabled title="Retry API not available">
                     <RotateCcw className="h-3 w-3 mr-1" /> Retry
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-400" disabled title="Escalate API not available">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-info" disabled title="Escalate API not available">
                     Escalate
                   </Button>
                 </div>

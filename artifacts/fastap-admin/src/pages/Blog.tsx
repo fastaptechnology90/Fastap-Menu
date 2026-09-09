@@ -8,6 +8,12 @@ import { Plus, Pencil, Trash2, X, Loader2, Newspaper, Eye, Globe, FileText } fro
 import { useToast } from "@/hooks/use-toast";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import { PageHeader } from "@/components/shared/Page";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FormField } from "@/components/shared/FormField";
 
 type Draft = Partial<BlogPost>;
 
@@ -35,21 +41,23 @@ export default function Blog() {
   const published = posts.filter(p => p.status === "published").length;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Newspaper className="h-6 w-6" /> Blog</h2>
-          <p className="text-muted-foreground">Write and publish blog posts. Managed by the Digital Marketing team.</p>
-        </div>
-        <Button onClick={() => setEditing({ status: "draft", title: "", content: "", excerpt: "" })}>
-          <Plus className="h-4 w-4 mr-1" /> New post
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Blog"
+        description="Write and publish blog posts. Managed by the Digital Marketing team."
+        actions={
+          <>
+            <Button onClick={() => setEditing({ status: "draft", title: "", content: "", excerpt: "" })}>
+            <Plus className="h-4 w-4 mr-1" /> New post
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Card><CardContent className="py-4"><p className="text-2xl font-extrabold">{posts.length}</p><p className="text-xs text-muted-foreground">Total posts</p></CardContent></Card>
-        <Card><CardContent className="py-4"><p className="text-2xl font-extrabold text-emerald-500">{published}</p><p className="text-xs text-muted-foreground">Published</p></CardContent></Card>
-        <Card><CardContent className="py-4"><p className="text-2xl font-extrabold text-amber-500">{posts.length - published}</p><p className="text-xs text-muted-foreground">Drafts</p></CardContent></Card>
+        <Card><CardContent className="py-4"><p className="text-2xl font-semibold">{posts.length}</p><p className="text-xs text-muted-foreground">Total posts</p></CardContent></Card>
+        <Card><CardContent className="py-4"><p className="text-2xl font-semibold text-success">{published}</p><p className="text-xs text-muted-foreground">Published</p></CardContent></Card>
+        <Card><CardContent className="py-4"><p className="text-2xl font-semibold text-warning">{posts.length - published}</p><p className="text-xs text-muted-foreground">Drafts</p></CardContent></Card>
       </div>
 
       {isLoading ? (
@@ -93,7 +101,7 @@ export default function Blog() {
                       await deleteMutation.mutateAsync(post.id);
                     }}
                   >
-                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    <Trash2 className="h-3.5 w-3.5 text-danger" />
                   </AsyncButton>
                 </div>
               </CardContent>
@@ -103,69 +111,67 @@ export default function Blog() {
       )}
 
       {/* Editor */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditing(null)}>
-          <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-lg">{editing.id ? "Edit post" : "New post"}</CardTitle>
-              <button onClick={() => setEditing(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
-            </CardHeader>
-            <CardContent className="space-y-3 overflow-y-auto">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Title</label>
-                <input value={editing.title ?? ""} onChange={e => setEditing(p => ({ ...p!, title: e.target.value }))} placeholder="Post title" className="w-full mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Cover image URL (optional)</label>
-                <input value={editing.coverUrl ?? ""} onChange={e => setEditing(p => ({ ...p!, coverUrl: e.target.value }))} placeholder="https://…" className="w-full mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Excerpt (short summary)</label>
-                <textarea value={editing.excerpt ?? ""} onChange={e => setEditing(p => ({ ...p!, excerpt: e.target.value }))} rows={2} placeholder="One or two lines shown in the list" className="w-full mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Content</label>
-                <textarea value={editing.content ?? ""} onChange={e => setEditing(p => ({ ...p!, content: e.target.value }))} rows={10} placeholder="Write your blog content here…" className="w-full mt-1 rounded-lg border border-border bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30" />
-              </div>
-              <div className="flex items-center justify-between gap-3 pt-1">
-                <label className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Status:</span>
-                  <select value={editing.status ?? "draft"} onChange={e => setEditing(p => ({ ...p!, status: e.target.value as "draft" | "published" }))} className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                  </select>
-                </label>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
-                  <Button size="sm" disabled={saveMutation.isPending || !editing.title?.trim()} onClick={() => saveMutation.mutate(editing)}>
-                    {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null} Save
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Both editors were bare fixed overlays: no focus trap, no Escape, and the page
+          behind them still reachable by Tab. */}
+      <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editing?.id ? "Edit post" : "New post"}</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <FormField label="Title">
+                <Input value={editing.title ?? ""} onChange={e => setEditing(p => ({ ...p!, title: e.target.value }))} placeholder="Post title" />
+              </FormField>
+              <FormField label="Cover image URL" hint="Optional.">
+                <Input value={editing.coverUrl ?? ""} onChange={e => setEditing(p => ({ ...p!, coverUrl: e.target.value }))} placeholder="https://…" />
+              </FormField>
+              <FormField label="Excerpt" hint="One or two lines shown in the list.">
+                <Textarea value={editing.excerpt ?? ""} onChange={e => setEditing(p => ({ ...p!, excerpt: e.target.value }))} rows={2} />
+              </FormField>
+              <FormField label="Content">
+                <Textarea value={editing.content ?? ""} onChange={e => setEditing(p => ({ ...p!, content: e.target.value }))} rows={10} placeholder="Write the post here…" />
+              </FormField>
+              <FormField label="Status">
+                <Select value={editing.status ?? "draft"} onValueChange={v => setEditing(p => ({ ...p!, status: v as "draft" | "published" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button disabled={saveMutation.isPending || !editing?.title?.trim()} onClick={() => editing && saveMutation.mutate(editing)}>
+              {saveMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null} Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Preview */}
-      {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setPreview(null)}>
-          <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <CardHeader className="pb-2 flex-row items-start justify-between space-y-0">
-              <div>
-                <CardTitle className="text-xl">{preview.title}</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">By {preview.author} · {new Date(preview.createdAt).toLocaleDateString()} · {preview.status}</p>
-              </div>
-              <button onClick={() => setPreview(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
-            </CardHeader>
-            <CardContent className="overflow-y-auto">
-              {preview.coverUrl && <img src={preview.coverUrl} alt="" className="w-full rounded-lg mb-4 max-h-64 object-cover" />}
-              {preview.excerpt && <p className="text-sm font-medium text-muted-foreground mb-3">{preview.excerpt}</p>}
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{preview.content}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <Dialog open={!!preview} onOpenChange={open => { if (!open) setPreview(null); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{preview?.title}</DialogTitle>
+            {preview && (
+              <p className="text-xs text-muted-foreground">
+                By {preview.author} · {new Date(preview.createdAt).toLocaleDateString("en-IN")} · {preview.status}
+              </p>
+            )}
+          </DialogHeader>
+          {preview && (
+            <div>
+              {preview.coverUrl && <img src={preview.coverUrl} alt="" className="mb-4 max-h-64 w-full rounded-md object-cover" />}
+              {preview.excerpt && <p className="mb-3 text-sm font-medium text-muted-foreground">{preview.excerpt}</p>}
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{preview.content}</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {confirmDialog}
     </div>
   );

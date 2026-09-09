@@ -12,6 +12,7 @@ import { Download, Plus, Loader2 } from "lucide-react";
 import { api, type Tax } from "@/lib/apiClient";
 import { downloadCsv } from "@/lib/download";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/Page";
 
 const defaultForm = { name: "", rate: "", type: "Sales Tax", region: "India" };
 
@@ -51,11 +52,16 @@ export default function Taxes() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div><h2 className="text-2xl font-bold tracking-tight">Tax Management</h2><p className="text-muted-foreground">Configure tax slabs and view compliance reports.</p></div>
-        <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Add Tax Rule</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Tax Management"
+        description="Configure tax slabs and view compliance reports."
+        actions={
+          <>
+            <Button onClick={() => { setDialog(true); setForm(defaultForm); }}><Plus className="mr-2 h-4 w-4" /> Add Tax Rule</Button>
+          </>
+        }
+      />
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Tax Slabs & Rules</CardTitle></CardHeader>

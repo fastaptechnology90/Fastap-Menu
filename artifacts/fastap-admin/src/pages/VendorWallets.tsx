@@ -18,20 +18,20 @@ export default function VendorWallets() {
   return (
     <PageShell title="Vendor Wallets" description="Wallet balances, locked funds, reserves, and penalty deductions per vendor." icon={<Wallet className="h-6 w-6" />} accent="emerald" loading={isLoading} onRefresh={() => refetch()} refreshing={isFetching}>
       <div className="admin-stat-grid">
-        <KpiCard title="Total Balance" value={fmtINR(totalBalance)} accent="emerald" icon={<Wallet className="h-4 w-4 text-emerald-500" />} />
-        <KpiCard title="Frozen Payouts" value={frozen} accent="amber" icon={<Lock className="h-4 w-4 text-amber-500" />} />
-        <KpiCard title="Negative Balances" value={negative} accent="rose" icon={<AlertCircle className="h-4 w-4 text-rose-500" />} />
+        <KpiCard title="Total Balance" value={fmtINR(totalBalance)} accent="emerald" icon={<Wallet className="h-4 w-4 text-success" />} />
+        <KpiCard title="Frozen Payouts" value={frozen} accent="amber" icon={<Lock className="h-4 w-4 text-warning" />} />
+        <KpiCard title="Negative Balances" value={negative} accent="rose" icon={<AlertCircle className="h-4 w-4 text-danger" />} />
       </div>
       <PanelCard title="Wallet Ledger" description="Click vendor to open full profile">
         <div className="admin-data-table-wrap">
           <DataTable data={wallets} columns={[
             { header: "Vendor", cell: (row: any) => <Link href={`/vendors/${row.vendorId}`} className="font-semibold hover:text-primary transition-colors">{row.vendorName}</Link> },
             { header: "Plan", cell: (row: any) => <Badge variant="outline" className="capitalize text-xs">{row.plan}</Badge> },
-            { header: "Balance", cell: (row: any) => <span className={`font-semibold ${row.negativeBalance ? "text-rose-500" : "text-emerald-600"}`}>{fmtINRFull(row.walletBalance)}</span> },
+            { header: "Balance", cell: (row: any) => <span className={`font-semibold ${row.negativeBalance ? "text-danger" : "text-success"}`}>{fmtINRFull(row.walletBalance)}</span> },
             { header: "Locked", cell: (row: any) => fmtINRFull(row.lockedBalance) },
             { header: "Reserve", cell: (row: any) => fmtINRFull(row.reserveBalance) },
-            { header: "Penalties", cell: (row: any) => <span className="text-rose-500">{fmtINRFull(row.penaltyDeductions)}</span> },
-            { header: "Status", cell: (row: any) => row.payoutsFrozen ? <Badge variant="destructive" className="text-xs">Frozen</Badge> : <Badge className="text-xs bg-emerald-500/15 text-emerald-600 border-emerald-500/30" variant="outline">Active</Badge> },
+            { header: "Penalties", cell: (row: any) => <span className="text-danger">{fmtINRFull(row.penaltyDeductions)}</span> },
+            { header: "Status", cell: (row: any) => row.payoutsFrozen ? <Badge variant="destructive" className="text-xs">Frozen</Badge> : <Badge className="text-xs bg-success-subtle text-success border-success-border" variant="outline">Active</Badge> },
           ]} />
         </div>
       </PanelCard>

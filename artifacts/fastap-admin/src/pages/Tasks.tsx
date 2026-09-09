@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { CheckSquare, Clock, Plus, RefreshCw, Loader2, Search, CheckCircle, AlertTriangle, PlayCircle } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 // The API stores task status lowercase ("pending", "in progress"); a few older rows and
 // the create response use title case. Every comparison goes through this so both match.
@@ -58,87 +59,87 @@ export default function Tasks() {
   const completed = tasks.filter((t: any) => norm(t.status) === "completed").length;
 
   const priorityColor: Record<string, string> = {
-    critical: "text-red-400 bg-red-500/10",
-    high: "text-orange-400 bg-orange-500/10",
-    medium: "text-yellow-400 bg-yellow-500/10",
-    low: "text-blue-400 bg-blue-500/10",
+    critical: "text-danger bg-danger-subtle",
+    high: "text-warning bg-warning-subtle",
+    medium: "text-warning bg-warning-subtle",
+    low: "text-info bg-info-subtle",
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Internal Task Management</h2>
-          <p className="text-muted-foreground">Track vendor verification, compliance reviews, refund reviews, and technical tasks.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Internal Task Management"
+        description="Track vendor verification, compliance reviews, refund reviews, and technical tasks."
+        actions={
+          <>
+            <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Create Task</Button>
+            <Button><Plus className="mr-2 h-4 w-4" /> Create Task</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Create New Task</DialogTitle></DialogHeader>
-              <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Task Title</Label>
-                  <Input placeholder="Task title..." value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["Vendor Verification", "Compliance Review", "Refund Review", "Technical Review", "KYC Review", "Settlement Review", "Fraud Investigation"].map(t => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Assigned To</Label>
-                    <Input placeholder="Agent name" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Due Date</Label>
-                    <Input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea placeholder="Task details..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
-                </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Create Task
-                </Button>
-              </form>
+            <DialogHeader><DialogTitle>Create New Task</DialogTitle></DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); createMutation.mutate(form); }} className="space-y-4 pt-2">
+            <div className="space-y-2">
+            <Label>Task Title</Label>
+            <Input placeholder="Task title..." value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            {["Vendor Verification", "Compliance Review", "Refund Review", "Technical Review", "KYC Review", "Settlement Review", "Fraud Investigation"].map(t => (
+            <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+            </SelectContent>
+            </Select>
+            </div>
+            <div className="space-y-2">
+            <Label>Priority</Label>
+            <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+            <SelectItem value="critical">Critical</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+            </Select>
+            </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+            <Label>Assigned To</Label>
+            <Input placeholder="Agent name" value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+            <Label>Due Date</Label>
+            <Input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            </div>
+            <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea placeholder="Task details..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Create Task
+            </Button>
+            </form>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <KpiCard title="Total Tasks" value={tasks.length} icon={<CheckSquare className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Pending" value={pending} icon={<Clock className="h-4 w-4 text-yellow-500" />} />
-        <KpiCard title="In Progress" value={inProgress} icon={<PlayCircle className="h-4 w-4 text-blue-500" />} />
-        <KpiCard title="Completed" value={completed} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
+        <KpiCard title="Pending" value={pending} icon={<Clock className="h-4 w-4 text-warning" />} />
+        <KpiCard title="In Progress" value={inProgress} icon={<PlayCircle className="h-4 w-4 text-info" />} />
+        <KpiCard title="Completed" value={completed} icon={<CheckCircle className="h-4 w-4 text-success" />} />
       </div>
 
       <Card>
@@ -171,7 +172,7 @@ export default function Tasks() {
               )},
               { header: "Assigned To", cell: (row: any) => <span className="text-sm">{row.assignedTo || "Unassigned"}</span> },
               { header: "Due Date", cell: (row: any) => (
-                <span className={`text-xs ${row.dueDate && new Date(row.dueDate) < new Date() && norm(row.status) !== "completed" ? "text-red-400 font-medium" : "text-muted-foreground"}`}>{row.dueDate || "No deadline"}</span>
+                <span className={`text-xs ${row.dueDate && new Date(row.dueDate) < new Date() && norm(row.status) !== "completed" ? "text-danger font-medium" : "text-muted-foreground"}`}>{row.dueDate || "No deadline"}</span>
               )},
               { header: "Status", cell: (row: any) => (
                 <Badge variant={norm(row.status) === "completed" ? "default" : norm(row.status) === "in progress" ? "secondary" : "outline"} className="text-xs">{statusLabel(row.status)}</Badge>
@@ -179,7 +180,7 @@ export default function Tasks() {
               { header: "Actions", cell: (row: any) => (
                 <div className="flex gap-1">
                   {norm(row.status) === "pending" && <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: row.id, status: "in progress" })}>Start</Button>}
-                  {norm(row.status) === "in progress" && <Button variant="ghost" size="sm" className="h-7 text-xs text-green-400" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: row.id, status: "completed" })}>Done</Button>}
+                  {norm(row.status) === "in progress" && <Button variant="ghost" size="sm" className="h-7 text-xs text-success" disabled={updateMutation.isPending} onClick={() => updateMutation.mutate({ id: row.id, status: "completed" })}>Done</Button>}
                   {norm(row.status) === "completed" && <span className="text-xs text-muted-foreground">Done</span>}
                 </div>
               )},

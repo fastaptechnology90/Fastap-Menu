@@ -17,12 +17,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PageHeader } from "@/components/shared/Page";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const VENDOR_TAGS: Record<string, { label: string; color: string }> = {
-  vip: { label: "VIP", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  enterprise: { label: "Enterprise", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  high_risk: { label: "High Risk", color: "bg-red-500/20 text-red-400 border-red-500/30" },
-  dormant: { label: "Dormant", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
+  vip: { label: "VIP", color: "bg-warning-subtle text-warning border-warning-border" },
+  enterprise: { label: "Enterprise", color: "bg-muted text-muted-foreground border" },
+  high_risk: { label: "High Risk", color: "bg-danger-subtle text-danger border-danger-border" },
+  dormant: { label: "Dormant", color: "bg-muted text-muted-foreground border" },
 };
 
 function getHealthScore(vendor: any) {
@@ -35,9 +37,9 @@ function getHealthScore(vendor: any) {
 }
 
 function getHealthColor(score: number) {
-  if (score >= 80) return "text-green-400";
-  if (score >= 60) return "text-yellow-400";
-  return "text-red-400";
+  if (score >= 80) return "text-success";
+  if (score >= 60) return "text-warning";
+  return "text-danger";
 }
 
 // Type labels are free text on the way in, so compare them case- and accent-insensitively.
@@ -152,17 +154,17 @@ export default function Vendors() {
   const enterpriseCount = liveVendors.filter(v => v.plan === "enterprise").length;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vendor Management</h2>
-          <p className="text-muted-foreground">{isLoading ? "Loading…" : `${liveVendors.length} vendors on platform`}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
+    <div className="space-y-6">
+      <PageHeader
+        title="Vendors"
+        description="Every venue on the platform, its plan, and whether it is trading."
+        badge={<Badge variant="muted">{isLoading ? "Loading…" : `${liveVendors.length} on platform`}</Badge>}
+        actions={
+          <>
+          <Button variant="outline" size="icon-sm" aria-label="Refresh" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCcw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="outline" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExportCSV}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Add Vendor</Button>
@@ -196,14 +198,15 @@ export default function Vendors() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard title="Total Vendors" value={liveVendors.length} icon={<Building2 className="h-4 w-4 text-primary" />} />
-        <KpiCard title="Active" value={activeCount} icon={<CheckCircle className="h-4 w-4 text-green-500" />} />
-        <KpiCard title="Suspended" value={suspendedCount} icon={<XCircle className="h-4 w-4 text-red-500" />} />
-        <KpiCard title="Enterprise" value={enterpriseCount} icon={<TrendingUp className="h-4 w-4 text-purple-500" />} />
+        <KpiCard title="Active" value={activeCount} icon={<CheckCircle className="h-4 w-4 text-success" />} />
+        <KpiCard title="Suspended" value={suspendedCount} icon={<XCircle className="h-4 w-4 text-danger" />} />
+        <KpiCard title="Enterprise" value={enterpriseCount} icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3 flex-wrap">
@@ -261,7 +264,23 @@ export default function Vendors() {
           emptyMessage="No vendors yet"
           emptyDescription="Restaurants appear here once they register or you add them."
           columns={[
-            { header: <input type="checkbox" checked={selected.length === filteredVendors.length && filteredVendors.length > 0} onChange={toggleSelectAll} />, cell: (row) => <input type="checkbox" checked={selected.includes(row.id)} onChange={() => toggleSelect(row.id)} /> },
+            {
+            header: (
+              <Checkbox
+                aria-label="Select all vendors"
+                checked={selected.length === filteredVendors.length && filteredVendors.length > 0}
+                onCheckedChange={toggleSelectAll}
+              />
+            ),
+            cell: (row) => (
+              <Checkbox
+                aria-label={`Select ${row.name}`}
+                checked={selected.includes(row.id)}
+                onCheckedChange={() => toggleSelect(row.id)}
+                onClick={e => e.stopPropagation()}
+              />
+            ),
+          },
             { header: "#", cell: (row) => <span className="text-xs text-muted-foreground font-mono">#{row.id}</span> },
             {
               header: "Business",
@@ -311,12 +330,12 @@ export default function Vendors() {
                     <DropdownMenuItem onClick={() => resetPasswordMutation.mutate(row.id)}>Reset Password</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {(row as any).platformControls?.deletedAt ? (
-                      <DropdownMenuItem className="text-green-500 cursor-pointer" onClick={() => restoreMutation.mutate(row.id)}>
+                      <DropdownMenuItem className="text-success cursor-pointer" onClick={() => restoreMutation.mutate(row.id)}>
                         <ShieldCheck className="mr-2 h-4 w-4" /> Restore vendor
                       </DropdownMenuItem>
                     ) : (
                       <>
-                        <DropdownMenuItem className={`cursor-pointer ${row.isActive ? "text-destructive" : "text-green-500"}`} onClick={() => toggleMutation.mutate(row.id)}>
+                        <DropdownMenuItem className={`cursor-pointer ${row.isActive ? "text-destructive" : "text-success"}`} onClick={() => toggleMutation.mutate(row.id)}>
                           {row.isActive ? <><ShieldBan className="mr-2 h-4 w-4" /> Suspend</> : <><ShieldCheck className="mr-2 h-4 w-4" /> Activate</>}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => deleteMutation.mutate(row.id)}>

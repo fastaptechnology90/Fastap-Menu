@@ -12,6 +12,7 @@ import { fmtINRFull } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { Plus, Copy, Trash2, Loader2, Package, Pencil } from "lucide-react";
+import { PageHeader } from "@/components/shared/Page";
 
 const DEFAULT_TOGGLES: Record<string, string> = {
   qrOrdering: "QR Ordering",
@@ -108,14 +109,16 @@ export default function Plans() {
   if (isLoading) return <div className="flex justify-center py-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Package Builder</h2>
-          <p className="text-muted-foreground">Create and manage subscription plans with feature toggles and limits.</p>
-        </div>
-        <Button onClick={() => openEdit()}><Plus className="mr-2 h-4 w-4" /> Create Plan</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Package Builder"
+        description="Create and manage subscription plans with feature toggles and limits."
+        actions={
+          <>
+            <Button onClick={() => openEdit()}><Plus className="mr-2 h-4 w-4" /> Create Plan</Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {plans.map(plan => (

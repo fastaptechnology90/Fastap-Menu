@@ -25,9 +25,9 @@ const APP_ICON: Record<string, typeof ChefHat> = {
 };
 
 const APP_TINT: Record<string, string> = {
-  kitchen: "bg-orange-500/15 text-orange-500 border-orange-500/25",
-  waiter: "bg-blue-500/15 text-blue-500 border-blue-500/25",
-  housekeeping: "bg-emerald-500/15 text-emerald-500 border-emerald-500/25",
+  kitchen: "bg-warning-subtle text-warning border-warning-border",
+  waiter: "bg-info-subtle text-info border-info-border",
+  housekeeping: "bg-success-subtle text-success border-success-border",
 };
 
 function formatSize(bytes: number) {
@@ -38,9 +38,9 @@ function formatSize(bytes: number) {
 
 function statusBadge(status: AppRelease["status"]) {
   const map: Record<string, string> = {
-    published: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-    draft: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-    ready: "bg-blue-500/15 text-blue-500 border-blue-500/30",
+    published: "bg-success-subtle text-success border-success-border",
+    draft: "bg-warning-subtle text-warning border-warning-border",
+    ready: "bg-info-subtle text-info border-info-border",
     archived: "bg-muted text-muted-foreground",
   };
   const label = status === "published" ? "LIVE" : status.toUpperCase();
@@ -272,7 +272,7 @@ export default function AppReleases() {
               {live ? (
                 <div className="rounded-xl border bg-muted/30 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-lg font-extrabold">v{live.version}</span>
+                    <span className="text-lg font-semibold">v{live.version}</span>
                     {statusBadge("published")}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
@@ -353,7 +353,7 @@ export default function AppReleases() {
                     <td className="py-2.5 pr-3">
                       <span className="font-medium">{venue.restaurant}</span>
                       {venue.stale.length > 0 && (
-                        <Badge variant="outline" className="ml-2 gap-1 border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600">
+                        <Badge variant="outline" className="ml-2 gap-1 border-warning-border bg-warning-subtle text-[10px] text-warning">
                           <AlertTriangle className="h-3 w-3" /> behind
                         </Badge>
                       )}
@@ -365,7 +365,7 @@ export default function AppReleases() {
                         <td key={app.appKey} className="px-3 py-2.5">
                           {got ? (
                             <>
-                              <span className={`font-mono text-xs font-semibold ${behind ? "text-destructive" : "text-emerald-600"}`}>
+                              <span className={`font-mono text-xs font-semibold ${behind ? "text-destructive" : "text-success"}`}>
                                 v{got.version ?? "?"}
                               </span>
                               <span className="ml-2 text-[11px] text-muted-foreground">
@@ -538,7 +538,7 @@ export default function AppReleases() {
                   className="mt-1 w-full rounded-xl border border-dashed p-4 text-left hover:bg-muted/40 transition disabled:opacity-60">
                   {form.file ? (
                     <span className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-success" />
                       <span className="truncate">{form.file.name}</span>
                       <span className="text-muted-foreground shrink-0">{formatSize(form.file.size)}</span>
                     </span>
