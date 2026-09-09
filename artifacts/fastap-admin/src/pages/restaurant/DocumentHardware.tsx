@@ -19,33 +19,33 @@ type HwRow = {
 const BLANK_HW = { id: "", name: "", type: "pos", location: "", status: "online", assignedTo: "", serialNo: "", model: "", cost: 0, purchasedOn: "" };
 
 const DOC_STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  active: { label: "Valid", color: "text-emerald-400", bg: "bg-emerald-500/15", icon: CheckCircle },
-  valid: { label: "Valid", color: "text-emerald-400", bg: "bg-emerald-500/15", icon: CheckCircle },
-  pending_renewal: { label: "Expiring", color: "text-yellow-400", bg: "bg-yellow-500/15", icon: Clock },
-  expiring: { label: "Expiring", color: "text-yellow-400", bg: "bg-yellow-500/15", icon: Clock },
-  expired: { label: "Expired", color: "text-red-400", bg: "bg-red-500/15", icon: AlertTriangle },
+  active: { label: "Valid", color: "text-success", bg: "bg-success-subtle", icon: CheckCircle },
+  valid: { label: "Valid", color: "text-success", bg: "bg-success-subtle", icon: CheckCircle },
+  pending_renewal: { label: "Expiring", color: "text-warning", bg: "bg-warning-subtle", icon: Clock },
+  expiring: { label: "Expiring", color: "text-warning", bg: "bg-warning-subtle", icon: Clock },
+  expired: { label: "Expired", color: "text-danger", bg: "bg-danger-subtle", icon: AlertTriangle },
 };
 
 const HW_TYPE_CFG: Record<string, { label: string; icon: typeof Tablet; color: string; bg: string }> = {
-  pos: { label: "POS Terminal", icon: Tablet, color: "text-blue-400", bg: "bg-blue-500/15" },
-  kds: { label: "KDS Display", icon: Monitor, color: "text-violet-400", bg: "bg-violet-500/15" },
-  display: { label: "Display", icon: Monitor, color: "text-violet-400", bg: "bg-violet-500/15" },
-  printer: { label: "Printer", icon: Printer, color: "text-amber-400", bg: "bg-amber-500/15" },
-  desktop: { label: "Desktop", icon: Cpu, color: "text-emerald-400", bg: "bg-emerald-500/15" },
-  nfc: { label: "NFC Reader", icon: Monitor, color: "text-pink-400", bg: "bg-pink-500/15" },
-  tablet: { label: "Tablet", icon: Tablet, color: "text-blue-400", bg: "bg-blue-500/15" },
-  kiosk: { label: "Kiosk", icon: Monitor, color: "text-orange-400", bg: "bg-orange-500/15" },
-  scanner: { label: "Scanner", icon: Cpu, color: "text-orange-400", bg: "bg-orange-500/15" },
+  pos: { label: "POS Terminal", icon: Tablet, color: "text-info", bg: "bg-info-subtle" },
+  kds: { label: "KDS Display", icon: Monitor, color: "text-muted-foreground", bg: "bg-muted" },
+  display: { label: "Display", icon: Monitor, color: "text-muted-foreground", bg: "bg-muted" },
+  printer: { label: "Printer", icon: Printer, color: "text-primary", bg: "bg-primary/15" },
+  desktop: { label: "Desktop", icon: Cpu, color: "text-success", bg: "bg-success-subtle" },
+  nfc: { label: "NFC Reader", icon: Monitor, color: "text-muted-foreground", bg: "bg-muted" },
+  tablet: { label: "Tablet", icon: Tablet, color: "text-info", bg: "bg-info-subtle" },
+  kiosk: { label: "Kiosk", icon: Monitor, color: "text-warning", bg: "bg-warning-subtle" },
+  scanner: { label: "Scanner", icon: Cpu, color: "text-warning", bg: "bg-warning-subtle" },
 };
 
 const HW_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  online: { label: "Online", color: "text-emerald-400", bg: "bg-emerald-500/15" },
-  offline: { label: "Offline", color: "text-red-400", bg: "bg-red-500/15" },
-  "low-battery": { label: "Low Battery", color: "text-yellow-400", bg: "bg-yellow-500/15" },
+  online: { label: "Marked in service", color: "text-success", bg: "bg-success-subtle" },
+  offline: { label: "Marked out of service", color: "text-danger", bg: "bg-danger-subtle" },
+  "low-battery": { label: "Low battery", color: "text-warning", bg: "bg-warning-subtle" },
 };
 
 const CAT_COLOR: Record<string, string> = {
-  License: "text-blue-400", GST: "text-emerald-400", Safety: "text-orange-400", Agreement: "text-violet-400", license: "text-blue-400",
+  License: "text-info", GST: "text-success", Safety: "text-warning", Agreement: "text-muted-foreground", license: "text-info",
 };
 
 function formatBytes(n: number | null | undefined) {
@@ -229,9 +229,9 @@ export default function DocumentHardware() {
     try {
       await hardwareApi.ping(restaurantId, Number(hw.id));
       await load();
-      toast({ title: `${hw.name} responded` });
+      toast({ title: `${hw.name} marked in service` });
     } catch (e: any) {
-      toast({ title: "No response from the device", description: e?.message, variant: "destructive" });
+      toast({ title: "Could not update the device", description: e?.message, variant: "destructive" });
     }
   }
 
@@ -264,39 +264,39 @@ export default function DocumentHardware() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Documents & Hardware</h1>
-          <p className="text-xs text-white/40">License vault, GST docs & hardware health</p>
+          <h1 className="text-xl font-semibold">Documents & Hardware</h1>
+          <p className="text-sm text-muted-foreground mt-1">Licence and GST documents, and the device register</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => load()} className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/70 font-bold px-4 py-2 rounded-xl text-sm transition-all">
+          <button onClick={() => load()} className="flex items-center gap-2 bg-muted hover-elevate text-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
             <Loader className="h-4 w-4" /> Refresh
           </button>
           {tab === "documents" && (
-            <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
+            <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
               <Upload className="h-4 w-4" /> Upload Document
             </button>
           )}
         </div>
       </div>
 
-      {apiError && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{apiError}</div>}
-      {loading && <div className="flex items-center gap-2 text-white/40 text-sm"><Loader className="h-4 w-4 animate-spin"/>Loading...</div>}
+      {apiError && <div className="p-3 rounded-lg bg-danger-subtle border border-danger-border text-danger text-sm">{apiError}</div>}
+      {loading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader className="h-4 w-4 animate-spin"/>Loading...</div>}
 
       {(expiring > 0 || offlineHW > 0) && (
         <div className="space-y-2">
-          {expiring > 0 && <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl"><AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0" /><p className="text-xs text-yellow-300">{expiring} document(s) expiring or expired</p></div>}
-          {offlineHW > 0 && <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl"><Monitor className="h-4 w-4 text-red-400 shrink-0" /><p className="text-xs text-red-300">{offlineHW} hardware device(s) need attention</p></div>}
+          {expiring > 0 && <div className="flex items-center gap-2 p-3 bg-warning-subtle border border-warning-border rounded-lg"><AlertTriangle className="h-4 w-4 text-warning shrink-0" /><p className="text-xs text-warning">{expiring} document(s) expiring or expired</p></div>}
+          {offlineHW > 0 && <div className="flex items-center gap-2 p-3 bg-danger-subtle border border-danger-border rounded-lg"><Monitor className="h-4 w-4 text-danger shrink-0" /><p className="text-xs text-danger">{offlineHW} device(s) marked as needing attention</p></div>}
         </div>
       )}
 
-      <div className="flex gap-1 bg-white/5 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-muted rounded-lg p-1 w-fit">
         {[
           { id: "documents", label: "Document Vault", icon: FileText },
           { id: "hardware", label: "Hardware", icon: Monitor },
         ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as Tab)} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${tab === t.id ? "bg-amber-500 text-black" : "text-white/50 hover:text-white"}`}>
+          <button key={t.id} onClick={() => setTab(t.id as Tab)} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             <t.icon className="h-3.5 w-3.5" />{t.label}
           </button>
         ))}
@@ -306,7 +306,7 @@ export default function DocumentHardware() {
         <>
           <div className="flex gap-1 flex-wrap">
             {categories.map(c => (
-              <button key={c} onClick={() => setCatFilter(c)} className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-all ${catFilter === c ? "bg-amber-500 text-black" : "bg-white/5 text-white/40 hover:bg-white/10"}`}>{c}</button>
+              <button key={c} onClick={() => setCatFilter(c)} className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors ${catFilter === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover-elevate"}`}>{c}</button>
             ))}
           </div>
           <div className="space-y-3">
@@ -314,9 +314,9 @@ export default function DocumentHardware() {
               const sc = DOC_STATUS_CFG[doc.status] || DOC_STATUS_CFG.valid;
               const StatusIcon = sc.icon;
               return (
-                <div key={doc.id} className={`bg-[#0e1520] border rounded-2xl p-4 flex items-center gap-3 ${doc.status === "expired" ? "border-red-500/20" : doc.status === "expiring" ? "border-yellow-500/20" : "border-white/5"}`}>
-                  <div className="h-10 w-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
-                    <FileText className="h-5 w-5 text-blue-400" />
+                <div key={doc.id} className={`bg-card border rounded-lg p-4 flex items-center gap-3 ${doc.status === "expired" ? "border-danger-border" : doc.status === "expiring" ? "border-warning-border" : "border-border"}`}>
+                  <div className="h-10 w-10 rounded-lg bg-info-subtle flex items-center justify-center shrink-0">
+                    <FileText className="h-5 w-5 text-info" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -325,26 +325,26 @@ export default function DocumentHardware() {
                         <StatusIcon className="h-3 w-3" />{sc.label}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-white/40">
-                      <span className={CAT_COLOR[doc.category] || "text-white/40"}>{doc.category}</span>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span className={CAT_COLOR[doc.category] || "text-muted-foreground"}>{doc.category}</span>
                       <span>Expires: {doc.expiry}</span>
                       <span>{doc.size}</span>
                       <span>{doc.fileType}</span>
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <button onClick={() => viewFile(doc)} title="View document" className="h-9 w-9 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 flex items-center justify-center">
+                    <button onClick={() => viewFile(doc)} title="View document" className="h-9 w-9 rounded-lg border border-border bg-muted text-muted-foreground hover-elevate flex items-center justify-center">
                       <Eye className="h-4 w-4" />
                     </button>
                     {doc.fileUrl && (doc.fileUrl.startsWith("data:") || doc.fileUrl.startsWith("http")) && (
-                      <a href={doc.fileUrl} download={`${doc.name}.${(doc.fileType || "pdf").toLowerCase()}`} title="Download" className="h-9 w-9 rounded-xl border border-white/10 text-white/50 hover:text-white hover:bg-white/5 flex items-center justify-center">
+                      <a href={doc.fileUrl} download={`${doc.name}.${(doc.fileType || "pdf").toLowerCase()}`} title="Download" className="h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center">
                         <Download className="h-4 w-4" />
                       </a>
                     )}
                     {/* A licence uploaded by mistake, or one that has been superseded, had
                         no way out of the vault. */}
                     {(
-                      <button onClick={() => deleteDoc(doc)} title="Delete document" aria-label={`Delete ${doc.name}`} className="h-9 w-9 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center">
+                      <button onClick={() => deleteDoc(doc)} title="Delete document" aria-label={`Delete ${doc.name}`} className="h-9 w-9 rounded-lg border border-danger-border bg-danger-subtle text-danger hover-elevate flex items-center justify-center">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -352,7 +352,7 @@ export default function DocumentHardware() {
                 </div>
               );
             })}
-            {filteredDocs.length === 0 && !loading && <p className="text-center text-white/30 py-12">No documents uploaded yet</p>}
+            {filteredDocs.length === 0 && !loading && <p className="text-center text-muted-foreground py-12">No documents uploaded yet</p>}
           </div>
         </>
       )}
@@ -360,23 +360,23 @@ export default function DocumentHardware() {
       {tab === "hardware" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground">
               {hardware.length} devices · ₹{hardware.reduce((s, h) => s + h.cost, 0).toLocaleString()} of equipment
             </p>
-            <button onClick={() => setHwForm({ ...BLANK_HW })} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2 rounded-xl text-sm transition-all">
+            <button onClick={() => setHwForm({ ...BLANK_HW })} className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
               <Plus className="h-4 w-4" /> Add Device
             </button>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Total Devices", value: hardware.length, color: "text-blue-400", bg: "bg-blue-500/10" },
-              { label: "Online", value: hardware.filter(h => h.status === "online").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-              { label: "Offline", value: hardware.filter(h => h.status === "offline").length, color: "text-red-400", bg: "bg-red-500/10" },
-              { label: "Issues", value: offlineHW, color: "text-orange-400", bg: "bg-orange-500/10" },
+              { label: "Total Devices", value: hardware.length, color: "text-info", bg: "bg-info-subtle" },
+              { label: "Online", value: hardware.filter(h => h.status === "online").length, color: "text-success", bg: "bg-success-subtle" },
+              { label: "Offline", value: hardware.filter(h => h.status === "offline").length, color: "text-danger", bg: "bg-danger-subtle" },
+              { label: "Issues", value: offlineHW, color: "text-warning", bg: "bg-warning-subtle" },
             ].map(s => (
-              <div key={s.label} className={`${s.bg} border border-white/5 rounded-2xl p-3 text-center`}>
-                <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+              <div key={s.label} className={`${s.bg} border border-border rounded-lg p-3 text-center`}>
+                <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </div>
             ))}
           </div>
@@ -385,9 +385,9 @@ export default function DocumentHardware() {
             const sc = HW_STATUS_CFG[hw.status] || HW_STATUS_CFG.offline;
             const HWIcon = tc.icon;
             return (
-              <div key={hw.id} className={`bg-[#0e1520] border rounded-2xl p-4 ${hw.status === "offline" ? "border-red-500/20" : "border-white/5"}`}>
+              <div key={hw.id} className={`bg-card border rounded-lg p-4 ${hw.status === "offline" ? "border-danger-border" : "border-border"}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-xl ${tc.bg} flex items-center justify-center shrink-0`}>
+                  <div className={`h-10 w-10 rounded-lg ${tc.bg} flex items-center justify-center shrink-0`}>
                     <HWIcon className={`h-5 w-5 ${tc.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -395,27 +395,27 @@ export default function DocumentHardware() {
                       <p className="text-sm font-semibold">{hw.name}</p>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${sc.bg} ${sc.color}`}>{sc.label}</span>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-white/40 flex-wrap">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                       <span>{hw.location}</span>
                       <span>{hw.assignedTo}</span>
-                      <span className="font-mono text-white/20">{hw.serialNo}</span>
-                      {hw.model && <span className="text-white/30">{hw.model}</span>}
-                      {hw.cost > 0 && <span className="text-amber-400/70 font-semibold">₹{hw.cost.toLocaleString()}</span>}
+                      <span className="font-mono text-muted-foreground">{hw.serialNo}</span>
+                      {hw.model && <span className="text-muted-foreground">{hw.model}</span>}
+                      {hw.cost > 0 && <span className="text-primary font-semibold">₹{hw.cost.toLocaleString()}</span>}
                     </div>
                   </div>
                   {hw.battery !== null && (
-                    <div className={`flex items-center gap-1 text-xs font-semibold shrink-0 ${hw.battery <= 20 ? "text-red-400" : "text-emerald-400"}`}>
+                    <div className={`flex items-center gap-1 text-xs font-semibold shrink-0 ${hw.battery <= 20 ? "text-danger" : "text-success"}`}>
                       <Battery className="h-3.5 w-3.5" />{hw.battery}%
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => pingHardware(hw)} aria-label={`Ping ${hw.name}`} title="Check the device is reachable" className="h-8 w-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/30">
+                    <button onClick={() => pingHardware(hw)} aria-label={`Mark ${hw.name} in service`} title="Mark this device in service" className="h-8 w-8 rounded-lg bg-success-subtle text-success flex items-center justify-center hover-elevate">
                       <RefreshCw className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => setHwForm({ ...hw })} aria-label={`Edit ${hw.name}`} className="h-8 w-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center hover:bg-blue-500/30">
+                    <button onClick={() => setHwForm({ ...hw })} aria-label={`Edit ${hw.name}`} className="h-8 w-8 rounded-lg bg-info-subtle text-info flex items-center justify-center hover-elevate">
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => deleteHardware(hw)} aria-label={`Remove ${hw.name}`} className="h-8 w-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30">
+                    <button onClick={() => deleteHardware(hw)} aria-label={`Remove ${hw.name}`} className="h-8 w-8 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -423,43 +423,43 @@ export default function DocumentHardware() {
               </div>
             );
           })}
-          {hardware.length === 0 && !loading && <p className="text-center text-white/30 py-12">No devices yet — use Add Device to register one.</p>}
+          {hardware.length === 0 && !loading && <p className="text-center text-muted-foreground py-12">No devices yet — use Add Device to register one.</p>}
         </div>
       )}
 
       {/* Upload document modal */}
       {showUpload && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowUpload(false)}>
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <h3 className="font-bold flex items-center gap-2"><Upload className="h-5 w-5 text-amber-400" /> Upload document</h3>
-              <button onClick={() => setShowUpload(false)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowUpload(false)}>
+          <div className="w-full max-w-md bg-card rounded-lg border border-border text-foreground max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><Upload className="h-5 w-5 text-primary" /> Upload document</h3>
+              <button onClick={() => setShowUpload(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
-                <label className="block text-xs text-white/40 mb-1">Document name <span className="text-red-400">*</span></label>
-                <input value={newDoc.name} onChange={e => setNewDoc(p => ({ ...p, name: e.target.value }))} placeholder="e.g. FSSAI License" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white" />
+                <label className="block text-xs text-muted-foreground mb-1">Document name <span className="text-danger">*</span></label>
+                <input value={newDoc.name} onChange={e => setNewDoc(p => ({ ...p, name: e.target.value }))} placeholder="e.g. FSSAI License" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Category</label>
-                  <select value={newDoc.category} onChange={e => setNewDoc(p => ({ ...p, category: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+                  <label className="block text-xs text-muted-foreground mb-1">Category</label>
+                  <select value={newDoc.category} onChange={e => setNewDoc(p => ({ ...p, category: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                     {["License", "GST", "Safety", "Agreement", "Other"].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Expiry date</label>
-                  <input type="date" value={newDoc.expiryDate} onChange={e => setNewDoc(p => ({ ...p, expiryDate: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white [color-scheme:dark]" />
+                  <label className="block text-xs text-muted-foreground mb-1">Expiry date</label>
+                  <input type="date" value={newDoc.expiryDate} onChange={e => setNewDoc(p => ({ ...p, expiryDate: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground [color-scheme:dark]" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1">File (PDF / image) <span className="text-red-400">*</span></label>
-                <input type="file" accept=".pdf,image/*" onChange={onFilePick} className="w-full text-sm text-white/70 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-amber-500 file:text-black file:font-bold file:cursor-pointer" />
-                {newDoc.fileName && <p className="text-[11px] text-emerald-400 mt-1">{newDoc.fileName} · {formatBytes(newDoc.fileSize)}</p>}
+                <label className="block text-xs text-muted-foreground mb-1">File (PDF / image) <span className="text-danger">*</span></label>
+                <input type="file" accept=".pdf,image/*" onChange={onFilePick} className="w-full text-sm text-primary-foreground/70 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground file:font-bold file:cursor-pointer" />
+                {newDoc.fileName && <p className="text-2xs text-success mt-1">{newDoc.fileName} · {formatBytes(newDoc.fileSize)}</p>}
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={() => setShowUpload(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
-                <button onClick={saveDoc} disabled={uploading || !newDoc.name.trim() || !newDoc.fileUrl} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2">
+                <button onClick={() => setShowUpload(false)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Cancel</button>
+                <button onClick={saveDoc} disabled={uploading || !newDoc.name.trim() || !newDoc.fileUrl} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
                   {uploading ? <Loader className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Upload
                 </button>
               </div>
@@ -470,28 +470,28 @@ export default function DocumentHardware() {
 
       {/* View document (fallback when no file stored) */}
       {viewDoc && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewDoc(null)}>
-          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <h3 className="font-bold flex items-center gap-2"><FileText className="h-5 w-5 text-blue-400" /> {viewDoc.name}</h3>
-              <button onClick={() => setViewDoc(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewDoc(null)}>
+          <div className="w-full max-w-sm bg-card rounded-lg border border-border text-foreground max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-info" /> {viewDoc.name}</h3>
+              <button onClick={() => setViewDoc(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-2 text-sm">
               {[["Category", viewDoc.category], ["Status", viewDoc.status], ["Expires", viewDoc.expiry], ["Size", viewDoc.size], ["Type", viewDoc.fileType], ["Uploaded", viewDoc.uploadedOn]].map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/40">{k}</span><span className="font-medium">{v}</span></div>
+                <div key={k} className="flex justify-between border-b border-border pb-2"><span className="text-muted-foreground">{k}</span><span className="font-medium">{v}</span></div>
               ))}
-              <p className="text-xs text-white/40 pt-2">No file is attached to this document — use "Upload Document" to attach one, then preview and download will be available here.</p>
+              <p className="text-xs text-muted-foreground pt-2">No file is attached to this document — use "Upload Document" to attach one, then preview and download will be available here.</p>
             </div>
           </div>
         </div>
       )}
 
       {hwForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <h3 className="font-bold">{hwForm.id ? "Edit Device" : "Add Device"}</h3>
-              <button onClick={() => setHwForm(null)} aria-label="Close"><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border text-foreground max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold">{hwForm.id ? "Edit Device" : "Add Device"}</h3>
+              <button onClick={() => setHwForm(null)} aria-label="Close"><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-3">
               {[
@@ -506,9 +506,9 @@ export default function DocumentHardware() {
                 { label: "Purchased On", field: "purchasedOn", type: "date" },
               ].map(({ label, field, type, placeholder, options }) => (
                 <div key={field}>
-                  <label className="block text-xs text-white/40 mb-1">{label}</label>
+                  <label className="block text-xs text-muted-foreground mb-1">{label}</label>
                   {type === "select" ? (
-                    <select value={hwForm[field] || ""} onChange={e => setHwForm({ ...hwForm, [field]: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/40">
+                    <select value={hwForm[field] || ""} onChange={e => setHwForm({ ...hwForm, [field]: e.target.value })} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/40">
                       {options?.map(o => <option key={o} value={o}>{HW_TYPE_CFG[o]?.label ?? HW_STATUS_CFG[o]?.label ?? o}</option>)}
                     </select>
                   ) : (
@@ -517,14 +517,14 @@ export default function DocumentHardware() {
                       placeholder={placeholder}
                       value={hwForm[field] === "—" ? "" : (hwForm[field] ?? "")}
                       onChange={e => setHwForm({ ...hwForm, [field]: type === "number" ? Number(e.target.value) : e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
                     />
                   )}
                 </div>
               ))}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setHwForm(null)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Cancel</button>
-                <button onClick={saveHardware} disabled={savingHw} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold disabled:opacity-40">
+                <button onClick={() => setHwForm(null)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Cancel</button>
+                <button onClick={saveHardware} disabled={savingHw} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold disabled:opacity-40">
                   {savingHw ? "Saving…" : hwForm.id ? "Save Changes" : "Add Device"}
                 </button>
               </div>

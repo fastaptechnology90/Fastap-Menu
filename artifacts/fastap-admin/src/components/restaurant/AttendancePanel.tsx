@@ -123,12 +123,12 @@ export function AttendancePanel({
 
   if (error) {
     return (
-      <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-4">
+      <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle p-4">
         <div>
-          <p className="text-sm font-semibold text-red-200">We could not load attendance.</p>
-          <p className="text-xs text-red-200/70">{error} This is not an empty log.</p>
+          <p className="text-sm font-semibold text-danger">We could not load attendance.</p>
+          <p className="text-xs text-danger">{error} This is not an empty log.</p>
         </div>
-        <button type="button" onClick={load} className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100">
+        <button type="button" onClick={load} className="shrink-0 rounded-lg bg-danger-subtle px-3 py-1.5 text-xs font-semibold text-danger">
           Try again
         </button>
       </div>
@@ -138,18 +138,18 @@ export function AttendancePanel({
   return (
     <div className="space-y-4">
       {/* ── Who is on the floor right now ── */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/40">
+          <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
             <UserCheck className="h-3.5 w-3.5" /> On the floor now
-            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">{open.length}</span>
+            <span className="rounded-full bg-success-subtle px-2 py-0.5 text-2xs font-semibold text-success">{open.length}</span>
           </p>
           <div className="flex items-center gap-2">
             <select
               value={clockInPick}
               onChange={e => setClockInPick(e.target.value)}
               aria-label="Staff member to clock in"
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white"
+              className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground"
             >
               <option value="">Clock someone in…</option>
               {clockableIn.map(s => <option key={s.id} value={s.id}>{s.name} · {s.role}</option>)}
@@ -158,7 +158,7 @@ export function AttendancePanel({
               type="button"
               onClick={clockIn}
               disabled={!clockInPick || busy === "in"}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300 transition-all hover:bg-emerald-500/30 disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-lg bg-success-subtle px-3 py-2 text-xs font-semibold text-success transition-colors hover-elevate disabled:opacity-40"
             >
               {busy === "in" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogIn className="h-3.5 w-3.5" />} Clock in
             </button>
@@ -166,17 +166,17 @@ export function AttendancePanel({
         </div>
 
         {loading && open.length === 0 ? (
-          <p className="mt-3 text-xs text-white/30">Loading…</p>
+          <p className="mt-3 text-xs text-muted-foreground">Loading…</p>
         ) : open.length === 0 ? (
-          <p className="mt-3 text-xs text-white/30">Nobody is clocked in. Use the picker above as staff arrive.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Nobody is clocked in. Use the picker above as staff arrive.</p>
         ) : (
           <div className="mt-3 space-y-2">
             {open.map(shift => (
-              <div key={shift.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3">
-                <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400" />
+              <div key={shift.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
+                <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{shift.staffName}</p>
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-muted-foreground">
                     {shift.staffRole} · in at {clockTime(shift.clockedInAt)} · {onFloorFor(shift.clockedInAt)} on the floor
                   </p>
                 </div>
@@ -186,13 +186,13 @@ export function AttendancePanel({
                   inputMode="numeric"
                   placeholder="Break (min)"
                   aria-label={`Break minutes for ${shift.staffName}`}
-                  className="w-24 shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs placeholder:text-white/25 focus:border-amber-500/40 focus:outline-none"
+                  className="w-24 shrink-0 rounded-lg border border-border bg-muted px-2 py-1.5 text-xs placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => clockOut(shift)}
                   disabled={busy === shift.staffId}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold transition-all hover:bg-white/10 disabled:opacity-40"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-semibold transition-colors hover-elevate disabled:opacity-40"
                 >
                   {busy === shift.staffId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />} Clock out
                 </button>
@@ -204,13 +204,13 @@ export function AttendancePanel({
 
       {/* ── The period a payroll run reads ── */}
       <div className="flex flex-wrap items-center gap-2">
-        <CalendarDays className="h-4 w-4 text-white/30" />
+        <CalendarDays className="h-4 w-4 text-muted-foreground" />
         <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} aria-label="From date"
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs focus:border-amber-500/40 focus:outline-none" />
-        <span className="text-xs text-white/30">to</span>
+          className="rounded-lg border border-border bg-muted px-3 py-2 text-xs focus:border-primary/40 focus:outline-none" />
+        <span className="text-xs text-muted-foreground">to</span>
         <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} aria-label="To date"
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs focus:border-amber-500/40 focus:outline-none" />
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-amber-400" />}
+          className="rounded-lg border border-border bg-muted px-3 py-2 text-xs focus:border-primary/40 focus:outline-none" />
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
       </div>
 
       {summary.length === 0 && shifts.length === 0 && !loading ? (
@@ -220,27 +220,27 @@ export function AttendancePanel({
         />
       ) : (
         <>
-          <div className="overflow-hidden rounded-2xl border border-white/8">
-            <div className="border-b border-white/5 bg-white/[0.02] px-4 py-2.5">
-              <p className="text-xs uppercase tracking-wider text-white/40">Per person · {from} to {to}</p>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="border-b border-border bg-card px-4 py-2.5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">Per person · {from} to {to}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/5 text-xs text-white/40">
+                  <tr className="border-b border-border text-xs text-muted-foreground">
                     {["Staff", "Role", "Shifts", "Hours", "Sales during shifts"].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-border">
                   {summary.map(row => (
-                    <tr key={row.staffId} className="hover:bg-white/[0.02]">
+                    <tr key={row.staffId} className="hover:bg-card">
                       <td className="px-4 py-2.5 font-semibold">{row.name}</td>
-                      <td className="px-4 py-2.5 text-xs capitalize text-white/50">{row.role}</td>
-                      <td className="px-4 py-2.5 tabular-nums text-white/70">{row.shifts}</td>
-                      <td className="px-4 py-2.5 tabular-nums font-semibold text-amber-400">{row.hours}</td>
-                      <td className="px-4 py-2.5 tabular-nums text-emerald-400">{money(row.sales)}</td>
+                      <td className="px-4 py-2.5 text-xs capitalize text-muted-foreground">{row.role}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-foreground">{row.shifts}</td>
+                      <td className="px-4 py-2.5 tabular-nums font-semibold text-primary">{row.hours}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-success">{money(row.sales)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -248,39 +248,39 @@ export function AttendancePanel({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-white/8">
-            <div className="border-b border-white/5 bg-white/[0.02] px-4 py-2.5">
-              <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/40">
+          <div className="overflow-hidden rounded-lg border border-border">
+            <div className="border-b border-border bg-card px-4 py-2.5">
+              <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" /> Every shift ({shifts.length})
               </p>
             </div>
             <div className="max-h-96 overflow-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-[#0e1520]">
-                  <tr className="border-b border-white/5 text-xs text-white/40">
+                <thead className="sticky top-0 bg-card">
+                  <tr className="border-b border-border text-xs text-muted-foreground">
                     {["Staff", "Date", "In", "Out", "Break", "Hours", "Sales"].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-border">
                   {shifts.map(s => (
-                    <tr key={s.id} className="hover:bg-white/[0.02]">
+                    <tr key={s.id} className="hover:bg-card">
                       <td className="px-4 py-2.5">{s.staffName}</td>
-                      <td className="px-4 py-2.5 text-xs text-white/50">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
                         {new Date(s.clockedInAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </td>
                       <td className="px-4 py-2.5 text-xs">{clockTime(s.clockedInAt)}</td>
                       <td className="px-4 py-2.5 text-xs">
                         {s.clockedOutAt
                           ? clockTime(s.clockedOutAt)
-                          : <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">STILL IN</span>}
+                          : <span className="rounded bg-success-subtle px-1.5 py-0.5 text-2xs font-semibold text-success">STILL IN</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-white/50">{s.breakMinutes ? `${s.breakMinutes}m` : "—"}</td>
-                      <td className="px-4 py-2.5 tabular-nums text-xs text-white/70">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.breakMinutes ? `${s.breakMinutes}m` : "—"}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-xs text-foreground">
                         {s.minutesWorked != null ? (Math.max(0, s.minutesWorked - s.breakMinutes) / 60).toFixed(2) : "—"}
                       </td>
-                      <td className="px-4 py-2.5 tabular-nums text-xs text-emerald-400">
+                      <td className="px-4 py-2.5 tabular-nums text-xs text-success">
                         {s.salesDuringShift != null ? money(Number(s.salesDuringShift)) : "—"}
                       </td>
                     </tr>

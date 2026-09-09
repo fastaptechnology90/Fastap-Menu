@@ -62,28 +62,28 @@ function duration(seconds: number) {
 }
 
 function Tile({
-  label, value, sub, icon: Icon, tone = "text-white",
+  label, value, sub, icon: Icon, tone = "text-foreground",
 }: {
   label: string; value: string; sub?: string; icon: typeof Cpu; tone?: string;
 }) {
   const measured = value !== "Not measured";
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <div className="flex items-center gap-2 text-white/40">
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="h-4 w-4" />
         <span className="text-xs uppercase tracking-wider">{label}</span>
       </div>
-      <p className={`mt-2 text-2xl font-extrabold ${measured ? tone : "text-white/25"}`}>{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-white/35">{sub}</p>}
+      <p className={`mt-2 text-2xl font-semibold ${measured ? tone : "text-muted-foreground"}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
 const LEVEL_TONE: Record<string, string> = {
-  error: "bg-red-500/15 text-red-300",
-  warn: "bg-amber-500/15 text-amber-300",
-  warning: "bg-amber-500/15 text-amber-300",
-  info: "bg-white/8 text-white/50",
+  error: "bg-danger-subtle text-danger",
+  warn: "bg-primary/15 text-primary",
+  warning: "bg-primary/15 text-primary",
+  info: "bg-muted text-muted-foreground",
 };
 
 export default function SystemMonitoring() {
@@ -119,16 +119,16 @@ export default function SystemMonitoring() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading && !metrics) return <div className="p-6 text-center text-sm text-white/40">Reading system state…</div>;
+  if (loading && !metrics) return <div className="p-6 text-center text-sm text-muted-foreground">Reading system state…</div>;
 
   if (error) {
     return (
       <div className="p-6">
-        <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-200">
+        <div className="rounded-lg border border-danger-border bg-danger-subtle p-5 text-sm text-danger">
           <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" /> Could not read system state</div>
-          <p className="mt-2 text-red-200/80">{error}</p>
-          <p className="mt-1 text-red-200/60">Treat this as a possible outage rather than as healthy — nothing here has been checked.</p>
-          <button onClick={() => load(true)} className="mt-4 rounded-xl border border-red-400/30 px-3 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-500/15">Try again</button>
+          <p className="mt-2 text-danger">{error}</p>
+          <p className="mt-1 text-danger">Treat this as a possible outage rather than as healthy — nothing here has been checked.</p>
+          <button onClick={() => load(true)} className="mt-4 rounded-lg border border-danger-border px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger-subtle">Try again</button>
         </div>
       </div>
     );
@@ -143,27 +143,27 @@ export default function SystemMonitoring() {
   const healthy = health?.status === "healthy";
 
   return (
-    <div className="space-y-4 p-4 text-white sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-4 p-4 text-foreground sm:p-6">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">System Monitoring</h1>
-          <p className="text-xs text-white/40">
+          <h1 className="text-xl font-semibold">System Monitoring</h1>
+          <p className="text-xs text-muted-foreground">
             {metrics?.last_checked ? `Read at ${new Date(metrics.last_checked).toLocaleTimeString("en-IN")}` : "Live readings"}
           </p>
         </div>
         <button
           onClick={() => load(true)}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </button>
       </div>
 
-      <div className={`rounded-2xl border p-4 ${healthy ? "border-emerald-500/25 bg-emerald-500/10" : "border-amber-500/25 bg-amber-500/10"}`}>
+      <div className={`rounded-lg border p-4 ${healthy ? "border-success-border bg-success-subtle" : "border-primary/25 bg-primary/10"}`}>
         <div className="flex items-center gap-2">
-          <Activity className={`h-4 w-4 ${healthy ? "text-emerald-300" : "text-amber-300"}`} />
-          <span className={`font-bold ${healthy ? "text-emerald-200" : "text-amber-200"}`}>
+          <Activity className={`h-4 w-4 ${healthy ? "text-success" : "text-primary"}`} />
+          <span className={`font-semibold ${healthy ? "text-success" : "text-primary"}`}>
             {healthy ? "All checks passing" : `Status: ${health?.status ?? "unknown"}`}
           </span>
         </div>
@@ -171,7 +171,7 @@ export default function SystemMonitoring() {
           {Object.entries(health?.components ?? {}).map(([name, c]) => (
             <span
               key={name}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${c.status === "up" ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${c.status === "up" ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"}`}
             >
               {name}: {c.status}
               {c.latency_ms != null && ` · ${c.latency_ms}ms`}
@@ -183,74 +183,76 @@ export default function SystemMonitoring() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile
-          icon={Cpu} label="CPU" tone="text-blue-400"
+          icon={Cpu} label="CPU" tone="text-info"
           value={cpu == null ? "Not measured" : `${cpu}%`}
           sub="This process"
         />
         <Tile
-          icon={HardDrive} label="Memory" tone="text-violet-400"
+          icon={HardDrive} label="Memory" tone="text-muted-foreground"
           value={mem == null ? "Not measured" : `${mem}%`}
           sub={rss ? `${(rss / 1024 / 1024).toFixed(0)} MB resident` : undefined}
         />
         <Tile
-          icon={Timer} label="Uptime" tone="text-emerald-400"
+          icon={Timer} label="Uptime" tone="text-success"
           value={metrics?.uptime_seconds ? duration(metrics.uptime_seconds) : "Not measured"}
           sub={metrics?.started_at ? `Since ${new Date(metrics.started_at).toLocaleString("en-IN")}` : "Process uptime, not service uptime"}
         />
         <Tile
-          icon={Database} label="Database" tone="text-amber-400"
+          icon={Database} label="Database" tone="text-primary"
           value={metrics?.db_response_ms == null ? "Not measured" : `${metrics.db_response_ms} ms`}
           sub={metrics?.db_connections == null ? "Pool size not exposed" : `${metrics.db_connections} connections`}
         />
         <Tile
-          icon={Gauge} label="Requests today" tone="text-white"
+          icon={Gauge} label="Requests today" tone="text-foreground"
           value={requests == null ? "Not measured" : requests.toLocaleString("en-IN")}
           sub={metrics?.requests_in_flight != null ? `${metrics.requests_in_flight} in flight now` : undefined}
         />
         <Tile
-          icon={AlertTriangle} label="Errors today" tone={errors ? "text-red-400" : "text-emerald-400"}
+          icon={AlertTriangle} label="Errors today" tone={errors ? "text-danger" : "text-success"}
           value={errors == null ? "Not measured" : String(errors)}
           sub={errorRate == null ? undefined : `${errorRate.toFixed(2)}% of requests`}
         />
         <Tile
-          icon={Timer} label="Avg response" tone="text-blue-400"
+          icon={Timer} label="Avg response" tone="text-info"
           value={metrics?.avg_response_ms == null ? "Not measured" : `${metrics.avg_response_ms} ms`}
           sub={metrics?.peak_concurrent_requests != null ? `Peak ${metrics.peak_concurrent_requests} concurrent` : undefined}
         />
         <Tile
-          icon={Activity} label="Active sessions" tone="text-white"
+          icon={Activity} label="Active sessions" tone="text-foreground"
           value={metrics?.active_sessions == null ? "Not measured" : metrics.active_sessions.toLocaleString("en-IN")}
           sub={metrics?.queue_size != null ? `${metrics.queue_size} queued` : undefined}
         />
       </div>
 
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-        <p className="text-xs uppercase tracking-wider text-white/40">Recent activity</p>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Recent activity</p>
         {logs.length === 0 ? (
-          <p className="mt-3 text-xs text-white/25">Nothing recorded yet.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Nothing recorded yet.</p>
         ) : (
           <div className="mt-3 max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-white/5">
-                {logs.slice(0, 40).map(l => (
-                  <tr key={l.id}>
-                    <td className="py-2 pr-2 w-20">
-                      <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase ${LEVEL_TONE[l.level] ?? LEVEL_TONE.info}`}>{l.level}</span>
-                    </td>
-                    <td className="py-2 pr-2 text-white/75">{l.message}</td>
-                    <td className="py-2 pr-2 text-xs text-white/35">{l.service}</td>
-                    <td className="py-2 text-right text-xs text-white/30 whitespace-nowrap">
-                      {new Date(l.timestamp).toLocaleString("en-IN")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-border">
+                  {logs.slice(0, 40).map(l => (
+                    <tr key={l.id}>
+                      <td className="py-2 pr-2 w-20">
+                        <span className={`rounded-md px-2 py-0.5 text-2xs font-semibold uppercase ${LEVEL_TONE[l.level] ?? LEVEL_TONE.info}`}>{l.level}</span>
+                      </td>
+                      <td className="py-2 pr-2 text-foreground">{l.message}</td>
+                      <td className="py-2 pr-2 text-xs text-muted-foreground">{l.service}</td>
+                      <td className="py-2 text-right text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(l.timestamp).toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
-      <p className="text-xs text-white/25">
+      <p className="text-xs text-muted-foreground">
         Uptime here is how long this server process has been running, not a service-level
         uptime figure — nothing on the platform records outage history yet, so no percentage
         is claimed.

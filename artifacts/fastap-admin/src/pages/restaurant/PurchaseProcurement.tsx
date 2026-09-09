@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter, Eye } from "lucide-react";
+import { ShoppingCart, Truck, Plus, X, CheckCircle, Clock, AlertCircle, Upload, Search, Building2, TrendingUp, Package, FileText, Star, DollarSign, ChevronDown, Filter, Eye, Receipt } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { procurement as procurementApi } from "@/lib/api";
 import { fmtINR } from "@/lib/format";
@@ -21,25 +21,25 @@ type SupplierRow = {
 };
 
 const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  draft:      {label:"Draft",     color:"text-white/40",  bg:"bg-white/10"},
-  pending:    {label:"Pending",   color:"text-yellow-400",bg:"bg-yellow-500/15"},
-  approved:   {label:"Approved",  color:"text-blue-400",  bg:"bg-blue-500/15"},
-  sent:       {label:"Sent",      color:"text-cyan-400",  bg:"bg-cyan-500/15"},
-  "in-transit":{label:"In Transit",color:"text-violet-400",bg:"bg-violet-500/15"},
-  received:   {label:"Received",  color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  delivered:  {label:"Delivered", color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  cancelled:  {label:"Cancelled", color:"text-red-400",   bg:"bg-red-500/15"},
+  draft:      {label:"Draft",     color:"text-muted-foreground",  bg:"bg-muted"},
+  pending:    {label:"Pending",   color:"text-warning",bg:"bg-warning-subtle"},
+  approved:   {label:"Approved",  color:"text-info",  bg:"bg-info-subtle"},
+  sent:       {label:"Sent",      color:"text-info",  bg:"bg-info-subtle"},
+  "in-transit":{label:"In Transit",color:"text-muted-foreground",bg:"bg-muted"},
+  received:   {label:"Received",  color:"text-success",bg:"bg-success-subtle"},
+  delivered:  {label:"Delivered", color:"text-success",bg:"bg-success-subtle"},
+  cancelled:  {label:"Cancelled", color:"text-danger",   bg:"bg-danger-subtle"},
 };
 
-const DEFAULT_STATUS_CFG = {label:"Unknown",color:"text-white/40",bg:"bg-white/10"};
+const DEFAULT_STATUS_CFG = {label:"Unknown",color:"text-muted-foreground",bg:"bg-muted"};
 const statusCfg = (s: string) => STATUS_CFG[s] ?? DEFAULT_STATUS_CFG;
 
 const INV_STATUS_CFG: Record<string,{color:string;bg:string}> = {
-  paid:    {color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  pending: {color:"text-yellow-400",bg:"bg-yellow-500/15"},
-  overdue: {color:"text-red-400",   bg:"bg-red-500/15"},
+  paid:    {color:"text-success",bg:"bg-success-subtle"},
+  pending: {color:"text-warning",bg:"bg-warning-subtle"},
+  overdue: {color:"text-danger",   bg:"bg-danger-subtle"},
 };
-const invStatusCfg = (s: string) => INV_STATUS_CFG[s] ?? {color:"text-white/40",bg:"bg-white/10"};
+const invStatusCfg = (s: string) => INV_STATUS_CFG[s] ?? {color:"text-muted-foreground",bg:"bg-muted"};
 
 type Tab = "purchase-orders"|"suppliers"|"invoices";
 
@@ -212,13 +212,13 @@ export default function PurchaseProcurement() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Purchase & Procurement</h1>
-          <p className="text-xs text-white/40">Purchase orders, supplier management and invoices</p>
+          <h1 className="text-xl font-semibold">Purchase & Procurement</h1>
+          <p className="text-xs text-muted-foreground">Purchase orders, supplier management and invoices</p>
         </div>
         {tab==="purchase-orders"&&(
-          <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
             <Plus className="h-4 w-4"/>New PO
           </button>
         )}
@@ -227,22 +227,22 @@ export default function PurchaseProcurement() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Monthly Spend",value:`₹${(monthlySpend/1000).toFixed(0)}K`,color:"text-amber-400",bg:"bg-amber-500/10"},
-          {label:"Active POs",value:orders.filter(o=>!["delivered","cancelled"].includes(o.status)).length,color:"text-blue-400",bg:"bg-blue-500/10"},
-          {label:"Payables Due",value:`₹${(totalPending/1000).toFixed(0)}K`,color:"text-red-400",bg:"bg-red-500/10"},
-          {label:"Overdue Invoices",value:overdueCount,color:"text-orange-400",bg:"bg-orange-500/10"},
+          {label:"Monthly Spend",value:`₹${(monthlySpend/1000).toFixed(0)}K`,color:"text-primary",bg:"bg-primary/10"},
+          {label:"Active POs",value:orders.filter(o=>!["delivered","cancelled"].includes(o.status)).length,color:"text-info",bg:"bg-info-subtle"},
+          {label:"Payables Due",value:`₹${(totalPending/1000).toFixed(0)}K`,color:"text-danger",bg:"bg-danger-subtle"},
+          {label:"Overdue Invoices",value:overdueCount,color:"text-warning",bg:"bg-warning-subtle"},
         ].map(s=>(
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
+            <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["purchase-orders","Purchase Orders"],["suppliers","Suppliers"],["invoices","Invoices"]] as [Tab,string][]).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
@@ -251,12 +251,12 @@ export default function PurchaseProcurement() {
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30"/>
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder="Search supplier, PO number..." value={search} onChange={e=>setSearch(e.target.value)}/>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+              <input className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search supplier, PO number..." value={search} onChange={e=>setSearch(e.target.value)}/>
             </div>
             <div className="flex gap-1 flex-wrap">
               {["all","draft","pending","approved","in-transit","delivered"].map(s=>(
-                <button key={s} onClick={()=>setStatusFilter(s)} className={`px-3 py-2 rounded-xl text-xs font-semibold border capitalize transition-all ${statusFilter===s?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/40"}`}>{s==="all"?"All":s}</button>
+                <button key={s} onClick={()=>setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-semibold border capitalize transition-colors ${statusFilter===s?"bg-primary/20 border-primary/40 text-primary":"border-border bg-muted text-muted-foreground"}`}>{s==="all"?"All":s}</button>
               ))}
             </div>
           </div>
@@ -265,30 +265,30 @@ export default function PurchaseProcurement() {
             {filtered.map(po=>{
               const scfg = statusCfg(po.status);
               return (
-                <div key={po.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 hover:border-white/10 cursor-pointer transition-all" onClick={()=>setSelectedPO(po)}>
+                <div key={po.id} className="bg-card border border-border rounded-lg p-4 hover:border-border cursor-pointer transition-colors" onClick={()=>setSelectedPO(po)}>
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0"><ShoppingCart className="h-5 w-5 text-amber-400"/></div>
+                    <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0"><ShoppingCart className="h-5 w-5 text-primary"/></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="text-sm font-bold">{po.id}</p>
+                        <p className="text-sm font-semibold">{po.id}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${scfg.bg} ${scfg.color}`}>{scfg.label}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${po.paymentStatus==="paid"?"bg-emerald-500/20 text-emerald-400":"bg-yellow-500/20 text-yellow-400"}`}>{po.paymentStatus==="paid"?"Paid":"Payment Pending"}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${po.paymentStatus==="paid"?"bg-success-subtle text-success":"bg-warning-subtle text-warning"}`}>{po.paymentStatus==="paid"?"Paid":"Payment Pending"}</span>
                       </div>
-                      <p className="text-sm text-white/60">{po.supplier}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-white/30">
+                      <p className="text-sm text-muted-foreground">{po.supplier}</p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>{po.items.length} item{po.items.length!==1?"s":""}</span>
                         <span>Created: {po.createdAt}</span>
                         <span>Expected: {po.expectedBy}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-extrabold text-amber-400">₹{po.total.toLocaleString()}</p>
+                      <p className="text-lg font-semibold text-primary">₹{po.total.toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 mt-3">
-                    {po.status==="draft"&&<button onClick={e=>{e.stopPropagation();updatePO(po.id,"pending");}} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Submit for Approval</button>}
-                    {po.status==="pending"&&<PermissionGate permission="approve_purchase"><button onClick={e=>{e.stopPropagation();updatePO(po.id,"approved");}} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Approve</button></PermissionGate>}
-                    {po.status==="in-transit"&&<button onClick={e=>{e.stopPropagation();updatePO(po.id,"delivered");}} className="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 text-xs font-semibold hover:bg-teal-500/30 flex items-center gap-1"><CheckCircle className="h-3 w-3"/>Mark Delivered</button>}
+                    {po.status==="draft"&&<button onClick={e=>{e.stopPropagation();updatePO(po.id,"pending");}} className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate">Submit for Approval</button>}
+                    {po.status==="pending"&&<PermissionGate permission="approve_purchase"><button onClick={e=>{e.stopPropagation();updatePO(po.id,"approved");}} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate">Approve</button></PermissionGate>}
+                    {po.status==="in-transit"&&<button onClick={e=>{e.stopPropagation();updatePO(po.id,"delivered");}} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate flex items-center gap-1"><CheckCircle className="h-3 w-3"/>Mark Delivered</button>}
                   </div>
                 </div>
               );
@@ -303,39 +303,39 @@ export default function PurchaseProcurement() {
           {suppliers.length === 0 ? <EmptyState title="No suppliers" /> : suppliers.map(s=>{
             const creditPct = Math.round((s.creditUsed/s.creditLimit)*100);
             return (
-              <div key={s.id} onClick={()=>setDetailSupplier(s)} title="Click for full supplier details" className="bg-[#0e1520] border border-white/5 rounded-2xl p-5 cursor-pointer hover:border-blue-500/30 transition-colors">
+              <div key={s.id} onClick={()=>setDetailSupplier(s)} title="Click for full supplier details" className="bg-card border border-border rounded-lg p-5 cursor-pointer hover:border-info-border transition-colors">
                 <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-blue-500/15 flex items-center justify-center shrink-0"><Building2 className="h-6 w-6 text-blue-400"/></div>
+                  <div className="h-12 w-12 rounded-lg bg-info-subtle flex items-center justify-center shrink-0"><Building2 className="h-6 w-6 text-info"/></div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold">{s.name}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>
+                      <h3 className="font-semibold">{s.name}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-success-subtle text-success">Active</span>
                     </div>
-                    <p className="text-xs text-white/40 mb-3">{s.category} · {s.contact} · {s.phone} · {s.paymentTerms} credit</p>
+                    <p className="text-xs text-muted-foreground mb-3">{s.category} · {s.contact} · {s.phone} · {s.paymentTerms} credit</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        {label:"Total Orders",value:s.totalOrders,color:"text-blue-400"},
-                        {label:"Total Spend",value:fmtINR(s.totalSpend),color:"text-amber-400"},
-                        {label:"Rating",value:s.rating == null ? "Not rated" : `${s.rating}★`,color:"text-yellow-400"},
-                        {label:"Credit Used",value:`₹${(s.creditUsed/1000).toFixed(0)}K/₹${(s.creditLimit/1000).toFixed(0)}K`,color:creditPct>80?"text-red-400":"text-emerald-400"},
+                        {label:"Total Orders",value:s.totalOrders,color:"text-info"},
+                        {label:"Total Spend",value:fmtINR(s.totalSpend),color:"text-primary"},
+                        {label:"Rating",value:s.rating == null ? "Not rated" : String(s.rating),color:"text-warning"},
+                        {label:"Credit Used",value:`₹${(s.creditUsed/1000).toFixed(0)}K/₹${(s.creditLimit/1000).toFixed(0)}K`,color:creditPct>80?"text-danger":"text-success"},
                       ].map(m=>(
-                        <div key={m.label} className="bg-white/5 rounded-lg p-2 text-center">
-                          <p className={`text-sm font-bold ${m.color}`}>{m.value}</p>
-                          <p className="text-xs text-white/30">{m.label}</p>
+                        <div key={m.label} className="bg-muted rounded-lg p-2 text-center">
+                          <p className={`text-sm font-semibold ${m.color}`}>{m.value}</p>
+                          <p className="text-xs text-muted-foreground">{m.label}</p>
                         </div>
                       ))}
                     </div>
                     <div className="mt-3">
-                      <div className="flex justify-between text-xs mb-1"><span className="text-white/40">Credit Utilization</span><span className={creditPct>80?"text-red-400":"text-white/40"}>{creditPct}%</span></div>
-                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                        <div className={`h-full rounded-full ${creditPct>80?"bg-red-500":creditPct>60?"bg-yellow-500":"bg-emerald-500"}`} style={{width:`${creditPct}%`}}/>
+                      <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Credit Utilization</span><span className={creditPct>80?"text-danger":"text-muted-foreground"}>{creditPct}%</span></div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full ${creditPct>80?"bg-danger":creditPct>60?"bg-warning":"bg-success"}`} style={{width:`${creditPct}%`}}/>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0" onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>setDetailSupplier(s)} title="View details" className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-semibold hover:bg-blue-500/30 flex items-center justify-center gap-1"><Eye className="h-3.5 w-3.5"/>View</button>
-                    <button onClick={()=>{ setPoForm(f=>({...f,supplierName:s.name})); setShowAdd(true); }} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">New PO</button>
-                    <button onClick={()=>{ setSearch(s.name); setTab("purchase-orders"); }} className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10">History</button>
+                    <button onClick={()=>setDetailSupplier(s)} title="View details" className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate flex items-center justify-center gap-1"><Eye className="h-3.5 w-3.5"/>View</button>
+                    <button onClick={()=>{ setPoForm(f=>({...f,supplierName:s.name})); setShowAdd(true); }} className="px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30">New PO</button>
+                    <button onClick={()=>{ setSearch(s.name); setTab("purchase-orders"); }} className="px-3 py-1.5 rounded-lg border border-border bg-muted text-muted-foreground text-xs font-semibold hover-elevate">History</button>
                   </div>
                 </div>
               </div>
@@ -347,51 +347,53 @@ export default function PurchaseProcurement() {
       {tab==="invoices"&&(
         <div className="space-y-3">
           {overdueCount>0&&(
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-400 shrink-0"/>
-              <p className="text-sm text-red-300">{overdueCount} invoice{overdueCount>1?"s":""} overdue. Please process payment immediately.</p>
+            <div className="bg-danger-subtle border border-danger-border rounded-lg p-4 flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-danger shrink-0"/>
+              <p className="text-sm text-danger">{overdueCount} invoice{overdueCount>1?"s":""} overdue. Please process payment immediately.</p>
             </div>
           )}
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-white/30 border-b border-white/5">
-                {["Invoice No.","PO Ref","Supplier","Amount","GST","Due Date","Status","Action"].map(h=><th key={h} className="pb-3 pr-4 font-medium">{h}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {invoiceList.map(inv=>{
-                const cfg = invStatusCfg(inv.status);
-                return (
-                  <tr key={inv.id} onClick={()=>setDetailInvoice(inv)} title="Click for full invoice details" className={`cursor-pointer hover:bg-white/5 transition-all ${inv.status==="overdue"?"bg-red-500/3":""}`}>
-                    <td className="py-3 pr-4 font-mono text-xs text-amber-400">{inv.id}</td>
-                    <td className="py-3 pr-4 text-xs text-white/50">{inv.po}</td>
-                    <td className="py-3 pr-4 font-semibold">{inv.supplier}</td>
-                    <td className="py-3 pr-4 font-bold text-amber-400">₹{inv.amount.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-white/50">₹{inv.gst.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-white/60">{inv.dueDate}</td>
-                    <td className="py-3 pr-4"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span></td>
-                    <td className="py-3" onClick={e=>e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={()=>setDetailInvoice(inv)} title="View invoice" className="h-7 w-7 rounded-lg bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 flex items-center justify-center shrink-0"><Eye className="h-3.5 w-3.5"/></button>
-                        {inv.status!=="paid"&&<button onClick={()=>payInvoice(inv)} className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Pay Now</button>}
-                        {inv.status==="paid"&&<button onClick={()=>window.print()} className="px-3 py-1 rounded-lg border border-white/10 text-xs text-white/40 hover:bg-white/5">Receipt</button>}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  {["Invoice No.","PO Ref","Supplier","Amount","GST","Due Date","Status","Action"].map(h=><th key={h} className="pb-3 pr-4 font-medium">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {invoiceList.map(inv=>{
+                  const cfg = invStatusCfg(inv.status);
+                  return (
+                    <tr key={inv.id} onClick={()=>setDetailInvoice(inv)} title="Click for full invoice details" className={`cursor-pointer hover:bg-muted transition-colors ${inv.status==="overdue"?"bg-danger-subtle":""}`}>
+                      <td className="py-3 pr-4 font-mono text-xs text-primary">{inv.id}</td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">{inv.po}</td>
+                      <td className="py-3 pr-4 font-semibold">{inv.supplier}</td>
+                      <td className="py-3 pr-4 font-semibold text-primary">₹{inv.amount.toLocaleString()}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">₹{inv.gst.toLocaleString()}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{inv.dueDate}</td>
+                      <td className="py-3 pr-4"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span></td>
+                      <td className="py-3" onClick={e=>e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={()=>setDetailInvoice(inv)} title="View invoice" className="h-7 w-7 rounded-lg bg-info-subtle text-info hover-elevate flex items-center justify-center shrink-0"><Eye className="h-3.5 w-3.5"/></button>
+                          {inv.status!=="paid"&&<button onClick={()=>payInvoice(inv)} className="px-3 py-1 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate">Pay Now</button>}
+                          {inv.status==="paid"&&<button onClick={()=>window.print()} className="px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted">Receipt</button>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* PO Detail */}
       {selectedPO&&(
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-end" onClick={()=>setSelectedPO(null)}>
-          <div className="w-full max-w-md h-full bg-[#0e1520] border-l border-white/10 overflow-y-auto" onClick={e=>e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div><h3 className="font-extrabold">{selectedPO.id}</h3><p className="text-xs text-white/40">{selectedPO.supplier}</p></div>
-              <button onClick={()=>setSelectedPO(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-end" onClick={()=>setSelectedPO(null)}>
+          <div className="w-full max-w-md h-full bg-card border-l border-border overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div><h3 className="font-semibold">{selectedPO.id}</h3><p className="text-xs text-muted-foreground">{selectedPO.supplier}</p></div>
+              <button onClick={()=>setSelectedPO(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="p-5 space-y-5">
               <div className="grid grid-cols-2 gap-3">
@@ -403,39 +405,41 @@ export default function PurchaseProcurement() {
                   {label:"Invoice",value:selectedPO.invoiceNo},
                   {label:"Total",value:`₹${selectedPO.total.toLocaleString()}`},
                 ].map(r=>(
-                  <div key={r.label} className="bg-white/5 rounded-xl p-3">
-                    <p className="text-xs text-white/40">{r.label}</p>
+                  <div key={r.label} className="bg-muted rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">{r.label}</p>
                     <p className="text-sm font-semibold mt-0.5">{r.value}</p>
                   </div>
                 ))}
               </div>
 
               <div>
-                <p className="text-xs text-white/40 uppercase tracking-wide mb-3">Items Ordered</p>
-                <div className="rounded-xl border border-white/8 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-xs text-white/30 bg-white/5 border-b border-white/5">{["Item","Qty","Unit Price","Total"].map(h=><th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}</tr></thead>
-                    <tbody className="divide-y divide-white/5">
-                      {selectedPO.items.map((item,i)=>(
-                        <tr key={i} className="hover:bg-white/3">
-                          <td className="px-3 py-2.5 font-medium">{item.name}</td>
-                          <td className="px-3 py-2.5 text-white/60">{item.qty} {item.unit}</td>
-                          <td className="px-3 py-2.5 text-white/60">₹{Number(item.price || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2.5 font-bold text-amber-400">₹{Number(item.total || 0).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                      <tr className="bg-white/5"><td colSpan={3} className="px-3 py-2.5 font-bold">Total</td><td className="px-3 py-2.5 font-extrabold text-amber-400">₹{selectedPO.total.toLocaleString()}</td></tr>
-                    </tbody>
-                  </table>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Items Ordered</p>
+                <div className="rounded-lg border border-border">
+                  <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+                    <table className="w-full text-sm">
+                      <thead><tr className="text-xs text-muted-foreground bg-muted border-b border-border">{["Item","Qty","Unit Price","Total"].map(h=><th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}</tr></thead>
+                      <tbody className="divide-y divide-border">
+                        {selectedPO.items.map((item,i)=>(
+                          <tr key={i} className="hover:bg-muted">
+                            <td className="px-3 py-2.5 font-medium">{item.name}</td>
+                            <td className="px-3 py-2.5 text-muted-foreground">{item.qty} {item.unit}</td>
+                            <td className="px-3 py-2.5 text-muted-foreground">₹{Number(item.price || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2.5 font-semibold text-primary">₹{Number(item.total || 0).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-muted"><td colSpan={3} className="px-3 py-2.5 font-semibold">Total</td><td className="px-3 py-2.5 font-semibold text-primary">₹{selectedPO.total.toLocaleString()}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
               <div className="flex gap-2">
-                {selectedPO.status==="draft"&&<button onClick={()=>{updatePO(selectedPO.id,"pending");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-blue-500/20 text-blue-400 font-bold text-sm hover:bg-blue-500/30">Submit</button>}
-                {selectedPO.status==="pending"&&<button onClick={()=>{updatePO(selectedPO.id,"approved");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-sm hover:bg-emerald-500/30">Approve</button>}
-                {selectedPO.status==="approved"&&<button onClick={()=>{updatePO(selectedPO.id,"in-transit");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-violet-500/20 text-violet-400 font-bold text-sm hover:bg-violet-500/30">Mark Dispatched</button>}
-                {selectedPO.status==="in-transit"&&<button onClick={()=>{updatePO(selectedPO.id,"delivered");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-xl bg-teal-500/20 text-teal-400 font-bold text-sm hover:bg-teal-500/30">Mark Delivered</button>}
-                <button onClick={()=>window.print()} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold hover:bg-white/5">Print PO</button>
+                {selectedPO.status==="draft"&&<button onClick={()=>{updatePO(selectedPO.id,"pending");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-lg bg-info-subtle text-info font-semibold text-sm hover-elevate">Submit</button>}
+                {selectedPO.status==="pending"&&<button onClick={()=>{updatePO(selectedPO.id,"approved");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-lg bg-success-subtle text-success font-semibold text-sm hover-elevate">Approve</button>}
+                {selectedPO.status==="approved"&&<button onClick={()=>{updatePO(selectedPO.id,"in-transit");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground font-semibold text-sm hover-elevate">Mark Dispatched</button>}
+                {selectedPO.status==="in-transit"&&<button onClick={()=>{updatePO(selectedPO.id,"delivered");setSelectedPO(null);}} className="flex-1 py-2.5 rounded-lg bg-success-subtle text-success font-semibold text-sm hover-elevate">Mark Delivered</button>}
+                <button onClick={()=>window.print()} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold hover:bg-muted">Print PO</button>
               </div>
             </div>
           </div>
@@ -443,19 +447,19 @@ export default function PurchaseProcurement() {
       )}
 
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 p-5 space-y-4">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold">New Purchase Order</h3>
-              <button onClick={() => setShowAdd(false)}><X className="h-5 w-5 text-white/40" /></button>
+              <h3 className="font-semibold">New Purchase Order</h3>
+              <button onClick={() => setShowAdd(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
             </div>
-            <input placeholder="Supplier name" value={poForm.supplierName} onChange={e => setPoForm(p => ({ ...p, supplierName: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
-            <input placeholder="Item name" value={poForm.itemName} onChange={e => setPoForm(p => ({ ...p, itemName: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
+            <input placeholder="Supplier name" value={poForm.supplierName} onChange={e => setPoForm(p => ({ ...p, supplierName: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm" />
+            <input placeholder="Item name" value={poForm.itemName} onChange={e => setPoForm(p => ({ ...p, itemName: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm" />
             <div className="grid grid-cols-2 gap-3">
-              <input type="number" min={1} placeholder="Qty" value={poForm.qty} onChange={e => setPoForm(p => ({ ...p, qty: Number(e.target.value) }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
-              <input type="number" min={0} placeholder="Unit price ₹" value={poForm.unitPrice} onChange={e => setPoForm(p => ({ ...p, unitPrice: Number(e.target.value) }))} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm" />
+              <input type="number" min={1} placeholder="Qty" value={poForm.qty} onChange={e => setPoForm(p => ({ ...p, qty: Number(e.target.value) }))} className="bg-muted border border-border rounded-lg px-3 py-2 text-sm" />
+              <input type="number" min={0} placeholder="Unit price ₹" value={poForm.unitPrice} onChange={e => setPoForm(p => ({ ...p, unitPrice: Number(e.target.value) }))} className="bg-muted border border-border rounded-lg px-3 py-2 text-sm" />
             </div>
-            <button onClick={createPO} disabled={creatingPo || !poForm.supplierName || !poForm.itemName} className="w-full py-3 rounded-xl bg-amber-500 font-bold text-sm disabled:opacity-40">
+            <button onClick={createPO} disabled={creatingPo || !poForm.supplierName || !poForm.itemName} className="w-full py-3 rounded-lg bg-primary font-semibold text-sm disabled:opacity-40">
               {creatingPo ? "Creating…" : `Create PO — ₹${(poForm.qty * poForm.unitPrice).toLocaleString()}`}
             </button>
           </div>
@@ -474,7 +478,7 @@ export default function PurchaseProcurement() {
           ["Email", s.email || "—"],
           ["Payment terms", s.paymentTerms || "—"],
           ["Status", s.status === "inactive" ? "Inactive" : "Active"],
-          ["Rating", s.rating == null ? "Not rated" : `${s.rating}★`],
+          ["Rating", s.rating == null ? "Not rated" : String(s.rating)],
           ["Total orders", String(s.totalOrders)],
           ["Total spend", `₹${s.totalSpend.toLocaleString("en-IN")}`],
           ["Last order", s.lastOrderAt || "Never ordered"],
@@ -482,33 +486,33 @@ export default function PurchaseProcurement() {
           ["Credit used", `₹${s.creditUsed.toLocaleString("en-IN")}`],
         ];
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailSupplier(null)}>
-            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+          <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailSupplier(null)}>
+            <div className="w-full max-w-md bg-card rounded-lg border border-border text-foreground max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
                 <div className="min-w-0">
-                  <h3 className="font-bold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-xl bg-blue-500/15 flex items-center justify-center"><Building2 className="h-4 w-4 text-blue-400" /></span>{s.name}</h3>
-                  <p className="text-xs text-white/40 mt-0.5">{s.category} · {s.paymentTerms} credit</p>
+                  <h3 className="font-semibold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-lg bg-info-subtle flex items-center justify-center"><Building2 className="h-4 w-4 text-info" /></span>{s.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.category} · {s.paymentTerms} credit</p>
                 </div>
-                <button onClick={() => setDetailSupplier(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+                <button onClick={() => setDetailSupplier(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
               </div>
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {rows.map(([k, v]) => (
                     <div key={k}>
-                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-2xs text-muted-foreground">{k}</p>
                       <p className="text-sm font-medium break-all">{v}</p>
                     </div>
                   ))}
                 </div>
                 <div>
-                  <div className="flex justify-between text-xs mb-1"><span className="text-white/40">Credit Utilization</span><span className={creditPct > 80 ? "text-red-400" : "text-white/50"}>{creditPct}%</span></div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div className={`h-full rounded-full ${creditPct > 80 ? "bg-red-500" : creditPct > 60 ? "bg-yellow-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(creditPct, 100)}%` }} />
+                  <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Credit Utilization</span><span className={creditPct > 80 ? "text-danger" : "text-muted-foreground"}>{creditPct}%</span></div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div className={`h-full rounded-full ${creditPct > 80 ? "bg-danger" : creditPct > 60 ? "bg-warning" : "bg-success"}`} style={{ width: `${Math.min(creditPct, 100)}%` }} />
                   </div>
                 </div>
                 <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => { setPoForm(f => ({ ...f, supplierName: s.name })); setShowAdd(true); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-xl bg-amber-500/20 text-amber-300 text-sm font-bold hover:bg-amber-500/30">New PO</button>
-                  <button onClick={() => { setSearch(s.name); setTab("purchase-orders"); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">View POs</button>
+                  <button onClick={() => { setPoForm(f => ({ ...f, supplierName: s.name })); setShowAdd(true); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-lg bg-primary/20 text-primary text-sm font-semibold hover:bg-primary/30">New PO</button>
+                  <button onClick={() => { setSearch(s.name); setTab("purchase-orders"); setDetailSupplier(null); }} className="flex-1 py-2.5 rounded-lg border border-border text-muted-foreground text-sm font-semibold hover:bg-muted">View POs</button>
                 </div>
               </div>
             </div>
@@ -533,30 +537,30 @@ export default function PurchaseProcurement() {
           ["Paid on", inv.paidOn || "—"],
         ];
         return (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailInvoice(null)}>
-            <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+          <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDetailInvoice(null)}>
+            <div className="w-full max-w-md bg-card rounded-lg border border-border text-foreground max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-xl bg-amber-500/15 flex items-center justify-center"><FileText className="h-4 w-4 text-amber-400" /></span>{inv.id}</h3>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span>
+                    <h3 className="font-semibold text-base flex items-center gap-2"><span className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center"><FileText className="h-4 w-4 text-primary" /></span>{inv.id}</h3>
+                    <span className={`text-2xs font-semibold px-2 py-0.5 rounded-full capitalize ${cfg.bg} ${cfg.color}`}>{inv.status}</span>
                   </div>
-                  <p className="text-xs text-white/40 mt-0.5">{inv.supplier}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{inv.supplier}</p>
                 </div>
-                <button onClick={() => setDetailInvoice(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+                <button onClick={() => setDetailInvoice(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
               </div>
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {rows.map(([k, v]) => (
                     <div key={k}>
-                      <p className="text-[11px] text-white/35">{k}</p>
+                      <p className="text-2xs text-muted-foreground">{k}</p>
                       <p className="text-sm font-medium break-all capitalize">{v}</p>
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                  {inv.status !== "paid" && <button onClick={() => { payInvoice(inv); setDetailInvoice(null); }} className="flex-1 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 text-sm font-bold hover:bg-emerald-500/30">Pay Now</button>}
-                  <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/5">Print / Receipt</button>
+                  {inv.status !== "paid" && <button onClick={() => { payInvoice(inv); setDetailInvoice(null); }} className="flex-1 py-2.5 rounded-lg bg-success-subtle text-success text-sm font-semibold hover-elevate">Pay Now</button>}
+                  <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-lg border border-border text-muted-foreground text-sm font-semibold hover:bg-muted">Print / Receipt</button>
                 </div>
               </div>
             </div>

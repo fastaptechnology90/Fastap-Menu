@@ -13,11 +13,11 @@ interface StaffMember { id: string; name: string; role: StaffRole; email: string
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_SHIFTS = ["Morning", "Afternoon", "Night", "Split", "Off"];
 const SHIFT_STYLE: Record<string, string> = {
-  Morning: "text-amber-400 bg-amber-500/10",
-  Afternoon: "text-cyan-400 bg-cyan-500/10",
-  Night: "text-violet-400 bg-violet-500/10",
-  Split: "text-emerald-400 bg-emerald-500/10",
-  Off: "text-white/25 bg-white/5",
+  Morning: "text-primary bg-primary/10",
+  Afternoon: "text-info bg-info-subtle",
+  Night: "text-muted-foreground bg-muted",
+  Split: "text-success bg-success-subtle",
+  Off: "text-muted-foreground bg-muted",
 };
 // When a day has no explicit setting, derive a sensible default from the base shift
 // (Sunday is the weekly off for everyone except waiters).
@@ -33,25 +33,25 @@ function buildWeekly(s: StaffMember): Record<string, string> {
 }
 import {
   Plus, Search, Phone, Mail, Star, Clock, Shield, Edit2, X, Save,
-  CheckCircle, AlertCircle, TrendingUp, Trash2
-} from "lucide-react";
+  CheckCircle, AlertCircle, TrendingUp, Trash2, Crown, Building2, CreditCard, UtensilsCrossed, ChefHat, Brush, ConciergeBell, Flower2, Martini, ChartColumn, Users, Store, User, CircleCheck, Coffee, Receipt } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const ROLE_CONFIG: Record<StaffRole, { label: string; icon: string; color: string }> = {
-  owner:        { label: "Owner",          icon: "👑", color: "text-yellow-400" },
-  manager:      { label: "Manager",        icon: "🏢", color: "text-violet-400" },
-  cashier:      { label: "Cashier",        icon: "💳", color: "text-blue-400" },
-  waiter:       { label: "Waiter",         icon: "🍽️", color: "text-orange-400" },
-  kitchen:      { label: "Kitchen Staff",  icon: "🍳", color: "text-amber-400" },
-  chef:         { label: "Chef",           icon: "👨‍🍳", color: "text-amber-400" },
-  housekeeping: { label: "Housekeeping",   icon: "🧹", color: "text-teal-400" },
-  reception:    { label: "Reception",      icon: "🛎️", color: "text-pink-400" },
-  spa:          { label: "Spa Staff",      icon: "💆", color: "text-rose-400" },
-  bar:          { label: "Bar Staff",      icon: "🍹", color: "text-indigo-400" },
-  finance:      { label: "Finance",        icon: "📊", color: "text-green-400" },
-  hr:           { label: "HR",             icon: "👥", color: "text-cyan-400" },
-  franchise:    { label: "Franchise",      icon: "🏪", color: "text-purple-400" },
+const ROLE_CONFIG: Record<StaffRole, { label: string; icon: LucideIcon; color: string }> = {
+  owner:        { label: "Owner",          icon: Crown, color: "text-warning" },
+  manager:      { label: "Manager",        icon: Building2, color: "text-muted-foreground" },
+  cashier:      { label: "Cashier",        icon: CreditCard, color: "text-info" },
+  waiter:       { label: "Waiter",         icon: UtensilsCrossed, color: "text-warning" },
+  kitchen:      { label: "Kitchen Staff",  icon: ChefHat, color: "text-primary" },
+  chef:         { label: "Chef",           icon: ChefHat, color: "text-primary" },
+  housekeeping: { label: "Housekeeping",   icon: Brush, color: "text-success" },
+  reception:    { label: "Reception",      icon: ConciergeBell, color: "text-muted-foreground" },
+  spa:          { label: "Spa Staff",      icon: Flower2, color: "text-danger" },
+  bar:          { label: "Bar Staff",      icon: Martini, color: "text-info" },
+  finance:      { label: "Finance",        icon: ChartColumn, color: "text-success" },
+  hr:           { label: "HR",             icon: Users, color: "text-info" },
+  franchise:    { label: "Franchise",      icon: Store, color: "text-muted-foreground" },
 };
-const DEFAULT_ROLE_CFG = { label: "Staff", icon: "👤", color: "text-white/60" };
+const DEFAULT_ROLE_CFG = { label: "Staff", icon: User, color: "text-muted-foreground" };
 const roleCfgOf = (r: StaffRole) => ROLE_CONFIG[r] ?? DEFAULT_ROLE_CFG;
 
 export default function StaffManagement() {
@@ -213,12 +213,12 @@ export default function StaffManagement() {
   return (
     <div className="p-4 lg:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Staff Management</h1>
-          <p className="text-xs text-white/40">{staff.filter(s => s.status === "active").length} active · {staff.filter(s => s.status === "on-break").length} on break · {staff.filter(s => s.status === "offline").length} offline</p>
+          <h1 className="text-xl font-semibold">Staff Management</h1>
+          <p className="text-xs text-muted-foreground">{staff.filter(s => s.status === "active").length} active · {staff.filter(s => s.status === "on-break").length} on break · {staff.filter(s => s.status === "offline").length} offline</p>
         </div>
-        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors">
           <Plus className="h-4 w-4" /> Add Staff
         </button>
       </div>
@@ -226,23 +226,23 @@ export default function StaffManagement() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Staff", value: staff.length, icon: "👥", color: "text-blue-400", bg: "from-blue-500/15" },
-          { label: "On Duty", value: staff.filter(s => s.status === "active").length, icon: "✅", color: "text-emerald-400", bg: "from-emerald-500/15" },
-          { label: "On Break", value: staff.filter(s => s.status === "on-break").length, icon: "☕", color: "text-yellow-400", bg: "from-yellow-500/15" },
-          { label: "Orders Served", value: staff.reduce((s, m) => s + m.ordersServed, 0), icon: "🧾", color: "text-amber-400", bg: "from-amber-500/15" },
+          { label: "Total Staff", value: staff.length, icon: Users, color: "text-info", bg: "bg-info-subtle/40" },
+          { label: "On Duty", value: staff.filter(s => s.status === "active").length, icon: CircleCheck, color: "text-success", bg: "bg-success-subtle/40" },
+          { label: "On Break", value: staff.filter(s => s.status === "on-break").length, icon: Coffee, color: "text-warning", bg: "bg-warning-subtle/40" },
+          { label: "Orders Served", value: staff.reduce((s, m) => s + m.ordersServed, 0), icon: Receipt, color: "text-primary", bg: "bg-primary/10" },
         ].map(card => (
-          <div key={card.label} className={`rounded-2xl bg-gradient-to-br ${card.bg} to-transparent border border-white/8 p-4`}>
-            <div className="text-2xl mb-1">{card.icon}</div>
-            <p className={`text-2xl font-extrabold ${card.color}`}>{card.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{card.label}</p>
+          <div key={card.label} className={`rounded-lg ${card.bg} border border-border p-4`}>
+            <card.icon className={`h-5 w-5 mb-2 ${card.color}`} />
+            <p className={`text-2xl font-semibold ${card.color}`}>{card.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{card.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {(["list", "schedule", "attendance"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${activeTab === tab ? "bg-amber-500 text-white" : "text-white/50 hover:text-white"}`}>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             {tab}
           </button>
         ))}
@@ -254,27 +254,27 @@ export default function StaffManagement() {
           {/* Filters */}
           <div className="flex gap-2 flex-wrap">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-              <input className="bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30 w-56" placeholder="Search staff..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input className="bg-muted border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground w-56" placeholder="Search staff..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <select className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40 text-white" value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}>
+            <select className="bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40 text-foreground" value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}>
               <option value="all">All Roles</option>
-              {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+              {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
             {(["all", "active", "on-break", "offline"] as const).map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${statusFilter === s ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
-                {s === "all" ? "All" : s === "active" ? "🟢 Active" : s === "on-break" ? "🟡 Break" : "⚫ Offline"}
+              <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${statusFilter === s ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                {s === "all" ? "All" : s === "active" ? "Active" : s === "on-break" ? "Break" : "Offline"}
               </button>
             ))}
           </div>
 
           {loadError && (
-            <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-4 flex items-center justify-between gap-3">
+            <div role="alert" className="rounded-lg border border-danger-border bg-danger-subtle p-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-red-200">We could not load your team.</p>
-                <p className="text-xs text-red-200/70">{loadError} This is not an empty roster.</p>
+                <p className="text-sm font-semibold text-danger">We could not load your team.</p>
+                <p className="text-xs text-danger">{loadError} This is not an empty roster.</p>
               </div>
-              <button onClick={loadStaff} className="shrink-0 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+              <button onClick={loadStaff} className="shrink-0 px-3 py-1.5 rounded-lg bg-danger-subtle text-danger text-xs font-semibold">Try again</button>
             </div>
           )}
 
@@ -290,35 +290,35 @@ export default function StaffManagement() {
             {filtered.map(member => {
               const roleCfg = roleCfgOf(member.role);
               return (
-                <div key={member.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 hover:border-amber-500/20 transition-all cursor-pointer" onClick={() => setSelected(member)}>
+                <div key={member.id} className="rounded-lg border border-border bg-card p-4 hover:border-primary/20 transition-colors cursor-pointer" onClick={() => setSelected(member)}>
                   <div className="flex items-start gap-3 mb-3">
                     <div className="relative">
-                      <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
-                        {roleCfg.icon}
+                      <div className={`h-12 w-12 rounded-lg bg-muted flex items-center justify-center ${roleCfg.color}`}>
+                        <roleCfg.icon className="h-6 w-6" />
                       </div>
-                      <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#0b1120] ${member.status === "active" ? "bg-emerald-400" : member.status === "on-break" ? "bg-yellow-400" : "bg-white/20"}`} />
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background ${member.status === "active" ? "bg-success" : member.status === "on-break" ? "bg-warning" : "bg-muted"}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold">{member.name}</p>
                       <p className={`text-xs font-medium ${roleCfg.color}`}>{roleCfg.label}</p>
-                      <p className="text-xs text-white/30 mt-0.5">Since {new Date(member.joinDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Since {new Date(member.joinDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${member.status === "active" ? "bg-emerald-500/20 text-emerald-400" : member.status === "on-break" ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10 text-white/30"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${member.status === "active" ? "bg-success-subtle text-success" : member.status === "on-break" ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground"}`}>
                       {member.status === "on-break" ? "On Break" : member.status}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs text-white/50 mb-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
                     <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /><span className="truncate">{member.email}</span></div>
                     <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /><span>{member.mobile}</span></div>
                     <div className="flex items-center gap-1.5"><Clock className="h-3 w-3" /><span>{member.shift} Shift</span></div>
-                    <div className="flex items-center gap-1.5"><Star className="h-3 w-3 text-yellow-400" /><span>{member.ordersServed > 0 ? `${member.ordersServed} orders · ${fmtINR(member.salesTotal)}` : "No orders yet"}</span></div>
+                    <div className="flex items-center gap-1.5"><Star className="h-3 w-3 text-warning" /><span>{member.ordersServed > 0 ? `${member.ordersServed} orders · ${fmtINR(member.salesTotal)}` : "No orders yet"}</span></div>
                   </div>
 
                   {/* Share of the busiest person's takings — a relative bar, not a score. */}
                   <div>
-                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${topSales > 0 ? Math.round((member.salesTotal / topSales) * 100) : 0}%` }} />
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary transition-colors" style={{ width: `${topSales > 0 ? Math.round((member.salesTotal / topSales) * 100) : 0}%` }} />
                     </div>
                   </div>
                 </div>
@@ -332,13 +332,14 @@ export default function StaffManagement() {
       {activeTab === "schedule" && (
         <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-white/40 flex items-center gap-1">Day-wise roster. Click the <Edit2 className="h-3 w-3 inline text-amber-400" /> pencil next to any staff member to set a different shift per day (e.g. Monday Night).</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">Day-wise roster. Click the <Edit2 className="h-3 w-3 inline text-primary" /> pencil next to any staff member to set a different shift per day (e.g. Monday Night).</p>
           <div className="flex items-center gap-2 flex-wrap">
-            {DAY_SHIFTS.map(sh => <span key={sh} className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh]}`}>{sh}</span>)}
+            {DAY_SHIFTS.map(sh => <span key={sh} className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh]}`}>{sh}</span>)}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/8 overflow-hidden">
-          <div className="grid grid-cols-8 text-xs text-white/40 border-b border-white/5 bg-white/[0.02]">
+        <div className="min-w-0 rounded-lg border border-border">
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+          <div className="grid min-w-[640px] grid-cols-8 text-xs text-muted-foreground border-b border-border bg-card">
             <div className="px-4 py-3 font-medium">Staff</div>
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
               <div key={d} className="px-2 py-3 font-medium text-center">{d}</div>
@@ -347,14 +348,14 @@ export default function StaffManagement() {
           {staff.map(s => {
             const roleCfg = roleCfgOf(s.role);
             return (
-              <div key={s.id} className="grid grid-cols-8 border-b border-white/5 hover:bg-white/3 transition-all">
+              <div key={s.id} className="grid min-w-[640px] grid-cols-8 border-b border-border hover-elevate transition-colors">
                 <div className="px-4 py-3 flex items-center gap-2">
-                  <span className="text-base">{roleCfg.icon}</span>
+                  <roleCfg.icon className={`h-4 w-4 shrink-0 ${roleCfg.color}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{s.name.split(" ")[0]}</p>
-                    <p className="text-xs text-white/30">{roleCfg.label}</p>
+                    <p className="text-xs text-muted-foreground">{roleCfg.label}</p>
                   </div>
-                  <button onClick={() => openEditFor(s)} title="Edit shift / schedule" className="shrink-0 h-7 w-7 flex items-center justify-center rounded-lg text-amber-400 hover:bg-amber-500/15 transition-all">
+                  <button onClick={() => openEditFor(s)} title="Edit shift / schedule" className="shrink-0 h-7 w-7 flex items-center justify-center rounded-lg text-primary hover:bg-primary/15 transition-colors">
                     <Edit2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -362,13 +363,14 @@ export default function StaffManagement() {
                   const sh = wk[d];
                   return (
                     <div key={d} className="px-1 py-3 flex items-center justify-center">
-                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh] || "text-amber-400 bg-amber-500/10"}`}>{sh}</span>
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${SHIFT_STYLE[sh] || "text-primary bg-primary/10"}`}>{sh}</span>
                     </div>
                   );
                 }); })()}
               </div>
             );
           })}
+          </div>
         </div>
         </div>
       )}
@@ -380,11 +382,11 @@ export default function StaffManagement() {
 
       {/* Add Staff Modal */}
       {addMode && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 p-5 space-y-4">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold">Add Staff Member</h3>
-              <button onClick={() => setAddMode(false)}><X className="h-5 w-5 text-white/40" /></button>
+              <h3 className="font-semibold">Add Staff Member</h3>
+              <button onClick={() => setAddMode(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
             </div>
             {[
               { key: "name", label: "Full Name", type: "text" },
@@ -393,22 +395,22 @@ export default function StaffManagement() {
               { key: "password", label: "Login Password", type: "password" },
             ].map(f => (
               <div key={f.key}>
-                <label className="text-xs text-white/40">{f.label}</label>
+                <label className="text-xs text-muted-foreground">{f.label}</label>
                 <input
                   type={f.type}
                   value={(addForm as any)[f.key]}
                   onChange={e => setAddForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40"
+                  className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40"
                 />
               </div>
             ))}
             <div>
-              <label className="text-xs text-white/40">Role</label>
-              <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+              <label className="text-xs text-muted-foreground">Role</label>
+              <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
                 {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
-            <button onClick={submitAddStaff} disabled={saving || !addForm.name || !addForm.email || addForm.password.length < 6} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm disabled:opacity-40">
+            <button onClick={submitAddStaff} disabled={saving || !addForm.name || !addForm.email || addForm.password.length < 6} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-40">
               {saving ? "Creating…" : "Create Staff"}
             </button>
           </div>
@@ -417,21 +419,21 @@ export default function StaffManagement() {
 
       {/* Staff Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <h3 className="font-bold">Staff Profile</h3>
-              <button onClick={() => setSelected(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold">Staff Profile</h3>
+              <button onClick={() => setSelected(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center text-3xl">
-                  {roleCfgOf(selected.role).icon}
+                <div className={`h-16 w-16 rounded-lg bg-muted flex items-center justify-center ${roleCfgOf(selected.role).color}`}>
+                  {(() => { const RoleIcon = roleCfgOf(selected.role).icon; return <RoleIcon className="h-8 w-8" />; })()}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">{selected.name}</h2>
+                  <h2 className="text-xl font-semibold">{selected.name}</h2>
                   <p className={`font-semibold ${roleCfgOf(selected.role).color}`}>{roleCfgOf(selected.role).label}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${selected.status === "active" ? "bg-emerald-500/20 text-emerald-400" : selected.status === "on-break" ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10 text-white/30"}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${selected.status === "active" ? "bg-success-subtle text-success" : selected.status === "on-break" ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground"}`}>
                     {selected.status}
                   </span>
                 </div>
@@ -440,36 +442,36 @@ export default function StaffManagement() {
                 ["Email", selected.email], ["Mobile", selected.mobile],
                 ["Shift", selected.shift], ["Join Date", new Date(selected.joinDate).toLocaleDateString("en-IN")],
               ].map(([l, v]) => (
-                <div key={l} className="flex justify-between py-2 border-b border-white/5">
-                  <span className="text-xs text-white/40">{l}</span>
-                  <span className="text-sm text-white/80">{v}</span>
+                <div key={l} className="flex justify-between py-2 border-b border-border">
+                  <span className="text-xs text-muted-foreground">{l}</span>
+                  <span className="text-sm text-foreground">{v}</span>
                 </div>
               ))}
               <div>
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-white/40">Sales on this floor</span>
-                  <span className="text-amber-400 font-bold">{selected.ordersServed > 0 ? `${selected.ordersServed} orders · ${fmtINR(selected.salesTotal)}` : "No orders yet"}</span>
+                  <span className="text-muted-foreground">Sales on this floor</span>
+                  <span className="text-primary font-semibold">{selected.ordersServed > 0 ? `${selected.ordersServed} orders · ${fmtINR(selected.salesTotal)}` : "No orders yet"}</span>
                 </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${topSales > 0 ? Math.round((selected.salesTotal / topSales) * 100) : 0}%` }} />
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-colors" style={{ width: `${topSales > 0 ? Math.round((selected.salesTotal / topSales) * 100) : 0}%` }} />
                 </div>
               </div>
               {selected.tablesAssigned && selected.tablesAssigned.length > 0 && (
                 <div>
-                  <p className="text-xs text-white/40 mb-2">Assigned Tables</p>
+                  <p className="text-xs text-muted-foreground mb-2">Assigned Tables</p>
                   <div className="flex gap-2 flex-wrap">
                     {selected.tablesAssigned.map(t => (
-                      <span key={t} className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-sm font-semibold">{t}</span>
+                      <span key={t} className="px-3 py-1 rounded-lg bg-primary/20 text-primary text-sm font-semibold">{t}</span>
                     ))}
                   </div>
                 </div>
               )}
               <div className="flex gap-2">
-                <button onClick={deleteStaff} disabled={deleting} className="py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40" title="Remove staff">
+                <button onClick={deleteStaff} disabled={deleting} className="py-3 px-4 rounded-lg border border-danger-border bg-danger-subtle text-danger hover-elevate text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40" title="Remove staff">
                   <Trash2 className="h-4 w-4" /> {deleting ? "Removing…" : "Remove"}
                 </button>
-                <button onClick={() => setSelected(null)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Close</button>
-                <button onClick={openEditStaff} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold flex items-center justify-center gap-2">
+                <button onClick={() => setSelected(null)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Close</button>
+                <button onClick={openEditStaff} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold flex items-center justify-center gap-2">
                   <Edit2 className="h-4 w-4" /> Edit Profile
                 </button>
               </div>
@@ -480,11 +482,11 @@ export default function StaffManagement() {
 
       {/* Edit Staff Modal */}
       {editMode && selected && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Edit2 className="h-4 w-4" /> Edit {selected.name}</h3>
-              <button onClick={() => setEditMode(false)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              <h3 className="font-semibold flex items-center gap-2"><Edit2 className="h-4 w-4" /> Edit {selected.name}</h3>
+              <button onClick={() => setEditMode(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             {[
               { key: "name", label: "Full Name", type: "text" },
@@ -493,61 +495,61 @@ export default function StaffManagement() {
               { key: "password", label: "New Password (leave blank to keep current)", type: "password" },
             ].map(f => (
               <div key={f.key}>
-                <label className="text-xs text-white/40">{f.label}</label>
+                <label className="text-xs text-muted-foreground">{f.label}</label>
                 <input
                   type={f.type}
                   value={(editForm as any)[f.key]}
                   onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500/40"
+                  className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40"
                 />
               </div>
             ))}
             <div>
-              <label className="text-xs text-white/40">Role</label>
-              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+              <label className="text-xs text-muted-foreground">Role</label>
+              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
                 {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-white/40">Shift (by time)</label>
-              <select value={editForm.shift} onChange={e => setEditForm(p => ({ ...p, shift: e.target.value }))} className="w-full mt-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm">
+              <label className="text-xs text-muted-foreground">Shift (by time)</label>
+              <select value={editForm.shift} onChange={e => setEditForm(p => ({ ...p, shift: e.target.value }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
                 {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
                 {/* keep whatever was stored even if it's an old plain label */}
                 {editForm.shift && !SHIFTS.includes(editForm.shift) && <option value={editForm.shift}>{editForm.shift}</option>}
               </select>
-              <p className="text-[10px] text-white/30 mt-1">This is the base / default shift — used when a day has no specific setting.</p>
+              <p className="text-2xs text-muted-foreground mt-1">This is the base / default shift — used when a day has no specific setting.</p>
             </div>
             <div>
-              <label className="text-xs text-white/40">Weekly schedule (day-wise)</label>
-              <p className="text-[10px] text-white/30 mb-1.5">Set a different shift for each day — e.g. Monday Night, Tuesday Morning. "Off" means a day off.</p>
+              <label className="text-xs text-muted-foreground">Weekly schedule (day-wise)</label>
+              <p className="text-2xs text-muted-foreground mb-1.5">Set a different shift for each day — e.g. Monday Night, Tuesday Morning. "Off" means a day off.</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {DAYS.map(d => (
-                  <div key={d} className="flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-lg px-2 py-1.5">
-                    <span className="text-xs font-semibold text-white/60 w-8 shrink-0">{d}</span>
+                  <div key={d} className="flex items-center gap-2 bg-card border border-border rounded-lg px-2 py-1.5">
+                    <span className="text-xs font-semibold text-muted-foreground w-8 shrink-0">{d}</span>
                     <select
                       value={editForm.weeklySchedule[d] || defaultDayShift({ shift: editForm.shift, role: editForm.role }, d)}
                       onChange={e => setEditForm(p => ({ ...p, weeklySchedule: { ...p.weeklySchedule, [d]: e.target.value } }))}
-                      className={`flex-1 min-w-0 bg-transparent border border-white/10 rounded-md px-1.5 py-1 text-xs font-semibold focus:outline-none ${SHIFT_STYLE[editForm.weeklySchedule[d]] || "text-white/70"}`}
+                      className={`flex-1 min-w-0 bg-transparent border border-border rounded-md px-1.5 py-1 text-xs font-semibold focus:outline-none ${SHIFT_STYLE[editForm.weeklySchedule[d]] || "text-foreground"}`}
                     >
-                      {DAY_SHIFTS.map(sh => <option key={sh} value={sh} className="bg-[#111827] text-white">{sh}</option>)}
+                      {DAY_SHIFTS.map(sh => <option key={sh} value={sh} className="bg-card text-foreground">{sh}</option>)}
                     </select>
                   </div>
                 ))}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, (p.shift || "Morning").split(" ")[0]])) }))} className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-white/50 hover:bg-white/5">All days base shift</button>
-                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, d === "Sun" ? "Off" : (p.shift || "Morning").split(" ")[0]])) }))} className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-white/50 hover:bg-white/5">Sunday Off</button>
+                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, (p.shift || "Morning").split(" ")[0]])) }))} className="text-2xs px-2 py-1 rounded-lg border border-border text-muted-foreground hover:bg-muted">All days base shift</button>
+                <button type="button" onClick={() => setEditForm(p => ({ ...p, weeklySchedule: Object.fromEntries(DAYS.map(d => [d, d === "Sun" ? "Off" : (p.shift || "Morning").split(" ")[0]])) }))} className="text-2xs px-2 py-1 rounded-lg border border-border text-muted-foreground hover:bg-muted">Sunday Off</button>
               </div>
             </div>
             <div>
-              <label className="text-xs text-white/40">Status</label>
+              <label className="text-xs text-muted-foreground">Status</label>
               <div className="flex gap-2 mt-1">
-                {[{ v: true, l: "🟢 Active" }, { v: false, l: "⚫ Offline" }].map(o => (
-                  <button key={String(o.v)} onClick={() => setEditForm(p => ({ ...p, active: o.v }))} className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${editForm.active === o.v ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>{o.l}</button>
+                {[{ v: true, l: "Active" }, { v: false, l: "Offline" }].map(o => (
+                  <button key={String(o.v)} onClick={() => setEditForm(p => ({ ...p, active: o.v }))} className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${editForm.active === o.v ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>{o.l}</button>
                 ))}
               </div>
             </div>
-            <button onClick={submitEditStaff} disabled={editSaving || !editForm.name || !editForm.email || (editForm.password.length > 0 && editForm.password.length < 6)} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40">
+            <button onClick={submitEditStaff} disabled={editSaving || !editForm.name || !editForm.email || (editForm.password.length > 0 && editForm.password.length < 6)} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40">
               <Save className="h-4 w-4" /> {editSaving ? "Saving…" : "Save Changes"}
             </button>
           </div>

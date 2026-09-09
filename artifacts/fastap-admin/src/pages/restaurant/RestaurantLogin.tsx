@@ -6,6 +6,7 @@ import { Icon } from "@/components/shared/Icon";
 import { PanelLogo } from "@/components/shared/PanelLogo";
 import { ForgotPasswordModal } from "@/components/shared/ForgotPasswordModal";
 import { IMAGES } from "@/lib/media";
+import { ArrowLeft } from "lucide-react";
 import {
   RESTAURANT_LOGIN_ROLES,
   defaultPathForRole,
@@ -15,22 +16,22 @@ type LoginMethod = "password" | "otp";
 
 // Country dial codes for the phone/OTP login. `len` = expected national number length
 // (used for light validation; 0 = flexible).
-const COUNTRY_CODES: { code: string; flag: string; name: string; len: number }[] = [
-  { code: "+91", flag: "🇮🇳", name: "India", len: 10 },
-  { code: "+971", flag: "🇦🇪", name: "UAE", len: 9 },
-  { code: "+966", flag: "🇸🇦", name: "Saudi Arabia", len: 9 },
-  { code: "+1", flag: "🇺🇸", name: "USA / Canada", len: 10 },
-  { code: "+44", flag: "🇬🇧", name: "UK", len: 10 },
-  { code: "+65", flag: "🇸🇬", name: "Singapore", len: 8 },
-  { code: "+61", flag: "🇦🇺", name: "Australia", len: 9 },
-  { code: "+92", flag: "🇵🇰", name: "Pakistan", len: 10 },
-  { code: "+880", flag: "🇧🇩", name: "Bangladesh", len: 10 },
-  { code: "+977", flag: "🇳🇵", name: "Nepal", len: 10 },
-  { code: "+94", flag: "🇱🇰", name: "Sri Lanka", len: 9 },
-  { code: "+49", flag: "🇩🇪", name: "Germany", len: 0 },
-  { code: "+33", flag: "🇫🇷", name: "France", len: 9 },
-  { code: "+81", flag: "🇯🇵", name: "Japan", len: 0 },
-  { code: "+86", flag: "🇨🇳", name: "China", len: 11 },
+const COUNTRY_CODES: { code: string; iso: string; name: string; len: number }[] = [
+  { code: "+91", iso: "IN", name: "India", len: 10 },
+  { code: "+971", iso: "AE", name: "UAE", len: 9 },
+  { code: "+966", iso: "SA", name: "Saudi Arabia", len: 9 },
+  { code: "+1", iso: "US", name: "USA / Canada", len: 10 },
+  { code: "+44", iso: "GB", name: "UK", len: 10 },
+  { code: "+65", iso: "SG", name: "Singapore", len: 8 },
+  { code: "+61", iso: "AU", name: "Australia", len: 9 },
+  { code: "+92", iso: "PK", name: "Pakistan", len: 10 },
+  { code: "+880", iso: "BD", name: "Bangladesh", len: 10 },
+  { code: "+977", iso: "NP", name: "Nepal", len: 10 },
+  { code: "+94", iso: "LK", name: "Sri Lanka", len: 9 },
+  { code: "+49", iso: "DE", name: "Germany", len: 0 },
+  { code: "+33", iso: "FR", name: "France", len: 9 },
+  { code: "+81", iso: "JP", name: "Japan", len: 0 },
+  { code: "+86", iso: "CN", name: "China", len: 11 },
 ];
 
 interface VenueOption {
@@ -178,13 +179,13 @@ export default function RestaurantLogin() {
         <div className="absolute inset-0 bg-gradient-to-t from-[hsl(222,47%,5%)] via-[hsl(222,47%,5%)]/80 to-transparent" />
         <div className="relative p-12 flex flex-col justify-end">
           <PanelLogo panel="restaurant" size="lg" showLabel label="FastMenu" />
-          <h2 className="font-display text-3xl font-bold mt-8 mb-3">Restaurant Manager Portal</h2>
-          <p className="text-white/55 max-w-md mb-6">12 staff roles — owner, manager, cashier, waiter, kitchen, reception, finance, and more. Each role sees only what they need.</p>
+          <h2 className="font-display text-3xl font-semibold mt-8 mb-3">Restaurant Manager Portal</h2>
+          <p className="text-muted-foreground max-w-md mb-6">12 staff roles — owner, manager, cashier, waiter, kitchen, reception, finance, and more. Each role sees only what they need.</p>
           <div className="flex flex-wrap gap-2">
             {RESTAURANT_LOGIN_ROLES.slice(0, 6).map(r => (
-              <span key={r.role} className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/10">{r.icon} {r.label}</span>
+              <span key={r.role} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border">{r.icon} {r.label}</span>
             ))}
-            <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-white/40">+6 more</span>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">+6 more</span>
           </div>
         </div>
       </div>
@@ -193,32 +194,32 @@ export default function RestaurantLogin() {
         <div className="w-full max-w-lg">
           <div className="text-center mb-6 lg:hidden">
             <div className="flex justify-center mb-4"><PanelLogo panel="restaurant" size="lg" /></div>
-            <h1 className="font-display text-2xl font-extrabold">Staff Login</h1>
-            <p className="text-sm text-white/40 mt-1">Select your role, then sign in</p>
+            <h1 className="font-display text-2xl font-semibold">Staff Login</h1>
+            <p className="text-sm text-muted-foreground mt-1">Select your role, then sign in</p>
           </div>
 
           {/* Role picker */}
           <div className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-400/90 mb-2">Select your role</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Select your role</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1">
               {RESTAURANT_LOGIN_ROLES.map(opt => (
                 <button
                   key={opt.role}
                   type="button"
                   onClick={() => pickRole(opt.role)}
-                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border text-center transition-colors ${
                     selectedRole === opt.role
-                      ? "border-amber-500/60 bg-amber-500/15 shadow-lg shadow-amber-500/10 scale-[1.02]"
-                      : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/8"
+                      ? "border-primary/60 bg-primary/15"
+                      : "border-border bg-muted hover:border-border hover-elevate"
                   }`}
                 >
                   <span className="text-xl leading-none">{opt.icon}</span>
-                  <span className="text-[10px] sm:text-xs font-semibold text-white/90 leading-tight">{opt.label}</span>
+                  <span className="text-2xs sm:text-xs font-semibold text-foreground leading-tight">{opt.label}</span>
                 </button>
               ))}
             </div>
             {activeRole && (
-              <p className="text-xs text-white/45 mt-2 text-center">
+              <p className="text-xs text-muted-foreground mt-2 text-center">
                 {activeRole.description}
               </p>
             )}
@@ -226,36 +227,36 @@ export default function RestaurantLogin() {
 
           {venueOptions && venueOptions.length > 0 && (
             <div className="mb-4 space-y-2">
-              <p className="text-xs text-amber-400 font-semibold uppercase">Select your restaurant</p>
+              <p className="text-xs text-primary font-semibold uppercase">Select your restaurant</p>
               {venueOptions.map(v => (
                 <button
                   key={v.id}
                   type="button"
                   onClick={() => { setSelectedRestaurantId(v.id); setVenueOptions(null); setError(""); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${selectedRestaurantId === v.id ? "border-amber-500/50 bg-amber-500/15" : "border-white/10 bg-white/5 hover:border-white/20"}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors ${selectedRestaurantId === v.id ? "border-primary/50 bg-primary/15" : "border-border bg-muted hover:border-border"}`}
                 >
-                  <Icon name="restaurant" size={20} className="text-amber-400" />
+                  <Icon name="restaurant" size={20} className="text-primary" />
                   <div>
-                    <p className="text-sm font-semibold text-white">{v.name}</p>
-                    {v.address && <p className="text-xs text-white/40">{v.address}</p>}
+                    <p className="text-sm font-semibold text-foreground">{v.name}</p>
+                    {v.address && <p className="text-xs text-muted-foreground">{v.address}</p>}
                   </div>
                 </button>
               ))}
             </div>
           )}
 
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl mb-4">
+          <div className="flex gap-1 bg-muted p-1 rounded-lg mb-4">
             <button
               type="button"
               onClick={() => { setLoginMethod("password"); setStep("form"); setError(""); pickRole(selectedRole); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${loginMethod === "password" ? "bg-amber-500 text-white" : "text-white/50 hover:text-white"}`}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${loginMethod === "password" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Email & Password
             </button>
             <button
               type="button"
               onClick={() => { setLoginMethod("otp"); setStep("form"); setError(""); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${loginMethod === "otp" ? "bg-amber-500 text-white" : "text-white/50 hover:text-white"}`}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${loginMethod === "otp" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Mobile OTP
             </button>
@@ -264,7 +265,7 @@ export default function RestaurantLogin() {
           {step === "form" && loginMethod === "password" && (
             <div className="space-y-3">
               <input
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
+                className="w-full bg-muted border border-border rounded-lg px-4 py-3.5 text-sm focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground"
                 placeholder="Staff email address"
                 type="email"
                 autoComplete="email"
@@ -273,14 +274,14 @@ export default function RestaurantLogin() {
               />
               <div className="relative">
                 <input
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 pr-11 py-3.5 text-sm focus:outline-none focus:border-amber-500/50 placeholder:text-white/30"
+                  className="w-full bg-muted border border-border rounded-lg px-4 pr-11 py-3.5 text-sm focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground"
                   placeholder="Password"
                   type={showPass ? "text" : "password"}
                   autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70">
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   <Icon name={showPass ? "visibility_off" : "visibility"} size={20} />
                 </button>
               </div>
@@ -288,21 +289,21 @@ export default function RestaurantLogin() {
           )}
 
           {step === "form" && loginMethod === "otp" && (
-            <div className="flex rounded-xl border border-white/10 bg-white/5 overflow-hidden focus-within:border-amber-500/50">
+            <div className="flex rounded-lg border border-border bg-muted overflow-hidden focus-within:border-primary/50">
               <select
                 value={countryCode}
                 onChange={e => setCountryCode(e.target.value)}
-                className="bg-transparent px-3 py-3.5 text-sm text-white/80 border-r border-white/10 focus:outline-none cursor-pointer max-w-[130px]"
+                className="bg-transparent px-3 py-3.5 text-sm text-foreground border-r border-border focus:outline-none cursor-pointer max-w-[130px]"
                 aria-label="Country code"
               >
                 {COUNTRY_CODES.map(c => (
-                  <option key={c.code + c.name} value={c.code} className="bg-neutral-900 text-white">
-                    {c.flag} {c.code}
+                  <option key={c.code + c.name} value={c.code} className="bg-muted text-foreground">
+                    {c.code} {c.iso}
                   </option>
                 ))}
               </select>
               <input
-                className="flex-1 min-w-0 bg-transparent px-4 py-3.5 text-sm focus:outline-none placeholder:text-white/30"
+                className="flex-1 min-w-0 bg-transparent px-4 py-3.5 text-sm focus:outline-none placeholder:text-muted-foreground"
                 placeholder="Registered mobile number"
                 inputMode="numeric"
                 value={mobile}
@@ -314,24 +315,24 @@ export default function RestaurantLogin() {
 
           {step === "otp-verify" && (
             <div className="space-y-4">
-              <p className="text-sm text-white/60">Enter the OTP sent to {countryCode} {mobile.slice(0, 5)}xxxxx</p>
+              <p className="text-sm text-muted-foreground">Enter the OTP sent to {countryCode} {mobile.slice(0, 5)}xxxxx</p>
               <div className="flex gap-2 justify-between">
                 {otp.map((v, i) => (
                   <input
                     key={i}
                     id={`r-otp-${i}`}
-                    className="w-12 h-12 text-center text-lg font-bold rounded-xl border border-white/10 bg-white/5 focus:border-amber-500 focus:outline-none"
+                    className="w-12 h-12 text-center text-lg font-semibold rounded-lg border border-border bg-muted focus:border-primary focus:outline-none"
                     maxLength={1}
                     value={v}
                     onChange={e => handleOtpChange(i, e.target.value)}
                   />
                 ))}
               </div>
-              <button type="button" onClick={() => setStep("form")} className="text-sm text-white/40 hover:text-white">← Change number</button>
+              <button type="button" onClick={() => setStep("form")} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />Change number</button>
             </div>
           )}
 
-          {error && <p className="text-xs text-red-400 mt-3 px-1">{error}</p>}
+          {error && <p className="text-xs text-danger mt-3 px-1">{error}</p>}
 
           <button
             type="button"
@@ -340,10 +341,10 @@ export default function RestaurantLogin() {
               else void handleLogin();
             }}
             disabled={loading}
-            className="w-full mt-4 py-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 font-bold text-sm shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
+            className="w-full mt-4 py-4 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm shadow-xl flex items-center justify-center gap-2"
           >
             {loading ? (
-              <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="h-5 w-5 border-2 border-border border-t-white rounded-full animate-spin" />
             ) : loginMethod === "otp" && step === "form" ? (
               "Send OTP"
             ) : (
@@ -354,14 +355,14 @@ export default function RestaurantLogin() {
           <button
             type="button"
             onClick={() => setShowForgot(true)}
-            className="mt-4 w-full text-center text-sm text-white/50 hover:text-amber-300 font-medium"
+            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-primary font-medium"
           >
             Forgot password?
           </button>
 
-          <p className="mt-4 text-center text-sm text-white/40">
+          <p className="mt-4 text-center text-sm text-muted-foreground">
             New restaurant?{" "}
-            <Link href="/restaurant/register" className="text-amber-400 hover:text-amber-300 font-semibold">
+            <Link href="/restaurant/register" className="text-primary hover:text-primary font-semibold">
               Register with KYC
             </Link>
           </p>

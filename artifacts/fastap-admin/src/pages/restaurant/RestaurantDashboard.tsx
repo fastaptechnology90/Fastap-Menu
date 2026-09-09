@@ -3,12 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { analytics as analyticsApi, restaurantApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
+import { Badge } from "@/components/ui/badge";
 import { RevenueByDate } from "@/components/restaurant/RevenueByDate";
 import { publicationEmptyMessage } from "@/lib/restaurantPublication";
 import {
   TrendingUp, ShoppingBag, Users, Grid3x3, AlertTriangle,
-  Star, Clock
-} from "lucide-react";
+  Star, Clock, Wallet, ArrowRight, ChefHat, UtensilsCrossed, CreditCard, Building2, User } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // The owner reads these tiles as their books, not as a headline. "₹47.9K" hides up to
@@ -24,24 +24,23 @@ function greetingFor(hour: number) {
 }
 
 // Small payment-method chip so the dashboard's Live Orders show how each order was paid.
-const PAY_CHIP: Record<string, { label: string; cls: string }> = {
-  upi: { label: "UPI", cls: "bg-emerald-500/15 text-emerald-400" },
-  cash: { label: "Cash", cls: "bg-amber-500/15 text-amber-400" },
-  card: { label: "Card", cls: "bg-blue-500/15 text-blue-400" },
-  room_bill: { label: "Room", cls: "bg-cyan-500/15 text-cyan-400" },
-  aggregator: { label: "Aggr", cls: "bg-pink-500/15 text-pink-400" },
-  wallet: { label: "Wallet", cls: "bg-pink-500/15 text-pink-400" },
+const PAY_CHIP: Record<string, string> = {
+  upi: "UPI",
+  cash: "Cash",
+  card: "Card",
+  room_bill: "Room",
+  aggregator: "Aggregator",
+  wallet: "Wallet",
 };
 function payChip(mode?: string) {
   // Same as the order list: an order with no method has not been paid yet.
   if (!mode) {
-    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-white/10 text-white/40">Unpaid</span>;
+    return <Badge variant="warning" className="text-2xs">Unpaid</Badge>;
   }
   const m = mode.toLowerCase();
-  const c = PAY_CHIP[m] || ((m.includes("gateway") || m.includes("online") || m.includes("razor"))
-    ? { label: "Gateway", cls: "bg-violet-500/15 text-violet-400" }
-    : { label: mode || "Cash", cls: "bg-white/10 text-white/50" });
-  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${c.cls}`}>{c.label}</span>;
+  const label = PAY_CHIP[m]
+    || ((m.includes("gateway") || m.includes("online") || m.includes("razor")) ? "Gateway" : mode);
+  return <Badge variant="muted" className="text-2xs">{label}</Badge>;
 }
 
 export default function RestaurantDashboard() {
@@ -138,31 +137,31 @@ export default function RestaurantDashboard() {
   // The Revenue card shows "This Month" — for any other period use the "Revenue by date"
   // widget at the top of the page (custom-date). Old inline dropdown removed.
   const KPI_CARDS = [
-    { label: "Today's Revenue", value: formatRevenue(todayRevenue), sub: `${todayOrders} orders · Week ${formatRevenue(weekRevenue)}`, icon: TrendingUp, color: "from-emerald-500/20 to-emerald-600/10", iconColor: "text-emerald-400" },
-    { label: "Revenue", value: formatRevenue(monthRevenue), sub: `This Month · ${monthOrderCount} orders`, icon: ShoppingBag, color: "from-orange-500/20 to-orange-600/10", iconColor: "text-orange-400" },
-    { label: "Table Occupancy", value: `${occupiedTables}/${restaurant.totalTables || tables.length}`, sub: `${restaurant.totalTables || tables.length ? Math.round(occupiedTables / (restaurant.totalTables || tables.length) * 100) : 0}% occupied`, icon: Grid3x3, color: "from-blue-500/20 to-blue-600/10", iconColor: "text-blue-400" },
-    { label: "Active Orders", value: activeOrders, sub: `${newOrders} new · ${readyOrders} ready`, icon: Clock, color: "from-violet-500/20 to-violet-600/10", iconColor: "text-violet-400" },
-    { label: "Wallet Balance", value: formatRevenue(walletBalance), sub: `Pending settlement ${formatRevenue(pendingSettlements)}`, icon: TrendingUp, color: "from-amber-500/20 to-amber-600/10", iconColor: "text-amber-400" },
-    { label: "Customer Rating", value: avgRating || "0", sub: `${vipCustomers} VIP · ${loyaltyCustomers} loyalty`, icon: Star, color: "from-yellow-500/20 to-yellow-600/10", iconColor: "text-yellow-400" },
-    { label: "Waiter Calls", value: activeWaiterCalls, sub: `${pendingReservations} reservations pending`, icon: AlertTriangle, color: "from-pink-500/20 to-pink-600/10", iconColor: "text-pink-400" },
-    { label: "Low Stock Alerts", value: lowStockItems, sub: "Items need restock", icon: AlertTriangle, color: "from-red-500/20 to-red-600/10", iconColor: "text-red-400" },
+    { label: "Today's Revenue", value: formatRevenue(todayRevenue), sub: `${todayOrders} orders · Week ${formatRevenue(weekRevenue)}`, icon: TrendingUp, iconColor: "text-muted-foreground" },
+    { label: "Revenue", value: formatRevenue(monthRevenue), sub: `This Month · ${monthOrderCount} orders`, icon: ShoppingBag, iconColor: "text-muted-foreground" },
+    { label: "Table Occupancy", value: `${occupiedTables}/${restaurant.totalTables || tables.length}`, sub: `${restaurant.totalTables || tables.length ? Math.round(occupiedTables / (restaurant.totalTables || tables.length) * 100) : 0}% occupied`, icon: Grid3x3, iconColor: "text-muted-foreground" },
+    { label: "Active Orders", value: activeOrders, sub: `${newOrders} new · ${readyOrders} ready`, icon: Clock, iconColor: "text-muted-foreground" },
+    { label: "Wallet Balance", value: formatRevenue(walletBalance), sub: `Pending settlement ${formatRevenue(pendingSettlements)}`, icon: TrendingUp, iconColor: "text-muted-foreground" },
+    { label: "Customer Rating", value: avgRating || "0", sub: `${vipCustomers} VIP · ${loyaltyCustomers} loyalty`, icon: Star, iconColor: "text-muted-foreground" },
+    { label: "Waiter Calls", value: activeWaiterCalls, sub: `${pendingReservations} reservations pending`, icon: AlertTriangle, iconColor: "text-muted-foreground" },
+    { label: "Low Stock Alerts", value: lowStockItems, sub: "Items need restock", icon: AlertTriangle, iconColor: lowStockItems > 0 ? "text-danger" : "text-muted-foreground" },
   ];
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">{greetingFor(new Date().getHours())}, {currentStaff?.name?.split(" ")[0]}! 👋</h1>
-          <p className="text-white/40 text-sm mt-0.5">{restaurant.name} · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+          <h1 className="text-xl font-semibold">{greetingFor(new Date().getHours())}, {currentStaff?.name?.split(" ")[0]}</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{restaurant.name} · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (
-            <p className="text-xs text-white/30 hidden sm:block">
+            <p className="text-xs text-muted-foreground hidden sm:block">
               Updated {lastRefresh.toLocaleTimeString()}
             </p>
           )}
-          <div className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border ${published ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" : "text-amber-400 bg-amber-400/10 border-amber-400/20"}`}>
-            <span className={`h-2 w-2 rounded-full ${published ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+          <div className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border ${published ? "text-success bg-success-subtle border-success-border" : "text-primary bg-primary/10 border-primary/20"}`}>
+            <span className={`h-2 w-2 rounded-full ${published ? "bg-success animate-pulse" : "bg-primary"}`} />
             {published ? "Live · refreshes every 15s" : "Not published"}
           </div>
         </div>
@@ -171,35 +170,35 @@ export default function RestaurantDashboard() {
       <RevenueByDate restaurantId={restaurantId} title="Revenue" />
 
       {!published && (
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
-          <p className="text-sm font-semibold text-amber-200">No analytics yet</p>
-          <p className="text-xs text-white/50 mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
+        <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
+          <p className="text-sm font-semibold text-primary">No analytics yet</p>
+          <p className="text-xs text-muted-foreground mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
         {KPI_CARDS.map(card => (
-          <div key={card.label} className={`rounded-2xl bg-gradient-to-br ${card.color} border border-white/8 p-4`}>
-            <div className="flex items-start justify-between mb-3 gap-1">
-              <card.icon className={`h-5 w-5 shrink-0 ${card.iconColor}`} />
+          <div key={card.label} className="min-w-0 rounded-md border bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <card.icon className={`h-4 w-4 shrink-0 ${card.iconColor}`} aria-hidden="true" />
+              <p className="truncate text-xs text-muted-foreground">{card.label}</p>
             </div>
-            <p className="text-2xl font-extrabold mb-1">{card.value}</p>
-            <p className="text-xs text-white/40 leading-tight">{card.label}</p>
-            <p className="text-xs text-white/30 mt-0.5">{card.sub}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">{card.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{card.sub}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 rounded-2xl bg-white/[0.03] border border-white/8 p-5">
+        <div className="xl:col-span-2 rounded-lg bg-card border border-border p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="font-bold">Revenue Trend</h3>
-              <p className="text-xs text-white/40">Daily breakdown</p>
+              <h3 className="font-semibold">Revenue Trend</h3>
+              <p className="text-xs text-muted-foreground">Daily breakdown</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-extrabold text-emerald-400">₹{todayRevenue.toLocaleString()}</p>
-              <p className="text-xs text-emerald-400">{todayOrders} orders today</p>
+              <p className="text-2xl font-semibold text-success">₹{todayRevenue.toLocaleString()}</p>
+              <p className="text-xs text-success">{todayOrders} orders today</p>
             </div>
           </div>
           {published && revenueData.length > 0 ? (
@@ -207,45 +206,45 @@ export default function RestaurantDashboard() {
             <AreaChart data={revenueData}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" tick={{ fontSize: 10, fill: "#ffffff40" }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
               <YAxis hide />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} formatter={(v: any) => [`₹${v.toLocaleString()}`, "Revenue"]} />
-              <Area type="monotone" dataKey="revenue" stroke="#f59e0b" strokeWidth={2} fill="url(#revGrad)" />
+              <Tooltip contentStyle={{ background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} formatter={(v: any) => [`₹${v.toLocaleString()}`, "Revenue"]} />
+              <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#revGrad)" />
             </AreaChart>
           </ResponsiveContainer>
           ) : (
-            <div className="h-[180px] flex items-center justify-center text-sm text-white/30">
+            <div className="h-[180px] flex items-center justify-center text-sm text-muted-foreground">
               {published ? "No sales data yet" : "No data available yet"}
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5">
+        <div className="rounded-lg bg-card border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold">Live Orders</h3>
-            <button onClick={() => navigate("/restaurant/orders")} className="text-xs text-amber-400 hover:text-amber-300">View all →</button>
+            <h3 className="font-semibold">Live Orders</h3>
+            <button onClick={() => navigate("/restaurant/orders")} className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80">View all<ArrowRight className="h-3 w-3" /></button>
           </div>
           <div className="space-y-3">
             {!published || liveOrders.length === 0 ? (
-              <p className="text-sm text-white/30 text-center py-8">{published ? "No active orders" : "Orders appear after publication"}</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{published ? "No active orders" : "Orders appear after publication"}</p>
             ) : liveOrders.slice(0, 5).map(order => (
-              <div key={order.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/8 transition-all cursor-pointer" onClick={() => setSelOrder(order)} title="Click for payment details">
-                <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${order.status === "new" ? "bg-orange-400 animate-pulse" : order.status === "ready" ? "bg-emerald-400 animate-pulse" : order.status === "preparing" ? "bg-blue-400" : "bg-white/30"}`} />
+              <div key={order.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted hover-elevate transition-colors cursor-pointer" onClick={() => setSelOrder(order)} title="Click for payment details">
+                <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${order.status === "new" ? "bg-warning animate-pulse" : order.status === "ready" ? "bg-success animate-pulse" : order.status === "preparing" ? "bg-info" : "bg-muted"}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-semibold">{order.tableNo}</span>
                     {payChip(order.paymentMethod)}
-                    <span className="text-xs text-white/30">{order.id}</span>
+                    <span className="text-xs text-muted-foreground">{order.id}</span>
                   </div>
-                  <p className="text-xs text-white/40 truncate">{order.customerName ? `${order.customerName} · ` : ""}{order.items.map(i => i.name).join(", ")}</p>
+                  <p className="text-xs text-muted-foreground truncate">{order.customerName ? `${order.customerName} · ` : ""}{order.items.map(i => i.name).join(", ")}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-amber-400">₹{order.total}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${order.status === "new" ? "bg-orange-500/20 text-orange-400" : order.status === "ready" ? "bg-emerald-500/20 text-emerald-400" : order.status === "preparing" ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white/40"}`}>
+                  <p className="text-sm font-semibold text-primary">₹{order.total}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${order.status === "new" ? "bg-warning-subtle text-warning" : order.status === "ready" ? "bg-success-subtle text-success" : order.status === "preparing" ? "bg-info-subtle text-info" : "bg-muted text-muted-foreground"}`}>
                     {order.status}
                   </span>
                 </div>
@@ -256,63 +255,63 @@ export default function RestaurantDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5">
-          <h3 className="font-bold mb-4">Top Selling Items</h3>
+        <div className="rounded-lg bg-card border border-border p-5">
+          <h3 className="font-semibold mb-4">Top Selling Items</h3>
           <div className="space-y-3">
             {published && topItems.length > 0 ? topItems.map((item, i) => (
               <div key={item.name} className="flex items-center gap-3">
-                <span className="h-7 w-7 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-extrabold flex items-center justify-center shrink-0">#{i + 1}</span>
+                <span className="h-7 w-7 rounded-lg bg-primary/20 text-primary text-xs font-semibold flex items-center justify-center shrink-0">#{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-white/30">{item.orders} orders · ₹{item.revenue.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{item.orders} orders · ₹{item.revenue.toLocaleString()}</p>
                 </div>
-                <span className={`text-xs font-semibold ${item.trend?.startsWith("-") ? "text-red-400" : item.trend === "0%" ? "text-white/30" : "text-emerald-400"}`}>{item.trend}</span>
+                <span className={`text-xs font-semibold ${item.trend?.startsWith("-") ? "text-danger" : item.trend === "0%" ? "text-muted-foreground" : "text-success"}`}>{item.trend}</span>
               </div>
             )) : (
-              <p className="text-sm text-white/30 text-center py-6">{published ? "No item sales data yet" : "No data available yet"}</p>
+              <p className="text-sm text-muted-foreground text-center py-6">{published ? "No item sales data yet" : "No data available yet"}</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5">
+        <div className="rounded-lg bg-card border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold">Section Occupancy</h3>
-            <button onClick={() => navigate("/restaurant/tables")} className="text-xs text-amber-400">View →</button>
+            <h3 className="font-semibold">Section Occupancy</h3>
+            <button onClick={() => navigate("/restaurant/tables")} className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80">View<ArrowRight className="h-3 w-3" /></button>
           </div>
           <div className="space-y-3">
             {sectionOccupancy.length === 0 ? <EmptyState title="No table sections loaded" /> : sectionOccupancy.map(sec => (
               <div key={sec.name}>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-white/60">{sec.name}</span>
-                  <span className="text-white/40">{sec.occupied}/{sec.total}</span>
+                  <span className="text-muted-foreground">{sec.name}</span>
+                  <span className="text-muted-foreground">{sec.occupied}/{sec.total}</span>
                 </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${sec.total ? (sec.occupied / sec.total) * 100 : 0}%` }} />
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-colors" style={{ width: `${sec.total ? (sec.occupied / sec.total) * 100 : 0}%` }} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-5">
+        <div className="rounded-lg bg-card border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold">Staff On Duty</h3>
-            <button onClick={() => navigate("/restaurant/staff")} className="text-xs text-amber-400">View →</button>
+            <h3 className="font-semibold">Staff On Duty</h3>
+            <button onClick={() => navigate("/restaurant/staff")} className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80">View<ArrowRight className="h-3 w-3" /></button>
           </div>
           <div className="space-y-2.5">
             {staffList.slice(0, 6).map(s => (
               <div key={s.id} className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-sm">
-                    {s.role === "chef" ? "👨‍🍳" : s.role === "waiter" ? "🍽️" : s.role === "cashier" ? "💳" : s.role === "manager" ? "🏢" : "👤"}
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm">
+                    {(() => { const RoleIcon = s.role === "chef" ? ChefHat : s.role === "waiter" ? UtensilsCrossed : s.role === "cashier" ? CreditCard : s.role === "manager" ? Building2 : User; return <RoleIcon className="h-4 w-4 text-muted-foreground" />; })()}
                   </div>
-                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0b1120] ${s.status === "active" ? "bg-emerald-400" : s.status === "on-break" ? "bg-yellow-400" : "bg-white/20"}`} />
+                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${s.status === "active" ? "bg-success" : s.status === "on-break" ? "bg-warning" : "bg-muted"}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{s.name}</p>
-                  <p className="text-xs text-white/30 capitalize">{s.role} · {s.shift}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{s.role} · {s.shift}</p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "active" ? "bg-emerald-500/20 text-emerald-400" : s.status === "on-break" ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10 text-white/30"}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${s.status === "active" ? "bg-success-subtle text-success" : s.status === "on-break" ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground"}`}>
                   {s.status === "on-break" ? "Break" : s.status}
                 </span>
               </div>
@@ -322,14 +321,14 @@ export default function RestaurantDashboard() {
       </div>
 
       {lowStockItems > 0 && (
-        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4">
+        <div className="rounded-lg bg-danger-subtle border border-danger-border p-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-danger shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-red-300">{lowStockItems} inventory items below minimum stock level</p>
-              <p className="text-xs text-white/40 mt-0.5">Review inventory and reorder before service peaks</p>
+              <p className="text-sm font-semibold text-danger">{lowStockItems} inventory items below minimum stock level</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Review inventory and reorder before service peaks</p>
             </div>
-            <button onClick={() => navigate("/restaurant/inventory")} className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-sm font-semibold transition-all shrink-0">
+            <button onClick={() => navigate("/restaurant/inventory")} className="px-4 py-2 rounded-lg bg-danger hover:bg-danger/90 text-sm font-semibold transition-colors shrink-0">
               View Inventory
             </button>
           </div>
@@ -337,16 +336,16 @@ export default function RestaurantDashboard() {
       )}
 
       {selOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelOrder(null)}>
-          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <h3 className="font-bold">Payment details</h3>
-              <button onClick={() => setSelOrder(null)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelOrder(null)}>
+          <div className="w-full max-w-sm bg-card rounded-lg border border-border text-foreground max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="font-semibold">Payment details</h3>
+              <button onClick={() => setSelOrder(null)} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
             </div>
             <div className="p-5 space-y-3 text-sm">
               <div className="text-center py-2">
-                <p className="text-3xl font-extrabold text-amber-400">₹{Number(selOrder.total).toLocaleString("en-IN")}</p>
-                <p className="text-xs text-white/40 mt-1">{selOrder.tableNo} · {selOrder.id}</p>
+                <p className="text-3xl font-semibold text-primary">₹{Number(selOrder.total).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{selOrder.tableNo} · {selOrder.id}</p>
               </div>
               {[
                 ["Payment method", String(selOrder.paymentMethod || "—").toUpperCase()],
@@ -358,12 +357,12 @@ export default function RestaurantDashboard() {
                 ["Customer", selOrder.customerName || "—"],
                 ["Room", selOrder.roomNumber || "—"],
               ].map(([k, v]) => (
-                <div key={k as string} className="flex justify-between gap-3 border-b border-white/5 pb-2">
-                  <span className="text-white/40">{k}</span>
+                <div key={k as string} className="flex justify-between gap-3 border-b border-border pb-2">
+                  <span className="text-muted-foreground">{k}</span>
                   <span className="font-medium text-right break-all capitalize">{v as string}</span>
                 </div>
               ))}
-              <button onClick={() => { navigate("/restaurant/orders"); }} className="w-full py-2.5 rounded-xl border border-white/10 text-white/70 text-sm font-semibold hover:bg-white/5">Open in Order Management</button>
+              <button onClick={() => { navigate("/restaurant/orders"); }} className="w-full py-2.5 rounded-lg border border-border text-foreground text-sm font-semibold hover:bg-muted">Open in Order Management</button>
             </div>
           </div>
         </div>

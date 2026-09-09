@@ -4,6 +4,7 @@ import { restaurantAuth } from "@/lib/api";
 import { Icon } from "@/components/shared/Icon";
 import { PanelLogo } from "@/components/shared/PanelLogo";
 import { IMAGES } from "@/lib/media";
+import { Crown } from "lucide-react";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -162,18 +163,18 @@ function DocUploadField({
   const [uploadError, setUploadError] = useState("");
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+    <div className="rounded-lg border border-border bg-card p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs text-white/80 leading-snug">
+        <p className="text-xs text-foreground leading-snug">
           {docDef.label}
-          {docDef.required && <span className="text-red-400 ml-1">*</span>}
+          {docDef.required && <span className="text-danger ml-1">*</span>}
         </p>
         {doc?.fileName && (
-          <button type="button" onClick={onClear} className="text-[10px] text-red-400 shrink-0">Remove</button>
+          <button type="button" onClick={onClear} className="text-2xs text-danger shrink-0">Remove</button>
         )}
       </div>
       <label className={`flex items-center gap-2 ${uploading ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}>
-        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25">
+        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25">
           <Icon name="upload_file" size={16} />
           {uploading ? "Processing…" : doc?.fileName ? "Replace file" : "Choose file"}
         </span>
@@ -210,12 +211,12 @@ function DocUploadField({
         />
       </label>
       {uploadError && (
-        <p role="alert" className="text-[11px] text-red-400 flex items-center gap-1">
+        <p role="alert" className="text-2xs text-danger flex items-center gap-1">
           <Icon name="error" size={14} /> {uploadError}
         </p>
       )}
       {doc?.fileName && (
-        <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+        <p className="text-2xs text-success flex items-center gap-1">
           <Icon name="check_circle" size={14} /> {doc.fileName}
         </p>
       )}
@@ -391,20 +392,20 @@ export default function RestaurantRegister() {
       {submitted ? (
         <div className="flex-1 flex items-center justify-center px-4 py-16">
           <div className="max-w-md w-full text-center space-y-5">
-            <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-              <Icon name="check_circle" size={36} className="text-emerald-400" />
+            <div className="mx-auto w-16 h-16 rounded-full bg-success-subtle border border-success-border flex items-center justify-center">
+              <Icon name="check_circle" size={36} className="text-success" />
             </div>
-            <h1 className="text-2xl font-bold">Registration submitted</h1>
-            <p className="text-white/60 text-sm leading-relaxed">
-              <span className="text-amber-400 font-semibold">{submittedVenue}</span> has been sent to the Fastap team for KYC review.
+            <h1 className="text-2xl font-semibold">Registration submitted</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              <span className="text-primary font-semibold">{submittedVenue}</span> has been sent to the Fastap team for KYC review.
               You will be able to sign in to the restaurant dashboard only after your documents are approved.
             </p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground">
               Check your email ({ownerEmail}) for updates. Approval usually takes 1–2 business days.
             </p>
             <Link
               href="/restaurant/login"
-              className="inline-flex items-center justify-center w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm"
+              className="inline-flex items-center justify-center w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm"
             >
               Go to sign in
             </Link>
@@ -418,14 +419,14 @@ export default function RestaurantRegister() {
         <div className="relative p-10 flex flex-col justify-between min-h-full">
           <PanelLogo panel="restaurant" size="lg" showLabel label="FastMenu" />
           <div>
-            <h2 className="font-display text-2xl font-bold mb-2">Register as restaurant owner</h2>
-            <p className="text-white/55 text-sm">
+            <h2 className="font-display text-2xl font-semibold mb-2">Register as restaurant owner</h2>
+            <p className="text-muted-foreground text-sm">
               Create your venue account with full KYC verification. Your application is reviewed by our team before dashboard access is granted.
             </p>
             <div className="flex flex-wrap gap-2 mt-4">
-              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">👑 Owner registration</span>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/10">KYC required</span>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/10">Admin approval</span>
+              <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary"><Crown className="h-3 w-3" />Owner registration</span>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border">KYC required</span>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border">Admin approval</span>
             </div>
           </div>
         </div>
@@ -435,13 +436,13 @@ export default function RestaurantRegister() {
         <div className="max-w-lg mx-auto">
           <div className="text-center mb-6 lg:hidden">
             <div className="flex justify-center mb-3"><PanelLogo panel="restaurant" size="lg" /></div>
-            <h1 className="font-display text-xl font-extrabold">Restaurant Owner Registration</h1>
-            <p className="text-sm text-white/40 mt-1">Register your restaurant on FastMenu</p>
+            <h1 className="font-display text-xl font-semibold">Restaurant Owner Registration</h1>
+            <p className="text-sm text-muted-foreground mt-1">Register your restaurant on FastMenu</p>
           </div>
 
           <div className="hidden lg:block mb-6">
-            <h1 className="text-2xl font-bold">Restaurant Owner Registration</h1>
-            <p className="text-sm text-white/45 mt-1">Complete all steps to submit your venue for approval</p>
+            <h1 className="text-2xl font-semibold">Restaurant Owner Registration</h1>
+            <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit your venue for approval</p>
           </div>
 
           <div className="flex gap-1 mb-6 overflow-x-auto">
@@ -456,8 +457,8 @@ export default function RestaurantRegister() {
                   setError("");
                   setStep((i + 1) as Step);
                 }}
-                className={`flex-shrink-0 flex-1 min-w-[4rem] text-center text-[10px] sm:text-xs py-2 px-1 rounded-lg border transition-colors cursor-pointer hover:border-white/30 ${
-                  step === i + 1 ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : step > i + 1 ? "border-emerald-500/30 text-emerald-400" : "border-white/10 text-white/30"
+                className={`flex-shrink-0 flex-1 min-w-[4rem] text-center text-2xs sm:text-xs py-2 px-1 rounded-lg border transition-colors cursor-pointer hover:border-border ${
+                  step === i + 1 ? "border-primary/50 bg-primary/15 text-primary" : step > i + 1 ? "border-success-border text-success" : "border-border text-muted-foreground"
                 }`}
               >
                 {label}
@@ -467,7 +468,7 @@ export default function RestaurantRegister() {
 
           {step === 1 && (
             <div className="space-y-3">
-              <h2 className="text-xl font-bold mb-4">Owner account</h2>
+              <h2 className="text-xl font-semibold mb-4">Owner account</h2>
               <input className="field" placeholder="Full name" value={ownerName} onChange={e => setOwnerName(e.target.value)} />
               <input className="field" placeholder="Email" type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)} />
               <input className="field" placeholder="Mobile (+91)" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} />
@@ -477,7 +478,7 @@ export default function RestaurantRegister() {
 
           {step === 2 && (
             <div className="space-y-3">
-              <h2 className="text-xl font-bold mb-4">Business details</h2>
+              <h2 className="text-xl font-semibold mb-4">Business details</h2>
               <input className="field" placeholder="Restaurant / brand name" value={restaurantName} onChange={e => setRestaurantName(e.target.value)} />
               <select className="field" value={businessType} onChange={e => setBusinessType(e.target.value)}>
                 {BUSINESS_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -485,7 +486,7 @@ export default function RestaurantRegister() {
               <input className="field" placeholder="Street address" value={address} onChange={e => setAddress(e.target.value)} />
               <div className="relative">
                 <input className="field w-full" placeholder="PIN code (auto-fills city & state)" value={pincode} onChange={e => handlePincode(e.target.value)} inputMode="numeric" maxLength={6} />
-                {pinLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-amber-400">…</span>}
+                {pinLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary">…</span>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <input className="field" placeholder="City" value={city} onChange={e => setCity(e.target.value)} />
@@ -499,8 +500,8 @@ export default function RestaurantRegister() {
 
           {step === 3 && (
             <div className="space-y-3">
-              <h2 className="text-xl font-bold mb-4">KYC & compliance</h2>
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11px] text-emerald-200/90">
+              <h2 className="text-xl font-semibold mb-4">KYC & compliance</h2>
+              <div className="rounded-lg bg-success-subtle border border-success-border px-3 py-2 text-2xs text-success">
                 Legal business name, bank account & IFSC are required. GST/FSSAI/PAN and document uploads are optional — our team verifies those, and the admin approves your venue.
               </div>
               <input className="field" placeholder="Legal business name *" value={legalBusinessName} onChange={e => setLegalBusinessName(e.target.value)} />
@@ -511,9 +512,9 @@ export default function RestaurantRegister() {
                 <input className="field" placeholder="Bank account *" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
                 <input className="field" placeholder="IFSC code *" value={ifsc} onChange={e => setIfsc(e.target.value)} />
               </div>
-              <div className="border border-white/10 rounded-xl p-4 space-y-3 mt-2">
-                <p className="text-xs text-white/50 font-semibold uppercase">Business & compliance documents</p>
-                <p className="text-[11px] text-white/40">All documents are optional. Upload what you have (GST, FSSAI, business registration, bank proof) — the team will verify them during KYC review.</p>
+              <div className="border border-border rounded-lg p-4 space-y-3 mt-2">
+                <p className="text-xs text-muted-foreground font-semibold uppercase">Business & compliance documents</p>
+                <p className="text-2xs text-muted-foreground">All documents are optional. Upload what you have (GST, FSSAI, business registration, bank proof) — the team will verify them during KYC review.</p>
                 {REQUIRED_BUSINESS_DOCS.map(def => (
                   <DocUploadField
                     key={def.id}
@@ -528,50 +529,50 @@ export default function RestaurantRegister() {
           )}
 
           {step === 4 && (
-            <div className="space-y-3 text-sm text-white/70">
-              <h2 className="text-xl font-bold mb-4 text-white">Review & submit</h2>
-              <p><span className="text-white/40">Role:</span> Restaurant Owner</p>
-              <p><span className="text-white/40">Name:</span> {ownerName} · {ownerEmail}</p>
-              <p><span className="text-white/40">Venue:</span> {restaurantName} ({businessType})</p>
-              <p><span className="text-white/40">Address:</span> {[address, city, state, pincode].filter(Boolean).join(", ")}</p>
-              <p><span className="text-white/40">GST:</span> {gstNumber || "—"} · <span className="text-white/40">FSSAI:</span> {fssaiNumber || "—"}</p>
-              <p><span className="text-white/40">Documents:</span> {documents.length} attached <span className="text-white/30">(optional — admin verifies)</span></p>
-              <p className="text-xs text-white/40 pt-2">
+            <div className="space-y-3 text-sm text-foreground">
+              <h2 className="text-xl font-semibold mb-4 text-foreground">Review & submit</h2>
+              <p><span className="text-muted-foreground">Role:</span> Restaurant Owner</p>
+              <p><span className="text-muted-foreground">Name:</span> {ownerName} · {ownerEmail}</p>
+              <p><span className="text-muted-foreground">Venue:</span> {restaurantName} ({businessType})</p>
+              <p><span className="text-muted-foreground">Address:</span> {[address, city, state, pincode].filter(Boolean).join(", ")}</p>
+              <p><span className="text-muted-foreground">GST:</span> {gstNumber || "—"} · <span className="text-muted-foreground">FSSAI:</span> {fssaiNumber || "—"}</p>
+              <p><span className="text-muted-foreground">Documents:</span> {documents.length} attached <span className="text-muted-foreground">(optional — admin verifies)</span></p>
+              <p className="text-xs text-muted-foreground pt-2">
                 By submitting you confirm the business information is accurate. Your venue will be activated after super admin verification.
               </p>
             </div>
           )}
 
-          {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
+          {error && <p className="text-xs text-danger mt-3">{error}</p>}
 
           <div className="flex gap-3 mt-8">
             {step > 1 && (
-              <button type="button" onClick={() => setStep((step - 1) as Step)} className="flex-1 py-3 rounded-xl border border-white/15 text-sm font-semibold text-white/70">
+              <button type="button" onClick={() => setStep((step - 1) as Step)} className="flex-1 py-3 rounded-lg border border-border text-sm font-semibold text-foreground">
                 Back
               </button>
             )}
             {step < STEPS.length ? (
-              <button type="button" onClick={handleContinue} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm">
+              <button type="button" onClick={handleContinue} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">
                 Continue
               </button>
             ) : (
-              <button type="button" onClick={handleSubmit} disabled={loading} className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 font-bold text-sm">
+              <button type="button" onClick={handleSubmit} disabled={loading} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm">
                 {loading ? "Submitting…" : "Submit for approval"}
               </button>
             )}
           </div>
 
-          <p className="mt-6 text-center text-sm text-white/40">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Already registered?{" "}
-            <Link href="/restaurant/login" className="text-amber-400 hover:text-amber-300 font-semibold">Sign in</Link>
+            <Link href="/restaurant/login" className="text-primary hover:text-primary font-semibold">Sign in</Link>
           </p>
-          <p className="mt-2 text-center text-xs text-white/30">
+          <p className="mt-2 text-center text-xs text-muted-foreground">
             Staff members should ask their manager for access — this page is for restaurant owners only.
           </p>
         </div>
       </div>
 
-      <style>{`.field{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:.75rem;padding:.875rem 1rem;font-size:.875rem;color:#fff}.field:focus{outline:none;border-color:rgba(245,158,11,.5)}select.field{padding-right:2.5rem;min-height:2.75rem;cursor:pointer}`}</style>
+      <style>{`.field{width:100%;background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:var(--radius-control);padding:.875rem 1rem;font-size:.875rem;color:hsl(var(--foreground))}.field:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}select.field{padding-right:2.5rem;min-height:2.75rem;cursor:pointer}`}</style>
       </>
       )}
     </div>

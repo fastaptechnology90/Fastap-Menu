@@ -5,11 +5,11 @@ import { useRestaurant } from "@/contexts/RestaurantContext";
 import { waiterCalls } from "@/lib/api";
 
 const TYPE_CFG: Record<string, { label: string; icon: typeof Bell; color: string }> = {
-  waiter: { label: "Call Waiter", icon: Bell, color: "text-amber-400" },
-  bill: { label: "Bill Request", icon: Receipt, color: "text-emerald-400" },
-  water: { label: "Water Refill", icon: Droplets, color: "text-blue-400" },
-  assistance: { label: "Assistance", icon: HelpCircle, color: "text-violet-400" },
-  order: { label: "Order Help", icon: UtensilsCrossed, color: "text-orange-400" },
+  waiter: { label: "Call Waiter", icon: Bell, color: "text-primary" },
+  bill: { label: "Bill Request", icon: Receipt, color: "text-success" },
+  water: { label: "Water Refill", icon: Droplets, color: "text-info" },
+  assistance: { label: "Assistance", icon: HelpCircle, color: "text-muted-foreground" },
+  order: { label: "Order Help", icon: UtensilsCrossed, color: "text-warning" },
 };
 
 function timeAgo(iso: string) {
@@ -56,58 +56,58 @@ export default function WaiterAutomation() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Waiter Automation</h1>
-          <p className="text-xs text-white/40">Live table requests — bill, water, assistance</p>
+          <h1 className="text-xl font-semibold">Waiter Automation</h1>
+          <p className="text-xs text-muted-foreground">Live table requests — bill, water, assistance</p>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold hover:bg-white/10">
+        <button onClick={load} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted text-sm font-semibold hover-elevate">
           <RefreshCw className="h-4 w-4" /> Refresh
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Active Calls", value: calls.length, color: "text-amber-400", bg: "bg-amber-500/10" },
-          { label: "Bill Requests", value: calls.filter(c => c.type === "bill").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Waiter Calls", value: calls.filter(c => c.type === "waiter").length, color: "text-orange-400", bg: "bg-orange-500/10" },
-          { label: "Other", value: calls.filter(c => !["bill", "waiter"].includes(c.type)).length, color: "text-violet-400", bg: "bg-violet-500/10" },
+          { label: "Active Calls", value: calls.length, color: "text-primary", bg: "bg-primary/10" },
+          { label: "Bill Requests", value: calls.filter(c => c.type === "bill").length, color: "text-success", bg: "bg-success-subtle" },
+          { label: "Waiter Calls", value: calls.filter(c => c.type === "waiter").length, color: "text-warning", bg: "bg-warning-subtle" },
+          { label: "Other", value: calls.filter(c => !["bill", "waiter"].includes(c.type)).length, color: "text-muted-foreground", bg: "bg-muted" },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
+            <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      {loading && <div className="flex items-center gap-2 text-white/40 text-sm"><Loader className="h-4 w-4 animate-spin" />Loading requests...</div>}
+      {loading && <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader className="h-4 w-4 animate-spin" />Loading requests...</div>}
 
       <div className="space-y-3">
         {calls.map(call => {
           const cfg = TYPE_CFG[call.type] || TYPE_CFG.waiter;
           const Icon = cfg.icon;
           return (
-            <div key={call.id} className="bg-[#0e1520] border border-amber-500/20 rounded-2xl p-4 flex items-start gap-4">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+            <div key={call.id} className="bg-card border border-primary/20 rounded-lg p-4 flex items-start gap-4">
+              <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
                 <Icon className={`h-5 w-5 ${cfg.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-bold">{cfg.label}</p>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/60">Table {call.tableName || call.tableId || "—"}</span>
-                  <span className="text-xs text-white/30">{call.createdAt ? timeAgo(call.createdAt) : ""}</span>
+                  <p className="font-semibold">{cfg.label}</p>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Table {call.tableName || call.tableId || "—"}</span>
+                  <span className="text-xs text-muted-foreground">{call.createdAt ? timeAgo(call.createdAt) : ""}</span>
                 </div>
-                {call.message && <p className="text-sm text-white/60 mt-1">{call.message}</p>}
+                {call.message && <p className="text-sm text-muted-foreground mt-1">{call.message}</p>}
               </div>
-              <button onClick={() => resolve(call.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 shrink-0">
+              <button onClick={() => resolve(call.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate shrink-0">
                 <CheckCircle className="h-3.5 w-3.5" /> Resolve
               </button>
             </div>
           );
         })}
         {!loading && calls.length === 0 && (
-          <div className="text-center py-16 text-white/30">
-            <Bell className="h-12 w-12 mx-auto mb-3 text-white/15" />
+          <div className="text-center py-16 text-muted-foreground">
+            <Bell className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
             <p>No active table requests</p>
           </div>
         )}

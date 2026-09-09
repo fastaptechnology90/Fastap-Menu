@@ -81,39 +81,39 @@ export default function RestaurantSubscription() {
   if (authBootstrapping || !currentStaff) {
     return (
       <div className="restaurant-panel flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="restaurant-panel min-h-screen bg-[#0a0a0f] text-white">
+    <div className="restaurant-panel min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <PanelLogo panel="restaurant" size="lg" />
             <div>
-              <p className="text-xs uppercase tracking-wider text-amber-400/80">Subscription required</p>
-              <h1 className="text-2xl font-bold">{restaurant.name || "Your restaurant"}</h1>
-              <p className="text-sm text-white/50">Choose a plan to unlock the restaurant panel</p>
+              <p className="text-xs uppercase tracking-wider text-primary">Subscription required</p>
+              <h1 className="text-2xl font-semibold">{restaurant.name || "Your restaurant"}</h1>
+              <p className="text-sm text-muted-foreground">Choose a plan to unlock the restaurant panel</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => logoutStaff().then(() => navigate("/restaurant/login"))}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
           >
             <LogOut className="h-4 w-4" /> Sign out
           </button>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
+        <div className="mb-8 rounded-lg border border-primary/20 bg-primary/10 p-5">
           <div className="flex items-start gap-3">
-            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <div>
-              <p className="font-semibold text-amber-100">Panel access is locked until you subscribe</p>
-              <p className="mt-1 text-sm text-white/60">
-                Signed in as <span className="text-white">{currentStaff.name}</span> ({currentStaff.role}).
+              <p className="font-semibold text-primary">Panel access is locked until you subscribe</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Signed in as <span className="text-foreground">{currentStaff.name}</span> ({currentStaff.role}).
                 {!canSubscribe && " Contact an owner or manager to complete checkout."}
               </p>
             </div>
@@ -121,23 +121,23 @@ export default function RestaurantSubscription() {
         </div>
 
         {success && (
-          <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-sm text-success">
             <CheckCircle className="h-4 w-4" /> {success}
           </div>
         )}
 
         {error && (
-          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="mb-6 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-sm text-danger">
             {error}
           </div>
         )}
 
         {loading ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : plans.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center text-white/50">
+          <div className="rounded-lg border border-border bg-muted p-10 text-center text-muted-foreground">
             No subscription plans are available right now. Please contact support.
           </div>
         ) : (
@@ -147,45 +147,45 @@ export default function RestaurantSubscription() {
               return (
                 <div
                   key={plan.id}
-                  className={`relative flex flex-col rounded-2xl border p-6 ${
-                    featured ? "border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-transparent" : "border-white/10 bg-white/[0.03]"
+                  className={`relative flex flex-col rounded-lg border p-6 ${
+                    featured ? "border-primary/40 bg-primary/5" : "border-border bg-card"
                   }`}
                 >
                   {featured && (
-                    <span className="absolute -top-3 left-4 inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-black">
+                    <span className="absolute -top-3 left-4 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-primary-foreground">
                       <Sparkles className="h-3 w-3" /> Popular
                     </span>
                   )}
                   <div className="mb-4 flex items-center gap-2">
-                    <Crown className={`h-5 w-5 ${featured ? "text-amber-400" : "text-white/40"}`} />
-                    <h2 className="text-xl font-bold">{plan.name}</h2>
+                    <Crown className={`h-5 w-5 ${featured ? "text-primary" : "text-muted-foreground"}`} />
+                    <h2 className="text-xl font-semibold">{plan.name}</h2>
                   </div>
-                  <p className="text-3xl font-black">
+                  <p className="text-3xl font-semibold">
                     {fmtINRFull(plan.price)}
-                    <span className="text-sm font-normal text-white/40">/month</span>
+                    <span className="text-sm font-normal text-muted-foreground">/month</span>
                   </p>
                   {plan.trialDays > 0 && (
-                    <p className="mt-1 text-xs text-emerald-400">{plan.trialDays}-day free trial included</p>
+                    <p className="mt-1 text-xs text-success">{plan.trialDays}-day free trial included</p>
                   )}
-                  <ul className="my-5 flex-1 space-y-2 text-sm text-white/70">
+                  <ul className="my-5 flex-1 space-y-2 text-sm text-foreground">
                     {(plan.features as string[]).slice(0, 8).map(feature => (
                       <li key={feature} className="flex items-start gap-2">
-                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                         <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
-                  <p className="mb-4 text-[11px] text-white/35">
+                  <p className="mb-4 text-2xs text-muted-foreground">
                     Up to {plan.maxBranches} branch(es) · {plan.maxStaff} staff · {plan.maxItems} menu items
                   </p>
                   <button
                     type="button"
                     disabled={!canSubscribe || submitting === plan.id}
                     onClick={() => handleSubscribe(plan.id)}
-                    className={`w-full rounded-xl py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    className={`w-full rounded-lg py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       featured
-                        ? "bg-amber-500 text-black hover:bg-amber-400"
-                        : "bg-white/10 text-white hover:bg-white/15"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-muted text-foreground hover-elevate"
                     }`}
                   >
                     {submitting === plan.id ? (
@@ -202,13 +202,13 @@ export default function RestaurantSubscription() {
           </div>
         )}
 
-        <p className="mt-8 text-center text-xs text-white/30">
+        <p className="mt-8 text-center text-xs text-muted-foreground">
           Already subscribed on another device?{" "}
-          <button type="button" onClick={() => refreshSubscription()} className="text-amber-400 hover:underline">
+          <button type="button" onClick={() => refreshSubscription()} className="text-primary hover:underline">
             Refresh status
           </button>
           {" · "}
-          <Link href="/restaurant/login" className="text-amber-400 hover:underline">Back to login</Link>
+          <Link href="/restaurant/login" className="text-primary hover:underline">Back to login</Link>
         </p>
       </div>
     </div>

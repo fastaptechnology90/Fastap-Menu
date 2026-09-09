@@ -5,8 +5,7 @@ import { restaurantApi, restaurantSettingsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Store, Clock, Bell, Shield, Printer, Wifi, CreditCard,
-  Globe, Palette, ChevronRight, Save, CheckCircle, QrCode
-} from "lucide-react";
+  Globe, Palette, ChevronRight, Save, CheckCircle, QrCode, Receipt, UtensilsCrossed } from "lucide-react";
 
 const SETTING_SECTIONS = [
   { id: "profile", label: "Restaurant Profile", icon: Store, desc: "Name, address, contact, GST" },
@@ -24,9 +23,9 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 /** Used where a section has nothing real to show yet — better than inventing a status. */
 function EmptyPanel({ title, message }: { title: string; message: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-8 text-center">
-      <p className="text-sm font-semibold text-white/70">{title}</p>
-      <p className="text-xs text-white/40 mt-1.5 max-w-sm mx-auto">{message}</p>
+    <div className="rounded-lg border border-border bg-card p-8 text-center">
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto">{message}</p>
     </div>
   );
 }
@@ -112,16 +111,16 @@ export default function RestaurantSettings() {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <div className="w-64 border-r border-white/5 bg-[#0e1520] overflow-y-auto">
+      <div className="w-64 border-r border-border bg-card overflow-y-auto">
         <div className="p-4">
-          <h2 className="font-bold text-sm mb-3">Settings</h2>
+          <h2 className="font-semibold text-sm mb-3">Settings</h2>
           <div className="space-y-0.5">
             {SETTING_SECTIONS.map(sec => (
-              <button key={sec.id} onClick={() => setActiveSection(sec.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${activeSection === sec.id ? "bg-amber-500/15 text-amber-300" : "text-white/50 hover:bg-white/5 hover:text-white"}`}>
-                <sec.icon className={`h-4 w-4 shrink-0 ${activeSection === sec.id ? "text-amber-400" : "text-white/30"}`} />
+              <button key={sec.id} onClick={() => setActiveSection(sec.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${activeSection === sec.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                <sec.icon className={`h-4 w-4 shrink-0 ${activeSection === sec.id ? "text-primary" : "text-muted-foreground"}`} />
                 <div>
                   <p className="text-xs font-semibold">{sec.label}</p>
-                  <p className="text-xs text-white/30">{sec.desc}</p>
+                  <p className="text-xs text-muted-foreground">{sec.desc}</p>
                 </div>
               </button>
             ))}
@@ -132,13 +131,13 @@ export default function RestaurantSettings() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5 lg:p-7">
         <div className="max-w-2xl space-y-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div>
-              <h1 className="text-lg font-extrabold">{activeSec?.label}</h1>
-              <p className="text-xs text-white/40">{activeSec?.desc}</p>
+              <h1 className="text-lg font-semibold">{activeSec?.label}</h1>
+              <p className="text-xs text-muted-foreground">{activeSec?.desc}</p>
             </div>
             {saved && (
-              <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold bg-emerald-500/10 px-3 py-1.5 rounded-xl">
+              <div className="flex items-center gap-2 text-success text-sm font-semibold bg-success-subtle px-3 py-1.5 rounded-lg">
                 <CheckCircle className="h-4 w-4" /> Saved!
               </div>
             )}
@@ -158,18 +157,18 @@ export default function RestaurantSettings() {
                 { label: "Cuisine Type", field: "cuisineType" },
               ].map(({ label, field }) => (
                 <div key={field}>
-                  <label className="block text-xs text-white/40 mb-1.5">{label}</label>
-                  <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500/40" value={(profile as any)[field]} onChange={e => setProfile({ ...profile, [field]: e.target.value })} />
+                  <label className="block text-xs text-muted-foreground mb-1.5">{label}</label>
+                  <input className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/40" value={(profile as any)[field]} onChange={e => setProfile({ ...profile, [field]: e.target.value })} />
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Total Tables</label>
-                  <input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500/40" value={profile.totalTables} onChange={e => setProfile({ ...profile, totalTables: Number(e.target.value) })} />
+                  <label className="block text-xs text-muted-foreground mb-1.5">Total Tables</label>
+                  <input type="number" className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/40" value={profile.totalTables} onChange={e => setProfile({ ...profile, totalTables: Number(e.target.value) })} />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Total Seats</label>
-                  <input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500/40" value={profile.totalSeats} onChange={e => setProfile({ ...profile, totalSeats: Number(e.target.value) })} />
+                  <label className="block text-xs text-muted-foreground mb-1.5">Total Seats</label>
+                  <input type="number" className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/40" value={profile.totalSeats} onChange={e => setProfile({ ...profile, totalSeats: Number(e.target.value) })} />
                 </div>
               </div>
             </div>
@@ -179,19 +178,19 @@ export default function RestaurantSettings() {
           {activeSection === "hours" && (
             <div className="space-y-3">
               {hours.map((h, i) => (
-                <div key={h.day} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/8">
-                  <button onClick={() => setHours(p => p.map((x, j) => j === i ? { ...x, open: !x.open } : x))} className={`w-10 h-5 rounded-full transition-all relative ${h.open ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${h.open ? "left-5" : "left-0.5"}`} />
+                <div key={h.day} className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border">
+                  <button onClick={() => setHours(p => p.map((x, j) => j === i ? { ...x, open: !x.open } : x))} className={`w-10 h-5 rounded-full transition-colors relative ${h.open ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${h.open ? "left-5" : "left-0.5"}`} />
                   </button>
                   <span className="w-24 text-sm font-medium">{h.day}</span>
                   {h.open ? (
                     <div className="flex items-center gap-2 flex-1">
-                      <input type="time" className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500/40 text-white [color-scheme:dark]" value={h.from} onChange={e => setHours(p => p.map((x, j) => j === i ? { ...x, from: e.target.value } : x))} />
-                      <span className="text-white/30 text-sm">to</span>
-                      <input type="time" className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500/40 text-white [color-scheme:dark]" value={h.to} onChange={e => setHours(p => p.map((x, j) => j === i ? { ...x, to: e.target.value } : x))} />
+                      <input type="time" className="bg-muted border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary/40 text-foreground [color-scheme:dark]" value={h.from} onChange={e => setHours(p => p.map((x, j) => j === i ? { ...x, from: e.target.value } : x))} />
+                      <span className="text-muted-foreground text-sm">to</span>
+                      <input type="time" className="bg-muted border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary/40 text-foreground [color-scheme:dark]" value={h.to} onChange={e => setHours(p => p.map((x, j) => j === i ? { ...x, to: e.target.value } : x))} />
                     </div>
                   ) : (
-                    <span className="text-sm text-white/30">Closed</span>
+                    <span className="text-sm text-muted-foreground">Closed</span>
                   )}
                 </div>
               ))}
@@ -201,7 +200,7 @@ export default function RestaurantSettings() {
           {/* Notifications */}
           {activeSection === "notifications" && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 uppercase tracking-wider">In-App Alerts</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">In-App Alerts</p>
               {[
                 { key: "newOrder", label: "New Order Received", desc: "Alert when new order comes in" },
                 { key: "orderReady", label: "Order Ready", desc: "Alert when kitchen marks order ready" },
@@ -210,26 +209,26 @@ export default function RestaurantSettings() {
                 { key: "staffAlert", label: "Staff Check-in/out", desc: "When staff logs in or out" },
                 { key: "dailyReport", label: "Daily Report", desc: "End-of-day summary" },
               ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                   <div>
                     <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs text-white/40">{desc}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
-                  <button onClick={() => setNotifs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-all relative ${(notifs as any)[key] ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${(notifs as any)[key] ? "left-5" : "left-0.5"}`} />
+                  <button onClick={() => setNotifs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-colors relative ${(notifs as any)[key] ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${(notifs as any)[key] ? "left-5" : "left-0.5"}`} />
                   </button>
                 </div>
               ))}
-              <p className="text-xs text-white/40 uppercase tracking-wider pt-2">Channels</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider pt-2">Channels</p>
               {[
                 { key: "smsAlerts", label: "SMS Alerts" },
                 { key: "whatsappAlerts", label: "WhatsApp Alerts" },
                 { key: "emailAlerts", label: "Email Alerts" },
               ].map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                   <p className="text-sm font-medium">{label}</p>
-                  <button onClick={() => setNotifs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-all relative ${(notifs as any)[key] ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${(notifs as any)[key] ? "left-5" : "left-0.5"}`} />
+                  <button onClick={() => setNotifs(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-colors relative ${(notifs as any)[key] ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${(notifs as any)[key] ? "left-5" : "left-0.5"}`} />
                   </button>
                 </div>
               ))}
@@ -245,19 +244,19 @@ export default function RestaurantSettings() {
                 { key: "deviceWhitelist", label: "Device Whitelist", desc: "Only allow approved devices" },
                 { key: "ipRestriction", label: "IP Restriction", desc: "Restrict access by IP address" },
               ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                   <div>
                     <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs text-white/40">{desc}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
-                  <button onClick={() => setSecurity(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-all relative ${(security as any)[key] === true ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${(security as any)[key] === true ? "left-5" : "left-0.5"}`} />
+                  <button onClick={() => setSecurity(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-colors relative ${(security as any)[key] === true ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${(security as any)[key] === true ? "left-5" : "left-0.5"}`} />
                   </button>
                 </div>
               ))}
               <div>
-                <label className="block text-xs text-white/40 mb-1.5">Session Timeout (minutes)</label>
-                <input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500/40" value={security.sessionTimeout} onChange={e => setSecurity({ ...security, sessionTimeout: Number(e.target.value) })} />
+                <label className="block text-xs text-muted-foreground mb-1.5">Session Timeout (minutes)</label>
+                <input type="number" className="w-full bg-muted border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary/40" value={security.sessionTimeout} onChange={e => setSecurity({ ...security, sessionTimeout: Number(e.target.value) })} />
               </div>
             </div>
           )}
@@ -265,7 +264,7 @@ export default function RestaurantSettings() {
           {/* Payment Settings */}
           {activeSection === "payments" && (
             <div className="space-y-3">
-              <p className="text-xs text-white/40 uppercase tracking-wider">Accepted Payment Methods</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Accepted Payment Methods</p>
               {[
                 { key: "upi", label: "UPI Payments", desc: "PhonePe, GPay, Paytm" },
                 { key: "card", label: "Debit/Credit Cards", desc: "Visa, Mastercard, RuPay" },
@@ -274,26 +273,26 @@ export default function RestaurantSettings() {
                 { key: "nfc", label: "NFC Contactless", desc: "Tap-to-pay" },
                 { key: "qrPayment", label: "QR Code Payment" },
               ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                   <div>
                     <p className="text-sm font-medium">{label}</p>
-                    {desc && <p className="text-xs text-white/40">{desc}</p>}
+                    {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
                   </div>
-                  <button onClick={() => setPayments(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-all relative ${(payments as any)[key] ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${(payments as any)[key] ? "left-5" : "left-0.5"}`} />
+                  <button onClick={() => setPayments(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-colors relative ${(payments as any)[key] ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${(payments as any)[key] ? "left-5" : "left-0.5"}`} />
                   </button>
                 </div>
               ))}
-              <p className="text-xs text-white/40 uppercase tracking-wider pt-2">Billing Settings</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider pt-2">Billing Settings</p>
               {[
                 { key: "autoGST", label: "Auto-apply GST (5%)" },
                 { key: "autoPrint", label: "Auto-print receipt after payment" },
                 { key: "tipEnabled", label: "Enable tip option at billing" },
               ].map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
                   <p className="text-sm font-medium">{label}</p>
-                  <button onClick={() => setPayments(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-all relative ${(payments as any)[key] ? "bg-amber-500" : "bg-white/20"}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${(payments as any)[key] ? "left-5" : "left-0.5"}`} />
+                  <button onClick={() => setPayments(p => ({ ...p, [key]: !p[key as keyof typeof p] }))} className={`w-10 h-5 rounded-full transition-colors relative ${(payments as any)[key] ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-colors ${(payments as any)[key] ? "left-5" : "left-0.5"}`} />
                   </button>
                 </div>
               ))}
@@ -303,38 +302,38 @@ export default function RestaurantSettings() {
           {/* Branding */}
           {activeSection === "branding" && (
             <div className="space-y-4">
-              <div className="rounded-xl bg-white/[0.03] border border-white/8 p-5 text-center">
+              <div className="rounded-lg bg-card border border-border p-5 text-center">
                 {branding.logo ? (
-                  <img src={branding.logo} alt="Restaurant logo" className="h-20 w-20 rounded-2xl object-cover border border-white/10 mx-auto mb-3" />
+                  <img src={branding.logo} alt="Restaurant logo" className="h-20 w-20 rounded-lg object-cover border border-border mx-auto mb-3" />
                 ) : (
-                  <div className="h-20 w-20 rounded-2xl bg-amber-500/20 border-2 border-dashed border-amber-500/40 flex items-center justify-center text-3xl mx-auto mb-3">🍽️</div>
+                  <div className="h-20 w-20 rounded-lg bg-primary/20 border-2 border-dashed border-primary/40 flex items-center justify-center text-primary mx-auto mb-3"><UtensilsCrossed className="h-8 w-8" /></div>
                 )}
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                 <div className="flex items-center justify-center gap-2">
-                  <button type="button" onClick={() => logoInputRef.current?.click()} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold">Upload Logo</button>
+                  <button type="button" onClick={() => logoInputRef.current?.click()} className="px-4 py-2 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Upload Logo</button>
                   {branding.logo && (
-                    <button type="button" onClick={() => setBranding(p => ({ ...p, logo: "" }))} className="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold text-white/50">Remove</button>
+                    <button type="button" onClick={() => setBranding(p => ({ ...p, logo: "" }))} className="px-4 py-2 rounded-lg border border-border hover:bg-muted text-sm font-semibold text-muted-foreground">Remove</button>
                   )}
                 </div>
-                <p className="text-xs text-white/30 mt-2">Saved with Save Changes below.</p>
+                <p className="text-xs text-muted-foreground mt-2">Saved with Save Changes below.</p>
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1.5">Brand Color</label>
+                <label className="block text-xs text-muted-foreground mb-1.5">Brand Color</label>
                 <div className="flex gap-2">
                   {["#f59e0b", "#f97316", "#3b82f6", "#8b5cf6", "#10b981", "#ef4444"].map(color => (
-                    <button key={color} type="button" onClick={() => setBranding(p => ({ ...p, brandColor: color }))} className={`h-8 w-8 rounded-xl border-2 transition-all ${branding.brandColor === color ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ backgroundColor: color }} aria-label={`Brand color ${color}`} />
+                    <button key={color} type="button" onClick={() => setBranding(p => ({ ...p, brandColor: color }))} className={`h-8 w-8 rounded-lg border-2 transition-colors ${branding.brandColor === color ? "border-border ring-2 ring-border" : "border-border hover:border-border"}`} style={{ backgroundColor: color }} aria-label={`Brand color ${color}`} />
                   ))}
                 </div>
               </div>
-              <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4 flex items-center justify-between">
+              <div className="rounded-lg bg-card border border-border p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <QrCode className="h-8 w-8 text-amber-400" />
+                  <QrCode className="h-8 w-8 text-primary" />
                   <div>
                     <p className="text-sm font-semibold">QR Code Generator</p>
-                    <p className="text-xs text-white/40">Generate table QR codes</p>
+                    <p className="text-xs text-muted-foreground">Generate table QR codes</p>
                   </div>
                 </div>
-                <button type="button" onClick={() => navigate("/restaurant/qr-management")} className="px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-semibold hover:bg-amber-500/30">Generate</button>
+                <button type="button" onClick={() => navigate("/restaurant/qr-management")} className="px-4 py-2 rounded-lg bg-primary/20 border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/30">Generate</button>
               </div>
             </div>
           )}
@@ -362,7 +361,7 @@ export default function RestaurantSettings() {
           )}
 
           {/* Save Button */}
-          <button onClick={handleSave} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={handleSave} className="flex items-center gap-2 px-6 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm shadow-sm transition-colors">
             <Save className="h-4 w-4" /> Save Changes
           </button>
         </div>

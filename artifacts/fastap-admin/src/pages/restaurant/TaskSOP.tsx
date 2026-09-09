@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-import { CheckSquare, Plus, X, Clock, CheckCircle, Users, FileText, PlayCircle, Download, Eye, Edit2, Trash2 } from "lucide-react";
+import { CheckSquare, Plus, X, Clock, CheckCircle, Users, FileText, PlayCircle, Download, Eye, Edit2, Trash2, StickyNote } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { tasksSop as tasksApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
@@ -294,20 +294,20 @@ export default function TaskSOP() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Tasks & SOP</h1>
-          <p className="text-xs text-white/40">Checklists, standard procedures and staff training</p>
+          <h1 className="text-xl font-semibold">Tasks & SOP</h1>
+          <p className="text-xs text-muted-foreground">Checklists, standard procedures and staff training</p>
         </div>
         {tab === "tasks" && (
-          <button onClick={() => setShowAddTask(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={() => setShowAddTask(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
             <Plus className="h-4 w-4" />Add Task
           </button>
         )}
         {/* The SOP tab listed documents and offered no way to add one — the only route in
             was seeding the table by hand. */}
         {tab === "sop" && (
-          <button onClick={() => { setEditSop(null); setSopForm({ title: "", category: "service", content: "", steps: "" }); setShowAddSop(true); }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={() => { setEditSop(null); setSopForm({ title: "", category: "service", content: "", steps: "" }); setShowAddSop(true); }} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
             <Plus className="h-4 w-4" />New Document
           </button>
         )}
@@ -315,21 +315,21 @@ export default function TaskSOP() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Today's Checklist", value: template.length ? `${done}/${template.length}` : "—", color: done === template.length && template.length ? "text-emerald-400" : "text-amber-400", bg: done === template.length && template.length ? "bg-emerald-500/10" : "bg-amber-500/10" },
-          { label: "Pending Tasks", value: tasks.filter(t => t.status !== "completed").length, color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "SOP Documents", value: sopDocs.length, color: "text-violet-400", bg: "bg-violet-500/10" },
-          { label: "Training Completions", value: trainingCompletions, color: "text-teal-400", bg: "bg-teal-500/10" },
+          { label: "Today's Checklist", value: template.length ? `${done}/${template.length}` : "—", color: done === template.length && template.length ? "text-success" : "text-primary", bg: done === template.length && template.length ? "bg-success-subtle" : "bg-primary/10" },
+          { label: "Pending Tasks", value: tasks.filter(t => t.status !== "completed").length, color: "text-info", bg: "bg-info-subtle" },
+          { label: "SOP Documents", value: sopDocs.length, color: "text-muted-foreground", bg: "bg-muted" },
+          { label: "Training Completions", value: trainingCompletions, color: "text-success", bg: "bg-success-subtle" },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
-            <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
+            <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["checklist", "Daily Checklist"], ["tasks", "Task Board"], ["sop", "SOP Documents"], ["training", "Training Videos"]] as [Tab, string][]).map(([t, l]) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? "bg-amber-500 text-black" : "text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
@@ -340,26 +340,26 @@ export default function TaskSOP() {
               <div className="flex items-center justify-between">
                 <div className="flex gap-2">
                   {(["opening", "closing"] as const).map(t => (
-                    <button key={t} onClick={() => setChecklistType(t)} className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize border transition-all ${checklistType === t ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
-                      {t === "opening" ? "🌅 Opening" : "🌙 Closing"} Checklist
+                    <button key={t} onClick={() => setChecklistType(t)} className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize border transition-colors ${checklistType === t ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                      {t === "opening" ? "Opening" : "Closing"} Checklist
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-sm">
-                    <span className={`font-extrabold ${mandatoryDone === mandatory.length ? "text-emerald-400" : "text-amber-400"}`}>{mandatoryDone}/{mandatory.length}</span>
-                    <span className="text-white/40"> mandatory</span>
+                    <span className={`font-semibold ${mandatoryDone === mandatory.length ? "text-success" : "text-primary"}`}>{mandatoryDone}/{mandatory.length}</span>
+                    <span className="text-muted-foreground"> mandatory</span>
                   </div>
-                  <button onClick={resetChecklist} className="text-xs text-white/40 hover:text-white border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/5">Reset</button>
+                  <button onClick={resetChecklist} className="text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg hover:bg-muted">Reset</button>
                 </div>
               </div>
-              <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4">
+              <div className="bg-card border border-border rounded-lg p-4">
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-white/50">{checklistType} checklist progress</span>
-                  <span className={`font-bold ${done === template.length ? "text-emerald-400" : "text-amber-400"}`}>{done}/{template.length} done</span>
+                  <span className="text-muted-foreground">{checklistType} checklist progress</span>
+                  <span className={`font-semibold ${done === template.length ? "text-success" : "text-primary"}`}>{done}/{template.length} done</span>
                 </div>
-                <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${done === template.length ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${template.length ? (done / template.length) * 100 : 0}%` }} />
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div className={`h-full rounded-full transition-colors ${done === template.length ? "bg-success" : "bg-primary"}`} style={{ width: `${template.length ? (done / template.length) * 100 : 0}%` }} />
                 </div>
               </div>
               {["manager", "cashier", "kitchen", "waiter", "housekeeping"].map(role => {
@@ -367,17 +367,17 @@ export default function TaskSOP() {
                 if (!roleTasks.length) return null;
                 return (
                   <div key={role}>
-                    <p className="text-xs text-white/40 uppercase tracking-wider font-semibold mb-2 capitalize">{role}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2 capitalize">{role}</p>
                     <div className="space-y-1.5">
                       {roleTasks.map(t => {
                         const isChecked = checked.has(t.id);
                         return (
-                          <button key={t.id} onClick={() => toggleCheck(t.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${isChecked ? "border-emerald-500/30 bg-emerald-500/8" : "border-white/8 bg-white/[0.03] hover:border-white/15"}`}>
-                            <div className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 border transition-all ${isChecked ? "bg-emerald-500 border-emerald-500" : "border-white/20"}`}>
-                              {isChecked && <CheckCircle className="h-3 w-3 text-white" />}
+                          <button key={t.id} onClick={() => toggleCheck(t.id)} className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${isChecked ? "border-success-border bg-success-subtle" : "border-border bg-card hover:border-border"}`}>
+                            <div className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 border transition-colors ${isChecked ? "bg-success border-success-border" : "border-border"}`}>
+                              {isChecked && <CheckCircle className="h-3 w-3 text-foreground" />}
                             </div>
-                            <span className={`text-sm flex-1 ${isChecked ? "text-white/40 line-through" : "text-white/80"}`}>{t.task}</span>
-                            {t.mandatory && !isChecked && <span className="text-xs text-red-400 border border-red-400/30 px-1.5 py-0.5 rounded-md shrink-0">Required</span>}
+                            <span className={`text-sm flex-1 ${isChecked ? "text-muted-foreground line-through" : "text-foreground"}`}>{t.task}</span>
+                            {t.mandatory && !isChecked && <span className="text-xs text-danger border border-danger-border px-1.5 py-0.5 rounded-md shrink-0">Required</span>}
                           </button>
                         );
                       })}
@@ -393,26 +393,26 @@ export default function TaskSOP() {
       {tab === "tasks" && (
         <div className="space-y-3">
           {tasks.length === 0 ? <EmptyState title="No tasks" description="Add operational tasks for your team." /> : tasks.map(task => (
-            <div key={task.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+            <div key={task.id} className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <button onClick={() => toggleTaskStatus(task)} className={`h-6 w-6 rounded-md flex items-center justify-center border shrink-0 mt-0.5 transition-all ${task.status === "completed" ? "bg-emerald-500 border-emerald-500" : "border-white/25 hover:border-white/50"}`}>
-                  {task.status === "completed" && <CheckCircle className="h-4 w-4 text-white" />}
+                <button onClick={() => toggleTaskStatus(task)} className={`h-6 w-6 rounded-md flex items-center justify-center border shrink-0 mt-0.5 transition-colors ${task.status === "completed" ? "bg-success border-success-border" : "border-border hover:border-border"}`}>
+                  {task.status === "completed" && <CheckCircle className="h-4 w-4 text-foreground" />}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-bold ${task.status === "completed" ? "text-white/40 line-through" : "text-white"}`}>{task.title}</p>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-white/40 flex-wrap">
+                  <p className={`text-sm font-semibold ${task.status === "completed" ? "text-muted-foreground line-through" : "text-foreground"}`}>{task.title}</p>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" />{task.assignedTo}</span>
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Due: {task.dueDate}</span>
-                    <span className={`px-2 py-0.5 rounded-full font-semibold ${task.priority === "high" ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/40"}`}>{task.priority}</span>
+                    <span className={`px-2 py-0.5 rounded-full font-semibold ${task.priority === "high" ? "bg-danger-subtle text-danger" : "bg-muted text-muted-foreground"}`}>{task.priority}</span>
                   </div>
-                  {task.notes && <p className="text-xs text-white/30 mt-1">📝 {task.notes}</p>}
+                  {task.notes && <p className="text-xs text-muted-foreground mt-1"><StickyNote className="h-3 w-3 inline mb-0.5" /> {task.notes}</p>}
                 </div>
                 {/* A task could be created and ticked off but never corrected or removed. */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={() => setEditTask({ ...task })} aria-label={`Edit ${task.title}`} className="h-7 w-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center hover:bg-blue-500/30">
+                  <button onClick={() => setEditTask({ ...task })} aria-label={`Edit ${task.title}`} className="h-7 w-7 rounded-lg bg-info-subtle text-info flex items-center justify-center hover-elevate">
                     <Edit2 className="h-3 w-3" />
                   </button>
-                  <button onClick={() => handleDeleteTask(task)} aria-label={`Delete ${task.title}`} className="h-7 w-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/30">
+                  <button onClick={() => handleDeleteTask(task)} aria-label={`Delete ${task.title}`} className="h-7 w-7 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
@@ -426,33 +426,33 @@ export default function TaskSOP() {
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
             {["all", "safety", "service", "finance", "hr", "compliance"].map(c => (
-              <button key={c} onClick={() => setSopCat(c)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border capitalize transition-all ${sopCat === c ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/40"}`}>{c === "all" ? "All Categories" : c}</button>
+              <button key={c} onClick={() => setSopCat(c)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${sopCat === c ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>{c === "all" ? "All Categories" : c}</button>
             ))}
           </div>
           <div className="grid lg:grid-cols-2 gap-4">
             {sopDocs.filter(d => sopCat === "all" || d.category === sopCat).length === 0 ? <EmptyState title="No SOP documents" description="Use New Document to write one." /> : sopDocs.filter(d => sopCat === "all" || d.category === sopCat).map(doc => {
               return (
-                <div key={doc.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
+                <div key={doc.id} className="bg-card border border-border rounded-lg p-5">
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-violet-400" /></div>
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-muted-foreground" /></div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold">{doc.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-white/40 mt-0.5">
+                      <h3 className="text-sm font-semibold">{doc.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span className="capitalize">{doc.category}</span>·<span>{doc.version}</span>·<span>{doc.pages} pages</span>
                       </div>
                     </div>
                   </div>
                   <div className="mb-3 flex items-center gap-2 text-xs">
-                    <span className={`px-2 py-0.5 rounded-full font-semibold ${doc.mandatory ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/40"}`}>
+                    <span className={`px-2 py-0.5 rounded-full font-semibold ${doc.mandatory ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground"}`}>
                       {doc.mandatory ? "Active" : "Archived"}
                     </span>
-                    <span className="text-white/30">Updated {doc.updatedAt}</span>
+                    <span className="text-muted-foreground">Updated {doc.updatedAt}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setViewSop({ ...doc, ...(sopRaw[doc.id] ?? {}) })} className="flex-1 py-2 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 flex items-center justify-center gap-1">
+                    <button onClick={() => setViewSop({ ...doc, ...(sopRaw[doc.id] ?? {}) })} className="flex-1 py-2 rounded-lg border border-border bg-muted text-muted-foreground text-xs font-semibold hover-elevate flex items-center justify-center gap-1">
                       <Eye className="h-3.5 w-3.5" />View
                     </button>
-                    <button onClick={() => downloadSop(doc.id)} className="flex-1 py-2 rounded-xl border border-white/10 bg-white/5 text-white/50 text-xs font-semibold hover:bg-white/10 flex items-center justify-center gap-1">
+                    <button onClick={() => downloadSop(doc.id)} className="flex-1 py-2 rounded-lg border border-border bg-muted text-muted-foreground text-xs font-semibold hover-elevate flex items-center justify-center gap-1">
                       <Download className="h-3.5 w-3.5" />Download
                     </button>
                     <button
@@ -468,11 +468,11 @@ export default function TaskSOP() {
                         setShowAddSop(true);
                       }}
                       aria-label={`Edit ${doc.title}`}
-                      className="px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                      className="px-3 py-2 rounded-lg border border-info-border bg-info-subtle text-info hover-elevate"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => handleDeleteSop(doc)} aria-label={`Delete ${doc.title}`} className="px-3 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                    <button onClick={() => handleDeleteSop(doc)} aria-label={`Delete ${doc.title}`} className="px-3 py-2 rounded-lg border border-danger-border bg-danger-subtle text-danger hover-elevate">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -488,12 +488,12 @@ export default function TaskSOP() {
           {trainingVideos.length === 0 ? <EmptyState title="No training videos" /> : trainingVideos.map(video => {
             const completePct = video.views ? Math.round((video.completions / video.views) * 100) : 0;
             return (
-              <div key={video.id} className="bg-[#0e1520] border border-white/5 rounded-2xl overflow-hidden">
-                <div className="bg-white/[0.03] border-b border-white/5 p-4 flex items-center gap-3">
-                  <div className="h-14 w-14 rounded-xl bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-300 shrink-0">{video.thumbnail}</div>
+              <div key={video.id} className="bg-card border border-border rounded-lg overflow-hidden">
+                <div className="bg-card border-b border-border p-4 flex items-center gap-3">
+                  <div className="h-14 w-14 rounded-lg bg-primary/15 flex items-center justify-center text-xs font-semibold text-primary shrink-0">{video.thumbnail}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold">{video.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-white/40 mt-0.5">
+                    <p className="text-sm font-semibold">{video.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{video.duration}</span>
                       <span className="capitalize">{video.category}</span>
                     </div>
@@ -501,15 +501,15 @@ export default function TaskSOP() {
                 </div>
                 <div className="p-4">
                   <div className="flex justify-between text-xs mb-2">
-                    <span className="text-white/40">{video.completions}/{video.views} staff completed</span>
-                    <span className="font-bold text-amber-400">{completePct}%</span>
+                    <span className="text-muted-foreground">{video.completions}/{video.views} staff completed</span>
+                    <span className="font-semibold text-primary">{completePct}%</span>
                   </div>
-                  <div className="h-2 rounded-full bg-white/10 mb-3 overflow-hidden"><div className="h-full rounded-full bg-amber-500" style={{ width: `${completePct}%` }} /></div>
+                  <div className="h-2 rounded-full bg-muted mb-3 overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${completePct}%` }} /></div>
                   <div className="flex gap-2">
-                    <button onClick={() => watchVideo(video)} disabled={loadingVideo === video.id} className="flex-1 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-bold hover:bg-amber-500/30 flex items-center justify-center gap-2">
+                    <button onClick={() => watchVideo(video)} disabled={loadingVideo === video.id} className="flex-1 py-2.5 rounded-lg bg-primary/20 border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/30 flex items-center justify-center gap-2">
                       <PlayCircle className="h-4 w-4" />{loadingVideo === video.id ? "Opening…" : "Watch"}
                     </button>
-                    <button onClick={() => markVideoComplete(video)} className="px-3 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold">Mark Done</button>
+                    <button onClick={() => markVideoComplete(video)} className="px-3 py-2.5 rounded-lg border border-success-border bg-success-subtle text-success text-xs font-semibold">Mark Done</button>
                   </div>
                 </div>
               </div>
@@ -519,33 +519,33 @@ export default function TaskSOP() {
       )}
 
       {viewSop && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setViewSop(null)}>
-          <div className="bg-[#111827] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setViewSop(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
               <div className="flex items-start gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-violet-400" /></div>
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0"><FileText className="h-5 w-5 text-muted-foreground" /></div>
                 <div className="min-w-0">
-                  <h2 className="font-bold text-sm truncate">{viewSop.title}</h2>
-                  <p className="text-xs text-white/40 capitalize mt-0.5">{viewSop.category} · {viewSop.version ?? "v1.0"} · {viewSop.pages ?? 1} pages</p>
+                  <h2 className="font-semibold text-sm truncate">{viewSop.title}</h2>
+                  <p className="text-xs text-muted-foreground capitalize mt-0.5">{viewSop.category} · {viewSop.version ?? "v1.0"} · {viewSop.pages ?? 1} pages</p>
                 </div>
               </div>
-              <button onClick={() => setViewSop(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              <button onClick={() => setViewSop(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
-            <div className="p-5 overflow-y-auto text-sm text-white/80 space-y-3">
+            <div className="p-5 overflow-y-auto text-sm text-foreground space-y-3">
               {Array.isArray(viewSop.steps) && viewSop.steps.length > 0 ? (
                 <ol className="space-y-2 list-decimal list-inside">
                   {viewSop.steps.map((step: any, i: number) => (
-                    <li key={i} className="text-white/75">{typeof step === "string" ? step : (step?.text ?? step?.title ?? JSON.stringify(step))}</li>
+                    <li key={i} className="text-foreground">{typeof step === "string" ? step : (step?.text ?? step?.title ?? JSON.stringify(step))}</li>
                   ))}
                 </ol>
               ) : viewSop.content ? (
-                <p className="whitespace-pre-wrap text-white/75 leading-relaxed">{viewSop.content}</p>
+                <p className="whitespace-pre-wrap text-foreground leading-relaxed">{viewSop.content}</p>
               ) : (
-                <p className="text-white/40 italic">No preview content available for this document. Use Download to get the full file.</p>
+                <p className="text-muted-foreground italic">No preview content available for this document. Use Download to get the full file.</p>
               )}
             </div>
-            <div className="p-4 border-t border-white/10">
-              <button onClick={() => { downloadSop(String(viewSop.id)); }} className="w-full py-2.5 rounded-xl bg-amber-500 text-black text-sm font-bold flex items-center justify-center gap-2 hover:bg-amber-400">
+            <div className="p-4 border-t border-border">
+              <button onClick={() => { downloadSop(String(viewSop.id)); }} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary/90">
                 <Download className="h-4 w-4" />Download
               </button>
             </div>
@@ -554,28 +554,28 @@ export default function TaskSOP() {
       )}
 
       {showAddTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">New Task</h2>
-              <button onClick={() => setShowAddTask(false)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              <h2 className="font-semibold">New Task</h2>
+              <button onClick={() => setShowAddTask(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="space-y-4">
-              <input value={newTask.title} onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))} placeholder="Task title" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40" />
-              <select value={newTask.assignedTo} onChange={e => setNewTask(p => ({ ...p, assignedTo: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+              <input value={newTask.title} onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))} placeholder="Task title" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40" />
+              <select value={newTask.assignedTo} onChange={e => setNewTask(p => ({ ...p, assignedTo: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                 <option value="">-- Select Staff --</option>
                 {staffOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <input type="date" value={newTask.dueDate} onChange={e => setNewTask(p => ({ ...p, dueDate: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white" />
+              <input type="date" value={newTask.dueDate} onChange={e => setNewTask(p => ({ ...p, dueDate: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground" />
               {/* Priority was posted to the server but had no control, so every task was
                   created "normal" and the urgent badge could never be set. */}
-              <select value={newTask.priority} onChange={e => setNewTask(p => ({ ...p, priority: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+              <select value={newTask.priority} onChange={e => setNewTask(p => ({ ...p, priority: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                 {["low", "normal", "high"].map(p => <option key={p} value={p}>{p} priority</option>)}
               </select>
-              <textarea value={newTask.notes} onChange={e => setNewTask(p => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Notes" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm resize-none" />
+              <textarea value={newTask.notes} onChange={e => setNewTask(p => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Notes" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm resize-none" />
               <div className="flex gap-3">
-                <button onClick={() => setShowAddTask(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleAddTask} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm">Add Task</button>
+                <button onClick={() => setShowAddTask(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleAddTask} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm">Add Task</button>
               </div>
             </div>
           </div>
@@ -583,25 +583,25 @@ export default function TaskSOP() {
       )}
 
       {editTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Edit Task</h2>
-              <button onClick={() => setEditTask(null)} aria-label="Close"><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              <h2 className="font-semibold">Edit Task</h2>
+              <button onClick={() => setEditTask(null)} aria-label="Close"><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="space-y-4">
-              <input value={editTask.title} onChange={e => setEditTask({ ...editTask, title: e.target.value })} placeholder="Task title" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40" />
-              <select value={editTask.assignedTo} onChange={e => setEditTask({ ...editTask, assignedTo: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+              <input value={editTask.title} onChange={e => setEditTask({ ...editTask, title: e.target.value })} placeholder="Task title" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40" />
+              <select value={editTask.assignedTo} onChange={e => setEditTask({ ...editTask, assignedTo: e.target.value })} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                 <option value="">-- Select Staff --</option>
                 {staffOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <select value={editTask.priority} onChange={e => setEditTask({ ...editTask, priority: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+              <select value={editTask.priority} onChange={e => setEditTask({ ...editTask, priority: e.target.value })} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                 {["low", "normal", "high"].map(p => <option key={p} value={p}>{p} priority</option>)}
               </select>
-              <textarea value={editTask.notes} onChange={e => setEditTask({ ...editTask, notes: e.target.value })} rows={2} placeholder="Notes" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm resize-none" />
+              <textarea value={editTask.notes} onChange={e => setEditTask({ ...editTask, notes: e.target.value })} rows={2} placeholder="Notes" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm resize-none" />
               <div className="flex gap-3">
-                <button onClick={() => setEditTask(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleSaveTask} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm">Save Changes</button>
+                <button onClick={() => setEditTask(null)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveTask} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm">Save Changes</button>
               </div>
             </div>
           </div>
@@ -609,28 +609,28 @@ export default function TaskSOP() {
       )}
 
       {showAddSop && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">{editSop ? "Edit Document" : "New SOP Document"}</h2>
-              <button onClick={() => { setShowAddSop(false); setEditSop(null); }} aria-label="Close"><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+              <h2 className="font-semibold">{editSop ? "Edit Document" : "New SOP Document"}</h2>
+              <button onClick={() => { setShowAddSop(false); setEditSop(null); }} aria-label="Close"><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="space-y-4">
-              <input value={sopForm.title} onChange={e => setSopForm(p => ({ ...p, title: e.target.value }))} placeholder="Document title" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40" />
-              <select value={sopForm.category} onChange={e => setSopForm(p => ({ ...p, category: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white">
+              <input value={sopForm.title} onChange={e => setSopForm(p => ({ ...p, title: e.target.value }))} placeholder="Document title" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40" />
+              <select value={sopForm.category} onChange={e => setSopForm(p => ({ ...p, category: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground">
                 {["safety", "service", "kitchen", "finance", "hr", "compliance"].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <div>
-                <label className="block text-xs text-white/40 mb-1.5">Summary</label>
-                <textarea value={sopForm.content} onChange={e => setSopForm(p => ({ ...p, content: e.target.value }))} rows={3} placeholder="What this procedure covers" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm resize-none" />
+                <label className="block text-xs text-muted-foreground mb-1.5">Summary</label>
+                <textarea value={sopForm.content} onChange={e => setSopForm(p => ({ ...p, content: e.target.value }))} rows={3} placeholder="What this procedure covers" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm resize-none" />
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1.5">Steps — one per line</label>
-                <textarea value={sopForm.steps} onChange={e => setSopForm(p => ({ ...p, steps: e.target.value }))} rows={6} placeholder={"Wash hands\nCheck fridge temperature\nRecord the reading"} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm resize-none font-mono" />
+                <label className="block text-xs text-muted-foreground mb-1.5">Steps — one per line</label>
+                <textarea value={sopForm.steps} onChange={e => setSopForm(p => ({ ...p, steps: e.target.value }))} rows={6} placeholder={"Wash hands\nCheck fridge temperature\nRecord the reading"} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm resize-none font-mono" />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowAddSop(false); setEditSop(null); }} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleSaveSop} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-sm">{editSop ? "Save Changes" : "Add Document"}</button>
+                <button onClick={() => { setShowAddSop(false); setEditSop(null); }} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveSop} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm">{editSop ? "Save Changes" : "Add Document"}</button>
               </div>
             </div>
           </div>

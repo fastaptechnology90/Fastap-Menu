@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Building2, Users, MapPin, Plus, X, ChevronRight, Truck, DollarSign, CheckCircle } from "lucide-react";
+import { Building2, Users, MapPin, Plus, X, ChevronRight, Truck, DollarSign, CheckCircle, Store, Receipt } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { branches as branchesApi, planLimitMessage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +37,7 @@ function mapBranch(b: any): Branch {
 // Display helpers for possibly-missing per-branch metrics.
 const revenueLabel = (v: number | null) => (v == null ? "N/A" : `₹${(v / 1000).toFixed(0)}K`);
 const metricLabel = (v: number | null) => (v == null ? "—" : String(v));
-const ratingLabel = (v: number | null) => (v == null ? "—" : `${v}★`);
+const ratingLabel = (v: number | null) => (v == null ? "—" : String(v));
 
 type FranchiseeRow = { id: string; name: string; branch: string; owner: string; royalty: number; status: string; dueDate: string; contract: string; phone: string };
 type TransferRow = { id: string; from: string; to: string; items: string; status: string; date: string; requestedBy: string; value: number };
@@ -156,82 +156,82 @@ export default function MultiBranchFranchise() {
   const royaltyOverdue = isRestaurantPublished ? franchisees.filter(f => f.status === "overdue").reduce((s, f) => s + (f.royalty || 0), 0) : 0;
 
   if (loading && branchList.length === 0) {
-    return <div className="p-6 text-center text-white/40 text-sm">Loading branches…</div>;
+    return <div className="p-6 text-center text-muted-foreground text-sm">Loading branches…</div>;
   }
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Branches & Franchise</h1>
-          <p className="text-xs text-white/40">{active} active branches · ₹{(totalRevenue/100000).toFixed(1)}L network revenue</p>
+          <h1 className="text-xl font-semibold">Branches & Franchise</h1>
+          <p className="text-xs text-muted-foreground">{active} active branches · ₹{(totalRevenue/100000).toFixed(1)}L network revenue</p>
         </div>
         <PermissionGate permission="branch_wise_access">
-          <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+          <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
             <Plus className="h-4 w-4"/>Add Branch
           </button>
         </PermissionGate>
       </div>
 
       {!isRestaurantPublished && (
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
-          <p className="text-sm font-semibold text-amber-200">Branch analytics unavailable</p>
-          <p className="text-xs text-white/50 mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
+        <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
+          <p className="text-sm font-semibold text-primary">Branch analytics unavailable</p>
+          <p className="text-xs text-muted-foreground mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
         </div>
       )}
 
       {/* Network Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Total Branches",value:branchList.length,icon:Building2,color:"text-blue-400",bg:"bg-blue-500/10"},
-          {label:"Active Branches",value:active,icon:CheckCircle,color:"text-emerald-400",bg:"bg-emerald-500/10"},
-          {label:"Network Revenue",value:isRestaurantPublished ? `₹${(totalRevenue/100000).toFixed(1)}L` : "₹0",icon:DollarSign,color:"text-amber-400",bg:"bg-amber-500/10"},
-          {label:"Franchise Partners",value:franchisees.length,icon:Users,color:"text-violet-400",bg:"bg-violet-500/10"},
+          {label:"Total Branches",value:branchList.length,icon:Building2,color:"text-info",bg:"bg-info-subtle"},
+          {label:"Active Branches",value:active,icon:CheckCircle,color:"text-success",bg:"bg-success-subtle"},
+          {label:"Network Revenue",value:isRestaurantPublished ? `₹${(totalRevenue/100000).toFixed(1)}L` : "₹0",icon:DollarSign,color:"text-primary",bg:"bg-primary/10"},
+          {label:"Franchise Partners",value:franchisees.length,icon:Users,color:"text-muted-foreground",bg:"bg-muted"},
         ].map(s=>(
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4 flex items-center gap-3`}>
-            <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
-            <div><p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p><p className="text-xs text-white/40">{s.label}</p></div>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4 flex items-center gap-3`}>
+            <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
+            <div><p className={`text-xl font-semibold ${s.color}`}>{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["branches","Branches"],["franchise","Franchise"],["transfers","Stock Transfers"],["analytics","Analytics"]] as [Tab,string][]).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
       {tab==="branches"&&(
         <div className="grid gap-4">
           {branchList.map(branch=>(
-            <div key={branch.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all cursor-pointer" onClick={()=>setSelected(branch)}>
+            <div key={branch.id} className="bg-card border border-border rounded-lg p-5 hover:border-border transition-colors cursor-pointer" onClick={()=>setSelected(branch)}>
               <div className="flex items-start gap-4">
-                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${branch.status==="active"?"bg-emerald-500/15":"bg-red-500/15"}`}>🏪</div>
+                <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-xl shrink-0 ${branch.status==="active"?"bg-success-subtle text-success":"bg-danger-subtle text-danger"}`}><Store className="h-6 w-6" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-extrabold">{branch.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${branch.status==="active"?"bg-emerald-500/20 text-emerald-400":"bg-red-500/20 text-red-400"}`}>{branch.status}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${branch.type==="franchise"?"bg-violet-500/20 text-violet-400":"bg-blue-500/20 text-blue-400"}`}>{branch.type}</span>
+                    <h3 className="font-semibold">{branch.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${branch.status==="active"?"bg-success-subtle text-success":"bg-danger-subtle text-danger"}`}>{branch.status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${branch.type==="franchise"?"bg-muted text-muted-foreground":"bg-info-subtle text-info"}`}>{branch.type}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-white/40 mb-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
                     <MapPin className="h-3 w-3"/>{branch.city} · Manager: {branch.manager} · {metricLabel(branch.tables)} tables
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      {label:"Revenue",value:revenueLabel(branch.revenue),color:"text-amber-400"},
-                      {label:"Orders",value:metricLabel(branch.orders),color:"text-blue-400"},
-                      {label:"Rating",value:ratingLabel(branch.rating),color:"text-yellow-400"},
-                      {label:"Staff",value:metricLabel(branch.staff),color:"text-violet-400"},
+                      {label:"Revenue",value:revenueLabel(branch.revenue),color:"text-primary"},
+                      {label:"Orders",value:metricLabel(branch.orders),color:"text-info"},
+                      {label:"Rating",value:ratingLabel(branch.rating),color:"text-warning"},
+                      {label:"Staff",value:metricLabel(branch.staff),color:"text-muted-foreground"},
                     ].map(m=>(
-                      <div key={m.label} className="bg-white/5 rounded-xl p-2 text-center">
-                        <p className={`text-base font-extrabold ${m.color}`}>{m.value}</p>
-                        <p className="text-xs text-white/30">{m.label}</p>
+                      <div key={m.label} className="bg-muted rounded-lg p-2 text-center">
+                        <p className={`text-base font-semibold ${m.color}`}>{m.value}</p>
+                        <p className="text-xs text-muted-foreground">{m.label}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-white/20 shrink-0 mt-1"/>
+                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 mt-1"/>
               </div>
             </div>
           ))}
@@ -242,35 +242,35 @@ export default function MultiBranchFranchise() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3 mb-2">
             {[
-              {label:"Total Royalty Due",value:`₹${royaltyDue.toLocaleString()}`,color:"text-amber-400"},
-              {label:"Paid This Month",value:`₹${royaltyPaid.toLocaleString()}`,color:"text-emerald-400"},
-              {label:"Overdue",value:`₹${royaltyOverdue.toLocaleString()}`,color:"text-red-400"},
+              {label:"Total Royalty Due",value:`₹${royaltyDue.toLocaleString()}`,color:"text-primary"},
+              {label:"Paid This Month",value:`₹${royaltyPaid.toLocaleString()}`,color:"text-success"},
+              {label:"Overdue",value:`₹${royaltyOverdue.toLocaleString()}`,color:"text-danger"},
             ].map(s=>(
-              <div key={s.label} className="bg-white/[0.03] border border-white/8 rounded-xl p-3 text-center">
-                <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-white/40">{s.label}</p>
+              <div key={s.label} className="bg-card border border-border rounded-lg p-3 text-center">
+                <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             ))}
           </div>
           {franchisees.length === 0 ? <EmptyState title="No franchise partners" description="Franchise royalty records will appear here." /> : franchisees.map(f=>(
-            <div key={f.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
+            <div key={f.id} className="bg-card border border-border rounded-lg p-5">
               <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-violet-500/15 flex items-center justify-center text-xl shrink-0">🏪</div>
+                <div className="h-12 w-12 rounded-lg bg-muted text-muted-foreground flex items-center justify-center shrink-0"><Store className="h-6 w-6" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-bold">{f.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${f.status==="paid"?"bg-emerald-500/20 text-emerald-400":f.status==="due"?"bg-yellow-500/20 text-yellow-400":"bg-red-500/20 text-red-400"}`}>{f.status==="paid"?"Royalty Paid":f.status==="due"?"Payment Due":"OVERDUE"}</span>
+                    <h3 className="font-semibold">{f.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${f.status==="paid"?"bg-success-subtle text-success":f.status==="due"?"bg-warning-subtle text-warning":"bg-danger-subtle text-danger"}`}>{f.status==="paid"?"Royalty Paid":f.status==="due"?"Payment Due":"OVERDUE"}</span>
                   </div>
-                  <p className="text-xs text-white/40 mb-3">Branch: {f.branch} · Owner: {f.owner} · Contract until {f.contract}</p>
+                  <p className="text-xs text-muted-foreground mb-3">Branch: {f.branch} · Owner: {f.owner} · Contract until {f.contract}</p>
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-white/5 rounded-lg p-2 text-center"><p className="text-base font-bold text-amber-400">₹{f.royalty.toLocaleString()}</p><p className="text-xs text-white/30">Royalty/mo</p></div>
-                    <div className="bg-white/5 rounded-lg p-2 text-center"><p className="text-base font-bold text-white/70">{f.dueDate}</p><p className="text-xs text-white/30">Due Date</p></div>
-                    <div className="bg-white/5 rounded-lg p-2 text-center"><p className="text-base font-bold text-blue-400">{f.phone}</p><p className="text-xs text-white/30">Contact</p></div>
+                    <div className="bg-muted rounded-lg p-2 text-center"><p className="text-base font-semibold text-primary">₹{f.royalty.toLocaleString()}</p><p className="text-xs text-muted-foreground">Royalty/mo</p></div>
+                    <div className="bg-muted rounded-lg p-2 text-center"><p className="text-base font-semibold text-foreground">{f.dueDate}</p><p className="text-xs text-muted-foreground">Due Date</p></div>
+                    <div className="bg-muted rounded-lg p-2 text-center"><p className="text-base font-semibold text-info">{f.phone}</p><p className="text-xs text-muted-foreground">Contact</p></div>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => f.status !== "paid" && markFranchisePaid(f.id)} disabled={f.status === "paid"} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${f.status!=="paid"?"bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30":"bg-white/5 text-white/30"}`}>{f.status==="paid"?"Receipt":"Mark Paid"}</button>
-                  <button disabled title="franchisee messaging endpoint not available" className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-white/30 opacity-50 cursor-not-allowed">Message</button>
+                  <button onClick={() => f.status !== "paid" && markFranchisePaid(f.id)} disabled={f.status === "paid"} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${f.status!=="paid"?"bg-success-subtle text-success hover-elevate":"bg-muted text-muted-foreground"}`}>{f.status==="paid"?"Receipt":"Mark Paid"}</button>
+                  <button disabled title="franchisee messaging endpoint not available" className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border bg-muted text-muted-foreground opacity-50 cursor-not-allowed">Message</button>
                 </div>
               </div>
             </div>
@@ -281,25 +281,25 @@ export default function MultiBranchFranchise() {
       {tab==="transfers"&&(
         <div className="space-y-3">
           <div className="flex justify-end">
-            <button disabled title="no endpoint to create a stock transfer request" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold opacity-50 cursor-not-allowed">
-              <Truck className="h-4 w-4 text-amber-400"/>Request Transfer
+            <button disabled title="no endpoint to create a stock transfer request" className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted text-sm font-semibold opacity-50 cursor-not-allowed">
+              <Truck className="h-4 w-4 text-primary"/>Request Transfer
             </button>
           </div>
           {transfers.length === 0 ? <EmptyState title="No stock transfers" description="Inter-branch transfer requests will appear here." /> : transfers.map(t=>(
-            <div key={t.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4">
+            <div key={t.id} className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-start gap-4">
-                <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0"><Truck className="h-5 w-5 text-amber-400"/></div>
+                <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0"><Truck className="h-5 w-5 text-primary"/></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="text-sm font-bold">{t.from} → {t.to}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status==="completed"?"bg-emerald-500/20 text-emerald-400":t.status==="in-transit"?"bg-blue-500/20 text-blue-400":"bg-yellow-500/20 text-yellow-400"}`}>{t.status}</span>
+                    <p className="text-sm font-semibold">{t.from} to {t.to}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status==="completed"?"bg-success-subtle text-success":t.status==="in-transit"?"bg-info-subtle text-info":"bg-warning-subtle text-warning"}`}>{t.status}</span>
                   </div>
-                  <p className="text-sm text-white/60">{t.items}</p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-white/30">
-                    <span>{t.date}</span><span>Requested by {t.requestedBy}</span><span className="text-amber-400">₹{t.value.toLocaleString()}</span>
+                  <p className="text-sm text-muted-foreground">{t.items}</p>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <span>{t.date}</span><span>Requested by {t.requestedBy}</span><span className="text-primary">₹{t.value.toLocaleString()}</span>
                   </div>
                 </div>
-                {t.status==="pending"&&<button onClick={()=>approveTransfer(t.id)} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Approve</button>}
+                {t.status==="pending"&&<button onClick={()=>approveTransfer(t.id)} className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate">Approve</button>}
               </div>
             </div>
           ))}
@@ -310,19 +310,19 @@ export default function MultiBranchFranchise() {
         <div className="space-y-5">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {analytics.length === 0 || !isRestaurantPublished ? <EmptyState title={isRestaurantPublished ? "No branch analytics yet" : "No data available yet"} /> : analytics.map(a=>(
-              <div key={a.metric} className="bg-white/[0.03] border border-white/8 rounded-2xl p-4">
+              <div key={a.metric} className="bg-card border border-border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-white/40">{a.metric}</p>
-                  <span className={`text-xs font-bold ${a.up?"text-emerald-400":"text-red-400"}`}>{a.trend}</span>
+                  <p className="text-xs text-muted-foreground">{a.metric}</p>
+                  <span className={`text-xs font-semibold ${a.up?"text-success":"text-danger"}`}>{a.trend}</span>
                 </div>
-                <p className="text-xl font-extrabold text-amber-400">{a.value}</p>
-                <p className="text-xs text-white/30 mt-0.5">{a.sub}</p>
+                <p className="text-xl font-semibold text-primary">{a.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{a.sub}</p>
               </div>
             ))}
           </div>
 
-          <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
-            <h3 className="font-bold mb-4">Branch Performance Comparison</h3>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h3 className="font-semibold mb-4">Branch Performance Comparison</h3>
             <div className="space-y-4">
               {branchList.filter(b=>b.status==="active").sort((a,b)=>(b.revenue||0)-(a.revenue||0)).map((branch,i)=>{
                 const pct = totalRevenue > 0 ? ((branch.revenue||0)/totalRevenue)*100 : 0;
@@ -330,16 +330,16 @@ export default function MultiBranchFranchise() {
                 <div key={branch.id}>
                   <div className="flex items-center justify-between text-xs mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className={`h-5 w-5 rounded-full flex items-center justify-center text-xs font-bold ${i===0?"bg-amber-500 text-black":"bg-white/10 text-white/60"}`}>{i+1}</span>
+                      <span className={`h-5 w-5 rounded-full flex items-center justify-center text-xs font-semibold ${i===0?"bg-primary text-primary-foreground":"bg-muted text-muted-foreground"}`}>{i+1}</span>
                       <span className="font-semibold">{branch.name}, {branch.city}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-white/50">
-                      <span className="text-amber-400 font-bold">{revenueLabel(branch.revenue)}</span>
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <span className="text-primary font-semibold">{revenueLabel(branch.revenue)}</span>
                       <span>{ratingLabel(branch.rating)}</span>
                     </div>
                   </div>
-                  <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-500 transition-all" style={{width:`${pct}%`}}/>
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-primary transition-colors" style={{width:`${pct}%`}}/>
                   </div>
                 </div>
                 );
@@ -351,42 +351,42 @@ export default function MultiBranchFranchise() {
 
       {/* Branch Detail Drawer */}
       {selected&&(
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-end" onClick={()=>setSelected(null)}>
-          <div className="w-full max-w-md h-full bg-[#0e1520] border-l border-white/10 overflow-y-auto" onClick={e=>e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <div><h3 className="font-extrabold">{selected.name}</h3><p className="text-xs text-white/40">{selected.city}</p></div>
-              <button onClick={()=>setSelected(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-end" onClick={()=>setSelected(null)}>
+          <div className="w-full max-w-md h-full bg-card border-l border-border overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div><h3 className="font-semibold">{selected.name}</h3><p className="text-xs text-muted-foreground">{selected.city}</p></div>
+              <button onClick={()=>setSelected(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  {label:"Revenue",value:revenueLabel(selected.revenue),color:"text-amber-400"},
-                  {label:"Orders",value:metricLabel(selected.orders),color:"text-blue-400"},
-                  {label:"Rating",value:ratingLabel(selected.rating),color:"text-yellow-400"},
-                  {label:"Staff",value:metricLabel(selected.staff),color:"text-violet-400"},
+                  {label:"Revenue",value:revenueLabel(selected.revenue),color:"text-primary"},
+                  {label:"Orders",value:metricLabel(selected.orders),color:"text-info"},
+                  {label:"Rating",value:ratingLabel(selected.rating),color:"text-warning"},
+                  {label:"Staff",value:metricLabel(selected.staff),color:"text-muted-foreground"},
                 ].map(m=>(
-                  <div key={m.label} className="bg-white/5 rounded-xl p-3 text-center border border-white/8">
-                    <p className={`text-xl font-extrabold ${m.color}`}>{m.value}</p>
-                    <p className="text-xs text-white/40">{m.label}</p>
+                  <div key={m.label} className="bg-muted rounded-lg p-3 text-center border border-border">
+                    <p className={`text-xl font-semibold ${m.color}`}>{m.value}</p>
+                    <p className="text-xs text-muted-foreground">{m.label}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-white/5 rounded-xl p-3 space-y-2 text-sm">
+              <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
                 {[
                   {label:"Manager",value:selected.manager},
                   {label:"Tables",value:metricLabel(selected.tables)},
                   {label:"Open Since",value:selected.openSince},
                   {label:"Type",value:selected.type==="franchise"?"Franchise Partner":"Company Owned"},
                 ].map(r=>(
-                  <div key={r.label} className="flex justify-between py-1.5 border-b border-white/5 last:border-0">
-                    <span className="text-white/40">{r.label}</span>
+                  <div key={r.label} className="flex justify-between py-1.5 border-b border-border last:border-0">
+                    <span className="text-muted-foreground">{r.label}</span>
                     <span className="font-semibold capitalize">{r.value}</span>
                   </div>
                 ))}
               </div>
               <div className="flex gap-2">
-                <button disabled title="per-branch reports endpoint not available" className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold opacity-50 cursor-not-allowed">View Reports</button>
-                <button onClick={() => selected && openManageBranch(selected)} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm">Manage Branch</button>
+                <button disabled title="per-branch reports endpoint not available" className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold opacity-50 cursor-not-allowed">View Reports</button>
+                <button onClick={() => selected && openManageBranch(selected)} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm">Manage Branch</button>
               </div>
             </div>
           </div>
@@ -395,11 +395,11 @@ export default function MultiBranchFranchise() {
 
       {/* Add Branch Modal */}
       {showAdd&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Add New Branch</h2>
-              <button onClick={()=>setShowAdd(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">Add New Branch</h2>
+              <button onClick={()=>setShowAdd(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-4">
               {[
@@ -407,18 +407,18 @@ export default function MultiBranchFranchise() {
                 {label:"City",key:"city",placeholder:"e.g. Mumbai"},
                 {label:"Manager Name",key:"manager",placeholder:"Manager's full name"},
               ].map(f=>(
-                <div key={f.key}><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
-                  <input value={(newBranch as any)[f.key]} onChange={e=>setNewBranch(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                <div key={f.key}><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  <input value={(newBranch as any)[f.key]} onChange={e=>setNewBranch(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
                 </div>
               ))}
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Branch Type</label>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Branch Type</label>
                 <div className="flex gap-2">
-                  {["company-owned","franchise"].map(t=><button key={t} onClick={()=>setNewBranch(p=>({...p,type:t}))} className={`flex-1 py-2 rounded-lg text-xs font-semibold border capitalize transition-all ${newBranch.type===t?"bg-amber-500/20 border-amber-500/40 text-amber-300":"border-white/10 bg-white/5 text-white/50"}`}>{t}</button>)}
+                  {["company-owned","franchise"].map(t=><button key={t} onClick={()=>setNewBranch(p=>({...p,type:t}))} className={`flex-1 py-2 rounded-lg text-xs font-semibold border capitalize transition-colors ${newBranch.type===t?"bg-primary/20 border-primary/40 text-primary":"border-border bg-muted text-muted-foreground"}`}>{t}</button>)}
                 </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleAddBranch} disabled={!newBranch.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Add Branch</button>
+                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleAddBranch} disabled={!newBranch.name} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">Add Branch</button>
               </div>
             </div>
           </div>
@@ -427,11 +427,11 @@ export default function MultiBranchFranchise() {
 
       {/* Manage / Edit Branch Modal */}
       {editBranch&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Manage Branch</h2>
-              <button onClick={()=>setEditBranch(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">Manage Branch</h2>
+              <button onClick={()=>setEditBranch(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-4">
               {[
@@ -439,13 +439,13 @@ export default function MultiBranchFranchise() {
                 {label:"Address / City",key:"city",placeholder:"e.g. Mumbai"},
                 {label:"Contact Phone",key:"manager",placeholder:"Branch contact number"},
               ].map(f=>(
-                <div key={f.key}><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">{f.label}</label>
-                  <input value={(editBranch as any)[f.key]} onChange={e=>setEditBranch(p=>p?{...p,[f.key]:e.target.value}:p)} placeholder={f.placeholder} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+                <div key={f.key}><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">{f.label}</label>
+                  <input value={(editBranch as any)[f.key]} onChange={e=>setEditBranch(p=>p?{...p,[f.key]:e.target.value}:p)} placeholder={f.placeholder} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
                 </div>
               ))}
               <div className="flex gap-3">
-                <button onClick={()=>setEditBranch(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleUpdateBranch} disabled={!editBranch.name||savingEdit} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
+                <button onClick={()=>setEditBranch(null)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleUpdateBranch} disabled={!editBranch.name||savingEdit} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
               </div>
             </div>
           </div>

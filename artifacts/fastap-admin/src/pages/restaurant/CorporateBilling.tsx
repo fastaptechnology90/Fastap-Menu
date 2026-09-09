@@ -19,7 +19,7 @@ export default function CorporateBilling() {
       ]}
       workaround={
         <>
-          <span className="font-semibold text-white/85">Until this ships:</span> bill corporate clients
+          <span className="font-semibold text-foreground">Until this ships:</span> bill corporate clients
           outside the platform. Orders placed against a company still appear in Orders and Revenue
           Overview, so you can export the period and invoice from those figures.
         </>

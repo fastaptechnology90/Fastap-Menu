@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Send, Bell, Plus, X, Users, TrendingUp, Clock, Target, Zap, Trash2, Pencil } from "lucide-react";
+import { Send, Bell, Plus, X, Users, TrendingUp, Clock, Target, Zap, Trash2, Pencil, MessageSquare, Smartphone, Mail, Megaphone } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { marketing as marketingApi } from "@/lib/api";
 import { EmptyState } from "@/components/restaurant/EmptyState";
@@ -41,19 +42,19 @@ type TriggerRow = { id: string; name: string; event: string; channel: string; st
 type TemplateRow = { id: string; name: string; channel: string; category: string; body: string; usedIn: number };
 type SegmentRow = { label: string; count: number; color: string };
 
-const CHANNEL_CFG: Record<string,{icon:string;color:string;bg:string}> = {
-  whatsapp: {icon:"💬",color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  sms:      {icon:"📱",color:"text-blue-400",   bg:"bg-blue-500/15"},
-  email:    {icon:"📧",color:"text-violet-400", bg:"bg-violet-500/15"},
-  push:     {icon:"🔔",color:"text-amber-400",  bg:"bg-amber-500/15"},
+const CHANNEL_CFG: Record<string,{icon:LucideIcon;color:string;bg:string}> = {
+  whatsapp: {icon:MessageSquare,color:"text-success",bg:"bg-success-subtle"},
+  sms:      {icon:Smartphone,color:"text-info",   bg:"bg-info-subtle"},
+  email:    {icon:Mail,color:"text-muted-foreground", bg:"bg-muted"},
+  push:     {icon:Bell,color:"text-primary",  bg:"bg-primary/15"},
 };
 
 const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  active:    {label:"Active",   color:"text-emerald-400",bg:"bg-emerald-500/15"},
-  scheduled: {label:"Scheduled",color:"text-blue-400",   bg:"bg-blue-500/15"},
-  sent:      {label:"Sent",     color:"text-teal-400",   bg:"bg-teal-500/15"},
-  draft:     {label:"Draft",    color:"text-white/40",   bg:"bg-white/10"},
-  paused:    {label:"Paused",   color:"text-yellow-400", bg:"bg-yellow-500/15"},
+  active:    {label:"Active",   color:"text-success",bg:"bg-success-subtle"},
+  scheduled: {label:"Scheduled",color:"text-info",   bg:"bg-info-subtle"},
+  sent:      {label:"Sent",     color:"text-success",   bg:"bg-success-subtle"},
+  draft:     {label:"Draft",    color:"text-muted-foreground",   bg:"bg-muted"},
+  paused:    {label:"Paused",   color:"text-warning", bg:"bg-warning-subtle"},
 };
 
 export default function MarketingAutomation() {
@@ -238,17 +239,17 @@ export default function MarketingAutomation() {
   const avgCTR = sentCampaigns.length ? sentCampaigns.reduce((s,c)=>s+(c.clicks/c.sent),0) / sentCampaigns.length : 0;
 
   if (loading && campaigns.length === 0) {
-    return <div className="p-6 text-center text-white/40 text-sm">Loading campaigns…</div>;
+    return <div className="p-6 text-center text-muted-foreground text-sm">Loading campaigns…</div>;
   }
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Marketing Automation</h1>
-          <p className="text-xs text-white/40">Campaigns, triggers and customer engagement</p>
+          <h1 className="text-xl font-semibold">Marketing Automation</h1>
+          <p className="text-xs text-muted-foreground">Campaigns, triggers and customer engagement</p>
         </div>
-        <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-bold shadow-lg shadow-amber-500/20 transition-all">
+        <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
           <Plus className="h-4 w-4"/>New Campaign
         </button>
       </div>
@@ -256,22 +257,22 @@ export default function MarketingAutomation() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Total Sent",value:totalSent.toLocaleString(),icon:Send,color:"text-blue-400",bg:"bg-blue-500/10"},
-          {label:"Avg Open Rate",value:`${Math.round(avgOpenRate*100)}%`,icon:Bell,color:"text-emerald-400",bg:"bg-emerald-500/10"},
-          {label:"Avg Click Rate",value:`${Math.round(avgCTR*100)}%`,icon:Target,color:"text-violet-400",bg:"bg-violet-500/10"},
-          {label:"Revenue Driven",value:`₹${(totalRevenue/1000).toFixed(0)}K`,icon:TrendingUp,color:"text-amber-400",bg:"bg-amber-500/10"},
+          {label:"Total Sent",value:totalSent.toLocaleString(),icon:Send,color:"text-info",bg:"bg-info-subtle"},
+          {label:"Avg Open Rate",value:`${Math.round(avgOpenRate*100)}%`,icon:Bell,color:"text-success",bg:"bg-success-subtle"},
+          {label:"Avg Click Rate",value:`${Math.round(avgCTR*100)}%`,icon:Target,color:"text-muted-foreground",bg:"bg-muted"},
+          {label:"Revenue Driven",value:`₹${(totalRevenue/1000).toFixed(0)}K`,icon:TrendingUp,color:"text-primary",bg:"bg-primary/10"},
         ].map(s=>(
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4 flex items-center gap-3`}>
-            <div className={`h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
-            <div><p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p><p className="text-xs text-white/40">{s.label}</p></div>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4 flex items-center gap-3`}>
+            <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
+            <div><p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         {([["campaigns","Campaigns"],["triggers","Auto Triggers"],["templates","Templates"],["analytics","Analytics"]] as [Tab,string][]).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab===t?"bg-amber-500 text-black":"text-white/50 hover:text-white"}`}>{l}</button>
+          <button key={t} onClick={()=>setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
         ))}
       </div>
 
@@ -283,40 +284,40 @@ export default function MarketingAutomation() {
             const openRate = c.sent ? Math.round((c.opened/c.sent)*100) : 0;
             const ctr = c.sent ? Math.round((c.clicks/c.sent)*100) : 0;
             return (
-              <div key={c.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
+              <div key={c.id} className="bg-card border border-border rounded-lg p-5">
                 <div className="flex items-start gap-3">
-                  <div className={`h-10 w-10 rounded-xl ${chcfg.bg} flex items-center justify-center text-xl shrink-0`}>{chcfg.icon}</div>
+                  <div className={`h-10 w-10 rounded-lg ${chcfg.bg} ${chcfg.color} flex items-center justify-center shrink-0`}><chcfg.icon className="h-5 w-5" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-bold">{c.name}</h3>
+                      <h3 className="font-semibold">{c.name}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${scfg.bg} ${scfg.color}`}>{scfg.label}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${chcfg.bg} ${chcfg.color}`}>{c.channel}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-white/40 mb-3">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                       <span className="flex items-center gap-1"><Users className="h-3 w-3"/>{c.audience} audience</span>
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3"/>{c.scheduled}</span>
                     </div>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {[
-                        {label:"Sent",value:c.sent.toLocaleString(),color:"text-blue-400"},
-                        {label:"Open Rate",value:`${openRate}%`,color:"text-emerald-400"},
-                        {label:"CTR",value:`${ctr}%`,color:"text-violet-400"},
-                        {label:"Revenue",value:c.revenue>0?`₹${(c.revenue/1000).toFixed(0)}K`:"—",color:"text-amber-400"},
+                        {label:"Sent",value:c.sent.toLocaleString(),color:"text-info"},
+                        {label:"Open Rate",value:`${openRate}%`,color:"text-success"},
+                        {label:"CTR",value:`${ctr}%`,color:"text-muted-foreground"},
+                        {label:"Revenue",value:c.revenue>0?`₹${(c.revenue/1000).toFixed(0)}K`:"—",color:"text-primary"},
                       ].map(m=>(
-                        <div key={m.label} className="bg-white/5 rounded-lg p-2 text-center">
-                          <p className={`text-sm font-extrabold ${m.color}`}>{m.value}</p>
-                          <p className="text-xs text-white/30">{m.label}</p>
+                        <div key={m.label} className="bg-muted rounded-lg p-2 text-center">
+                          <p className={`text-sm font-semibold ${m.color}`}>{m.value}</p>
+                          <p className="text-xs text-muted-foreground">{m.label}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    {c.status==="active"&&<button onClick={()=>setCampaignActive(c,false,"paused")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/30 disabled:opacity-40">Pause</button>}
-                    {c.status==="paused"&&<button onClick={()=>setCampaignActive(c,true,"resumed")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-40">Resume</button>}
-                    {c.status==="draft"&&<button onClick={()=>setCampaignActive(c,true,"launched")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30 disabled:opacity-40">Launch</button>}
-                    {c.status==="scheduled"&&<button onClick={()=>handleSendNow(c)} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-40">Send Now</button>}
-                    <button onClick={()=>openEdit(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/60 text-xs font-semibold hover:bg-white/10 disabled:opacity-40"><Pencil className="h-3 w-3"/>Edit</button>
-                    <button onClick={()=>handleDeleteCampaign(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-semibold hover:bg-red-500/20 disabled:opacity-40"><Trash2 className="h-3 w-3"/>Delete</button>
+                    {c.status==="active"&&<button onClick={()=>setCampaignActive(c,false,"paused")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-warning-subtle text-warning text-xs font-semibold hover-elevate disabled:opacity-40">Pause</button>}
+                    {c.status==="paused"&&<button onClick={()=>setCampaignActive(c,true,"resumed")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate disabled:opacity-40">Resume</button>}
+                    {c.status==="draft"&&<button onClick={()=>setCampaignActive(c,true,"launched")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate disabled:opacity-40">Launch</button>}
+                    {c.status==="scheduled"&&<button onClick={()=>handleSendNow(c)} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 disabled:opacity-40">Send Now</button>}
+                    <button onClick={()=>openEdit(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-muted text-muted-foreground text-xs font-semibold hover-elevate disabled:opacity-40"><Pencil className="h-3 w-3"/>Edit</button>
+                    <button onClick={()=>handleDeleteCampaign(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-danger-border bg-danger-subtle text-danger text-xs font-semibold hover-elevate disabled:opacity-40"><Trash2 className="h-3 w-3"/>Delete</button>
                   </div>
                 </div>
               </div>
@@ -327,9 +328,9 @@ export default function MarketingAutomation() {
 
       {tab==="triggers"&&(
         <div className="space-y-4">
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
-            <Zap className="h-5 w-5 text-amber-400 shrink-0"/>
-            <p className="text-sm text-amber-300">Triggers fire automatically based on customer behavior. They run 24/7 without manual action.</p>
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex items-center gap-3">
+            <Zap className="h-5 w-5 text-primary shrink-0"/>
+            <p className="text-sm text-primary">Triggers fire automatically based on customer behavior. They run 24/7 without manual action.</p>
           </div>
           <div className="space-y-3">
             {triggers.length === 0 ? <EmptyState title="No automation triggers" description="Create campaigns with trigger types to see automations." /> : triggers.map(t=>{
@@ -339,31 +340,31 @@ export default function MarketingAutomation() {
               // would read as a campaign that fired and failed.
               const convRate = t.fires ? Math.round((t.conversions/t.fires)*100) : 0;
               return (
-                <div key={t.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
+                <div key={t.id} className="bg-card border border-border rounded-lg p-5">
                   <div className="flex items-start gap-3">
-                    <div className={`h-10 w-10 rounded-xl ${chcfg.bg} flex items-center justify-center text-xl shrink-0`}>{chcfg.icon}</div>
+                    <div className={`h-10 w-10 rounded-lg ${chcfg.bg} ${chcfg.color} flex items-center justify-center shrink-0`}><chcfg.icon className="h-5 w-5" /></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold">{t.name}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status==="active"?"bg-emerald-500/15 text-emerald-400":"bg-yellow-500/15 text-yellow-400"}`}>{t.status}</span>
+                        <h3 className="font-semibold">{t.name}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${t.status==="active"?"bg-success-subtle text-success":"bg-warning-subtle text-warning"}`}>{t.status}</span>
                       </div>
-                      <p className="text-xs text-white/40 mb-2">Trigger: {t.condition}</p>
-                      <div className="text-xs bg-white/5 rounded-lg p-2.5 text-white/60 mb-3 font-mono">{t.message}</div>
+                      <p className="text-xs text-muted-foreground mb-2">Trigger: {t.condition}</p>
+                      <div className="text-xs bg-muted rounded-lg p-2.5 text-muted-foreground mb-3 font-mono">{t.message}</div>
                       <div className="flex items-center gap-4 text-xs">
                         {t.deliveryTracked === false ? (
                           <>
-                            <span className="text-white/40">{t.audienceSize ?? 0} customers in this segment</span>
-                            <span className="text-white/30">Sends and conversions are not tracked yet</span>
+                            <span className="text-muted-foreground">{t.audienceSize ?? 0} customers in this segment</span>
+                            <span className="text-muted-foreground">Sends and conversions are not tracked yet</span>
                           </>
                         ) : (
                           <>
-                            <span className="text-white/40">{t.fires} fires</span>
-                            <span className="text-emerald-400 font-semibold">{convRate}% conversion ({t.conversions})</span>
+                            <span className="text-muted-foreground">{t.fires} fires</span>
+                            <span className="text-success font-semibold">{convRate}% conversion ({t.conversions})</span>
                           </>
                         )}
                       </div>
                     </div>
-                    <button onClick={()=>toggleTrigger(t)} disabled={busyId===t.id} title={t.status==="active"?"Turn trigger off":"Turn trigger on"} className={`h-10 w-16 rounded-xl flex items-center justify-center border transition-all disabled:opacity-40 ${t.status==="active"?"bg-emerald-500/20 border-emerald-500/30 text-emerald-400":"bg-yellow-500/20 border-yellow-500/30 text-yellow-400"}`}>
+                    <button onClick={()=>toggleTrigger(t)} disabled={busyId===t.id} title={t.status==="active"?"Turn trigger off":"Turn trigger on"} className={`h-10 w-16 rounded-lg flex items-center justify-center border transition-colors disabled:opacity-40 ${t.status==="active"?"bg-success-subtle border-success-border text-success":"bg-warning-subtle border-warning-border text-warning"}`}>
                       {t.status==="active"?"On":"Off"}
                     </button>
                   </div>
@@ -378,12 +379,12 @@ export default function MarketingAutomation() {
         <div className="space-y-4">
           {/* Audience Segments */}
           <div>
-            <h3 className="text-sm font-bold text-white/70 mb-3">Audience Segments</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Audience Segments</h3>
             <div className="flex gap-2 flex-wrap">
               {segments.length === 0 ? <EmptyState title="No segments" /> : segments.map(s=>(
-                <button key={s.label} onClick={()=>composeForSegment(s.label)} title={`New campaign for ${s.label}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:border-amber-500/30 hover:bg-amber-500/10 transition-all text-xs font-semibold">
-                  <span className={`font-extrabold ${s.color}`}>{s.count}</span>
-                  <span className="text-white/50">{s.label}</span>
+                <button key={s.label} onClick={()=>composeForSegment(s.label)} title={`New campaign for ${s.label}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted hover:border-primary/30 hover:bg-primary/10 transition-colors text-xs font-semibold">
+                  <span className={`font-semibold ${s.color}`}>{s.count}</span>
+                  <span className="text-muted-foreground">{s.label}</span>
                 </button>
               ))}
             </div>
@@ -393,13 +394,13 @@ export default function MarketingAutomation() {
             {templates.length === 0 ? <EmptyState title="No message templates" /> : templates.map(t=>{
               const chcfg = CHANNEL_CFG[t.channel];
               return (
-                <div key={t.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-5 hover:border-white/10 cursor-pointer transition-all" onClick={()=>setSelectedTemplate(selectedTemplate?.id===t.id?null:t)}>
+                <div key={t.id} className="bg-card border border-border rounded-lg p-5 hover:border-border cursor-pointer transition-colors" onClick={()=>setSelectedTemplate(selectedTemplate?.id===t.id?null:t)}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{chcfg.icon}</span>
+                      <chcfg.icon className={`h-5 w-5 ${chcfg.color}`} />
                       <div>
-                        <p className="font-bold text-sm">{t.name}</p>
-                        <div className="flex items-center gap-2 text-xs text-white/40 mt-0.5">
+                        <p className="font-semibold text-sm">{t.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                           <span className={`capitalize ${chcfg.color}`}>{t.channel}</span>
                           <span>·</span>
                           <span className="capitalize">{t.category}</span>
@@ -408,14 +409,14 @@ export default function MarketingAutomation() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={(e)=>{e.stopPropagation();useTemplate(t);}} title="Start a campaign from this template" className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Use</button>
+                    <button onClick={(e)=>{e.stopPropagation();useTemplate(t);}} title="Start a campaign from this template" className="px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30">Use</button>
                   </div>
-                  <div className="text-xs bg-white/5 rounded-lg p-3 text-white/60">{t.body}</div>
+                  <div className="text-xs bg-muted rounded-lg p-3 text-muted-foreground">{t.body}</div>
                   {selectedTemplate?.id===t.id&&(
-                    <div className="mt-3 pt-3 border-t border-white/8">
-                      <p className="text-xs text-white/40 mb-2">Variables in this template:</p>
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-2">Variables in this template:</p>
                       <div className="flex flex-wrap gap-1">
-                        {(t.body.match(/\{[^}]+\}/g)||[]).map(v=><span key={v} className="text-xs bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full">{v}</span>)}
+                        {(t.body.match(/\{[^}]+\}/g)||[]).map(v=><span key={v} className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full">{v}</span>)}
                       </div>
                     </div>
                   )}
@@ -429,8 +430,8 @@ export default function MarketingAutomation() {
       {tab==="analytics"&&(
         <div className="space-y-5">
           <div className="grid lg:grid-cols-3 gap-4">
-            <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
-              <h3 className="font-bold mb-4">Channel Performance</h3>
+            <div className="bg-card border border-border rounded-lg p-5">
+              <h3 className="font-semibold mb-4">Channel Performance</h3>
               <div className="space-y-3">
                 {Object.entries(CHANNEL_CFG).map(([channel,cfg])=>{
                   const cCampaigns = campaigns.filter(c=>c.channel===channel&&c.sent>0);
@@ -438,11 +439,11 @@ export default function MarketingAutomation() {
                   return (
                     <div key={channel}>
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="flex items-center gap-1.5"><span>{cfg.icon}</span><span className={`capitalize ${cfg.color}`}>{channel}</span></span>
-                        <span className="text-white/50">{openR}% open rate</span>
+                        <span className="flex items-center gap-1.5"><cfg.icon className={`h-3.5 w-3.5 ${cfg.color}`} /><span className={`capitalize ${cfg.color}`}>{channel}</span></span>
+                        <span className="text-muted-foreground">{openR}% open rate</span>
                       </div>
-                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                        <div className="h-full bg-amber-500 rounded-full" style={{width:`${openR}%`}}/>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{width:`${openR}%`}}/>
                       </div>
                     </div>
                   );
@@ -450,56 +451,56 @@ export default function MarketingAutomation() {
               </div>
             </div>
 
-            <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
-              <h3 className="font-bold mb-4">Campaign Performance</h3>
+            <div className="bg-card border border-border rounded-lg p-5">
+              <h3 className="font-semibold mb-4">Campaign Performance</h3>
               <div className="space-y-3">
                 {campaigns.filter(c=>c.sent>0).map(c=>(
                   <div key={c.id}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/60 truncate max-w-32">{c.name}</span>
-                      <span className="text-white/40">{c.sent>0?Math.round((c.opened/c.sent)*100):0}% open</span>
+                      <span className="text-muted-foreground truncate max-w-32">{c.name}</span>
+                      <span className="text-muted-foreground">{c.sent>0?Math.round((c.opened/c.sent)*100):0}% open</span>
                     </div>
-                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{width:`${c.sent>0?Math.round((c.opened/c.sent)*100):0}%`}}/>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-success rounded-full" style={{width:`${c.sent>0?Math.round((c.opened/c.sent)*100):0}%`}}/>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
-              <h3 className="font-bold mb-4">Revenue by Campaign</h3>
+            <div className="bg-card border border-border rounded-lg p-5">
+              <h3 className="font-semibold mb-4">Revenue by Campaign</h3>
               <div className="space-y-3">
                 {campaigns.filter(c=>c.revenue>0).sort((a,b)=>b.revenue-a.revenue).map(c=>(
                   <div key={c.id} className="flex items-center gap-3">
-                    <span className="text-xl">{CHANNEL_CFG[c.channel]?.icon||"📢"}</span>
+                    {(() => { const ChannelIcon = CHANNEL_CFG[c.channel]?.icon || Megaphone; return <ChannelIcon className="h-5 w-5 text-muted-foreground" />; })()}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate">{c.name}</p>
-                      <div className="h-1.5 rounded-full bg-white/10 mt-1 overflow-hidden">
-                        <div className="h-full bg-amber-500 rounded-full" style={{width:`${(c.revenue/totalRevenue)*100}%`}}/>
+                      <div className="h-1.5 rounded-full bg-muted mt-1 overflow-hidden">
+                        <div className="h-full bg-primary rounded-full" style={{width:`${(c.revenue/totalRevenue)*100}%`}}/>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-amber-400 shrink-0">₹{(c.revenue/1000).toFixed(0)}K</span>
+                    <span className="text-xs font-semibold text-primary shrink-0">₹{(c.revenue/1000).toFixed(0)}K</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-5">
-            <h3 className="font-bold mb-4">Customer Engagement Summary</h3>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h3 className="font-semibold mb-4">Customer Engagement Summary</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
               {[
-                {label:"Campaigns Run",value:campaigns.length,color:"text-white"},
-                {label:"Total Reach",value:campaigns.reduce((s,c)=>s+c.audience,0).toLocaleString(),color:"text-blue-400"},
-                {label:"Messages Sent",value:totalSent.toLocaleString(),color:"text-violet-400"},
-                {label:"Total Opens",value:campaigns.reduce((s,c)=>s+c.opened,0).toLocaleString(),color:"text-emerald-400"},
-                {label:"Total Clicks",value:campaigns.reduce((s,c)=>s+c.clicks,0).toLocaleString(),color:"text-amber-400"},
-                {label:"Revenue",value:`₹${(totalRevenue/1000).toFixed(0)}K`,color:"text-amber-400"},
+                {label:"Campaigns Run",value:campaigns.length,color:"text-foreground"},
+                {label:"Total Reach",value:campaigns.reduce((s,c)=>s+c.audience,0).toLocaleString(),color:"text-info"},
+                {label:"Messages Sent",value:totalSent.toLocaleString(),color:"text-muted-foreground"},
+                {label:"Total Opens",value:campaigns.reduce((s,c)=>s+c.opened,0).toLocaleString(),color:"text-success"},
+                {label:"Total Clicks",value:campaigns.reduce((s,c)=>s+c.clicks,0).toLocaleString(),color:"text-primary"},
+                {label:"Revenue",value:`₹${(totalRevenue/1000).toFixed(0)}K`,color:"text-primary"},
               ].map(s=>(
-                <div key={s.label} className="bg-white/5 rounded-xl p-3 text-center border border-white/5">
-                  <p className={`text-lg font-extrabold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-white/30">{s.label}</p>
+                <div key={s.label} className="bg-muted rounded-lg p-3 text-center border border-border">
+                  <p className={`text-lg font-semibold ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -509,37 +510,37 @@ export default function MarketingAutomation() {
 
       {/* Add Campaign Modal */}
       {showAdd&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-lg">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">New Campaign</h2>
-              <button onClick={()=>setShowAdd(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">New Campaign</h2>
+              <button onClick={()=>setShowAdd(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Campaign Name</label>
-                <input value={newCampaign.name} onChange={e=>setNewCampaign(p=>({...p,name:e.target.value}))} placeholder="e.g. Weekend Special Offer" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Campaign Name</label>
+                <input value={newCampaign.name} onChange={e=>setNewCampaign(p=>({...p,name:e.target.value}))} placeholder="e.g. Weekend Special Offer" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Channel</label>
-                <div className="grid grid-cols-4 gap-2">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Channel</label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {(["whatsapp","sms","email","push"] as const).map(c=>{
                     const cfg = CHANNEL_CFG[c];
-                    return <button key={c} onClick={()=>setNewCampaign(p=>({...p,channel:c}))} className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold capitalize transition-all ${newCampaign.channel===c?`${cfg.bg} border-white/20 ${cfg.color}`:"border-white/10 bg-white/5 text-white/50"}`}><span className="text-xl">{cfg.icon}</span>{c}</button>;
+                    return <button key={c} onClick={()=>setNewCampaign(p=>({...p,channel:c}))} className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-semibold capitalize transition-colors ${newCampaign.channel===c?`${cfg.bg} border-border ${cfg.color}`:"border-border bg-muted text-muted-foreground"}`}><cfg.icon className="h-5 w-5" />{c}</button>;
                   })}
                 </div>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Target Audience</label>
-                <select value={newCampaign.segment} onChange={e=>setNewCampaign(p=>({...p,segment:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Target Audience</label>
+                <select value={newCampaign.segment} onChange={e=>setNewCampaign(p=>({...p,segment:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none text-foreground">
                   {segments.map(s=><option key={s.label} value={s.label}>{s.label} ({s.count})</option>)}
                 </select>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Message</label>
-                <textarea value={newCampaign.message} onChange={e=>setNewCampaign(p=>({...p,message:e.target.value}))} rows={4} placeholder="Write your message... Use {name} for personalization" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
-                <p className="text-xs text-white/30 mt-1 text-right">{newCampaign.message.length} chars</p>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Message</label>
+                <textarea value={newCampaign.message} onChange={e=>setNewCampaign(p=>({...p,message:e.target.value}))} rows={4} placeholder="Write your message... Use {name} for personalization" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-muted-foreground"/>
+                <p className="text-xs text-muted-foreground mt-1 text-right">{newCampaign.message.length} chars</p>
               </div>
               <div className="flex gap-3">
-                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={() => handleCreateCampaign(false)} className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold">Save Draft</button>
-                <button onClick={() => handleCreateCampaign(true)} disabled={!newCampaign.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">Launch Campaign</button>
+                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={() => handleCreateCampaign(false)} className="px-4 py-2.5 rounded-lg border border-border bg-muted text-sm font-semibold">Save Draft</button>
+                <button onClick={() => handleCreateCampaign(true)} disabled={!newCampaign.name} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">Launch Campaign</button>
               </div>
             </div>
           </div>
@@ -548,36 +549,36 @@ export default function MarketingAutomation() {
 
       {/* Edit Campaign Modal */}
       {editId&&(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-full max-w-lg">
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold">Edit Campaign</h2>
-              <button onClick={()=>setEditId(null)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+              <h2 className="font-semibold">Edit Campaign</h2>
+              <button onClick={()=>setEditId(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="space-y-4">
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Campaign Name</label>
-                <input value={editCampaign.name} onChange={e=>setEditCampaign(p=>({...p,name:e.target.value}))} placeholder="Campaign name" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/20"/>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Campaign Name</label>
+                <input value={editCampaign.name} onChange={e=>setEditCampaign(p=>({...p,name:e.target.value}))} placeholder="Campaign name" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"/>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Channel</label>
-                <div className="grid grid-cols-4 gap-2">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Channel</label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {(["whatsapp","sms","email","push"] as const).map(c=>{
                     const cfg = CHANNEL_CFG[c];
-                    return <button key={c} onClick={()=>setEditCampaign(p=>({...p,channel:c}))} className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-semibold capitalize transition-all ${editCampaign.channel===c?`${cfg.bg} border-white/20 ${cfg.color}`:"border-white/10 bg-white/5 text-white/50"}`}><span className="text-xl">{cfg.icon}</span>{c}</button>;
+                    return <button key={c} onClick={()=>setEditCampaign(p=>({...p,channel:c}))} className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-semibold capitalize transition-colors ${editCampaign.channel===c?`${cfg.bg} border-border ${cfg.color}`:"border-border bg-muted text-muted-foreground"}`}><cfg.icon className="h-5 w-5" />{c}</button>;
                   })}
                 </div>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Target Audience</label>
-                <select value={editCampaign.segment} onChange={e=>setEditCampaign(p=>({...p,segment:e.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none text-white">
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Target Audience</label>
+                <select value={editCampaign.segment} onChange={e=>setEditCampaign(p=>({...p,segment:e.target.value}))} className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none text-foreground">
                   {segments.length===0 && <option value={editCampaign.segment}>{editCampaign.segment}</option>}
                   {segments.map(s=><option key={s.label} value={s.label}>{s.label} ({s.count})</option>)}
                 </select>
               </div>
-              <div><label className="text-xs text-white/40 mb-1.5 block uppercase tracking-wide">Message</label>
-                <textarea value={editCampaign.message} onChange={e=>setEditCampaign(p=>({...p,message:e.target.value}))} rows={4} placeholder="Update the campaign message... Use {name} for personalization" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-white/20"/>
+              <div><label className="text-xs text-muted-foreground mb-1.5 block uppercase tracking-wide">Message</label>
+                <textarea value={editCampaign.message} onChange={e=>setEditCampaign(p=>({...p,message:e.target.value}))} rows={4} placeholder="Update the campaign message... Use {name} for personalization" className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none resize-none placeholder:text-muted-foreground"/>
               </div>
               <div className="flex gap-3">
-                <button onClick={()=>setEditId(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-                <button onClick={handleSaveEdit} disabled={savingEdit || !editCampaign.name} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
+                <button onClick={()=>setEditId(null)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={savingEdit || !editCampaign.name} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">{savingEdit?"Saving…":"Save Changes"}</button>
               </div>
             </div>
           </div>

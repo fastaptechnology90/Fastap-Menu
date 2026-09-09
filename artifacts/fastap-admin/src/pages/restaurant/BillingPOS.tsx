@@ -18,11 +18,11 @@ import {
 } from "lucide-react";
 
 const PAYMENT_METHODS = [
-  { id: "upi", label: "UPI", icon: Smartphone, color: "text-blue-400", bg: "bg-blue-500/20" },
-  { id: "card", label: "Card", icon: CreditCard, color: "text-violet-400", bg: "bg-violet-500/20" },
-  { id: "cash", label: "Cash", icon: Banknote, color: "text-emerald-400", bg: "bg-emerald-500/20" },
-  { id: "wallet", label: "Wallet", icon: Wallet, color: "text-amber-400", bg: "bg-amber-500/20" },
-  { id: "nfc", label: "NFC Tap", icon: Nfc, color: "text-pink-400", bg: "bg-pink-500/20" },
+  { id: "upi", label: "UPI", icon: Smartphone, color: "text-info", bg: "bg-info-subtle" },
+  { id: "card", label: "Card", icon: CreditCard, color: "text-muted-foreground", bg: "bg-muted" },
+  { id: "cash", label: "Cash", icon: Banknote, color: "text-success", bg: "bg-success-subtle" },
+  { id: "wallet", label: "Wallet", icon: Wallet, color: "text-primary", bg: "bg-primary/20" },
+  { id: "nfc", label: "NFC Tap", icon: Nfc, color: "text-muted-foreground", bg: "bg-muted" },
 ];
 
 interface BillItem {
@@ -38,6 +38,29 @@ interface BillItem {
   adjustedBy?: string;
 }
 
+/**
+ * The tax rate this order was actually priced at.
+ *
+ * Line subtotals on a stored order are tax-exclusive, so `total - sum(lines)` is the
+ * tax the server charged and dividing by the line sum gives the rate that produced it.
+ * That keeps the cashier's screen on the venue's own rates — and on the excise rate for
+ * a bill containing alcohol — instead of a 5% figure hardcoded in the panel. Voided and
+ * comped lines are excluded because the order total no longer contains them.
+ */
+const DEFAULT_TAX_RATE = 0.05;
+
+function taxRateOf(order: { total: number; items: { qty: number; price: number; subtotal?: number; voided?: boolean; comped?: boolean }[] }) {
+  const lineSum = order.items.reduce(
+    (s, i) => (i.voided || i.comped ? s : s + (i.subtotal && i.subtotal > 0 ? i.subtotal : i.price * (i.qty || 1))),
+    0,
+  );
+  if (lineSum <= 0) return DEFAULT_TAX_RATE;
+  const rate = (Number(order.total) - lineSum) / lineSum;
+  // Anything outside this band means the order carries a tip or a discount we cannot see
+  // from here, so fall back rather than invent a rate.
+  return Number.isFinite(rate) && rate >= 0 && rate <= 0.3 ? rate : DEFAULT_TAX_RATE;
+}
+
 export default function BillingPOS() {
   const { liveOrders, tables, updateOrderStatus, refreshOrders, restaurantId, isRestaurantPublished, currentStaff } = useRestaurant();
   const [selectedOrder, setSelectedOrder] = useState<typeof liveOrders[0] | null>(null);
@@ -48,6 +71,12 @@ export default function BillingPOS() {
   const [reference, setReference] = useState("");
   const [discount, setDiscount] = useState(0);
   const [tip, setTip] = useState(0);
+  // The tax rate this order was actually priced at, read back off the order itself.
+  // Not every line is 5% GST — alcohol is taxed at the venue's excise rate — and the
+  // venue can set its own rates, so a rate hardcoded here would disagree with the
+  // order record on any bill containing a drink. 0.05 is only the fallback for an
+  // order whose own figures do not add up.
+  const [taxRate, setTaxRate] = useState(DEFAULT_TAX_RATE);
   const [coupon, setCoupon] = useState("");
   const [splitCount, setSplitCount] = useState(1);
   const [paid, setPaid] = useState(false);
@@ -122,6 +151,7 @@ export default function BillingPOS() {
 
   function loadOrder(order: typeof liveOrders[0]) {
     setSelectedOrder(order);
+    setTaxRate(taxRateOf(order));
     // Bill the order's ACTUAL amount: derive the unit price from the stored line subtotal
     // (÷ qty) so the POS total matches the order total, instead of a possibly-stale unit price.
     setBillItems(order.items.map((i, index) => {
@@ -203,9 +233,15 @@ export default function BillingPOS() {
   const r2 = (n: number) => Math.round(n * 100) / 100;
   // Voided and comped lines stay on screen but must never be charged for.
   const subtotal = r2(billItems.reduce((s, i) => (i.voided || i.comped ? s : s + i.price * i.qty), 0));
-  const gst = r2(subtotal * 0.05);
   const discountAmt = r2(subtotal * discount / 100);
-  const grandTotal = r2(subtotal + gst - discountAmt + tip);
+  // Tax is charged on the discounted value, which is both the law and what the server
+  // records (`taxable = subtotal - discount` in the order route). This screen used to
+  // tax the gross subtotal, so every discounted bill charged the guest the tax on the
+  // discount as well and the printed "GST (5%)" line was not 5% of anything on the bill.
+  const taxable = r2(Math.max(0, subtotal - discountAmt));
+  const gst = r2(taxable * taxRate);
+  const gstLabel = `${(taxRate * 100).toFixed(taxRate * 100 % 1 === 0 ? 0 : 2)}%`;
+  const grandTotal = r2(taxable + gst + tip);
   const perPerson = splitCount > 1 ? Math.ceil(grandTotal / splitCount) : grandTotal;
 
   function downloadInvoice(gstInvoice: boolean) {
@@ -224,8 +260,9 @@ export default function BillingPOS() {
         : `${i.name} x${i.qty} @ ₹${r2(i.price)} = ₹${r2(i.price * i.qty)}`),
       "",
       `Subtotal: ₹${subtotal}`,
-      `GST (5%): ₹${gst}`,
       `Discount: ₹${discountAmt}`,
+      `Taxable value: ₹${taxable}`,
+      `GST (${gstLabel}): ₹${gst}`,
       `Tip: ₹${tip}`,
       `Grand Total: ₹${grandTotal}`,
     ].join("\n");
@@ -286,10 +323,10 @@ export default function BillingPOS() {
       {/* Left: Order Selection */}
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-extrabold">Billing & POS</h1>
-          <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
-            <button onClick={() => setTab("new")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "new" ? "bg-amber-500 text-white" : "text-white/50"}`}>Active Bills</button>
-            <button onClick={() => setTab("recent")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "recent" ? "bg-amber-500 text-white" : "text-white/50"}`}>Recent</button>
+          <h1 className="text-xl font-semibold">Billing & POS</h1>
+          <div className="flex gap-1 bg-muted p-1 rounded-lg">
+            <button onClick={() => setTab("new")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "new" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Active Bills</button>
+            <button onClick={() => setTab("recent")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${tab === "recent" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Recent</button>
           </div>
         </div>
 
@@ -299,20 +336,20 @@ export default function BillingPOS() {
             {/* Today's Summary */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Today's Collection", value: `₹${todayStats.collection.toLocaleString("en-IN")}`, color: "text-emerald-400" },
-                { label: "Bills Generated", value: String(todayStats.bills), color: "text-blue-400" },
-                { label: "Avg Bill Value", value: `₹${Math.round(todayStats.avgBill).toLocaleString("en-IN")}`, color: "text-amber-400" },
+                { label: "Today's Collection", value: `₹${todayStats.collection.toLocaleString("en-IN")}`, color: "text-success" },
+                { label: "Bills Generated", value: String(todayStats.bills), color: "text-info" },
+                { label: "Avg Bill Value", value: `₹${Math.round(todayStats.avgBill).toLocaleString("en-IN")}`, color: "text-primary" },
               ].map(s => (
-                <div key={s.label} className="rounded-xl bg-white/[0.03] border border-white/8 p-3 text-center">
-                  <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-white/40 mt-0.5">{s.label}</p>
+                <div key={s.label} className="rounded-lg bg-card border border-border p-3 text-center">
+                  <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>
 
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-              <input className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/40 placeholder:text-white/30" placeholder="Search table..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search table..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -320,21 +357,21 @@ export default function BillingPOS() {
                 <button
                   key={order.id}
                   onClick={() => loadOrder(order)}
-                  className={`rounded-2xl border p-4 text-left hover:border-amber-500/30 transition-all ${selectedOrder?.id === order.id ? "border-amber-500/50 bg-amber-500/10" : "border-white/8 bg-white/[0.03]"}`}
+                  className={`rounded-lg border p-4 text-left hover:border-primary/30 transition-colors ${selectedOrder?.id === order.id ? "border-primary/50 bg-primary/10" : "border-border bg-card"}`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-extrabold text-lg">{order.tableNo}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === "ready" ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/20 text-orange-400"}`}>{order.status}</span>
+                    <span className="font-semibold text-lg">{order.tableNo}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === "ready" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning"}`}>{order.status}</span>
                   </div>
-                  <p className="text-xs text-white/40 mb-1">{order.items.map(i => `${i.qty}× ${i.name}`).join(", ")}</p>
+                  <p className="text-xs text-muted-foreground mb-1">{order.items.map(i => `${i.qty}× ${i.name}`).join(", ")}</p>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-white/30">{order.guests} guests</span>
-                    <span className="font-bold text-amber-400">₹{order.total}</span>
+                    <span className="text-xs text-muted-foreground">{order.guests} guests</span>
+                    <span className="font-semibold text-primary">₹{order.total}</span>
                   </div>
                 </button>
               ))}
               {billableOrders.length === 0 && (
-                <div className="col-span-2 text-center py-12 text-white/30">
+                <div className="col-span-2 text-center py-12 text-muted-foreground">
                   <Receipt className="h-12 w-12 mx-auto mb-3" />
                   <p>No active orders to bill</p>
                 </div>
@@ -344,27 +381,27 @@ export default function BillingPOS() {
         )}
 
         {tab === "recent" && (
-          <div className="rounded-2xl border border-white/8 overflow-hidden">
+          <div className="rounded-lg border border-border">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.02] text-xs text-white/40">
+                  <tr className="border-b border-border bg-card text-xs text-muted-foreground">
                     {["Bill ID", "Table", "Amount", "Method", "Time", "Status"].map(h => <th key={h} className="text-left px-4 py-3 font-medium">{h}</th>)}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-border">
                   {recentBills.map(bill => (
-                    <tr key={bill.id} onClick={() => setBillDetail(bill)} className="hover:bg-white/5 cursor-pointer" title="Click to view payment details">
+                    <tr key={bill.id} onClick={() => setBillDetail(bill)} className="hover:bg-muted cursor-pointer" title="Click to view payment details">
                       <td className="px-4 py-3 font-mono text-xs">{bill.id}</td>
                       <td className="px-4 py-3 font-semibold">{bill.table}</td>
-                      <td className="px-4 py-3 font-bold text-amber-400">₹{bill.amount.toLocaleString("en-IN")}</td>
-                      <td className="px-4 py-3 text-white/60 uppercase">{bill.method}</td>
-                      <td className="px-4 py-3 text-white/40">{bill.time}</td>
-                      <td className="px-4 py-3"><span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{bill.status}</span></td>
+                      <td className="px-4 py-3 font-semibold text-primary">₹{bill.amount.toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-3 text-muted-foreground uppercase">{bill.method}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{bill.time}</td>
+                      <td className="px-4 py-3"><span className="text-xs bg-success-subtle text-success px-2 py-0.5 rounded-full">{bill.status}</span></td>
                     </tr>
                   ))}
                   {recentBills.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-white/30 text-sm">No bills collected yet today.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">No bills collected yet today.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -383,50 +420,50 @@ export default function BillingPOS() {
           type="button"
           aria-label="Close bill"
           onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
-          className="xl:hidden fixed inset-0 z-30 bg-black/60"
+          className="xl:hidden fixed inset-0 z-30 bg-foreground/40"
         />
       )}
       <div
         className={`${selectedOrder || paid ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md
           xl:static xl:flex xl:w-96 xl:max-w-none xl:z-auto
-          border-l border-white/5 flex-col bg-[#0e1520]`}
+          border-l border-border flex-col bg-card`}
       >
         {/* Only needed while the panel is a sheet — at xl it is a permanent sidebar. */}
         {(selectedOrder || paid) && (
           <button
             onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }}
-            className="xl:hidden flex items-center gap-1.5 px-4 py-3 text-sm text-white/50 hover:text-white border-b border-white/5"
+            className="xl:hidden flex items-center gap-1.5 px-4 py-3 text-sm text-muted-foreground hover:text-foreground border-b border-border"
           >
             <ChevronLeft className="h-4 w-4" /> Back to orders
           </button>
         )}
         {!selectedOrder && !paid ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-white/20 p-8 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
             <Receipt className="h-16 w-16 mb-4" />
             <p className="font-semibold">Select an order to generate bill</p>
           </div>
         ) : paid ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="h-20 w-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mb-5">
-              <CheckCircle className="h-10 w-10 text-emerald-400" />
+            <div className="h-20 w-20 rounded-full bg-success-subtle border-2 border-success-border flex items-center justify-center mb-5">
+              <CheckCircle className="h-10 w-10 text-success" />
             </div>
-            <h3 className="text-xl font-extrabold text-emerald-400 mb-1">Payment Successful!</h3>
-            <p className="text-white/50 text-sm mb-1">{selectedOrder?.tableNo} · ₹{grandTotal}</p>
-            <p className="text-xs text-white/30">{PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}</p>
+            <h3 className="text-xl font-semibold text-success mb-1">Payment Successful!</h3>
+            <p className="text-muted-foreground text-sm mb-1">{selectedOrder?.tableNo} · ₹{grandTotal}</p>
+            <p className="text-xs text-muted-foreground">{PAYMENT_METHODS.find(m => m.id === paymentMethod)?.label}</p>
             <div className="flex gap-2 mt-6 w-full">
-              <button onClick={() => window.print()} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold flex items-center justify-center gap-2"><Printer className="h-4 w-4" /> Print</button>
-              <button onClick={() => downloadInvoice(false)} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-semibold flex items-center justify-center gap-2"><Download className="h-4 w-4" /> PDF</button>
+              <button onClick={() => window.print()} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold flex items-center justify-center gap-2"><Printer className="h-4 w-4" /> Print</button>
+              <button onClick={() => downloadInvoice(false)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold flex items-center justify-center gap-2"><Download className="h-4 w-4" /> PDF</button>
             </div>
-            <button onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }} className="mt-2 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-sm font-bold">New Bill</button>
+            <button onClick={() => { setSelectedOrder(null); setPaid(false); setBillItems([]); }} className="mt-2 w-full py-3 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold">New Bill</button>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between p-4 border-b border-white/5">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
-                <p className="font-bold">{selectedOrder?.tableNo}</p>
-                <p className="text-xs text-white/40">{selectedOrder?.id} · {selectedOrder?.guests} guests</p>
+                <p className="font-semibold">{selectedOrder?.tableNo}</p>
+                <p className="text-xs text-muted-foreground">{selectedOrder?.id} · {selectedOrder?.guests} guests</p>
               </div>
-              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-xs hover:bg-white/5"><Printer className="h-3.5 w-3.5" /> KOT</button>
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs hover:bg-muted"><Printer className="h-3.5 w-3.5" /> KOT</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -437,13 +474,13 @@ export default function BillingPOS() {
                   return (
                     <div key={i} className="space-y-1">
                       <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1.5 bg-white/5 rounded-lg p-0.5 ${adjusted ? "opacity-40" : ""}`}>
-                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))} className="h-6 w-6 rounded-md bg-white/10 flex items-center justify-center hover:bg-white/20 disabled:cursor-not-allowed"><Minus className="h-3 w-3" /></button>
-                          <span className="w-5 text-center text-xs font-bold">{item.qty}</span>
-                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-amber-500 flex items-center justify-center hover:bg-amber-400 disabled:cursor-not-allowed"><Plus className="h-3 w-3" /></button>
+                        <div className={`flex items-center gap-1.5 bg-muted rounded-lg p-0.5 ${adjusted ? "opacity-40" : ""}`}>
+                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: Math.max(0, it.qty - 1) } : it).filter(it => it.qty > 0))} className="h-6 w-6 rounded-md bg-muted flex items-center justify-center hover-elevate disabled:cursor-not-allowed"><Minus className="h-3 w-3" /></button>
+                          <span className="w-5 text-center text-xs font-semibold">{item.qty}</span>
+                          <button disabled={adjusted} onClick={() => setBillItems(p => p.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))} className="h-6 w-6 rounded-md bg-primary flex items-center justify-center hover:bg-primary/90 disabled:cursor-not-allowed"><Plus className="h-3 w-3" /></button>
                         </div>
-                        <span className={`flex-1 text-sm ${adjusted ? "line-through text-white/35" : ""}`}>{item.name}</span>
-                        <span className={`font-semibold text-sm ${adjusted ? "line-through text-white/30" : "text-amber-400"}`}>₹{r2(item.price * item.qty)}</span>
+                        <span className={`flex-1 text-sm ${adjusted ? "line-through text-muted-foreground" : ""}`}>{item.name}</span>
+                        <span className={`font-semibold text-sm ${adjusted ? "line-through text-muted-foreground" : "text-primary"}`}>₹{r2(item.price * item.qty)}</span>
                       </div>
                       <AdjustedLineNote voided={item.voided} comped={item.comped} reason={item.adjustReason} by={item.adjustedBy} />
                       <LineAdjustControls
@@ -470,10 +507,10 @@ export default function BillingPOS() {
 
               {/* Discount */}
               <div>
-                <p className="text-xs text-white/40 mb-2">Discount</p>
+                <p className="text-xs text-muted-foreground mb-2">Discount</p>
                 <div className="flex gap-2">
                   {[0, 5, 10, 15, 20].map(d => (
-                    <button key={d} onClick={() => setDiscount(d)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${discount === d ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
+                    <button key={d} onClick={() => setDiscount(d)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${discount === d ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
                       {d === 0 ? "None" : `${d}%`}
                     </button>
                   ))}
@@ -482,10 +519,10 @@ export default function BillingPOS() {
 
               {/* Tip */}
               <div>
-                <p className="text-xs text-white/40 mb-2">Tip</p>
+                <p className="text-xs text-muted-foreground mb-2">Tip</p>
                 <div className="flex gap-2">
                   {[0, 20, 50, 100].map(t => (
-                    <button key={t} onClick={() => setTip(t)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${tip === t ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50"}`}>
+                    <button key={t} onClick={() => setTip(t)} className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${tip === t ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
                       {t === 0 ? "None" : `₹${t}`}
                     </button>
                   ))}
@@ -494,33 +531,34 @@ export default function BillingPOS() {
 
               {/* Split */}
               <div>
-                <p className="text-xs text-white/40 mb-2">Split Bill</p>
+                <p className="text-xs text-muted-foreground mb-2">Split Bill</p>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><Minus className="h-3 w-3" /></button>
+                  <button onClick={() => setSplitCount(Math.max(1, splitCount - 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Minus className="h-3 w-3" /></button>
                   <span className="flex-1 text-center text-sm">{splitCount === 1 ? "No split" : `${splitCount} ways`}</span>
-                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Plus className="h-3 w-3" /></button>
                 </div>
               </div>
 
               {/* Bill Summary */}
-              <div className="rounded-xl bg-white/5 p-3 space-y-1.5 text-xs">
+              <div className="rounded-lg bg-muted p-3 space-y-1.5 text-xs">
                 {[
                   ["Subtotal", `₹${subtotal}`],
-                  ["GST (5%)", `₹${gst}`],
                   discount > 0 && [`Discount (${discount}%)`, `-₹${discountAmt}`],
+                  discount > 0 && ["Taxable value", `₹${taxable}`],
+                  [`GST (${gstLabel})`, `₹${gst}`],
                   tip > 0 && ["Tip", `₹${tip}`],
                 ].filter(Boolean).map((row: any) => (
-                  <div key={row[0]} className="flex justify-between text-white/50">
+                  <div key={row[0]} className="flex justify-between text-muted-foreground">
                     <span>{row[0]}</span>
                     <span>{row[1]}</span>
                   </div>
                 ))}
-                <div className="border-t border-white/10 pt-1.5 flex justify-between font-bold text-base">
+                <div className="border-t border-border pt-1.5 flex justify-between font-semibold text-base">
                   <span>Total</span>
-                  <span className="text-amber-400">₹{grandTotal}</span>
+                  <span className="text-primary">₹{grandTotal}</span>
                 </div>
                 {splitCount > 1 && (
-                  <div className="text-center text-emerald-400 font-semibold pt-1 border-t border-white/10">
+                  <div className="text-center text-success font-semibold pt-1 border-t border-border">
                     ₹{perPerson} / person
                   </div>
                 )}
@@ -528,10 +566,10 @@ export default function BillingPOS() {
 
               {/* Payment Method */}
               <div>
-                <p className="text-xs text-white/40 mb-2">Payment Method</p>
-                <div className="grid grid-cols-5 gap-1.5">
+                <p className="text-xs text-muted-foreground mb-2">Payment Method</p>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
                   {PAYMENT_METHODS.map(m => (
-                    <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${paymentMethod === m.id ? `${m.bg} border-current ${m.color}` : "border-white/10 bg-white/5 text-white/40"}`}>
+                    <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-colors ${paymentMethod === m.id ? `${m.bg} border-current ${m.color}` : "border-border bg-muted text-muted-foreground"}`}>
                       <m.icon className="h-4 w-4" />
                       <span className="text-xs">{m.label}</span>
                     </button>
@@ -542,22 +580,22 @@ export default function BillingPOS() {
                     value={reference}
                     onChange={e => setReference(e.target.value)}
                     placeholder={paymentMethod === "upi" ? "UPI ID / UTR number (optional)" : paymentMethod === "card" ? "Card txn / RRN (optional)" : "NFC txn reference (optional)"}
-                    className="mt-2 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500/40 placeholder:text-white/30"
+                    className="mt-2 w-full bg-muted border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
                   />
                 )}
               </div>
             </div>
 
             {/* Pay Button */}
-            <div className="p-4 border-t border-white/5 space-y-2">
+            <div className="p-4 border-t border-border space-y-2">
               <PermissionGate permission="view_orders">
-              <button onClick={handlePay} disabled={paying} className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-60 font-bold text-base shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 transition-all">
+              <button onClick={handlePay} disabled={paying} className="w-full py-3.5 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-60 font-semibold text-base shadow-xl flex items-center justify-center gap-2 transition-colors">
                 {paying ? "Processing…" : <>Collect ₹{grandTotal.toLocaleString()} <CheckCircle className="h-5 w-5" /></>}
               </button>
               </PermissionGate>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="flex-1 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-semibold flex items-center justify-center gap-1"><Printer className="h-3.5 w-3.5" /> Print Bill</button>
-                <button onClick={() => downloadInvoice(true)} className="flex-1 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-semibold flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> GST Invoice</button>
+                <button onClick={() => window.print()} className="flex-1 py-2 rounded-lg border border-border hover:bg-muted text-xs font-semibold flex items-center justify-center gap-1"><Printer className="h-3.5 w-3.5" /> Print Bill</button>
+                <button onClick={() => downloadInvoice(true)} className="flex-1 py-2 rounded-lg border border-border hover:bg-muted text-xs font-semibold flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> GST Invoice</button>
               </div>
             </div>
           </>
@@ -566,16 +604,16 @@ export default function BillingPOS() {
 
       {/* Bill payment detail — click a recent bill to see how the payment was made */}
       {billDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setBillDetail(null)}>
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#111827] text-white" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <h3 className="font-bold flex items-center gap-2"><Receipt className="h-5 w-5 text-amber-400" /> Payment details</h3>
-              <button onClick={() => setBillDetail(null)}><X className="h-5 w-5 text-white/40 hover:text-white" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm" onClick={() => setBillDetail(null)}>
+          <div className="w-full max-w-sm rounded-lg border border-border bg-card text-foreground max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><Receipt className="h-5 w-5 text-primary" /> Payment details</h3>
+              <button onClick={() => setBillDetail(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             <div className="p-5 space-y-3 text-sm">
               <div className="text-center py-2">
-                <p className="text-3xl font-extrabold text-amber-400">₹{Number(billDetail.amount).toLocaleString("en-IN")}</p>
-                <p className="text-xs text-white/40 mt-1">{billDetail.id} · {billDetail.table}</p>
+                <p className="text-3xl font-semibold text-primary">₹{Number(billDetail.amount).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{billDetail.id} · {billDetail.table}</p>
               </div>
               {[
                 ["Payment method", String(billDetail.method || "—").toUpperCase()],
@@ -586,8 +624,8 @@ export default function BillingPOS() {
                 ["Status", billDetail.status || "paid"],
                 ...(billDetail.refundedTotal ? [["Refunded so far", `₹${Number(billDetail.refundedTotal).toFixed(2)}`]] : []),
               ].map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3 border-b border-white/5 pb-2">
-                  <span className="text-white/40">{k}</span>
+                <div key={k} className="flex justify-between gap-3 border-b border-border pb-2">
+                  <span className="text-muted-foreground">{k}</span>
                   <span className="font-medium text-right break-all">{v}</span>
                 </div>
               ))}
@@ -602,7 +640,7 @@ export default function BillingPOS() {
                   />
                 </>
               ) : (
-                <p className="text-xs text-white/30">This bill has no linked order, so it cannot be refunded from here.</p>
+                <p className="text-xs text-muted-foreground">This bill has no linked order, so it cannot be refunded from here.</p>
               )}
             </div>
           </div>

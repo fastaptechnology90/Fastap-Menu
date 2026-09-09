@@ -3,32 +3,32 @@ import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
 import { splitCustomizations } from "@/lib/orderItemExtras";
 import { kitchenDisplayApi, printing, openPrintWindow } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
-import { ChefHat, Volume2, VolumeX, Flame, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play } from "lucide-react";
+import { ChefHat, Volume2, VolumeX, Flame, Clock, AlertTriangle, CheckCircle, Printer, Settings, RotateCcw, Zap, Wine, IceCream, Salad, Beef, X, Play, Target, StickyNote, UtensilsCrossed, Bike, ShoppingBag, Hotel } from "lucide-react";
 
 function Timer({ start, targetMins = 20 }: { start: Date; targetMins?: number }) {
   const [elapsed, setElapsed] = useState(Math.floor((Date.now() - new Date(start).getTime()) / 1000));
   useEffect(() => { const t = setInterval(() => setElapsed(e => e + 1), 1000); return () => clearInterval(t); }, []);
   const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
   const pct = Math.min(100, (mins / targetMins) * 100);
-  const color = pct >= 100 ? "text-red-400 animate-pulse" : pct >= 70 ? "text-yellow-400" : "text-emerald-400";
+  const color = pct >= 100 ? "text-danger animate-pulse" : pct >= 70 ? "text-warning" : "text-success";
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <span className={`font-mono font-extrabold text-sm ${color}`}>{String(mins).padStart(2,"0")}:{String(secs).padStart(2,"0")}</span>
-      <div className="w-12 h-1 rounded-full bg-white/10 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${pct>=100?"bg-red-500":pct>=70?"bg-yellow-500":"bg-emerald-500"}`} style={{width:`${pct}%`}} />
+      <span className={`font-mono font-semibold text-sm ${color}`}>{String(mins).padStart(2,"0")}:{String(secs).padStart(2,"0")}</span>
+      <div className="w-12 h-1 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full transition-colors ${pct>=100?"bg-danger":pct>=70?"bg-warning":"bg-success"}`} style={{width:`${pct}%`}} />
       </div>
     </div>
   );
 }
 
 const STATIONS = [
-  { id:"all", label:"All Stations", icon:ChefHat, color:"text-white" },
-  { id:"hot", label:"Hot Line", icon:Flame, color:"text-red-400" },
-  { id:"grill", label:"Grill", icon:Beef, color:"text-orange-400" },
-  { id:"cold", label:"Cold", icon:Salad, color:"text-cyan-400" },
-  { id:"bar", label:"Bar", icon:Wine, color:"text-violet-400" },
-  { id:"desserts", label:"Desserts", icon:IceCream, color:"text-pink-400" },
-  { id:"expo", label:"Expo", icon:Zap, color:"text-amber-400" },
+  { id:"all", label:"All Stations", icon:ChefHat, color:"text-foreground" },
+  { id:"hot", label:"Hot Line", icon:Flame, color:"text-danger" },
+  { id:"grill", label:"Grill", icon:Beef, color:"text-warning" },
+  { id:"cold", label:"Cold", icon:Salad, color:"text-info" },
+  { id:"bar", label:"Bar", icon:Wine, color:"text-muted-foreground" },
+  { id:"desserts", label:"Desserts", icon:IceCream, color:"text-muted-foreground" },
+  { id:"expo", label:"Expo", icon:Zap, color:"text-primary" },
 ];
 
 function getItemStation(name: string): string {
@@ -41,9 +41,9 @@ function getItemStation(name: string): string {
 }
 
 const COLS: { key: LiveOrder["status"]; label: string; color: string; bg: string; dot: string }[] = [
-  { key:"new", label:"New / Queued", color:"text-orange-400", bg:"from-orange-500/8", dot:"bg-orange-400 animate-pulse" },
-  { key:"preparing", label:"Cooking", color:"text-blue-400", bg:"from-blue-500/8", dot:"bg-blue-400 animate-pulse" },
-  { key:"ready", label:"Ready to Serve", color:"text-emerald-400", bg:"from-emerald-500/8", dot:"bg-emerald-400" },
+  { key:"new", label:"New / Queued", color:"text-warning", bg:"bg-warning-subtle/30", dot:"bg-warning animate-pulse" },
+  { key:"preparing", label:"Cooking", color:"text-info", bg:"bg-info-subtle/30", dot:"bg-info animate-pulse" },
+  { key:"ready", label:"Ready to Serve", color:"text-success", bg:"bg-success-subtle/30", dot:"bg-success" },
 ];
 
 const DEFAULT_TARGETS: Record<string,number> = { hot:18, grill:22, cold:8, bar:5, desserts:10, expo:25, all:20 };
@@ -232,21 +232,21 @@ export default function KitchenDisplay() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-[#050a12]">
+    <div className="h-full min-h-0 flex flex-col bg-background">
       {/* New-order flash — a pulsing amber frame so the kitchen notices even at a glance
           (and even when sound is muted). Non-blocking overlay. */}
       {flash && (
-        <div className="pointer-events-none fixed inset-0 z-50 ring-8 ring-inset ring-amber-400/70 animate-pulse" aria-hidden="true" />
+        <div className="pointer-events-none fixed inset-0 z-50 ring-8 ring-inset ring-primary animate-pulse" aria-hidden="true" />
       )}
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-[#0c1220]">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background">
         <div className="flex items-center gap-2 shrink-0">
-          <div className="h-7 w-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
-            <ChefHat className="h-4 w-4 text-amber-400" />
+          <div className="h-7 w-7 rounded-lg bg-primary/20 flex items-center justify-center">
+            <ChefHat className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <p className="font-extrabold text-xs">Kitchen Display</p>
-            <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs text-emerald-400">Live</span></div>
+            <p className="font-semibold text-xs">Kitchen Display</p>
+            <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse"/><span className="text-xs text-success">Live</span></div>
           </div>
         </div>
 
@@ -255,7 +255,7 @@ export default function KitchenDisplay() {
           {STATIONS.map(s => {
             const Icon = s.icon;
             return (
-              <button key={s.id} onClick={()=>setStation(s.id)} className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${station===s.id ? `bg-amber-500/20 border-amber-500/40 ${s.color}` : "border-white/10 bg-white/5 text-white/40 hover:text-white/70"}`}>
+              <button key={s.id} onClick={()=>setStation(s.id)} className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${station===s.id ? `bg-primary/20 border-primary/40 ${s.color}` : "border-border bg-muted text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="h-3 w-3" />{s.label}
               </button>
             );
@@ -264,68 +264,68 @@ export default function KitchenDisplay() {
 
         {/* Controls */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={()=>{const v=!priorityMode;setPriorityMode(v);savePref({priorityMode:v});}} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${priorityMode?"bg-red-500/20 border-red-500/40 text-red-300":"border-white/10 bg-white/5 text-white/40"}`}>
+          <button onClick={()=>{const v=!priorityMode;setPriorityMode(v);savePref({priorityMode:v});}} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${priorityMode?"bg-danger-subtle border-danger-border text-danger":"border-border bg-muted text-muted-foreground"}`}>
             <Flame className="h-3.5 w-3.5"/>Rush
           </button>
-          <button onClick={()=>{const v=!soundOn;setSoundOn(v);savePref({soundOn:v});}} className={`h-8 w-8 rounded-lg flex items-center justify-center border transition-all ${soundOn?"bg-amber-500/20 border-amber-500/40 text-amber-400":"bg-white/5 border-white/10 text-white/30"}`}>
+          <button onClick={()=>{const v=!soundOn;setSoundOn(v);savePref({soundOn:v});}} className={`h-8 w-8 rounded-lg flex items-center justify-center border transition-colors ${soundOn?"bg-primary/20 border-primary/40 text-primary":"bg-muted border-border text-muted-foreground"}`}>
             {soundOn ? <Volume2 className="h-3.5 w-3.5"/> : <VolumeX className="h-3.5 w-3.5"/>}
           </button>
-          <div className="flex gap-0.5 bg-white/5 p-0.5 rounded-lg">
+          <div className="flex gap-0.5 bg-muted p-0.5 rounded-lg">
             {(["kanban","list","grid"] as const).map(v=>(
-              <button key={v} onClick={()=>setView(v)} className={`px-2 py-1 rounded-md text-xs font-medium capitalize transition-all ${view===v?"bg-white/15 text-white":"text-white/30"}`}>{v}</button>
+              <button key={v} onClick={()=>setView(v)} className={`px-2 py-1 rounded-md text-xs font-medium capitalize transition-colors ${view===v?"bg-muted text-foreground":"text-muted-foreground"}`}>{v}</button>
             ))}
           </div>
-          <button onClick={()=>bumped.length>0&&setRecallOrder(bumped[0])} disabled={bumped.length===0} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-white/10 bg-white/5 text-white/40 hover:text-white/70 disabled:opacity-30 transition-all">
+          <button onClick={()=>bumped.length>0&&setRecallOrder(bumped[0])} disabled={bumped.length===0} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs border border-border bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
             <RotateCcw className="h-3.5 w-3.5"/>Recall ({bumped.length})
           </button>
-          <button onClick={()=>setShowSettings(true)} className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all">
+          <button onClick={()=>setShowSettings(true)} className="h-8 w-8 rounded-lg bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <Settings className="h-3.5 w-3.5"/>
           </button>
         </div>
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-6 border-b border-white/5 bg-[#080d18]">
+      <div className="grid grid-cols-3 sm:grid-cols-6 border-b border-border bg-background">
         {[
-          {label:"Total",value:stats.total,color:"text-white"},
-          {label:"New",value:stats.new,color:"text-orange-400"},
-          {label:"Cooking",value:stats.cooking,color:"text-blue-400"},
-          {label:"Ready",value:stats.ready,color:"text-emerald-400"},
-          {label:"Urgent",value:stats.urgent,color:"text-red-400"},
-          {label:"Avg Wait",value:`${stats.avg}m`,color:"text-amber-400"},
+          {label:"Total",value:stats.total,color:"text-foreground"},
+          {label:"New",value:stats.new,color:"text-warning"},
+          {label:"Cooking",value:stats.cooking,color:"text-info"},
+          {label:"Ready",value:stats.ready,color:"text-success"},
+          {label:"Urgent",value:stats.urgent,color:"text-danger"},
+          {label:"Avg Wait",value:`${stats.avg}m`,color:"text-primary"},
         ].map(s=>(
-          <div key={s.label} className="flex flex-col items-center justify-center py-2 border-r border-white/5 last:border-r-0">
-            <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/30">{s.label}</p>
+          <div key={s.label} className="flex flex-col items-center justify-center py-2 border-r border-border last:border-r-0">
+            <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground">{s.label}</p>
           </div>
         ))}
       </div>
 
       {active.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
-          <div className="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 text-3xl">🍳</div>
-          <h3 className="text-lg font-bold text-white/80">No active kitchen orders right now</h3>
-          <p className="text-sm text-white/40 mt-1 max-w-md">New dine-in / room / online orders will appear here automatically as soon as they come in. Completed, served and cancelled orders are hidden.</p>
+          <div className="h-16 w-16 rounded-lg bg-muted text-muted-foreground flex items-center justify-center mb-4"><ChefHat className="h-7 w-7" /></div>
+          <h3 className="text-lg font-semibold text-foreground">No active kitchen orders right now</h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md">New dine-in / room / online orders will appear here automatically as soon as they come in. Completed, served and cancelled orders are hidden.</p>
         </div>
       )}
 
       {/* Kanban */}
       {active.length > 0 && view==="kanban" && (
-        <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-3 divide-x divide-white/5">
+        <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-3 divide-x divide-border">
           {COLS.map(col=>{
             const orders = getCol(col.key);
             return (
-              <div key={col.key} className={`flex flex-col min-h-0 bg-gradient-to-b ${col.bg} to-transparent`}>
-                <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
+              <div key={col.key} className={`flex flex-col min-h-0 ${col.bg}`}>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
                   <div className="flex items-center gap-2">
                     <div className={`h-2 w-2 rounded-full ${col.dot}`}/>
-                    <span className={`text-sm font-bold ${col.color}`}>{col.label}</span>
+                    <span className={`text-sm font-semibold ${col.color}`}>{col.label}</span>
                   </div>
-                  <span className={`h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center text-xs font-extrabold ${col.color} bg-white/10`}>{orders.length}</span>
+                  <span className={`h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center text-xs font-semibold ${col.color} bg-muted`}>{orders.length}</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                   {orders.length === 0 && (
-                    <p className="px-2 py-6 text-center text-xs text-white/25">
+                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">
                       {station === "all" ? "Nothing here" : "Nothing for this station"}
                     </p>
                   )}
@@ -335,17 +335,17 @@ export default function KitchenDisplay() {
                     const isWarn = mins >= target*0.7 && !isUrgent;
                     const stItems = station==="all" ? order.items : order.items.filter(i=>getItemStation(i.name)===station);
                     return (
-                      <div key={order.id} className={`rounded-xl border p-3 transition-all ${isUrgent?"border-red-500/60 bg-red-500/10 shadow-lg shadow-red-500/10":isWarn?"border-yellow-500/40 bg-yellow-500/5":"border-white/8 bg-white/[0.04]"}`}>
+                      <div key={order.id} className={`rounded-lg border p-3 transition-colors ${isUrgent?"border-danger-border bg-danger-subtle":isWarn?"border-warning-border bg-warning-subtle":"border-border bg-card"}`}>
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-extrabold text-base leading-none">{order.tableNo}</span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded-md ${order.type==="dine-in"?"bg-amber-500/15 text-amber-400":order.type==="delivery"?"bg-blue-500/15 text-blue-400":"bg-white/10 text-white/50"}`}>
-                                {order.type==="dine-in"?"🍽️":order.type==="delivery"?"🛵":order.type==="takeaway"?"🛍️":"🏨"} {order.type}
+                              <span className="font-semibold text-base leading-none">{order.tableNo}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-md ${order.type==="dine-in"?"bg-primary/15 text-primary":order.type==="delivery"?"bg-info-subtle text-info":"bg-muted text-muted-foreground"}`}>
+                                {(() => { const TypeIcon = order.type==="dine-in"?UtensilsCrossed:order.type==="delivery"?Bike:order.type==="takeaway"?ShoppingBag:Hotel; return <TypeIcon className="h-3 w-3 inline mb-0.5" />; })()} {order.type}
                               </span>
-                              {isUrgent&&<span className="flex items-center gap-0.5 text-xs text-red-400 font-bold"><AlertTriangle className="h-3 w-3"/>LATE</span>}
+                              {isUrgent&&<span className="flex items-center gap-0.5 text-xs text-danger font-semibold"><AlertTriangle className="h-3 w-3"/>LATE</span>}
                             </div>
-                            <p className="text-xs text-white/30 mt-0.5">{order.id} · {order.guests} guests</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{order.id} · {order.guests} guests</p>
                           </div>
                           <Timer start={order.placedAt} targetMins={target}/>
                         </div>
@@ -355,23 +355,23 @@ export default function KitchenDisplay() {
                             const hasExtras = (Array.isArray(item.addons)&&item.addons.length>0)||(Array.isArray(item.customizations)&&item.customizations.length>0)||item.variant||item.notes;
                             return (
                             <div key={i} className="flex items-start gap-2">
-                              <div className={`h-5 w-5 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${item.status==="ready"?"bg-emerald-500/30 text-emerald-400":item.status==="preparing"?"bg-blue-500/30 text-blue-400":"bg-white/10 text-white/50"}`}>{item.qty}</div>
+                              <div className={`h-5 w-5 rounded-md flex items-center justify-center text-xs font-semibold shrink-0 ${item.status==="ready"?"bg-success-subtle text-success":item.status==="preparing"?"bg-info-subtle text-info":"bg-muted text-muted-foreground"}`}>{item.qty}</div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className={`text-sm flex-1 ${item.status==="ready"?"line-through text-white/40":"text-white/85"}`}>{item.name}</span>
-                                  <span className={`text-xs px-1.5 py-0.5 rounded-md shrink-0 ${getItemStation(item.name)==="grill"?"bg-orange-500/15 text-orange-400":getItemStation(item.name)==="cold"?"bg-cyan-500/15 text-cyan-400":getItemStation(item.name)==="bar"?"bg-violet-500/15 text-violet-400":getItemStation(item.name)==="desserts"?"bg-pink-500/15 text-pink-400":"bg-red-500/15 text-red-400"}`}>
+                                  <span className={`text-sm flex-1 ${item.status==="ready"?"line-through text-muted-foreground":"text-foreground"}`}>{item.name}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-md shrink-0 ${getItemStation(item.name)==="grill"?"bg-warning-subtle text-warning":getItemStation(item.name)==="cold"?"bg-info-subtle text-info":getItemStation(item.name)==="bar"?"bg-muted text-muted-foreground":getItemStation(item.name)==="desserts"?"bg-muted text-muted-foreground":"bg-danger-subtle text-danger"}`}>
                                     {getItemStation(item.name)}
                                   </span>
                                 </div>
                                 {hasExtras && (
-                                  <div className="mt-1 ml-0.5 pl-2 border-l-2 border-amber-500/40 space-y-0.5">
-                                    {item.variant && <p className="text-[11px] text-violet-300">🍽 {item.variant}</p>}
-                                    {Array.isArray(item.addons)&&item.addons.length>0 && <p className="text-[11px] font-semibold text-emerald-300">➕ Add: {item.addons.map(a=>a.name).join(", ")}</p>}
+                                  <div className="mt-1 ml-0.5 pl-2 border-l-2 border-primary/40 space-y-0.5">
+                                    {item.variant && <p className="text-2xs text-muted-foreground">{item.variant}</p>}
+                                    {Array.isArray(item.addons)&&item.addons.length>0 && <p className="text-2xs font-semibold text-success">Add: {item.addons.map(a=>a.name).join(", ")}</p>}
                                     {(() => { const { removes, prefs } = splitCustomizations(item.customizations); return (<>
-                                      {removes.length>0 && <p className="text-[11px] font-semibold text-rose-300">➖ Remove: {removes.join(", ")}</p>}
-                                      {prefs.length>0 && <p className="text-[11px] font-semibold text-cyan-300">⚡ {prefs.join(" · ")}</p>}
+                                      {removes.length>0 && <p className="text-2xs font-semibold text-danger">Remove: {removes.join(", ")}</p>}
+                                      {prefs.length>0 && <p className="text-2xs font-semibold text-info">{prefs.join(" · ")}</p>}
                                     </>); })()}
-                                    {item.notes && <p className="text-[11px] text-yellow-300">📝 {item.notes}</p>}
+                                    {item.notes && <p className="text-2xs text-warning"><StickyNote className="h-3 w-3 inline mb-0.5" /> {item.notes}</p>}
                                   </div>
                                 )}
                               </div>
@@ -380,29 +380,29 @@ export default function KitchenDisplay() {
                         </div>
 
                         {order.specialReq&&(
-                          <div className="flex items-start gap-1.5 text-xs bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-lg px-2.5 py-1.5 mb-2.5">
+                          <div className="flex items-start gap-1.5 text-xs bg-warning-subtle border border-warning-border text-warning rounded-lg px-2.5 py-1.5 mb-2.5">
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px"/><span>{order.specialReq}</span>
                           </div>
                         )}
 
-                        <div className="text-xs text-white/30 mb-2.5">{order.waiter}</div>
+                        <div className="text-xs text-muted-foreground mb-2.5">{order.waiter}</div>
 
                         <div className="flex gap-1.5">
                           {(col.key==="new"||order.status==="accepted")&&(
                             <>
-                              <button onClick={()=>bump(order,"preparing")} className="flex-1 py-2 rounded-lg bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/30 transition-all flex items-center justify-center gap-1">
+                              <button onClick={()=>bump(order,"preparing")} className="flex-1 py-2 rounded-lg bg-info-subtle border border-info-border text-info text-xs font-semibold hover-elevate transition-colors flex items-center justify-center gap-1">
                                 <Play className="h-3 w-3"/>Start Cooking
                               </button>
-                              <button onClick={()=>printKot(order)} title="Print kitchen ticket" className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"><Printer className="h-3.5 w-3.5"/></button>
+                              <button onClick={()=>printKot(order)} title="Print kitchen ticket" className="h-8 w-8 rounded-lg bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"><Printer className="h-3.5 w-3.5"/></button>
                             </>
                           )}
                           {col.key==="preparing"&&(
-                            <button onClick={()=>bump(order,"ready")} className="flex-1 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/30 transition-all flex items-center justify-center gap-1">
+                            <button onClick={()=>bump(order,"ready")} className="flex-1 py-2 rounded-lg bg-success-subtle border border-success-border text-success text-xs font-semibold hover-elevate transition-colors flex items-center justify-center gap-1">
                               <CheckCircle className="h-3 w-3"/>Mark Ready
                             </button>
                           )}
                           {col.key==="ready"&&(
-                            <button onClick={()=>bump(order,"served")} className="flex-1 py-2 rounded-lg bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold hover:bg-teal-500/30 transition-all flex items-center justify-center gap-1">
+                            <button onClick={()=>bump(order,"served")} className="flex-1 py-2 rounded-lg bg-success-subtle border border-success-border text-success text-xs font-semibold hover-elevate transition-colors flex items-center justify-center gap-1">
                               <CheckCircle className="h-3 w-3"/>Serve
                             </button>
                           )}
@@ -411,7 +411,7 @@ export default function KitchenDisplay() {
                     );
                   })}
                   {orders.length===0&&(
-                    <div className="flex flex-col items-center justify-center h-32 text-white/15">
+                    <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
                       <CheckCircle className="h-8 w-8 mb-2"/><p className="text-xs">All clear</p>
                     </div>
                   )}
@@ -425,41 +425,43 @@ export default function KitchenDisplay() {
       {/* List View */}
       {active.length > 0 && view==="list"&&(
         <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-white/30 border-b border-white/5">
-                {["Order","Table","Type","Items","Stations","Status","Timer","Action"].map(h=>(
-                  <th key={h} className="pb-3 pr-4 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {sortKitchenOrders(active, priorityMode).map(order=>(
-                <tr key={order.id} className={`hover:bg-white/3 transition-all ${Math.floor((Date.now()-new Date(order.placedAt).getTime())/60000)>=target?"bg-red-500/5":""}`}>
-                  <td className="py-3 pr-4 font-mono text-xs text-white/50">{order.id}</td>
-                  <td className="py-3 pr-4 font-extrabold">{order.tableNo}</td>
-                  <td className="py-3 pr-4 text-xs text-white/50">{order.type}</td>
-                  <td className="py-3 pr-4"><p className="text-xs text-white/60 max-w-36 truncate">{order.items.map(i=>`${i.qty}×${i.name}`).join(", ")}</p></td>
-                  <td className="py-3 pr-4">
-                    <div className="flex flex-wrap gap-1">
-                      {[...new Set(order.items.map(i=>getItemStation(i.name)))].map(st=>(
-                        <span key={st} className="text-xs px-1.5 py-0.5 rounded-md bg-white/10 text-white/50 capitalize">{st}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${order.status==="new"?"bg-orange-500/20 text-orange-400":order.status==="preparing"?"bg-blue-500/20 text-blue-400":order.status==="ready"?"bg-emerald-500/20 text-emerald-400":"bg-white/10 text-white/40"}`}>{order.status}</span>
-                  </td>
-                  <td className="py-3 pr-4"><Timer start={order.placedAt} targetMins={target}/></td>
-                  <td className="py-3">
-                    {(order.status==="new"||order.status==="accepted")&&<button onClick={()=>bump(order,"preparing")} className="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold hover:bg-blue-500/30">Start</button>}
-                    {order.status==="preparing"&&<button onClick={()=>bump(order,"ready")} className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30">Ready</button>}
-                    {order.status==="ready"&&<button onClick={()=>bump(order,"served")} className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30">Served</button>}
-                  </td>
+          <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  {["Order","Table","Type","Items","Stations","Status","Timer","Action"].map(h=>(
+                    <th key={h} className="pb-3 pr-4 font-medium">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sortKitchenOrders(active, priorityMode).map(order=>(
+                  <tr key={order.id} className={`hover:bg-muted transition-colors ${Math.floor((Date.now()-new Date(order.placedAt).getTime())/60000)>=target?"bg-danger-subtle":""}`}>
+                    <td className="py-3 pr-4 font-mono text-xs text-muted-foreground">{order.id}</td>
+                    <td className="py-3 pr-4 font-semibold">{order.tableNo}</td>
+                    <td className="py-3 pr-4 text-xs text-muted-foreground">{order.type}</td>
+                    <td className="py-3 pr-4"><p className="text-xs text-muted-foreground max-w-36 truncate">{order.items.map(i=>`${i.qty}×${i.name}`).join(", ")}</p></td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap gap-1">
+                        {[...new Set(order.items.map(i=>getItemStation(i.name)))].map(st=>(
+                          <span key={st} className="text-xs px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground capitalize">{st}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${order.status==="new"?"bg-warning-subtle text-warning":order.status==="preparing"?"bg-info-subtle text-info":order.status==="ready"?"bg-success-subtle text-success":"bg-muted text-muted-foreground"}`}>{order.status}</span>
+                    </td>
+                    <td className="py-3 pr-4"><Timer start={order.placedAt} targetMins={target}/></td>
+                    <td className="py-3">
+                      {(order.status==="new"||order.status==="accepted")&&<button onClick={()=>bump(order,"preparing")} className="px-3 py-1 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate">Start</button>}
+                      {order.status==="preparing"&&<button onClick={()=>bump(order,"ready")} className="px-3 py-1 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate">Ready</button>}
+                      {order.status==="ready"&&<button onClick={()=>bump(order,"served")} className="px-3 py-1 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30">Served</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -470,9 +472,9 @@ export default function KitchenDisplay() {
             {sortKitchenOrders(active, priorityMode).map(order=>{
               const mins = Math.floor((Date.now()-new Date(order.placedAt).getTime())/60000);
               return (
-                <div key={order.id} className={`rounded-xl border p-3 ${mins>=target?"border-red-500/50 bg-red-500/8":"border-white/8 bg-white/[0.04]"}`}>
+                <div key={order.id} className={`rounded-lg border p-3 ${mins>=target?"border-danger-border bg-danger-subtle":"border-border bg-card"}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-extrabold">{order.tableNo}</span>
+                    <span className="font-semibold">{order.tableNo}</span>
                     <Timer start={order.placedAt} targetMins={target}/>
                   </div>
                   <div className="space-y-1 mb-2">
@@ -480,16 +482,16 @@ export default function KitchenDisplay() {
                       const extras=[...(item.addons?.map(a=>a.name)||[]),...(item.customizations||[])];
                       return (
                         <div key={i}>
-                          <p className="text-xs text-white/60 truncate">{item.qty}× {item.name}</p>
-                          {extras.length>0&&<p className="text-[10px] text-amber-300/90 truncate">↳ {extras.join(", ")}</p>}
-                          {item.notes&&<p className="text-[10px] text-yellow-300/80 truncate">📝 {item.notes}</p>}
+                          <p className="text-xs text-muted-foreground truncate">{item.qty}× {item.name}</p>
+                          {extras.length>0&&<p className="text-2xs text-primary truncate">{extras.join(", ")}</p>}
+                          {item.notes&&<p className="text-2xs text-warning truncate">{item.notes}</p>}
                         </div>
                       );
                     })}
-                    {order.items.length>3&&<p className="text-xs text-white/30">+{order.items.length-3} more</p>}
+                    {order.items.length>3&&<p className="text-xs text-muted-foreground">+{order.items.length-3} more</p>}
                   </div>
-                  {order.specialReq&&<p className="text-xs text-yellow-300 truncate mb-1">⚠️ {order.specialReq}</p>}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${order.status==="new"?"bg-orange-500/20 text-orange-400":order.status==="preparing"?"bg-blue-500/20 text-blue-400":"bg-emerald-500/20 text-emerald-400"}`}>{order.status}</span>
+                  {order.specialReq&&<p className="text-xs text-warning truncate mb-1"><AlertTriangle className="h-3 w-3 inline mb-0.5" /> {order.specialReq}</p>}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${order.status==="new"?"bg-warning-subtle text-warning":order.status==="preparing"?"bg-info-subtle text-info":"bg-success-subtle text-success"}`}>{order.status}</span>
                 </div>
               );
             })}
@@ -499,39 +501,39 @@ export default function KitchenDisplay() {
 
       {/* Settings Modal */}
       {showSettings&&(
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#111827] rounded-2xl border border-white/10 overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <h3 className="font-bold flex items-center gap-2"><Settings className="h-4 w-4 text-amber-400"/>KDS Settings</h3>
-              <button onClick={()=>setShowSettings(false)}><X className="h-5 w-5 text-white/40 hover:text-white"/></button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card rounded-lg border border-border overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><Settings className="h-4 w-4 text-primary"/>KDS Settings</h3>
+              <button onClick={()=>setShowSettings(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground"/></button>
             </div>
             <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
               <div>
-                <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Target Prep Times (minutes)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Target Prep Times (minutes)</p>
                 <div className="space-y-2">
                   {Object.entries(targetTimes).filter(([k])=>k!=="all").map(([st,mins])=>(
                     <div key={st} className="flex items-center justify-between">
-                      <span className="text-sm capitalize text-white/70">{st==="hot"?"Hot Line":st==="cold"?"Cold Station":st.charAt(0).toUpperCase()+st.slice(1)}</span>
+                      <span className="text-sm capitalize text-foreground">{st==="hot"?"Hot Line":st==="cold"?"Cold Station":st.charAt(0).toUpperCase()+st.slice(1)}</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={()=>{const v=Math.max(3,mins-1);setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">−</button>
-                        <span className="w-8 text-center text-sm font-bold text-amber-400">{mins}</span>
-                        <button onClick={()=>{const v=mins+1;setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 text-sm">+</button>
+                        <button onClick={()=>{const v=Math.max(3,mins-1);setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover-elevate text-sm">−</button>
+                        <span className="w-8 text-center text-sm font-semibold text-primary">{mins}</span>
+                        <button onClick={()=>{const v=mins+1;setTargetTimes(t=>({...t,[st]:v}));savePref({targetTimes:{[st]:v}});}} className="h-6 w-6 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover-elevate text-sm">+</button>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Options</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Options</p>
                 <div className="space-y-3">
                   {([
                     {key:"soundOn" as const,label:"Sound Alerts",val:soundOn,set:setSoundOn},
                     {key:"autoAccept" as const,label:"Auto-accept Orders",val:autoAccept,set:setAutoAccept},
                   ]).map(({key,label,val,set})=>(
                     <div key={label} className="flex items-center justify-between">
-                      <span className="text-sm text-white/70">{label}</span>
-                      <button onClick={()=>{const v=!val;set(v);savePref({[key]:v});}} className={`h-6 w-11 rounded-full transition-all relative ${val?"bg-amber-500":"bg-white/10"}`}>
-                        <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${val?"left-[22px]":"left-0.5"}`}/>
+                      <span className="text-sm text-foreground">{label}</span>
+                      <button onClick={()=>{const v=!val;set(v);savePref({[key]:v});}} className={`h-6 w-11 rounded-full transition-colors relative ${val?"bg-primary":"bg-muted"}`}>
+                        <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-colors ${val?"left-[22px]":"left-0.5"}`}/>
                       </button>
                     </div>
                   ))}
@@ -539,8 +541,8 @@ export default function KitchenDisplay() {
               </div>
               {/* Each control saves as it is changed, so this only closes the panel —
                   calling it "Save Settings" implied nothing had been saved until now. */}
-              <button onClick={()=>setShowSettings(false)} className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm">Done</button>
-              <p className="text-center text-xs text-white/30">Saved for this venue — every kitchen screen sees the same targets.</p>
+              <button onClick={()=>setShowSettings(false)} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">Done</button>
+              <p className="text-center text-xs text-muted-foreground">Saved for this venue — every kitchen screen sees the same targets.</p>
             </div>
           </div>
         </div>
@@ -548,20 +550,20 @@ export default function KitchenDisplay() {
 
       {/* Recall Modal */}
       {recallOrder&&(
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 p-5">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-card rounded-lg border border-border p-5 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold flex items-center gap-2"><RotateCcw className="h-4 w-4 text-amber-400"/>Recall Order</h3>
-              <button onClick={()=>setRecallOrder(null)}><X className="h-5 w-5 text-white/40"/></button>
+              <h3 className="font-semibold flex items-center gap-2"><RotateCcw className="h-4 w-4 text-primary"/>Recall Order</h3>
+              <button onClick={()=>setRecallOrder(null)}><X className="h-5 w-5 text-muted-foreground"/></button>
             </div>
-            <div className="bg-white/5 rounded-xl p-3 mb-4">
-              <p className="font-bold">{recallOrder.tableNo} — {recallOrder.id}</p>
-              <p className="text-xs text-white/40 mt-1">{recallOrder.items.map(i=>`${i.qty}× ${i.name}`).join(", ")}</p>
+            <div className="bg-muted rounded-lg p-3 mb-4">
+              <p className="font-semibold">{recallOrder.tableNo} — {recallOrder.id}</p>
+              <p className="text-xs text-muted-foreground mt-1">{recallOrder.items.map(i=>`${i.qty}× ${i.name}`).join(", ")}</p>
             </div>
-            <p className="text-sm text-white/50 mb-4">This will move the order back to "Preparing" status.</p>
+            <p className="text-sm text-muted-foreground mb-4">This will move the order back to "Preparing" status.</p>
             <div className="flex gap-3">
-              <button onClick={()=>setRecallOrder(null)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-semibold">Cancel</button>
-              <button onClick={()=>{updateOrderStatus(recallOrder.id,"preparing");setRecallOrder(null);}} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-sm">Recall Order</button>
+              <button onClick={()=>setRecallOrder(null)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+              <button onClick={()=>{updateOrderStatus(recallOrder.id,"preparing");setRecallOrder(null);}} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">Recall Order</button>
             </div>
           </div>
         </div>

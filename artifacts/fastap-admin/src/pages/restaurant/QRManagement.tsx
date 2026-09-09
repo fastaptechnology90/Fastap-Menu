@@ -3,7 +3,7 @@ import { useRestaurant } from "@/contexts/RestaurantContext";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { buildScanUrl } from "@/lib/smartEntry";
-import { QrCode, Plus, Download, RefreshCw, Eye, Copy, Smartphone, Wifi, Trash2, Edit2, Check, Table2, BedDouble } from "lucide-react";
+import { QrCode, Plus, Download, RefreshCw, Eye, Copy, Smartphone, Wifi, Trash2, Edit2, Check, Table2, BedDouble, Hotel } from "lucide-react";
 import QRCode from "qrcode";
 
 const API_BASE = "/api";
@@ -190,21 +190,21 @@ export default function QRManagement() {
     (venueSlug ? 1 : 0);
 
   const stats = [
-    { label: "Total QR Codes", value: totalQrCount, icon: QrCode, color: "text-violet-400" },
-    { label: "Total Scans", value: totalScans, icon: Eye, color: "text-blue-400" },
-    { label: "Active Tables", value: tables.length, icon: Table2, color: "text-green-400" },
-    { label: "Rooms", value: rooms.length || roomQRs.length, icon: BedDouble, color: "text-orange-400" },
+    { label: "Total QR Codes", value: totalQrCount, icon: QrCode, color: "text-muted-foreground" },
+    { label: "Total Scans", value: totalScans, icon: Eye, color: "text-info" },
+    { label: "Active Tables", value: tables.length, icon: Table2, color: "text-success" },
+    { label: "Rooms", value: rooms.length || roomQRs.length, icon: BedDouble, color: "text-warning" },
   ];
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" /></div>;
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-border" /></div>;
 
   if (loadError) {
     return (
       <div className="p-6">
-        <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-5 text-center">
-          <p className="text-sm font-semibold text-red-200">We could not load your QR codes.</p>
-          <p className="mt-1 text-xs text-red-200/70">{loadError}</p>
-          <button onClick={loadAll} className="mt-4 px-4 py-2 rounded-lg bg-red-500/20 text-red-100 text-xs font-semibold">Try again</button>
+        <div role="alert" className="rounded-lg border border-danger-border bg-danger-subtle p-5 text-center">
+          <p className="text-sm font-semibold text-danger">We could not load your QR codes.</p>
+          <p className="mt-1 text-xs text-danger">{loadError}</p>
+          <button onClick={loadAll} className="mt-4 px-4 py-2 rounded-lg bg-danger-subtle text-danger text-xs font-semibold">Try again</button>
         </div>
       </div>
     );
@@ -214,38 +214,38 @@ export default function QRManagement() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-violet-500/10 rounded-lg"><QrCode className="h-6 w-6 text-violet-400" /></div>
+          <div className="p-2 bg-muted rounded-lg"><QrCode className="h-6 w-6 text-muted-foreground" /></div>
           <div>
-            <h1 className="text-2xl font-bold text-white">QR / NFC Management</h1>
-            <p className="text-slate-400 text-sm">Manage QR codes for tables, rooms, and general ordering</p>
+            <h1 className="text-2xl font-semibold text-foreground">QR / NFC Management</h1>
+            <p className="text-muted-foreground text-sm">Manage QR codes for tables, rooms, and general ordering</p>
           </div>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium transition-colors">
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-muted hover-elevate text-foreground rounded-lg text-sm font-medium transition-colors">
           <Plus className="h-4 w-4" /> Generate QR
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(s => (
-          <div key={s.label} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div key={s.label} className="bg-muted rounded-lg p-4 border border-border">
             <s.icon className={`h-5 w-5 ${s.color} mb-2`} />
-            <div className="text-2xl font-bold text-white">{s.value}</div>
-            <div className="text-xs text-slate-400">{s.label}</div>
+            <div className="text-2xl font-semibold text-foreground">{s.value}</div>
+            <div className="text-xs text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+      <div className="bg-muted rounded-lg p-4 border border-border">
         <div className="flex items-start gap-4">
           <div className="bg-white p-2 rounded-lg"><QRCodeSVG value={baseUrl} size={100} /></div>
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1"><Wifi className="h-4 w-4 text-violet-400" /><span className="text-sm font-semibold text-white">Restaurant Menu URL</span></div>
-            <p className="text-xs text-slate-400 break-all mb-3">{baseUrl}</p>
+            <div className="flex items-center gap-2 mb-1"><Wifi className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-semibold text-foreground">Restaurant Menu URL</span></div>
+            <p className="text-xs text-muted-foreground break-all mb-3">{baseUrl}</p>
             <div className="flex gap-2">
-              <button onClick={() => handleCopy(baseUrl, 0)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
+              <button onClick={() => handleCopy(baseUrl, 0)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                 {copied === 0 ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied === 0 ? "Copied!" : "Copy URL"}
               </button>
-              <button onClick={() => handleDownload(baseUrl, `${venueSlug || "restaurant"}-menu-qr.png`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
+              <button onClick={() => handleDownload(baseUrl, `${venueSlug || "restaurant"}-menu-qr.png`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                 <Download className="h-3 w-3" /> Download
               </button>
             </div>
@@ -253,9 +253,9 @@ export default function QRManagement() {
         </div>
       </div>
 
-      <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg w-fit border border-slate-700/50">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit border border-border">
         {(["table", "room", "general"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${tab === t ? "bg-violet-600 text-white" : "text-slate-400 hover:text-white"}`}>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${tab === t ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             {t === "table" ? `Tables (${tables.length || tableQRs.length})` : t === "room" ? `Rooms (${rooms.length || roomQRs.length})` : `General (${generalQRs.length})`}
           </button>
         ))}
@@ -268,23 +268,23 @@ export default function QRManagement() {
               const qr = tableQRs.find(q => q.tableId === table.id);
               const url = scanUrl({ table: table.name });
               return (
-                <div key={table.id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 flex flex-col items-center gap-3">
-                  <div className="bg-white p-2 rounded-lg shadow-lg"><QRCodeSVG value={url} size={100} /></div>
+                <div key={table.id} className="bg-muted rounded-lg border border-border p-4 flex flex-col items-center gap-3">
+                  <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={url} size={100} /></div>
                   <div className="text-center">
-                    <div className="font-semibold text-white text-sm">{table.name}</div>
+                    <div className="font-semibold text-foreground text-sm">{table.name}</div>
                     {/* The code above is built from the table's scan URL, so it is
                         printable and scannable right now. "No QR yet" said the opposite
                         of the truth; what is actually missing is scan counting. */}
-                    <div className="text-xs text-slate-400">Cap: {table.capacity} • {qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
+                    <div className="text-xs text-muted-foreground">Cap: {table.capacity} • {qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
                   </div>
                   <div className="flex gap-2 w-full">
-                    <button onClick={() => handleCopy(url, table.id)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
+                    <button onClick={() => handleCopy(url, table.id)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       {copied === table.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     </button>
-                    <button onClick={() => handleGenerate(table.id, table.name)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
+                    <button onClick={() => handleGenerate(table.id, table.name)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Track"}
                     </button>
-                    <button title="Download QR" onClick={() => handleDownload(url, `${venueSlug || "restaurant"}-table-${table.name}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                    <button title="Download QR" onClick={() => handleDownload(url, `${venueSlug || "restaurant"}-table-${table.name}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                       <Download className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -292,14 +292,14 @@ export default function QRManagement() {
               );
             })}
           </div>
-          {tables.length === 0 && <div className="text-center text-slate-400 py-12">No tables found. Add tables first in Table Management.</div>}
+          {tables.length === 0 && <div className="text-center text-muted-foreground py-12">No tables found. Add tables first in Table Management.</div>}
         </div>
       )}
 
       {tab === "room" && (
         <div className="space-y-3">
           <div className="flex justify-end">
-            <button onClick={() => { setNewType("room"); setShowAdd(true); }} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => { setNewType("room"); setShowAdd(true); }} className="flex items-center gap-2 px-4 py-2 bg-muted hover-elevate text-foreground rounded-lg text-sm font-medium transition-colors">
               <Plus className="h-4 w-4" /> Add Room QR
             </button>
           </div>
@@ -310,20 +310,20 @@ export default function QRManagement() {
               const url = scanUrl({ room: roomNum });
               const key = roomNum;
               return (
-                <div key={key} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 flex flex-col items-center gap-3">
-                  <div className="bg-white p-2 rounded-lg shadow-lg"><QRCodeSVG value={qr?.url || url} size={100} /></div>
+                <div key={key} className="bg-muted rounded-lg border border-border p-4 flex flex-col items-center gap-3">
+                  <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={qr?.url || url} size={100} /></div>
                   <div className="text-center">
-                    <div className="font-semibold text-white text-sm">Room {roomNum}</div>
-                    <div className="text-xs text-slate-400">{qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
+                    <div className="font-semibold text-foreground text-sm">Room {roomNum}</div>
+                    <div className="text-xs text-muted-foreground">{qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
                   </div>
                   <div className="flex gap-2 w-full">
-                    <button onClick={() => handleCopy(qr?.url || url, qr?.id ?? roomNum.charCodeAt(0))} className="flex-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors">
+                    <button onClick={() => handleCopy(qr?.url || url, qr?.id ?? roomNum.charCodeAt(0))} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       {copied === (qr?.id ?? roomNum.charCodeAt(0)) ? "Copied!" : "Copy"}
                     </button>
-                    <button onClick={() => handleGenerate(undefined, undefined, roomNum)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-violet-600/30 hover:bg-violet-600/50 text-xs text-violet-300 transition-colors">
+                    <button onClick={() => handleGenerate(undefined, undefined, roomNum)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Track"}
                     </button>
-                    <button title="Download QR" onClick={() => handleDownload(qr?.url || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                    <button title="Download QR" onClick={() => handleDownload(qr?.url || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                       <Download className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -331,7 +331,7 @@ export default function QRManagement() {
               );
             })}
             {rooms.length === 0 && roomQRs.length === 0 && (
-              <div className="col-span-3 text-center text-slate-400 py-12">No rooms found. Add rooms in Hotel Management or generate a room QR above.</div>
+              <div className="col-span-3 text-center text-muted-foreground py-12">No rooms found. Add rooms in Hotel Management or generate a room QR above.</div>
             )}
           </div>
         </div>
@@ -340,52 +340,52 @@ export default function QRManagement() {
       {tab === "general" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {generalQRs.map(qr => (
-            <div key={qr.id} className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 flex flex-col items-center gap-3">
-              <div className="bg-white p-2 rounded-lg shadow-lg"><QRCodeSVG value={qr.url || baseUrl} size={100} /></div>
+            <div key={qr.id} className="bg-muted rounded-lg border border-border p-4 flex flex-col items-center gap-3">
+              <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={qr.url || baseUrl} size={100} /></div>
               <div className="text-center">
-                <div className="font-semibold text-white text-sm">{qr.label || qr.name}</div>
-                <div className="text-xs text-slate-400">{qr.scans || 0} scans</div>
+                <div className="font-semibold text-foreground text-sm">{qr.label || qr.name}</div>
+                <div className="text-xs text-muted-foreground">{qr.scans || 0} scans</div>
               </div>
               <div className="flex gap-2 w-full">
-                <button onClick={() => handleCopy(qr.url || baseUrl, qr.id)} className="flex-1 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition-colors text-sm">
+                <button onClick={() => handleCopy(qr.url || baseUrl, qr.id)} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors text-sm">
                   {copied === qr.id ? "Copied!" : "Copy Link"}
                 </button>
-                <button title="Download QR" onClick={() => handleDownload(qr.url || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors">
+                <button title="Download QR" onClick={() => handleDownload(qr.url || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                   <Download className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => handleDelete(qr.id, qr.label || qr.name || "this code")} className="py-1.5 px-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors">
+                <button onClick={() => handleDelete(qr.id, qr.label || qr.name || "this code")} className="py-1.5 px-3 rounded-lg bg-danger-subtle hover-elevate text-danger transition-colors">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
           ))}
-          {generalQRs.length === 0 && <div className="col-span-3 text-center text-slate-400 py-12">No general QR codes.</div>}
+          {generalQRs.length === 0 && <div className="col-span-3 text-center text-muted-foreground py-12">No general QR codes.</div>}
         </div>
       )}
 
       {showAdd && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Generate New QR Code</h3>
+        <div className="fixed inset-0 bg-foreground/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-muted rounded-lg p-6 w-full max-w-md border border-border max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Generate New QR Code</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Name / Label</label>
-                <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none" placeholder="e.g. Takeaway Counter, Room 201..." />
+                <label className="text-xs text-muted-foreground mb-1 block">Name / Label</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full bg-muted text-foreground rounded-lg px-3 py-2 text-sm border border-border focus:border-border outline-none" placeholder="e.g. Takeaway Counter, Room 201..." />
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Type</label>
-                <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm border border-slate-600 focus:border-violet-500 outline-none">
+                <label className="text-xs text-muted-foreground mb-1 block">Type</label>
+                <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full bg-muted text-foreground rounded-lg px-3 py-2 text-sm border border-border focus:border-border outline-none">
                   <option value="table">Table</option>
                   <option value="room">Hotel Room</option>
                   <option value="takeaway">Takeaway</option>
                   <option value="general">General</option>
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">Tip: a table's own QR is created from its card in the Tables tab. QRs made here (Takeaway / General / an unlinked Table) appear under the <b>General</b> tab.</p>
+                <p className="text-2xs text-muted-foreground mt-1">Tip: a table's own QR is created from its card in the Tables tab. QRs made here (Takeaway / General / an unlinked Table) appear under the <b>General</b> tab.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowAdd(false); setNewName(""); }} className="flex-1 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm transition-colors">Cancel</button>
-              <button onClick={() => handleGenerate(undefined, undefined, newType === "room" ? newName : undefined)} className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors">Generate</button>
+              <button onClick={() => { setShowAdd(false); setNewName(""); }} className="flex-1 py-2 rounded-lg bg-muted hover-elevate text-muted-foreground text-sm transition-colors">Cancel</button>
+              <button onClick={() => handleGenerate(undefined, undefined, newType === "room" ? newName : undefined)} className="flex-1 py-2 rounded-lg bg-muted hover-elevate text-foreground text-sm font-medium transition-colors">Generate</button>
             </div>
           </div>
         </div>

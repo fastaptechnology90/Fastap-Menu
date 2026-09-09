@@ -84,7 +84,7 @@ export function PrintControls({
         <button
           onClick={() => run("kot")}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-semibold text-foreground hover-elevate disabled:opacity-40"
         >
           <ChefHat className="h-3.5 w-3.5" />
           {busy === "kot" ? "Printing…" : kotCopies > 0 ? `Reprint KOT (${kotCopies})` : "Print KOT"}
@@ -92,7 +92,7 @@ export function PrintControls({
         <button
           onClick={() => run("bill")}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/25 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/15 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/25 disabled:opacity-40"
         >
           <Receipt className="h-3.5 w-3.5" />
           {busy === "bill" ? "Printing…" : billCopies > 0 ? `Duplicate bill (${billCopies})` : "Print bill"}
@@ -102,7 +102,7 @@ export function PrintControls({
       {showHistory && prints.length > 0 && (
         <div className="mt-2 space-y-0.5">
           {prints.slice(-4).map((p, i) => (
-            <p key={`${p.at}-${i}`} className="flex items-center gap-1.5 text-[11px] text-white/30">
+            <p key={`${p.at}-${i}`} className="flex items-center gap-1.5 text-2xs text-muted-foreground">
               <Printer className="h-3 w-3" />
               {p.kind === "kot" ? "Kitchen ticket" : "Bill"} copy {p.copy} · {p.by} · {new Date(p.at).toLocaleTimeString("en-IN")}
             </p>

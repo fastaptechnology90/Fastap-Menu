@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle, AlertCircle, Download, CreditCard, Banknote, DollarSign, BarChart3, BookOpen } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle, AlertCircle, Download, CreditCard, Banknote, DollarSign, BarChart3, BookOpen, Smartphone } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { finance as financeApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -9,11 +10,11 @@ import type { SettlementRow, OnlineTxnRow, CashLedgerRow } from "@/lib/restauran
 
 type Tab = "overview" | "wallet" | "cash-ledger" | "settlements" | "reports";
 
-const TYPE_CFG: Record<string, { icon: string; color: string }> = {
-  upi:  { icon: "📱", color: "text-blue-400" },
-  card: { icon: "💳", color: "text-violet-400" },
-  cash: { icon: "💵", color: "text-emerald-400" },
-  wallet: { icon: "👛", color: "text-amber-400" },
+const TYPE_CFG: Record<string, { icon: LucideIcon; color: string }> = {
+  upi:  { icon: Smartphone, color: "text-info" },
+  card: { icon: CreditCard, color: "text-muted-foreground" },
+  cash: { icon: Banknote, color: "text-success" },
+  wallet: { icon: Wallet, color: "text-primary" },
 };
 
 export default function FinanceWallet() {
@@ -91,12 +92,12 @@ export default function FinanceWallet() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">Finance & Wallet</h1>
-          <p className="text-xs text-white/40">Fastap wallet, settlements, P&L & cash ledger</p>
+          <h1 className="text-xl font-semibold">Finance & Wallet</h1>
+          <p className="text-xs text-muted-foreground">Fastap wallet, settlements, P&L & cash ledger</p>
         </div>
-        <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white/70 font-bold px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50">
+        <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 bg-muted hover-elevate text-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
           <Download className="h-4 w-4" /> {exporting ? "Exporting…" : "Export"}
         </button>
       </div>
@@ -104,40 +105,40 @@ export default function FinanceWallet() {
       <RevenueByDate restaurantId={restaurantId} title="Revenue" />
 
       {!isRestaurantPublished && !hasFinanceData && (
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4">
-          <p className="text-sm font-semibold text-amber-200">Finance analytics unavailable</p>
-          <p className="text-xs text-white/50 mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
+        <div className="rounded-lg bg-primary/10 border border-primary/20 p-4">
+          <p className="text-sm font-semibold text-primary">Finance analytics unavailable</p>
+          <p className="text-xs text-muted-foreground mt-1">{publicationEmptyMessage(restaurant.publicationStatus)}</p>
         </div>
       )}
 
       {/* Wallet Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Online Wallet", value: `₹${walletData.onlineBalance.toLocaleString()}`, icon: Wallet, color: "text-emerald-400", bg: "bg-emerald-500/10", desc: "Gateway received" },
-          { label: "Pending Settlement", value: `₹${walletData.pendingSettlement.toLocaleString()}`, icon: Clock, color: "text-yellow-400", bg: "bg-yellow-500/10", desc: "Awaiting transfer" },
-          { label: "Locked Balance", value: `₹${walletData.lockedBalance.toLocaleString()}`, icon: AlertCircle, color: "text-orange-400", bg: "bg-orange-500/10", desc: "Refund/chargeback hold" },
-          { label: "Cash Sales (MTD)", value: `₹${walletData.totalCashSales.toLocaleString()}`, icon: Banknote, color: "text-blue-400", bg: "bg-blue-500/10", desc: "Cash ledger total" },
+          { label: "Online Wallet", value: `₹${walletData.onlineBalance.toLocaleString()}`, icon: Wallet, color: "text-success", bg: "bg-success-subtle", desc: "Gateway received" },
+          { label: "Pending Settlement", value: `₹${walletData.pendingSettlement.toLocaleString()}`, icon: Clock, color: "text-warning", bg: "bg-warning-subtle", desc: "Awaiting transfer" },
+          { label: "Locked Balance", value: `₹${walletData.lockedBalance.toLocaleString()}`, icon: AlertCircle, color: "text-warning", bg: "bg-warning-subtle", desc: "Refund/chargeback hold" },
+          { label: "Cash Sales (MTD)", value: `₹${walletData.totalCashSales.toLocaleString()}`, icon: Banknote, color: "text-info", bg: "bg-info-subtle", desc: "Cash ledger total" },
         ].map(s => (
-          <div key={s.label} className={`rounded-2xl ${s.bg} border border-white/5 p-4`}>
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4`}>
             <div className="flex items-center gap-2 mb-2">
               <s.icon className={`h-4 w-4 ${s.color}`} />
-              <p className="text-xs text-white/40">{s.label}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
-            <p className={`text-xl font-extrabold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/30 mt-0.5">{s.desc}</p>
+            <p className={`text-xl font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white/5 rounded-xl p-1 overflow-x-auto w-fit">
+      <div className="flex gap-1 bg-muted rounded-lg p-1 overflow-x-auto w-fit">
         {[
           { id: "overview", label: "P&L", icon: BarChart3 },
           { id: "wallet", label: "Online Txns", icon: Wallet },
           { id: "cash-ledger", label: "Cash Ledger", icon: Banknote },
           { id: "settlements", label: "Settlements", icon: CheckCircle },
         ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as Tab)} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${tab === t.id ? "bg-amber-500 text-black" : "text-white/50 hover:text-white"}`}>
+          <button key={t.id} onClick={() => setTab(t.id as Tab)} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             <t.icon className="h-3.5 w-3.5" />{t.label}
           </button>
         ))}
@@ -145,10 +146,10 @@ export default function FinanceWallet() {
 
       {tab === "overview" && (
         <div className="grid lg:grid-cols-2 gap-4">
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
-            <h2 className="text-sm font-bold mb-1 text-white/70">Profit & Loss (MTD)</h2>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h2 className="text-sm font-semibold mb-1 text-foreground">Profit & Loss (MTD)</h2>
             {!expensesTracked && (
-              <p className="text-xs text-white/30 mb-3">Expense breakdown (COGS, staff, rent…) isn't returned by the finance API yet — showing revenue &amp; net profit only.</p>
+              <p className="text-xs text-muted-foreground mb-3">Expense breakdown (COGS, staff, rent…) isn't returned by the finance API yet — showing revenue &amp; net profit only.</p>
             )}
             <div className="space-y-2">
               {[
@@ -161,53 +162,53 @@ export default function FinanceWallet() {
                 { label: "Marketing", value: -pnl.marketing, type: "expense" },
                 { label: "Miscellaneous", value: -pnl.misc, type: "expense" },
               ].map(r => (
-                <div key={r.label} className={`flex justify-between items-center py-2 border-b border-white/5 last:border-0 ${r.bold ? "font-bold" : ""}`}>
-                  <span className={`text-sm ${r.bold ? "text-white" : "text-white/50"}`}>{r.label}</span>
+                <div key={r.label} className={`flex justify-between items-center py-2 border-b border-border last:border-0 ${r.bold ? "font-semibold" : ""}`}>
+                  <span className={`text-sm ${r.bold ? "text-foreground" : "text-muted-foreground"}`}>{r.label}</span>
                   {r.type === "expense" && r.value === 0 && !expensesTracked ? (
-                    <span className="text-sm font-semibold text-white/25" title="Not provided by the finance API">—</span>
+                    <span className="text-sm font-semibold text-muted-foreground" title="Not provided by the finance API">—</span>
                   ) : (
-                    <span className={`text-sm font-semibold ${r.type === "revenue" || r.type === "profit" ? "text-emerald-400" : "text-red-400"}`}>
+                    <span className={`text-sm font-semibold ${r.type === "revenue" || r.type === "profit" ? "text-success" : "text-danger"}`}>
                       {r.value > 0 ? "+" : ""}₹{Math.abs(r.value).toLocaleString()}
                     </span>
                   )}
                 </div>
               ))}
-              <div className="flex justify-between items-center py-3 border-t-2 border-amber-500/30 mt-2">
-                <span className="text-base font-extrabold text-amber-400">Net Profit</span>
+              <div className="flex justify-between items-center py-3 border-t-2 border-primary/30 mt-2">
+                <span className="text-base font-semibold text-primary">Net Profit</span>
                 <div className="text-right">
-                  <p className="text-lg font-extrabold text-emerald-400">₹{pnl.netProfit.toLocaleString()}</p>
-                  <p className="text-xs text-emerald-400/70">{pnl.margin}% margin</p>
+                  <p className="text-lg font-semibold text-success">₹{pnl.netProfit.toLocaleString()}</p>
+                  <p className="text-xs text-success">{pnl.margin}% margin</p>
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-[#0e1520] border border-white/5 rounded-2xl p-5">
-            <h2 className="text-sm font-bold mb-4 text-white/70">Revenue Split</h2>
+          <div className="bg-card border border-border rounded-lg p-5">
+            <h2 className="text-sm font-semibold mb-4 text-foreground">Revenue Split</h2>
             <div className="space-y-3">
               {[
-                { label: "Online Revenue (UPI/Card/NFC)", value: walletData.totalOnlineSales, percent: Math.round((walletData.totalOnlineSales / (walletData.totalOnlineSales + walletData.totalCashSales || 1)) * 100), color: "bg-blue-500" },
-                { label: "Cash Revenue", value: walletData.totalCashSales, percent: Math.round((walletData.totalCashSales / (walletData.totalOnlineSales + walletData.totalCashSales || 1)) * 100), color: "bg-emerald-500" },
+                { label: "Online Revenue (UPI/Card/NFC)", value: walletData.totalOnlineSales, percent: Math.round((walletData.totalOnlineSales / (walletData.totalOnlineSales + walletData.totalCashSales || 1)) * 100), color: "bg-info" },
+                { label: "Cash Revenue", value: walletData.totalCashSales, percent: Math.round((walletData.totalCashSales / (walletData.totalOnlineSales + walletData.totalCashSales || 1)) * 100), color: "bg-success" },
               ].map(r => (
                 <div key={r.label} className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-white/60">{r.label}</span>
-                    <span className="font-bold">₹{r.value.toLocaleString()} ({r.percent}%)</span>
+                    <span className="text-muted-foreground">{r.label}</span>
+                    <span className="font-semibold">₹{r.value.toLocaleString()} ({r.percent}%)</span>
                   </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div className={`h-full ${r.color} rounded-full`} style={{ width: `${r.percent}%` }} />
                   </div>
                 </div>
               ))}
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {[
-                  { label: "Total Revenue", value: `₹${(walletData.totalOnlineSales + walletData.totalCashSales).toLocaleString()}`, color: "text-white" },
-                  { label: "Net Profit", value: `₹${pnl.netProfit.toLocaleString()}`, color: "text-emerald-400" },
-                  { label: "Tax Collected", value: `₹${walletData.taxCollected.toLocaleString()}`, color: "text-yellow-400" },
-                  { label: "Pending Refunds", value: `₹${walletData.pendingRefunds.toLocaleString()}`, color: "text-orange-400" },
+                  { label: "Total Revenue", value: `₹${(walletData.totalOnlineSales + walletData.totalCashSales).toLocaleString()}`, color: "text-foreground" },
+                  { label: "Net Profit", value: `₹${pnl.netProfit.toLocaleString()}`, color: "text-success" },
+                  { label: "Tax Collected", value: `₹${walletData.taxCollected.toLocaleString()}`, color: "text-warning" },
+                  { label: "Pending Refunds", value: `₹${walletData.pendingRefunds.toLocaleString()}`, color: "text-warning" },
                 ].map(f => (
-                  <div key={f.label} className="bg-white/5 rounded-xl p-3">
-                    <p className="text-xs text-white/40">{f.label}</p>
-                    <p className={`text-sm font-bold mt-0.5 ${f.color}`}>{f.value}</p>
+                  <div key={f.label} className="bg-muted rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">{f.label}</p>
+                    <p className={`text-sm font-semibold mt-0.5 ${f.color}`}>{f.value}</p>
                   </div>
                 ))}
               </div>
@@ -217,26 +218,26 @@ export default function FinanceWallet() {
       )}
 
       {tab === "wallet" && (
-        <div className="bg-[#0e1520] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-white/5">
-            <h2 className="text-sm font-bold">Online Payment Transactions</h2>
-            <p className="text-xs text-white/40 mt-0.5">Gateway · UTR · Net payout tracking</p>
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-sm font-semibold">Online Payment Transactions</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Gateway · UTR · Net payout tracking</p>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-border">
             {onlineTxns.map(t => (
-              <div key={t.id} onClick={() => setSelTxn(t)} className="px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors" title="Click for payment details">
+              <div key={t.id} onClick={() => setSelTxn(t)} className="px-4 py-3 cursor-pointer hover:bg-muted transition-colors" title="Click for payment details">
                 <div className="flex items-center gap-3">
-                  <span className="text-xl shrink-0">{TYPE_CFG[t.type]?.icon || "💰"}</span>
+                  {(() => { const MethodIcon = TYPE_CFG[t.type]?.icon || Wallet; return <MethodIcon className={`h-5 w-5 shrink-0 ${TYPE_CFG[t.type]?.color || "text-muted-foreground"}`} />; })()}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold capitalize">{t.type.toUpperCase()} Payment</p>
-                      <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${t.status === "success" ? "bg-emerald-500/15 text-emerald-400" : "bg-orange-500/15 text-orange-400"}`}>{t.status}</span>
+                      <p className="text-sm font-semibold capitalize">{t.type.toUpperCase()} Payment</p>
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${t.status === "success" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning"}`}>{t.status}</span>
                     </div>
-                    <p className="text-xs text-white/40 font-mono mt-0.5">{t.utr} · {t.time}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{t.utr} · {t.time}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-bold ${t.net > 0 ? "text-emerald-400" : "text-red-400"}`}>{t.net > 0 ? "+" : ""}₹{Math.abs(t.net).toLocaleString()}</p>
-                    <p className="text-xs text-white/30">Tax ₹{t.tax} · Fee ₹{t.commission}</p>
+                    <p className={`text-sm font-semibold ${t.net > 0 ? "text-success" : "text-danger"}`}>{t.net > 0 ? "+" : ""}₹{Math.abs(t.net).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Tax ₹{t.tax} · Fee ₹{t.commission}</p>
                   </div>
                 </div>
               </div>
@@ -246,24 +247,24 @@ export default function FinanceWallet() {
       )}
 
       {tab === "cash-ledger" && (
-        <div className="bg-[#0e1520] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-white/5">
-            <h2 className="text-sm font-bold">Cash Ledger</h2>
-            <p className="text-xs text-white/40 mt-0.5">Separate from online wallet — cash-only tracking</p>
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-sm font-semibold">Cash Ledger</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Separate from online wallet — cash-only tracking</p>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-border">
             {cashLedger.map((entry, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${entry.amount > 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${entry.amount > 0 ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"}`}>
                   {entry.amount > 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold capitalize">{entry.type}</p>
-                  <p className="text-xs text-white/40">{entry.note} · {entry.date}</p>
+                  <p className="text-xs text-muted-foreground">{entry.note} · {entry.date}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${entry.amount > 0 ? "text-emerald-400" : "text-red-400"}`}>{entry.amount > 0 ? "+" : ""}₹{Math.abs(entry.amount).toLocaleString()}</p>
-                  <p className="text-xs text-white/30">Bal: ₹{entry.balance.toLocaleString()}</p>
+                  <p className={`text-sm font-semibold ${entry.amount > 0 ? "text-success" : "text-danger"}`}>{entry.amount > 0 ? "+" : ""}₹{Math.abs(entry.amount).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Bal: ₹{entry.balance.toLocaleString()}</p>
                 </div>
               </div>
             ))}
@@ -273,43 +274,43 @@ export default function FinanceWallet() {
 
       {tab === "settlements" && (
         <div className="space-y-3">
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
-            <Clock className="h-5 w-5 text-amber-400 shrink-0" />
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex items-center gap-3">
+            <Clock className="h-5 w-5 text-primary shrink-0" />
             <div>
-              <p className="text-sm font-bold text-amber-300">Pending Settlement</p>
-              <p className="text-xs text-amber-400/70">₹{walletData.pendingSettlement.toLocaleString()} — estimated transfer pending</p>
+              <p className="text-sm font-semibold text-primary">Pending Settlement</p>
+              <p className="text-xs text-primary">₹{walletData.pendingSettlement.toLocaleString()} — estimated transfer pending</p>
             </div>
           </div>
           {settlements.map(s => (
-            <div key={s.id} className="bg-[#0e1520] border border-white/5 rounded-2xl p-4 flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${s.status === "completed" ? "bg-emerald-500/15" : "bg-yellow-500/15"}`}>
-                {s.status === "completed" ? <CheckCircle className="h-5 w-5 text-emerald-400" /> : <Clock className="h-5 w-5 text-yellow-400" />}
+            <div key={s.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${s.status === "completed" ? "bg-success-subtle" : "bg-warning-subtle"}`}>
+                {s.status === "completed" ? <CheckCircle className="h-5 w-5 text-success" /> : <Clock className="h-5 w-5 text-warning" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold">{s.id}</p>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.status === "completed" ? "bg-emerald-500/15 text-emerald-400" : "bg-yellow-500/15 text-yellow-400"}`}>{s.status}</span>
+                  <p className="text-sm font-semibold">{s.id}</p>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.status === "completed" ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning"}`}>{s.status}</span>
                 </div>
-                <p className="text-xs text-white/40 mt-0.5">{s.bank} · {s.mode} · UTR: <span className="font-mono">{s.utr}</span></p>
-                <p className="text-xs text-white/30 mt-0.5">{s.date}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.bank} · {s.mode} · UTR: <span className="font-mono">{s.utr}</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.date}</p>
               </div>
-              <p className="text-base font-extrabold text-emerald-400 shrink-0">₹{s.amount.toLocaleString()}</p>
+              <p className="text-base font-semibold text-success shrink-0">₹{s.amount.toLocaleString()}</p>
             </div>
           ))}
         </div>
       )}
 
       {selTxn && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelTxn(null)}>
-          <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-white/10 text-white" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <h3 className="font-bold flex items-center gap-2"><CreditCard className="h-5 w-5 text-amber-400" /> Payment details</h3>
-              <button onClick={() => setSelTxn(null)} className="text-white/40 hover:text-white text-xl leading-none">×</button>
+        <div className="fixed inset-0 z-50 bg-foreground/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelTxn(null)}>
+          <div className="w-full max-w-sm bg-card rounded-lg border border-border text-foreground max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-5 w-5 text-primary" /> Payment details</h3>
+              <button onClick={() => setSelTxn(null)} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
             </div>
             <div className="p-5 space-y-3 text-sm">
               <div className="text-center py-2">
-                <p className="text-3xl font-extrabold text-amber-400">₹{Number(selTxn.amount).toLocaleString("en-IN")}</p>
-                <p className="text-xs text-white/40 mt-1 font-mono">{selTxn.id}</p>
+                <p className="text-3xl font-semibold text-primary">₹{Number(selTxn.amount).toLocaleString("en-IN")}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">{selTxn.id}</p>
               </div>
               {[
                 ["Payment method", String(selTxn.type || "—").toUpperCase()],
@@ -325,8 +326,8 @@ export default function FinanceWallet() {
                 ["Time", selTxn.time || "—"],
                 ["Status", selTxn.status || "—"],
               ].map(([k, v]) => (
-                <div key={k as string} className="flex justify-between gap-3 border-b border-white/5 pb-2">
-                  <span className="text-white/40">{k}</span>
+                <div key={k as string} className="flex justify-between gap-3 border-b border-border pb-2">
+                  <span className="text-muted-foreground">{k}</span>
                   <span className="font-medium text-right break-all">{v as string}</span>
                 </div>
               ))}

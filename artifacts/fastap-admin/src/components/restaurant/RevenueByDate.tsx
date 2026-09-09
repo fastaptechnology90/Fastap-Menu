@@ -45,34 +45,34 @@ export function RevenueByDate({ restaurantId, title = "Revenue" }: { restaurantI
   }
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-col lg:flex-row lg:items-center gap-4">
         <div className="lg:w-56 shrink-0">
-          <p className="text-xs text-white/40 flex items-center gap-1.5"><IndianRupee className="h-3.5 w-3.5" /> {title} {data?.from ? `(${data.from}${data.to && data.to !== data.from ? ` → ${data.to}` : ""})` : "(all time)"}</p>
-          <p className="text-3xl font-extrabold text-emerald-400 mt-1">
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5"><IndianRupee className="h-3.5 w-3.5" /> {title} {data?.from ? `(${data.from}${data.to && data.to !== data.from ? ` → ${data.to}` : ""})` : "(all time)"}</p>
+          <p className="text-3xl font-semibold text-success mt-1">
             {isFetching ? <Loader2 className="h-6 w-6 animate-spin" /> : `₹${Number(data?.revenue ?? 0).toLocaleString("en-IN")}`}
           </p>
-          <p className="text-xs text-white/30 mt-0.5">{data?.totalOrders ?? 0} orders in range</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{data?.totalOrders ?? 0} orders in range</p>
         </div>
         <div className="flex-1 space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {PRESETS.map(p => (
               <button key={p.key} onClick={() => applyPreset(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${preset === p.key ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50 hover:text-white"}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${preset === p.key ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground hover:text-foreground"}`}>
                 {p.label}
               </button>
             ))}
             <button onClick={() => setPreset("custom")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1 ${preset === "custom" ? "bg-amber-500/20 border-amber-500/40 text-amber-300" : "border-white/10 bg-white/5 text-white/50 hover:text-white"}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1 ${preset === "custom" ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground hover:text-foreground"}`}>
               <CalendarRange className="h-3.5 w-3.5" /> Custom
             </button>
           </div>
           {preset === "custom" && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-white/40">From</span>
-              <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white [color-scheme:dark]" />
-              <span className="text-white/40">To</span>
-              <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white [color-scheme:dark]" />
+              <span className="text-muted-foreground">From</span>
+              <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} className="rounded-lg border border-border bg-muted px-2 py-1.5 text-xs text-foreground [color-scheme:dark]" />
+              <span className="text-muted-foreground">To</span>
+              <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="rounded-lg border border-border bg-muted px-2 py-1.5 text-xs text-foreground [color-scheme:dark]" />
             </div>
           )}
         </div>
