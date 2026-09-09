@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, ordersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
-import { reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
+import { recordOrderRefundInLedger } from "../lib/order-payment-ledger.js";
 import { restoreStockForOrder } from "../lib/stock-consumption.js";
 import { taxRateFor, round2 } from "../lib/order-pricing.js";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse.js";
@@ -61,6 +61,8 @@ async function applyAdjustment(
   items: OrderItem[],
   entry: Record<string, unknown>,
 ) {
+  const wasSettled = order.paymentStatus === "paid" || order.status === "completed";
+  const totalBefore = parseFloat(String(order.total ?? 0)) || 0;
   const subtotal = billableTotal(items);
   const rate = await taxRateFor(restaurantId);
   const discount = parseFloat(String(order.discountAmount ?? 0)) || 0;
@@ -79,6 +81,21 @@ async function applyAdjustment(
     total: total.toFixed(2),
     metadata: { ...meta, adjustments: [...history, entry] },
   }).where(and(eq(ordersTable.id, order.id), eq(ordersTable.restaurantId, restaurantId))).returning();
+
+  // Voiding or comping a line on a bill that was ALREADY settled takes money off a total
+  // the guest has paid. That used to rewrite the order silently: the income row kept the
+  // original amount, so the order said one thing and Finance said another, and nobody was
+  // ever handed the difference. Book it as a refund so the two agree again.
+  if (wasSettled && updated) {
+    const given = Math.round((totalBefore - (parseFloat(String(updated.total ?? 0)) || 0)) * 100) / 100;
+    if (given > 0) {
+      await recordOrderRefundInLedger({
+        restaurantId, order: updated, amount: given,
+        reason: String(entry.reason ?? ""),
+        what: `line ${entry.type === "comp" ? "comped" : "voided"} after payment`,
+      });
+    }
+  }
 
   return updated;
 }
@@ -211,8 +228,15 @@ router.post("/restaurants/:restaurantId/orders/:orderId/refund", requireAuth, as
     },
   }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
 
+  // Every refund reaches the ledger, not only a full one. The old rule — "a partial one
+  // leaves the order genuinely part-paid, so the finance rows should still reflect what was
+  // kept" — did not hold: the income row still carried the whole amount, so what was handed
+  // back stayed booked as income and the drawer came up short against Finance.
+  await recordOrderRefundInLedger({
+    restaurantId, order, amount: round2(requested), reason: String(reason).trim(),
+    what: full ? "refunded in full" : "part refunded",
+  });
   if (full) {
-    await reverseOrderPaymentInLedger({ restaurantId, order, reason: String(reason).trim() });
     await restoreStockForOrder(restaurantId, orderId);
   }
 

@@ -3,6 +3,7 @@ import { eq, and, gte, lt } from "drizzle-orm";
 import { db, ordersTable, cashShiftsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { round2 } from "../lib/order-pricing.js";
+import { isPaidOrder } from "../lib/payment-calculations.js";
 
 /**
  * The day-end report a restaurant closes on.
@@ -53,9 +54,34 @@ async function buildReport(restaurantId: number, dateStr: string | undefined) {
     lt(ordersTable.createdAt, bounds.end),
   ));
 
-  const settled = orders.filter(o => o.paymentStatus === "paid" || o.status === "completed");
+  // A cancelled order is not a taking, even if it was marked paid before it was voided —
+  // a UPI order auto-marks paid and can then be cancelled. This filter used to be
+  // "paid OR completed" with no cancellation check, so the same orders were counted in
+  // BOTH `settled` and `cancelled` and the Z reading reported money that had been handed
+  // back. The dashboard and Revenue have always excluded them, so the two disagreed by the
+  // value of every cancelled bill. `isPaidOrder` is the one rule the rest of the product
+  // settles revenue by; the day-end reading now uses it too.
+  // `isPaidOrder` alone drops a part-refunded bill outright, which would lose the money
+  // that WAS kept on it; the refund itself is netted off just below.
+  const settled = orders.filter(o =>
+    isPaidOrder(o)
+    || (String(o.paymentStatus ?? "") === "partially_refunded" && String(o.status ?? "") !== "cancelled"),
+  );
   const cancelled = orders.filter(o => o.status === "cancelled");
   const refunded = orders.filter(o => String(o.paymentStatus ?? "").includes("refund"));
+
+  /** What was actually handed back on an order, from the adjustment trail on it. */
+  const refundedOn = (o: typeof orders[number]) => {
+    const meta = (typeof o.metadata === "object" && o.metadata !== null ? o.metadata : {}) as Record<string, unknown>;
+    const r = meta.refund as { total?: unknown } | undefined;
+    return num(r?.total);
+  };
+  // Money given back during the day comes off the day's takings. A partly refunded order
+  // keeps its full total on the row, so without this the report overstates the till by
+  // every rupee refunded.
+  // Only over `settled`: an order refunded in full has already left that list, so counting
+  // its refund here as well would subtract the same money twice.
+  const refundsGiven = round2(settled.reduce((t, o) => t + refundedOn(o), 0));
 
   const sum = (rows: typeof orders, field: "subtotal" | "tax" | "total" | "tipAmount" | "discountAmount") =>
     round2(rows.reduce((t, o) => t + num(o[field]), 0));
@@ -66,12 +92,15 @@ async function buildReport(restaurantId: number, dateStr: string | undefined) {
     const method = String(o.paymentMethod ?? "uncollected").toLowerCase();
     byMethod[method] ??= { count: 0, amount: 0 };
     byMethod[method].count += 1;
-    byMethod[method].amount = round2(byMethod[method].amount + num(o.total));
+    // Net of anything refunded on this order, so the cash line equals what is in the drawer.
+    byMethod[method].amount = round2(byMethod[method].amount + num(o.total) - refundedOn(o));
   }
 
   const byType: Record<string, { count: number; amount: number }> = {};
   for (const o of settled) {
-    const type = String(o.type ?? "dine_in");
+    // "dine-in" and "dine_in" are both written by different order paths and were reported
+    // as two separate order types, splitting one day's dine-in trade across two lines.
+    const type = String(o.type ?? "dine_in").toLowerCase().replace(/-/g, "_");
     byType[type] ??= { count: 0, amount: 0 };
     byType[type].count += 1;
     byType[type].amount = round2(byType[type].amount + num(o.total));
@@ -124,7 +153,9 @@ async function buildReport(restaurantId: number, dateStr: string | undefined) {
       tax: sum(settled, "tax"),
       tips: sum(settled, "tipAmount"),
       discounts: sum(settled, "discountAmount"),
-      total: sum(settled, "total"),
+      total: round2(sum(settled, "total") - refundsGiven),
+      grossTotal: sum(settled, "total"),
+      refunds: refundsGiven,
       averageOrder: settled.length ? round2(sum(settled, "total") / settled.length) : 0,
     },
     byPaymentMethod: byMethod,

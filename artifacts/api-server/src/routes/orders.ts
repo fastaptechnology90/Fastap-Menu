@@ -163,13 +163,18 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
 
     const reduction = round2(originalTotal - requested);
     if (reduction > 0) {
-      const staffName = req.session.staffSession?.name ?? collectedBy ?? "staff";
+      // The session field is `staffName`; `.name` has never existed on it, so this always
+      // fell through to whatever the client put in `collectedBy` — a free-text field the
+      // caller chooses. Every discount was therefore signed by a name the person applying
+      // it typed themselves. Trust the session first.
+      const staffName = req.session.staffSession?.staffName ?? collectedBy ?? "staff";
       orderPatch.metadata = {
         ...(orderPatch.metadata as Record<string, unknown>),
         discount: {
           amount: reduction,
           originalTotal: round2(originalTotal),
           reason: typeof req.body?.discountReason === "string" ? req.body.discountReason.trim() : "",
+          appliedByRole: req.session.staffSession?.staffRole ?? null,
           appliedBy: staffName,
           appliedAt: new Date().toISOString(),
         },
@@ -202,6 +207,23 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     // every cancellation would permanently understate stock.
     if (String(existing.status ?? "").toLowerCase() !== "cancelled") {
       await restoreStockForOrder(restaurantId, orderId);
+    }
+
+    // The ledger reversal above hands the money back, but the ORDER was left saying
+    // `paymentStatus: "paid"` — so a voided bill still read as collected on the orders
+    // list, on a reprint, in an export and to the mobile apps, while Finance showed the
+    // money returned. Two records of the same bill telling opposite stories.
+    //
+    // Cancelling is the one gesture a floor makes ("void that, give it back"), so the
+    // refund is recorded as part of it rather than demanded as a separate step first —
+    // requiring two calls would leave bills stranded half-voided whenever the second is
+    // forgotten, which is worse than the problem being fixed.
+    if (order.paymentStatus === "paid" || order.paymentStatus === "partially_refunded") {
+      const [settledOff] = await db.update(ordersTable)
+        .set({ paymentStatus: "refunded" })
+        .where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)))
+        .returning();
+      if (settledOff) order = settledOff;
     }
   }
 
