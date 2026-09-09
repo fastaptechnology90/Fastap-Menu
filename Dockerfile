@@ -25,6 +25,13 @@ RUN pnpm install --no-frozen-lockfile
 RUN pnpm --filter @workspace/fastap-admin build \
     && pnpm --filter @workspace/api-server build
 
+# This was never set, so the deployed server ran as if it were a developer's laptop. The
+# one that mattered: with no SMS provider configured and no NODE_ENV, guest sign-in issued
+# the fixed demo code for ANY phone number and handed it back in the response — a live
+# way into any guest account. It also keeps the logger on its JSON transport rather than
+# the pretty-printer, which is what a log collector expects.
+ENV NODE_ENV=production
+
 # Railway injects PORT; the server reads process.env.PORT. cwd is /app, so the API finds
 # the built site at artifacts/fastap-admin/dist/public (see app.ts STATIC_DIR).
 CMD ["node", "artifacts/api-server/dist/index.mjs"]

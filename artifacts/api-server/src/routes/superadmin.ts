@@ -823,8 +823,11 @@ router.get("/superadmin/settlements", ...admin, async (_req, res) => {
 
 router.post("/superadmin/settlements/:id/release", ...admin, async (req, res) => {
   const id = parseInt(String(req.params.id).replace("STL-", ""), 10);
+  // Stamp where this payout period ends, so the next one starts here rather than summing
+  // the venue's whole history again and paying for these orders a second time.
+  const releasedAt = new Date();
   const [updated] = await db.update(platformSettlementsTable).set({
-    status: "released", releasedAt: new Date(),
+    status: "released", releasedAt, periodEnd: releasedAt,
   }).where(eq(platformSettlementsTable.id, id)).returning();
   // No row matched: the payout was never released. This used to answer 200 with a
   // synthesised "released" body, so the screen reported a payout that never moved.

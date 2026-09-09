@@ -104,6 +104,115 @@ export async function taxRateFor(restaurantId: number): Promise<number> {
 }
 
 /**
+ * The tax treatments a menu line can carry, and the rate each attracts at this venue.
+ *
+ * `liquorConfigured` says whether the venue has actually set a rate for alcohol. Alcohol
+ * sits outside GST in India — it carries state excise and VAT instead — and the rate varies
+ * by state, so there is no honest default. Until a venue sets one, liquor is billed at 0%
+ * rather than swept into GST: under-charging is a commercial decision the venue can correct,
+ * whereas collecting 5% GST on a non-GST supply makes the tax invoice a false document.
+ */
+export type VenueTaxRates = { food: number; liquor: number; liquorConfigured: boolean };
+
+export async function taxRatesFor(restaurantId: number): Promise<VenueTaxRates> {
+  const [restaurant] = await db
+    .select({ settings: restaurantsTable.settings })
+    .from(restaurantsTable)
+    .where(eq(restaurantsTable.id, restaurantId))
+    .limit(1);
+
+  const settings = (restaurant?.settings ?? {}) as Record<string, unknown>;
+  const billing = (settings.billing ?? {}) as Record<string, unknown>;
+  const foodPercent = toNumber(billing.taxPercent);
+  const food = foodPercent > 0 && foodPercent <= 40 ? foodPercent / 100 : 0.05;
+
+  const liquorPercent = toNumber(billing.liquorTaxPercent);
+  const liquorConfigured = liquorPercent > 0 && liquorPercent <= 100;
+  return { food, liquor: liquorConfigured ? liquorPercent / 100 : 0, liquorConfigured };
+}
+
+/**
+ * Split GST into its two halves.
+ *
+ * Each half is worked out from the taxable value at half the rate, which is what the law
+ * requires and which makes them equal by construction. The old code halved an already
+ * rounded total — `cgst = round(totalGst / 2)`, `sgst = totalGst - cgst` — so any bill whose
+ * GST landed on an odd number of paise came out as e.g. CGST 1.63 / SGST 1.62. That is about
+ * half of all bills, and each one is malformed.
+ */
+export function splitGst(taxableAmount: number, rate: number): { cgst: number; sgst: number; totalGst: number } {
+  const half = round2(Math.max(0, taxableAmount) * (rate / 2));
+  return { cgst: half, sgst: half, totalGst: round2(half * 2) };
+}
+
+export type TaxableLine = { amount: number; taxCategory?: string | null };
+
+/**
+ * Work out the tax on a basket, one bucket per treatment.
+ *
+ * A discount comes off the whole basket, so it is apportioned across the buckets in
+ * proportion to what each contributes — otherwise a discount on a food-and-drinks bill
+ * would relieve tax on the wrong supply.
+ */
+export function computeBasketTax(lines: TaxableLine[], rates: VenueTaxRates, discount = 0) {
+  const bucketOf = (l: TaxableLine) => {
+    const c = String(l.taxCategory ?? "food").toLowerCase();
+    return c === "liquor" || c === "alcohol" ? "liquor" : c === "exempt" ? "exempt" : "food";
+  };
+  const gross = { food: 0, liquor: 0, exempt: 0 };
+  for (const l of lines) gross[bucketOf(l) as keyof typeof gross] += Math.max(0, l.amount);
+
+  const subtotal = round2(gross.food + gross.liquor + gross.exempt);
+  const relief = Math.min(Math.max(0, discount), subtotal);
+  const share = (v: number) => (subtotal > 0 ? round2(Math.max(0, v - relief * (v / subtotal))) : 0);
+
+  const foodTaxable = share(gross.food);
+  const liquorTaxable = share(gross.liquor);
+  const exemptTaxable = share(gross.exempt);
+
+  const gst = splitGst(foodTaxable, rates.food);
+  const liquorTax = round2(liquorTaxable * rates.liquor);
+
+  return {
+    subtotal,
+    discount: round2(relief),
+    foodTaxable,
+    liquorTaxable,
+    exemptTaxable,
+    cgst: gst.cgst,
+    sgst: gst.sgst,
+    gst: gst.totalGst,
+    liquorTax,
+    liquorRatePercent: round2(rates.liquor * 100),
+    liquorTaxConfigured: rates.liquorConfigured,
+    /** Everything the guest pays in tax, which is what the order row stores. */
+    tax: round2(gst.totalGst + liquorTax),
+  };
+}
+
+/**
+ * Tax on an order's own lines.
+ *
+ * Split, merge, reorder and void/comp each re-taxed the basket with their own
+ * `round2(taxable * rate)`, which is not the same number as the CGST + SGST the order was
+ * priced with: rounding each half independently can differ from rounding the whole by a
+ * paisa. So splitting a bill and merging it straight back handed a total a paisa away from
+ * where it started. They also all assumed one rate for everything, so splitting a table's
+ * bill quietly re-taxed the whisky at the food rate. Every path now goes through here.
+ */
+export async function taxForOrderItems(
+  restaurantId: number,
+  items: { subtotal?: unknown; price?: unknown; quantity?: unknown; taxCategory?: string | null }[],
+  discount = 0,
+) {
+  const lines = items.map(i => ({
+    amount: toNumber(i.subtotal ?? (toNumber(i.price) * (toNumber(i.quantity) || 1))),
+    taxCategory: i.taxCategory ?? "food",
+  }));
+  return computeBasketTax(lines, await taxRatesFor(restaurantId), discount);
+}
+
+/**
  * Resolve a coupon code against the promo table. An unknown, expired, inactive or
  * unmet code yields no discount rather than an error — the guest still gets their
  * order, just at full price, which is what a counter would do.

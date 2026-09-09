@@ -12,6 +12,9 @@ import {
   computeSlotAvailability,
   depositForType,
   generateBookingToken,
+  normalizeTime,
+  readPartySize,
+  validateReservation,
   RESERVATION_TYPE_CATALOG,
 } from "../lib/reservationLogic.js";
 import { getSettingsSection } from "../lib/restaurant-settings.js";
@@ -40,13 +43,14 @@ router.get("/public/reservations/slots", async (req, res): Promise<void> => {
   );
   const reservationSlots = await getSettingsSection<Record<string, string[]>>(restaurantId, "reservationSlots", {});
   const slots = computeSlotAvailability(reservationType, date, existing, reservationSlots);
+  const deposits = await getSettingsSection<Record<string, unknown>>(restaurantId, "reservationDeposits", {});
   res.json({
     date,
     reservationType,
     slots,
     live: true,
     availableCount: slots.filter(s => s.available).length,
-    deposit: depositForType(reservationType),
+    deposit: depositForType(reservationType, deposits),
   });
 });
 
@@ -69,10 +73,11 @@ router.get("/public/reservation-slots", async (req, res): Promise<void> => {
   );
   const reservationSlots = await getSettingsSection<Record<string, string[]>>(restaurantId, "reservationSlots", {});
   const slots = computeSlotAvailability(reservationType, date, existing, reservationSlots);
+  const deposits = await getSettingsSection<Record<string, unknown>>(restaurantId, "reservationDeposits", {});
   res.json({
     slots: slots.filter(s => s.available).map(s => s.label),
     available: slots,
-    deposit: depositForType(reservationType),
+    deposit: depositForType(reservationType, deposits),
   });
 });
 
@@ -113,8 +118,35 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
   if (phoneProblem) { res.status(400).json({ error: phoneProblem, field: "customerPhone" }); return; }
 
   const type = reservationType ?? "table";
-  const deposit = depositAmount != null ? parseNum(depositAmount) : depositForType(type);
-  const normalizedTime = time.includes("M") ? time : time;
+  // The deposit is the venue's to set, not the client's to send: a guest could name their
+  // own. Only what the venue has published counts.
+  const venueDeposits = await getSettingsSection<Record<string, unknown>>(restaurantId, "reservationDeposits", {});
+  const deposit = depositForType(type, venueDeposits);
+
+  // `guestCount ?? 2` is what made every booking a party of two: the guest page sends
+  // `partySize`, which nothing read. Both spellings are accepted, and the rest of the
+  // booking is checked before anything is written — party size, a date that has not
+  // already passed, a time the venue is actually open, and room left in the sitting.
+  const partySize = readPartySize(req.body);
+  const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
+  if (!venue) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  const sameDay = await db.select().from(reservationsTable).where(
+    and(eq(reservationsTable.restaurantId, restaurantId), eq(reservationsTable.date, String(date))),
+  );
+  const slotOverrides = await getSettingsSection<Record<string, string[]>>(restaurantId, "reservationSlots", {});
+  const problem = validateReservation({
+    reservationType: type,
+    date: String(date),
+    time: String(time),
+    partySize,
+    openTime: venue.openTime,
+    closeTime: venue.closeTime,
+    existing: sameDay,
+    slotOverrides,
+  });
+  if (problem) { res.status(400).json(problem); return; }
+
+  const normalizedTime = normalizeTime(time) ?? String(time);
 
   const [reservation] = await db.insert(reservationsTable).values({
     restaurantId,
@@ -123,7 +155,7 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
     customerEmail,
     date,
     time: normalizedTime,
-    guestCount: guestCount ?? 2,
+    guestCount: partySize ?? guestCount ?? 2,
     notes,
     reservationType: type,
     zone: zone ?? null,
@@ -156,12 +188,10 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
     }).catch(() => {});
   }
 
-  const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
-
   res.status(201).json({
     ...updated,
     bookingToken: token,
-    restaurantName: restaurant?.name,
+    restaurantName: venue.name,
     depositRequired: deposit,
     depositStatus: updated?.depositStatus,
   });

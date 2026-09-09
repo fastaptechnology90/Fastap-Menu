@@ -54,6 +54,7 @@ import {
   socialEmailForProvider, GUEST_TYPES, type GuestType,
 } from "../lib/guestAuthLogic.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
+import { otpSendRateLimit, otpVerifyRateLimit } from "../middlewares/rate-limit.js";
 import { getPublicIntegrationsConfig } from "../lib/platform-integrations.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
 import { priceMenuItem, taxRateFor } from "../lib/order-pricing.js";
@@ -503,27 +504,86 @@ router.post("/public/auth/guest", async (req, res): Promise<void> => {
 const DEMO_GUEST_PHONE = "9876543210";
 const DEMO_GUEST_OTP = "123456";
 
-router.post("/public/auth/otp/send", async (req, res): Promise<void> => {
+const IS_PRODUCTION = () => process.env.NODE_ENV === "production";
+
+/**
+ * The demo account, and only the demo account.
+ *
+ * The test used to be `phone === DEMO || phone.endsWith(DEMO)`, and `endsWith` is not a
+ * narrower test than equality — it is a wider one. `+919876543210`, the ordinary
+ * international form, matched. So did `99999876543210`, an unrelated number, which was
+ * signed in with the fixed code and given a real guest account. Worse, the same flag then
+ * bypassed the production check on both the generated code AND on returning it in the
+ * response body, so the backdoor was live in production for anyone who noticed the
+ * pattern. Exact match, and never in production.
+ */
+function isDemoPhone(phone: string): boolean {
+  return phone === DEMO_GUEST_PHONE;
+}
+
+/**
+ * Whether real one-time codes are in force.
+ *
+ * NODE_ENV alone is a footgun — a deployment that forgets to set it would keep the fixed
+ * demo code — so a configured SMS provider counts as production too: the moment a venue
+ * can actually send a code, the fixed one stops working and nothing is echoed back.
+ */
+async function realOtpsInForce(): Promise<boolean> {
+  return IS_PRODUCTION() || (await smsIsDeliverable());
+}
+
+/** Whether a code asked for now could actually be delivered to a phone. */
+async function smsIsDeliverable(): Promise<boolean> {
+  try {
+    const platform = await getPlatformSettingsRaw();
+    return getPublicIntegrationsConfig(platform.integrations).messaging.sms === true;
+  } catch {
+    return false;
+  }
+}
+
+router.post("/public/auth/otp/send", otpSendRateLimit, async (req, res): Promise<void> => {
   const phone = String(req.body.phone ?? "").replace(/\D/g, "");
-  if (!phone) { res.status(400).json({ error: "phone required" }); return; }
-  const isDemoPhone = phone === DEMO_GUEST_PHONE || phone.endsWith(DEMO_GUEST_PHONE);
-  const otp = isDemoPhone ? DEMO_GUEST_OTP
-    : process.env.NODE_ENV === "production" ? generateOtp() : DEMO_GUEST_OTP;
+  if (phone.length < 8 || phone.length > 15) {
+    res.status(400).json({ error: "Enter a valid mobile number." });
+    return;
+  }
+
+  const real = await realOtpsInForce();
+  const demo = !real && isDemoPhone(phone);
+
+  // There has to be a way to send the code. Saying "OTP sent" with no SMS provider
+  // configured leaves the guest waiting for a message no part of this system can send.
+  if (real && IS_PRODUCTION() && !(await smsIsDeliverable())) {
+    res.status(503).json({
+      error: "Sign-in by phone is not available yet. Please ask a member of staff.",
+      code: "SMS_NOT_CONFIGURED",
+    });
+    return;
+  }
+
+  const otp = real ? generateOtp() : DEMO_GUEST_OTP;
   otpStore.set(phone, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
   res.json({
     success: true,
     message: "OTP sent",
-    devOtp: process.env.NODE_ENV !== "production" || isDemoPhone ? otp : undefined,
+    // Never once real codes are in force, for any number. This field is a development
+    // convenience and was the whole exploit: the server handed back the code it had
+    // just issued, and the demo-phone flag bypassed the production check on it.
+    devOtp: real ? undefined : otp,
+    demoAccount: demo || undefined,
   });
 });
 
-router.post("/public/auth/otp/verify", async (req, res): Promise<void> => {
+router.post("/public/auth/otp/verify", otpVerifyRateLimit, async (req, res): Promise<void> => {
   try {
     const phone = String(req.body.phone ?? "").replace(/\D/g, "");
     const { otp, name, restaurantId } = req.body;
     const rid = restaurantId ? parseInt(String(restaurantId), 10) : undefined;
     if (!phone || !otp) { res.status(400).json({ error: "phone and otp required" }); return; }
-    const isDemoLogin = (phone === DEMO_GUEST_PHONE || phone.endsWith(DEMO_GUEST_PHONE)) && String(otp) === DEMO_GUEST_OTP;
+    // Same fix as on the send side: the `endsWith` match let any number ending in the demo
+    // digits sign in with the fixed code, in production.
+    const isDemoLogin = !(await realOtpsInForce()) && isDemoPhone(phone) && String(otp) === DEMO_GUEST_OTP;
     const stored = otpStore.get(phone);
     if (!isDemoLogin && (!stored || stored.otp !== String(otp) || stored.expiresAt < Date.now())) {
       res.status(401).json({ error: "Invalid or expired OTP" });

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count, sum, gte, sql, desc } from "drizzle-orm";
-import { db, menuItemsTable, categoriesTable, ordersTable, qrCodesTable, customersTable, feedbackTable, reservationsTable } from "@workspace/db";
+import { db, menuItemsTable, categoriesTable, ordersTable, qrCodesTable, menuViewsTable, customersTable, feedbackTable, reservationsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import {
   resolveAnalyticsAccess,
@@ -98,6 +98,18 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
 
   const [totalCustomers] = await db.select({ count: count() }).from(customersTable).where(eq(customersTable.restaurantId, restaurantId));
   const [totalScansRow] = await db.select({ total: sum(qrCodesTable.scans) }).from(qrCodesTable).where(eq(qrCodesTable.restaurantId, restaurantId));
+  // The headline metric of a QR-menu product read zero while `menu_views` held hundreds of
+  // rows: both figures came from a counter on `qr_codes`, and this venue has no qr_codes
+  // rows at all. Every menu open is recorded in `menu_views` — with `source: "qr"` when the
+  // guest arrived through a table code — so that is what these now count.
+  const menuViewWhere = since
+    ? and(eq(menuViewsTable.restaurantId, restaurantId), gte(menuViewsTable.viewedAt, since))
+    : eq(menuViewsTable.restaurantId, restaurantId);
+  const [menuViewRow] = await db.select({ count: count() }).from(menuViewsTable).where(menuViewWhere);
+  const [qrViewRow] = await db.select({ count: count() }).from(menuViewsTable)
+    .where(and(menuViewWhere, eq(menuViewsTable.source, "qr")));
+  const menuViews = menuViewRow?.count ?? 0;
+  const qrScans = qrViewRow?.count ?? 0;
   // A "repeat" customer is one who has come back. This ran the same query as the total,
   // so the two figures were always identical and the panel showed 100% repeat business.
   const [repeatCustomers] = await db.select({ count: count() }).from(customersTable)
@@ -155,12 +167,14 @@ router.get("/restaurants/:restaurantId/analytics/summary", requireAuth, async (r
     totalRevenue,
     avgOrderValue: parseFloat(avgOrderValue.toFixed(2)),
     totalCustomers: totalCustomers?.count ?? 0,
-    qrScans: parseInt(String(totalScansRow?.total ?? 0)),
+    qrScans,
+    /** The counter kept on the venue's own printed QR codes, which is a different signal. */
+    qrCodeScans: parseInt(String(totalScansRow?.total ?? 0)),
     repeatCustomers: repeatCustomers?.count ?? 0,
     feedbackAvgRating: parseFloat(avgRating.toFixed(1)),
     avgFoodRating: parseFloat(avgFoodRating.toFixed(1)),
     topCategory,
-    views: parseInt(String(totalScansRow?.total ?? 0)),
+    views: menuViews,
     ratings: parseFloat(avgRating.toFixed(1)),
     reviews: feedbackRows.length,
     reservations: reservationsRow?.count ?? 0,
@@ -351,28 +365,47 @@ router.get("/restaurants/:restaurantId/analytics/order-stats", requireAuth, asyn
   }));
 
   const customers = await db.select().from(customersTable).where(eq(customersTable.restaurantId, restaurantId));
+  // These four overlapped: a customer marked "vip" with six visits was counted under VIP,
+  // under Loyal, and again under whichever segment field they carried — so 17 customers
+  // came out as 27 across four buckets, with percentages that still summed to 100. Each
+  // customer now falls in exactly one bucket, most specific first, and the percentages are
+  // taken over the real customer count.
+  const bucketFor = (c: typeof customers[number]) => {
+    if (c.segment === "vip") return "VIP Members";
+    if ((c.totalOrders ?? 0) >= 5) return "Loyal (5+ visits)";
+    if (c.segment === "regular" || (c.totalOrders ?? 0) > 1) return "Returning";
+    return "New Guests";
+  };
+  const tally = new Map<string, number>();
+  for (const c of customers) tally.set(bucketFor(c), (tally.get(bucketFor(c)) ?? 0) + 1);
   const segments = [
-    { segment: "New Guests", count: customers.filter(c => c.segment === "new").length, percent: 0, color: "text-blue-400", bg: "bg-blue-500/20" },
-    { segment: "Returning", count: customers.filter(c => c.segment === "regular").length, percent: 0, color: "text-emerald-400", bg: "bg-emerald-500/20" },
-    { segment: "Loyal (5+ visits)", count: customers.filter(c => (c.totalOrders ?? 0) >= 5).length, percent: 0, color: "text-amber-400", bg: "bg-amber-500/20" },
-    { segment: "VIP Members", count: customers.filter(c => c.segment === "vip").length, percent: 0, color: "text-violet-400", bg: "bg-violet-500/20" },
+    { segment: "New Guests", count: tally.get("New Guests") ?? 0, percent: 0, color: "text-blue-400", bg: "bg-blue-500/20" },
+    { segment: "Returning", count: tally.get("Returning") ?? 0, percent: 0, color: "text-emerald-400", bg: "bg-emerald-500/20" },
+    { segment: "Loyal (5+ visits)", count: tally.get("Loyal (5+ visits)") ?? 0, percent: 0, color: "text-amber-400", bg: "bg-amber-500/20" },
+    { segment: "VIP Members", count: tally.get("VIP Members") ?? 0, percent: 0, color: "text-violet-400", bg: "bg-violet-500/20" },
   ];
-  const segTotal = segments.reduce((s, x) => s + x.count, 0) || 1;
+  const segTotal = customers.length || 1;
   for (const seg of segments) seg.percent = Math.round((seg.count / segTotal) * 100);
 
-  const hourly: Record<string, number> = {};
+  // Keyed by the hour itself rather than its label, because the array was emitted in
+  // first-seen order — 3PM, 7PM, 8PM, 9PM, 12AM, 11PM, 2AM — and the chart drawn from it
+  // had a scrambled x-axis, which is what made an 11pm venue look like it peaked at 2 AM.
+  const hourly = new Map<number, number>();
   for (const o of orders) {
     const h = new Date(o.createdAt).getHours();
-    const label = h === 0 ? "12AM" : h <= 12 ? `${h}${h === 12 ? "PM" : "AM"}` : `${h - 12}PM`;
-    hourly[label] = (hourly[label] ?? 0) + 1;
+    hourly.set(h, (hourly.get(h) ?? 0) + 1);
   }
+  const hourLabel = (h: number) => (h === 0 ? "12AM" : h === 12 ? "12PM" : h < 12 ? `${h}AM` : `${h - 12}PM`);
+  const hourlyOrders = [...hourly.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([h, ordersCount]) => ({ hour: h, time: hourLabel(h), orders: ordersCount }));
   res.json({
     isPublished: true,
     byStatus,
     byType,
     paymentMix,
     customerSegments: segments,
-    hourlyOrders: Object.entries(hourly).map(([time, ordersCount]) => ({ time, orders: ordersCount })),
+    hourlyOrders,
     growth: 0,
   });
 });

@@ -4,7 +4,7 @@ import { db, ordersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { recordOrderRefundInLedger } from "../lib/order-payment-ledger.js";
 import { restoreStockForOrder } from "../lib/stock-consumption.js";
-import { taxRateFor, round2 } from "../lib/order-pricing.js";
+import { taxForOrderItems, round2 } from "../lib/order-pricing.js";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse.js";
 import { logger } from "../lib/logger.js";
 
@@ -64,11 +64,13 @@ async function applyAdjustment(
   const wasSettled = order.paymentStatus === "paid" || order.status === "completed";
   const totalBefore = parseFloat(String(order.total ?? 0)) || 0;
   const subtotal = billableTotal(items);
-  const rate = await taxRateFor(restaurantId);
   const discount = parseFloat(String(order.discountAmount ?? 0)) || 0;
   const tip = parseFloat(String(order.tipAmount ?? 0)) || 0;
   const taxable = Math.max(0, round2(subtotal - discount));
-  const tax = round2(taxable * rate);
+  // Same tax function the order was priced with, so voiding a line cannot move the total
+  // by a rounding paisa, and a comped whisky is still not taxed as food.
+  const billableLines = items.filter(i => !i.voided && !i.comped) as { subtotal?: unknown; taxCategory?: string | null }[];
+  const tax = (await taxForOrderItems(restaurantId, billableLines, discount)).tax;
   const total = round2(taxable + tax + tip);
 
   const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as Record<string, unknown>;

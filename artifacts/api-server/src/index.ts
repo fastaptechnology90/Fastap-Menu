@@ -83,6 +83,79 @@ async function ensureSchemaColumns() {
       updated_at timestamptz NOT NULL DEFAULT now()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS app_release_visibility_unique ON app_release_visibility (restaurant_id, app_key)`,
+
+    // Everything below was created by hand against a local database and existed nowhere
+    // else, so a deploy would have shipped code querying tables the live database does
+    // not have. Same rule as above: additive only, safe to run on every boot.
+
+    // One row per shift a staff member works — payroll and the day-end report read this.
+    `CREATE TABLE IF NOT EXISTS staff_attendance (
+      id serial PRIMARY KEY,
+      restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      staff_id integer NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+      staff_name text NOT NULL,
+      staff_role text NOT NULL,
+      clocked_in_at timestamptz NOT NULL DEFAULT now(),
+      clocked_out_at timestamptz,
+      minutes_worked integer,
+      break_minutes integer NOT NULL DEFAULT 0,
+      sales_during_shift numeric(10,2) NOT NULL DEFAULT 0,
+      clock_in_method text NOT NULL DEFAULT 'panel',
+      notes text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS staff_attendance_open_idx ON staff_attendance (restaurant_id, clocked_out_at)`,
+    `CREATE INDEX IF NOT EXISTS staff_attendance_staff_idx ON staff_attendance (staff_id, clocked_in_at)`,
+
+    // Which venue is running which build of a staff app.
+    `CREATE TABLE IF NOT EXISTS app_downloads (
+      id serial PRIMARY KEY,
+      release_id integer REFERENCES app_releases(id) ON DELETE SET NULL,
+      app_key text NOT NULL,
+      version text,
+      restaurant_id integer REFERENCES restaurants(id) ON DELETE CASCADE,
+      staff_id integer,
+      staff_name text,
+      user_agent text,
+      ip_address text,
+      downloaded_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS app_downloads_restaurant_idx ON app_downloads (restaurant_id, downloaded_at)`,
+    `CREATE INDEX IF NOT EXISTS app_downloads_release_idx ON app_downloads (release_id)`,
+
+    // The Z reading that actually closes a business day, so it cannot be taken twice.
+    `CREATE TABLE IF NOT EXISTS day_closures (
+      id serial PRIMARY KEY,
+      restaurant_id integer NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      business_date text NOT NULL,
+      z_number integer NOT NULL,
+      report jsonb NOT NULL DEFAULT '{}'::jsonb,
+      closed_at timestamptz NOT NULL DEFAULT now(),
+      closed_by text
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS day_closures_unique ON day_closures (restaurant_id, business_date)`,
+
+    // A tax invoice number has to be consecutive per venue per financial year.
+    `CREATE TABLE IF NOT EXISTS invoice_series (
+      restaurant_id integer NOT NULL,
+      financial_year text NOT NULL,
+      last_number integer NOT NULL DEFAULT 0,
+      PRIMARY KEY (restaurant_id, financial_year)
+    )`,
+
+    // Staff-app sessions were in memory, so a restart signed every tablet out at once.
+    `CREATE TABLE IF NOT EXISTS mobile_sessions (
+      token text PRIMARY KEY,
+      staff_id integer NOT NULL,
+      restaurant_id integer NOT NULL,
+      expires_at timestamptz NOT NULL,
+      session jsonb NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS mobile_sessions_expiry_idx ON mobile_sessions (expires_at)`,
+
+    // Alcohol is taxed outside GST, so a dish has to say which regime it falls under.
+    `ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS tax_category text`,
   ];
   for (const sql of guards) {
     try {

@@ -4,7 +4,6 @@ import { db, restaurantsTable, ordersTable } from "@workspace/db";
 import { taxRateFor, round2 } from "../lib/order-pricing.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { isCashPaymentMethod, isOnlinePaymentMethod } from "../lib/payment-gateway.js";
-import { generateInvoiceNumber } from "../lib/paymentLogic.js";
 import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 
 const router: IRouter = Router();
@@ -206,7 +205,8 @@ router.post("/public/dining/group-payment", async (req, res): Promise<void> => {
   const [updated] = await db.update(ordersTable).set({
     paymentMethod: "split",
     paymentStatus,
-    invoiceNumber: order.invoiceNumber ?? generateInvoiceNumber(order.id, order.restaurantId),
+    // Nothing has been collected yet, so no invoice number is drawn: one used to be
+    // stamped here on a bill that was still awaiting payment at the counter.
     metadata: { ...meta, billing },
   }).where(eq(ordersTable.id, orderId)).returning();
 

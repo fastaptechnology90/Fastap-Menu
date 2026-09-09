@@ -5,11 +5,12 @@ import { randomBytes } from "node:crypto";
 import { db, ordersTable, restaurantsTable } from "@workspace/db";
 import {
   getPaymentCatalog, computeBillQuote, buildGstInvoice, buildInvoiceHtml,
-  generateInvoiceNumber, validateSplitPayments, resolvePaymentStatus,
+  validateSplitPayments, resolvePaymentStatus,
 } from "../lib/paymentLogic.js";
 import { buildInvoicePdfBuffer } from "../lib/invoicePdf.js";
 import { billingFromSettings } from "../lib/restaurant-catalogs.js";
 import { taxRateFor } from "../lib/order-pricing.js";
+import { allocateInvoiceNumber } from "../lib/invoice-series.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPaymentsPublicConfig, isOnlinePaymentMethod, isCashPaymentMethod, processGatewayPayment } from "../lib/payment-gateway.js";
@@ -256,7 +257,12 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
     paymentMethod: method,
     paymentStatus,
     tipAmount: tipAmount != null ? String(parseNum(tipAmount).toFixed(2)) : order.tipAmount,
-    invoiceNumber: order.invoiceNumber ?? generateInvoiceNumber(order.id, order.restaurantId),
+    // An invoice number is drawn from the venue's consecutive series when the money is
+    // booked — see allocateInvoiceNumber — not stamped on here from the order id, which
+    // left the series full of holes and numbered payments that had failed.
+    ...(paymentStatus === "paid"
+      ? { invoiceNumber: order.invoiceNumber ?? await allocateInvoiceNumber(order.restaurantId, order) ?? undefined }
+      : {}),
     metadata: { ...meta, ...gatewayMeta, billing, receiptToken },
   }).where(eq(ordersTable.id, orderId)).returning();
 
@@ -286,10 +292,8 @@ router.get("/public/payments/invoice/:orderId", async (req, res): Promise<void> 
   const billing = billingFromSettings(settings, restaurant);
   const invoice = guestInvoice(order, restaurant?.name ?? "Restaurant", billing);
 
-  if (!order.invoiceNumber) {
-    await db.update(ordersTable).set({ invoiceNumber: invoice.invoiceNumber }).where(eq(ordersTable.id, orderId));
-  }
-
+  // Looking at a bill no longer issues an invoice number. It used to, which is how a
+  // payment that failed still consumed one.
   res.json({ invoice, html: buildInvoiceHtml(invoice) });
 });
 
@@ -309,7 +313,7 @@ router.get("/public/payments/invoice/:orderId/download", async (req, res): Promi
   const html = buildInvoiceHtml(invoice);
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.html"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber ?? `bill-${orderId}`}.html"`);
   res.send(html);
 });
 
@@ -329,7 +333,7 @@ router.get("/public/payments/invoice/:orderId/pdf", async (req, res): Promise<vo
   const pdf = buildInvoicePdfBuffer(invoice);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber ?? `bill-${orderId}`}.pdf"`);
   res.send(pdf);
 });
 

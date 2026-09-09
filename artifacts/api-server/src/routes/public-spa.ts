@@ -2,8 +2,11 @@ import { Router, type IRouter } from "express";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { db, spaServicesTable, spaBookingsTable, restaurantsTable } from "@workspace/db";
 import {
-  computeAvailableSlots, getCatalog, couplePrice, MEMBERSHIP_PLANS, THERAPISTS,
+  computeAvailableSlots, getCatalog, couplePrice, membershipPlansFor, therapistsFor,
 } from "../lib/spaWellnessLogic.js";
+import { loadCatalogSection } from "../lib/restaurant-catalogs.js";
+
+interface SpaCatalogOverrides { therapists?: unknown; membershipPlans?: unknown }
 
 const router: IRouter = Router();
 
@@ -20,12 +23,20 @@ router.get("/public/spa/catalog/:restaurantId", async (req, res): Promise<void> 
   );
   const spaServices = services.filter(s => !["yoga", "gym", "meditation", "wellness"].includes(s.category));
   const wellnessServices = services.filter(s => ["yoga", "gym", "meditation", "wellness"].includes(s.category));
+  // Therapists and membership tiers come from this venue's own catalog. They used to be a
+  // platform-wide list of invented names and prices served to every venue as its own.
+  const overrides = await loadCatalogSection<SpaCatalogOverrides>(restaurantId, "spaCatalog", {});
+  const catalog = getCatalog(overrides);
   res.json({
-    ...getCatalog(),
+    ...catalog,
     restaurantName: restaurant?.name,
     spaServices: spaServices.map(s => ({ ...s, price: parseNum(s.price) })),
     wellnessServices: wellnessServices.map(s => ({ ...s, price: parseNum(s.price) })),
-    live: true,
+    membershipsOffered: catalog.membershipPlans.length > 0,
+    notice: catalog.membershipPlans.length === 0
+      ? `${restaurant?.name ?? "This venue"} has not published spa memberships. Ask at the spa desk.`
+      : null,
+    live: services.length > 0,
   });
 });
 
@@ -72,9 +83,17 @@ router.post("/public/spa/bookings", async (req, res): Promise<void> => {
   let type = bookingType ?? (isWellness ? "wellness" : "single");
 
   if (type === "membership" && membershipPlanId) {
-    const plan = MEMBERSHIP_PLANS.find(p => p.id === membershipPlanId);
-    price = plan?.price ?? 4999;
-    name = plan ? `${plan.label} Membership` : "Wellness Membership";
+    // The price used to fall back to ₹4,999 for an unknown plan id, so a guest could book a
+    // membership this venue has never offered and it would be written to the books.
+    const plan = membershipPlansFor(
+      await loadCatalogSection<SpaCatalogOverrides>(restaurantId, "spaCatalog", {}),
+    ).find(p => p.id === membershipPlanId);
+    if (!plan) {
+      res.status(400).json({ error: "That membership is not offered here. Please ask at the spa desk." });
+      return;
+    }
+    price = Number(plan.price);
+    name = `${plan.label} Membership`;
     duration = 0;
   } else if (serviceId) {
     const [svc] = await db.select().from(spaServicesTable).where(eq(spaServicesTable.id, serviceId));
@@ -89,7 +108,10 @@ router.post("/public/spa/bookings", async (req, res): Promise<void> => {
 
   if (type === "couple") price = couplePrice(price);
 
-  const therapistName = therapist ?? THERAPISTS.find(t => t.id === therapistId)?.name ?? therapistId;
+  const therapistName = therapist
+    ?? therapistsFor(await loadCatalogSection<SpaCatalogOverrides>(restaurantId, "spaCatalog", {}))
+      .find(t => t.id === therapistId)?.name
+    ?? therapistId;
 
   const [booking] = await db.insert(spaBookingsTable).values({
     restaurantId,
@@ -105,7 +127,10 @@ router.post("/public/spa/bookings", async (req, res): Promise<void> => {
     notes,
     status: type === "membership" ? "confirmed" : "booked",
     bookingType: type,
-    paymentStatus: type === "membership" ? "paid" : "pending",
+    // Nothing has been collected here. Marking a membership "paid" put ₹14,999 nobody had
+    // handed over into the owner's revenue, under "Collected", where it could never be
+    // chased. It is owed until somebody takes the money.
+    paymentStatus: "pending",
     metadata: {
       therapistId: therapistId ?? "any",
       partnerName: partnerName ?? null,
@@ -124,8 +149,13 @@ router.post("/public/spa/membership", async (req, res): Promise<void> => {
     res.status(400).json({ error: "restaurantId, guestName, membershipPlanId required" });
     return;
   }
-  const plan = MEMBERSHIP_PLANS.find(p => p.id === membershipPlanId);
-  if (!plan) { res.status(400).json({ error: "Invalid membership plan" }); return; }
+  const plan = membershipPlansFor(
+    await loadCatalogSection<SpaCatalogOverrides>(restaurantId, "spaCatalog", {}),
+  ).find(p => p.id === membershipPlanId);
+  if (!plan) {
+    res.status(400).json({ error: "That membership is not offered here. Please ask at the spa desk." });
+    return;
+  }
 
   const scheduledAt = startDate ? new Date(startDate) : new Date();
   const [booking] = await db.insert(spaBookingsTable).values({
@@ -138,7 +168,8 @@ router.post("/public/spa/membership", async (req, res): Promise<void> => {
     price: String(plan.price),
     status: "confirmed",
     bookingType: "membership",
-    paymentStatus: "paid",
+    // See above: a membership is not paid because it was booked.
+    paymentStatus: "pending",
     metadata: { membershipPlanId, sessionsIncluded: plan.sessions, period: plan.period },
   }).returning();
 

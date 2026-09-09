@@ -1,6 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, ordersTable, financeTransactionsTable, cashShiftsTable } from "@workspace/db";
 import { accrueStaffEarningsForOrder } from "./staff-earnings.js";
+import { allocateInvoiceNumber } from "./invoice-series.js";
 
 /**
  * Records a paid order in the finance ledger.
@@ -26,6 +27,13 @@ export async function recordOrderPaymentInLedger(opts: {
   try {
     const amount = String(parseFloat(String(order.total ?? "0")).toFixed(2));
     const method = (opts.method || order.paymentMethod || "cash") as string;
+
+    // The moment money is booked is the moment a tax invoice exists, so the number is
+    // drawn here and nowhere else. Doing it at the point the bill was merely displayed
+    // burnt numbers on orders that were never paid, leaving holes in a series that has
+    // to be consecutive.
+    const invoiceNumber = await allocateInvoiceNumber(restaurantId, order);
+    if (invoiceNumber) order.invoiceNumber = invoiceNumber;
 
     // The server who closed the table earns on this order the moment it is paid. Doing it
     // here — not at the ledger's duplicate guard below — means an order whose income row

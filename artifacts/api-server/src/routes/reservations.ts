@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, reservationsTable, tablesMapTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { getAccessibleRestaurant } from "../lib/restaurant-access.js";
+import { readPartySize, normalizeTime } from "../lib/reservationLogic.js";
 
 const router: IRouter = Router();
 
@@ -67,6 +68,13 @@ router.post("/restaurants/:restaurantId/reservations", requireAuth, async (req, 
   if (!(await getAccessibleRestaurant(req, restaurantId))) { res.status(404).json({ error: "Restaurant not found" }); return; }
   const { customerName, customerPhone, customerEmail, date, time, guestCount, status, reservationType, zone, roomNumber, notes, specialRequest, depositAmount, depositStatus, tableId } = req.body;
   if (!customerName || !date || !time) { res.status(400).json({ error: "customerName, date and time required" }); return; }
+  // The guest page and the queue endpoint both send `partySize`; only `guestCount` was
+  // read, so a party of eight was recorded as a party of two. Both spellings work now.
+  const partySize = readPartySize(req.body);
+  if (partySize !== null && (partySize < 1 || partySize > 500)) {
+    res.status(400).json({ error: "Party size must be between 1 and 500.", field: "partySize" });
+    return;
+  }
   const depositNum = Number(depositAmount);
   const hasDeposit = Number.isFinite(depositNum) && depositNum > 0;
   const [reservation] = await db.insert(reservationsTable).values({
@@ -75,8 +83,8 @@ router.post("/restaurants/:restaurantId/reservations", requireAuth, async (req, 
     customerPhone: customerPhone ?? null,
     customerEmail: customerEmail ?? null,
     date,
-    time,
-    guestCount: guestCount ?? 2,
+    time: normalizeTime(time) ?? time,
+    guestCount: partySize ?? guestCount ?? 2,
     status: status ?? "pending",
     // A booking taken over the phone is usually put against a table there and then. The
     // create route dropped `tableId` silently, so it could only ever be added afterwards

@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import { resolveAdminPermissions } from "../lib/admin-rbac.js";
-import { registerRateLimit, loginRateLimit } from "../middlewares/rate-limit.js";
+import { registerRateLimit, loginRateLimit, loginNetworkRateLimit } from "../middlewares/rate-limit.js";
 import { isEmailConfigured, sendEmail, publicBaseUrl, verificationEmail } from "../lib/email.js";
 import { makeResetToken, verifyResetToken } from "../lib/password-reset.js";
 import { logger } from "../lib/logger.js";
@@ -75,7 +75,7 @@ router.post("/auth/register", registerRateLimit, async (req, res): Promise<void>
   });
 });
 
-router.post("/auth/login", loginRateLimit, async (req, res): Promise<void> => {
+router.post("/auth/login", loginNetworkRateLimit, loginRateLimit, async (req, res): Promise<void> => {
   const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { email, password } = parsed.data;

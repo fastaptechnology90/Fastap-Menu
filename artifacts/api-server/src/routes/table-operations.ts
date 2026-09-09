@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray } from "drizzle-orm";
 import { db, ordersTable, tablesMapTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
-import { taxRateFor, round2 } from "../lib/order-pricing.js";
+import { taxForOrderItems, round2 } from "../lib/order-pricing.js";
 import { broadcastEvent } from "../lib/sse.js";
 import { logger } from "../lib/logger.js";
 
@@ -25,13 +25,13 @@ const num = (v: unknown) => {
 
 type OrderItem = { name?: string; subtotal?: number; voided?: boolean; comped?: boolean; [k: string]: unknown };
 
-/** Recompute money from the lines that still count, using the venue's own tax rate. */
+/** Recompute money from the lines that still count, taxing each at its own treatment. */
 async function totalsFor(restaurantId: number, items: OrderItem[], discount = 0, tip = 0) {
-  const subtotal = round2(items.reduce((t, i) => (i.voided || i.comped ? t : t + num(i.subtotal)), 0));
-  const rate = await taxRateFor(restaurantId);
+  const billable = items.filter(i => !i.voided && !i.comped);
+  const subtotal = round2(billable.reduce((t, i) => t + num(i.subtotal), 0));
+  const breakdown = await taxForOrderItems(restaurantId, billable as { subtotal?: unknown; taxCategory?: string | null }[], discount);
   const taxable = Math.max(0, round2(subtotal - discount));
-  const tax = round2(taxable * rate);
-  return { subtotal, tax, total: round2(taxable + tax + tip) };
+  return { subtotal, tax: breakdown.tax, total: round2(taxable + breakdown.tax + tip), breakdown };
 }
 
 /**
