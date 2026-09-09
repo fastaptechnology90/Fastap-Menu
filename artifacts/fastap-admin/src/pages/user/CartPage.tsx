@@ -43,6 +43,9 @@ export default function CartPage() {
   } = useUser();
   const { pendingOrders, isOnline } = useOffline();
   const [queuedOffline, setQueuedOffline] = useState(false);
+  // The venue's own opening hours, which nothing used to read. A venue that has not
+  // published any is treated as open — the server says the same.
+  const venueClosed = venue.hours.hoursPublished && !venue.hours.isOpen;
 
   const [orderType, setOrderType] = useState<OrderTypeId>(() =>
     venue.roomNumber ? "room-service" : activeTable ? "dine-in" : "takeaway",
@@ -166,6 +169,12 @@ export default function CartPage() {
 
   async function handlePlaceOrder() {
     setPlaceError("");
+    // Placing an order into a closed kitchen produced a ticket nobody was there to
+    // cook and a guest left waiting for food that was never coming.
+    if (venueClosed) {
+      setPlaceError(venue.hours.message);
+      return;
+    }
     setPlacing(true);
     try {
       const order = await placeOrder({
@@ -655,8 +664,17 @@ export default function CartPage() {
             {placeError}
           </p>
         )}
-        <button onClick={handlePlaceOrder} disabled={placing} className="guest-btn-primary w-full py-4 text-base font-bold disabled:opacity-60 disabled:transform-none">
-          {placing ? <><div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Placing Order…</> : <><ShoppingBag className="h-5 w-5" /> Place Order · ₹{grandTotal}</>}
+        {venueClosed && (
+          <p role="status" className="mb-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
+            {venue.hours.message}
+          </p>
+        )}
+        <button onClick={handlePlaceOrder} disabled={placing || venueClosed} className="guest-btn-primary w-full py-4 text-base font-bold disabled:opacity-60 disabled:transform-none">
+          {placing
+            ? <><div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Placing Order…</>
+            : venueClosed
+              ? <><ShoppingBag className="h-5 w-5" /> Opens at {venue.hours.openTime}</>
+              : <><ShoppingBag className="h-5 w-5" /> Place Order · ₹{grandTotal}</>}
         </button>
       </div>
     </div>

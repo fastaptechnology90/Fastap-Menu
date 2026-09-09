@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, hotelRoomsTable, housekeepingTasksTable, roomServiceRequestsTable } from "@workspace/db";
 import { getSettingsSection } from "../lib/restaurant-settings.js";
 import { autoAssignHousekeepingTask } from "../lib/staff-auto-assignment.js";
+import { callerIsInRoom } from "../lib/guest-room-access.js";
 
 const router: IRouter = Router();
 
@@ -48,10 +49,17 @@ router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void
     services: DEFAULT_SERVICES,
     tvChannels: DEFAULT_TV_CHANNELS,
   });
+  // `live: true` was hardcoded, so a hotel that had configured nothing still told the
+  // guest its in-room list was the real one. It now says which of the two it is, and
+  // the TV line-up is only offered when the hotel actually published one — a guest
+  // should not be shown five invented channel names as though they were in the room.
+  const services = Array.isArray(stored.services) && stored.services.length ? stored.services : DEFAULT_SERVICES;
+  const publishedChannels = Array.isArray(stored.tvChannels) && stored.tvChannels.length ? stored.tvChannels : null;
   res.json({
-    services: Array.isArray(stored.services) && stored.services.length ? stored.services : DEFAULT_SERVICES,
-    tvChannels: Array.isArray(stored.tvChannels) && stored.tvChannels.length ? stored.tvChannels : DEFAULT_TV_CHANNELS,
-    live: true,
+    services,
+    tvChannels: publishedChannels ?? [],
+    live: Boolean(Array.isArray(stored.services) && stored.services.length),
+    tvChannelsPublished: Boolean(publishedChannels),
   });
 });
 
@@ -65,9 +73,10 @@ router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Pro
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
   );
   if (!room) { res.status(404).json({ error: "Room not found" }); return; }
-  // The occupant's phone number is not something this endpoint needs to hand out; the
-  // room page only shows the name to greet the guest already standing in the room.
-  const { guestPhone: _guestPhone, ...safe } = room;
+  // The occupant's identity does not belong in an endpoint keyed on nothing but a room
+  // number. Guessing "102" used to return who was staying there, from when to when,
+  // with their phone number. The room page needs the controls, not the guest list.
+  const { guestPhone: _p, guestName: _n, checkIn: _ci, checkOut: _co, notes: _notes, ...safe } = room;
   res.json({
     ...safe,
     roomControls: parseControls(room.roomControls),
@@ -77,6 +86,17 @@ router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Pro
 router.patch("/public/hotel/room/:restaurantId/:roomNumber/controls", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
+
+  // Anyone who could type a room number could switch a stranger's lights off, set their
+  // air conditioning and turn on Do Not Disturb from the other side of the world. This
+  // is not a full credential — the binding is only the room QR this browser opened —
+  // but it stops the room number alone being the whole key. A real fix needs the room
+  // to carry a secret the guest is given at check-in; see the guest audit note.
+  if (!(await callerIsInRoom(req, restaurantId, roomNumber))) {
+    res.status(403).json({ error: "Scan the QR code in your room to use the room controls." });
+    return;
+  }
+
   const patch = req.body?.roomControls ?? req.body;
   let [room] = await db.select().from(hotelRoomsTable).where(
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
@@ -133,10 +153,18 @@ router.post("/public/hotel/wake-up-call", async (req, res): Promise<void> => {
 router.get("/public/hotel/requests/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
+
+  // What a room has asked for — and the free-text notes that come with it — is the
+  // occupant's business. A room number was the only thing needed to read it.
+  if (!(await callerIsInRoom(req, restaurantId, roomNumber))) {
+    res.status(403).json({ error: "Scan the QR code in your room to see this room's requests." });
+    return;
+  }
+
   const requests = await db.select().from(roomServiceRequestsTable).where(
     and(eq(roomServiceRequestsTable.restaurantId, restaurantId), eq(roomServiceRequestsTable.roomNumber, roomNumber)),
   );
-  res.json(requests.slice(0, 20));
+  res.json(requests.slice(0, 20).map(({ guestPhone: _p, ...r }) => r));
 });
 
 export default router;

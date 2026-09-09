@@ -7,13 +7,56 @@ import { loadCatalogSection } from "../lib/restaurant-catalogs.js";
 
 const router: IRouter = Router();
 
+interface EventCatalogOverrides {
+  halls?: { id: string; name: string; capacity?: number; rate?: number }[];
+  cateringPackages?: { id: string; label: string; perGuest?: number }[];
+  decorationPackages?: { id: string; label: string; price?: number }[];
+  seatingLayouts?: unknown[];
+  eventTypes?: unknown[];
+}
+
+/** A venue only offers banquet space once it has actually listed some. */
+function hasPublishedSpaces(overrides: EventCatalogOverrides): boolean {
+  return Array.isArray(overrides.halls) && overrides.halls.length > 0;
+}
+
+/**
+ * What this venue can actually host.
+ *
+ * This used to answer with six named halls — "Grand Banquet Hall, 300 guests, ₹25,000",
+ * a rooftop garden, a pool deck — for every restaurant on the platform, and stamp
+ * `live: true` on top. None of it belonged to the venue being asked about: a 40-cover
+ * restaurant in Bangalore and a hotel in Udaipur were handed the identical brochure,
+ * and a guest could get a printed quotation for a hall that does not exist.
+ *
+ * A venue's halls, catering and decoration packages now come only from what it has
+ * published in its own settings. A venue that has published nothing says so, and the
+ * enquiry form still works — the events team replies with real availability and rates.
+ */
 router.get("/public/events/catalog/:restaurantId", async (req, res): Promise<void> => {
   const eventType = req.query.eventType as string | undefined;
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
   if (!restaurant) { res.status(404).json({ error: "Venue not found" }); return; }
-  const overrides = await loadCatalogSection(restaurantId, "eventCatalog", {});
-  res.json({ ...getCatalog(eventType, overrides), restaurantName: restaurant.name, live: true });
+  const overrides = await loadCatalogSection<EventCatalogOverrides>(restaurantId, "eventCatalog", {});
+  const published = hasPublishedSpaces(overrides);
+  const catalog = getCatalog(eventType, overrides as Parameters<typeof getCatalog>[1]);
+
+  res.json({
+    // Event types and seating layouts are industry vocabulary — "Wedding", "Theatre
+    // style" — not claims about this venue, so they stay.
+    eventTypes: catalog.eventTypes,
+    seatingLayouts: catalog.seatingLayouts,
+    halls: published ? catalog.halls : [],
+    cateringPackages: published && Array.isArray(overrides.cateringPackages) ? overrides.cateringPackages : [],
+    decorationPackages: published && Array.isArray(overrides.decorationPackages) ? overrides.decorationPackages : [],
+    restaurantName: restaurant.name,
+    configured: published,
+    live: published,
+    notice: published
+      ? null
+      : `${restaurant.name} has not published its event spaces or packages yet. Send an enquiry and the events team will reply with availability and rates.`,
+  });
 });
 
 router.get("/public/events/my", async (req, res): Promise<void> => {
@@ -27,8 +70,27 @@ router.get("/public/events/my", async (req, res): Promise<void> => {
 });
 
 router.post("/public/events/quotation", async (req, res): Promise<void> => {
-  const { hallId, guestCount, cateringPackageId, decorationPackageId } = req.body;
+  const { restaurantId, hallId, guestCount, cateringPackageId, decorationPackageId } = req.body;
   if (!hallId || !guestCount) { res.status(400).json({ error: "hallId and guestCount required" }); return; }
+
+  // An unknown hall id used to silently fall back to the first hall in a hardcoded list
+  // and quote its ₹25,000 rate, so the guest walked away holding a price for a room the
+  // venue does not have. A quotation is only issued against a space the venue published.
+  const rid = parseInt(String(restaurantId ?? 0), 10);
+  if (!rid) { res.status(400).json({ error: "restaurantId required" }); return; }
+  const overrides = await loadCatalogSection<EventCatalogOverrides>(rid, "eventCatalog", {});
+  if (!hasPublishedSpaces(overrides)) {
+    res.status(409).json({
+      error: "This venue has not published its event spaces or rates yet. Send an enquiry and the events team will quote for you.",
+      configured: false,
+    });
+    return;
+  }
+  if (!overrides.halls!.some(h => h.id === hallId)) {
+    res.status(404).json({ error: "That space is not one this venue offers." });
+    return;
+  }
+
   const quotation = buildQuotation(hallId, parseInt(guestCount, 10), cateringPackageId ?? "standard", decorationPackageId ?? "minimal");
   res.json({ quotation, validUntil: new Date(Date.now() + 7 * 86400000).toISOString() });
 });
@@ -49,7 +111,15 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
   if (!restaurantId || !name) { res.status(400).json({ error: "restaurantId and name required" }); return; }
 
   const guests = parseInt(guestCount, 10) || 0;
-  const quote = quotation ?? buildQuotation(hallId ?? "grand_hall", guests, cateringPackageId ?? "standard", decorationPackageId ?? "minimal");
+  // An enquiry to a venue with no published halls used to be costed against "grand_hall"
+  // — a hall from the hardcoded brochure — and that invented figure was written to the
+  // event's `totalAmount`. A venue that has published nothing gets an enquiry with no
+  // price on it, which is the truth: the team has yet to quote.
+  const enquiryOverrides = await loadCatalogSection<EventCatalogOverrides>(parseInt(String(restaurantId), 10), "eventCatalog", {});
+  const quotable = hasPublishedSpaces(enquiryOverrides) && hallId && enquiryOverrides.halls!.some(h => h.id === hallId);
+  const quote = quotation ?? (quotable
+    ? buildQuotation(hallId, guests, cateringPackageId ?? "standard", decorationPackageId ?? "minimal")
+    : null);
 
   const [event] = await db.insert(banquetEventsTable).values({
     restaurantId,
@@ -65,7 +135,7 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
     status: "enquiry",
     catering: true,
     decor: Boolean(decorationPackageId),
-    totalAmount: String(quote.total),
+    totalAmount: quote ? String(quote.total) : "0",
     // An enquiry is not a payment. Writing the quoted advance into `advancePaid` put
     // tens of thousands of rupees nobody had handed over into the venue's books, and
     // showed the events team a deposit as already collected. The figure the guest still
@@ -83,7 +153,13 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
   }).returning();
 
   const meta = event.metadata as Record<string, unknown> | null;
-  res.status(201).json({ ...event, quotation: quote, enquiryToken: meta?.enquiryToken });
+  res.status(201).json({
+    ...event,
+    quotation: quote,
+    quoted: Boolean(quote),
+    enquiryToken: meta?.enquiryToken,
+    notice: quote ? null : "Your enquiry has reached the events team. They will come back to you with availability and a price.",
+  });
 });
 
 router.post("/public/events/:eventId/invitations", async (req, res): Promise<void> => {

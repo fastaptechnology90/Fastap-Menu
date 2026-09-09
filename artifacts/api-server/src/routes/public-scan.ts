@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { buildScanUrl } from "../lib/scan-urls.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
+import { venueHours } from "../lib/venue-hours.js";
 
 const router: IRouter = Router();
 
@@ -113,6 +114,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
     res.json({
       type: "venue",
       scannedAt: new Date().toISOString(),
+      hours: venueHours(restaurant),
       restaurant: {
         id: restaurant.id,
         name: restaurant.name,
@@ -152,6 +154,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
     res.json({
       type: "table",
       scannedAt: new Date().toISOString(),
+      hours: venueHours(restaurant),
       restaurant: {
         id: restaurant.id,
         name: restaurant.name,
@@ -184,18 +187,17 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
     return;
   }
 
-  let [room] = await db.select().from(hotelRoomsTable).where(
+  const [room] = await db.select().from(hotelRoomsTable).where(
     and(eq(hotelRoomsTable.restaurantId, restaurant.id), eq(hotelRoomsTable.number, roomParam!)),
   );
 
+  // A scan is a read. This used to insert the room when the number was unknown, so
+  // GET /public/scan/<slug>?room=9999 quietly added a room to the hotel's inventory —
+  // and a room number is the one thing an outsider can guess. An unknown number is now
+  // a 404, the same answer an unknown table already gave.
   if (!room) {
-    [room] = await db.insert(hotelRoomsTable).values({
-      restaurantId: restaurant.id,
-      number: roomParam!,
-      type: "standard",
-      floor: parseInt(roomParam!.replace(/\D/g, "")[0] || "1", 10) || 1,
-      status: "vacant",
-    }).returning();
+    res.status(404).json({ error: "Room not found", restaurant: { id: restaurant.id, name: restaurant.name, slug: restaurant.slug } });
+    return;
   }
 
   await bumpQrScan(restaurant.id, { room: room.number });
@@ -206,6 +208,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
   res.json({
     type: "room",
     scannedAt: new Date().toISOString(),
+    hours: venueHours(restaurant),
     restaurant: {
       id: restaurant.id,
       name: restaurant.name,
@@ -222,9 +225,13 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
       floor: room.floor,
       status: room.status,
       statusLabel: ROOM_STATUS_LABEL[room.status] ?? room.status,
-      guestName: room.guestName,
-      checkIn: room.checkIn,
-      checkOut: room.checkOut,
+      // Who is staying in room 101, and until when, used to be returned here. A room
+      // number is a location, not a credential — anyone could edit ?room= and read the
+      // occupant off a stranger's door. The scan tells you which room you are in; it
+      // does not tell you who is in it.
+      guestName: null,
+      checkIn: null,
+      checkOut: null,
       bookable,
       canOrder: room.status !== "maintenance",
     },

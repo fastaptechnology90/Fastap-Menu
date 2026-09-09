@@ -76,6 +76,28 @@ router.get("/public/reservation-slots", async (req, res): Promise<void> => {
   });
 });
 
+/**
+ * A booking has to be reachable.
+ *
+ * The guest page sent `customerPhone: "0000000000"` whenever the visitor was not signed
+ * in, because the form never asked for a number. The booking was written under that
+ * placeholder, "My Bookings" looks bookings up by phone, and so the guest could never
+ * find, change or cancel what they had just booked — and the venue had no way to call
+ * the table when the time came. Every anonymous booking on the platform shares the same
+ * phone number, so they all belong to each other.
+ */
+function invalidPhone(raw: unknown): string | null {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 15) {
+    return "Enter a phone number we can reach you on — the venue calls this number if anything changes.";
+  }
+  // "0000000000", "1111111111" and friends: a single repeated digit is a placeholder.
+  if (new Set(digits).size === 1) {
+    return "That does not look like a real phone number. The venue needs a number it can call.";
+  }
+  return null;
+}
+
 router.post("/public/reservations", async (req, res): Promise<void> => {
   const {
     restaurantId, customerName, customerPhone, customerEmail, date, time,
@@ -86,6 +108,9 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Required fields missing" });
     return;
   }
+
+  const phoneProblem = invalidPhone(customerPhone);
+  if (phoneProblem) { res.status(400).json({ error: phoneProblem, field: "customerPhone" }); return; }
 
   const type = reservationType ?? "table";
   const deposit = depositAmount != null ? parseNum(depositAmount) : depositForType(type);

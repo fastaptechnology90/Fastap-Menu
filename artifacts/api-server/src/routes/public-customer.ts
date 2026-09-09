@@ -57,6 +57,8 @@ import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPublicIntegrationsConfig } from "../lib/platform-integrations.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
 import { priceMenuItem, taxRateFor } from "../lib/order-pricing.js";
+import { venueHours, closedResponse } from "../lib/venue-hours.js";
+import { loadOwnedOrder } from "../lib/guest-order-access.js";
 
 const router: IRouter = Router();
 
@@ -275,6 +277,7 @@ router.get("/public/venue/:slug", async (req, res): Promise<void> => {
 
   res.json({
     restaurant,
+    hours: venueHours(restaurant),
     branch: detectedBranch,
     branches,
     areas: areas.map(a => ({
@@ -284,7 +287,9 @@ router.get("/public/venue/:slug", async (req, res): Promise<void> => {
     })),
     areaGroups,
     table: detectedTable ? { id: detectedTable.id, name: detectedTable.name, status: detectedTable.status, zone: detectedTable.zone, capacity: detectedTable.capacity, isVip: detectedTable.isVip } : null,
-    room: detectedRoom ? { number: detectedRoom.number, type: detectedRoom.type, floor: detectedRoom.floor, guestName: detectedRoom.guestName } : null,
+    // The occupant's name used to travel with the room here, and ?room= is a free-text
+    // query parameter — so any visitor could read who was checked into any room.
+    room: detectedRoom ? { number: detectedRoom.number, type: detectedRoom.type, floor: detectedRoom.floor } : null,
     section: detectedSection ? { id: detectedSection.id, name: detectedSection.name, areaType: detectedSection.areaType } : null,
     detection: {
       entryMethod: accessMethod,
@@ -927,6 +932,25 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
 
   const requestType = type || "food";
 
+  // `open_time`/`close_time` sat unread in the restaurants table, so nothing anywhere
+  // knew whether the venue was open. For a hotel those columns are the front-of-house
+  // restaurant's hours, not room service — a hotel takes room orders through the night —
+  // so an out-of-hours room order is flagged rather than refused, and the guest is told
+  // the kitchen is shut instead of being left to wonder why nothing arrives.
+  let afterHours: ReturnType<typeof venueHours> | null = null;
+  if (requestType === "food" || requestType === "bar") {
+    const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
+    const hours = venueHours(venue);
+    if (!hours.isOpen) {
+      if (venue?.businessType === "hotel") {
+        afterHours = hours;
+      } else {
+        res.status(409).json(closedResponse(hours));
+        return;
+      }
+    }
+  }
+
   // Food and drink are priced from the menu, exactly as a table order is. The price and
   // total the room page posted used to be written straight to the folio, so a ₹275 club
   // sandwich could be charged to the room at ₹1 — and the kitchen still sent it up.
@@ -1025,7 +1049,13 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   }
 
   const assigned = await autoAssignRoomServiceRequest(restaurantId, request.id);
-  res.status(201).json(assigned ?? request);
+  res.status(201).json({
+    ...(assigned ?? request),
+    // Non-null only when the order was placed outside the venue's published hours, so
+    // the room page can say "the kitchen is closed — this will be picked up at 06:30"
+    // rather than implying a meal is on its way.
+    afterHours: afterHours ? { ...afterHours, warning: afterHours.message } : null,
+  });
 });
 
 router.post("/public/housekeeping", async (req, res): Promise<void> => {
@@ -1068,7 +1098,11 @@ router.get("/public/room/:restaurantId/:roomNumber", async (req, res): Promise<v
     and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, req.params.roomNumber)),
   );
   if (!room) { res.status(404).json({ error: "Room not found" }); return; }
-  res.json(room);
+  // This returned the entire row to anyone who asked: the occupant's name, their phone
+  // number, and their check-in and check-out dates, with no session and no credential.
+  // Room numbers are sequential, so counting from 101 printed the hotel's guest list.
+  const { guestName: _n, guestPhone: _p, checkIn: _ci, checkOut: _co, notes: _notes, ...safe } = room;
+  res.json(safe);
 });
 
 // Event routes moved to public-events.ts
@@ -1125,6 +1159,115 @@ router.get("/public/orders/:orderId/status", async (req, res): Promise<void> => 
     tableCleared: Boolean((order.metadata as Record<string, unknown> | null)?.tableCleared),
     ...tracking,
   });
+});
+
+/**
+ * Cancel an order the guest has only just placed.
+ *
+ * There was no way for a diner to undo a mis-tap: no endpoint and no button. The only
+ * cancel path in the product belonged to staff, so a guest who ordered the wrong dish
+ * had to find a waiter before the kitchen started it. The window is deliberately short
+ * and closes the moment the kitchen accepts the ticket — after that it is the venue's
+ * food, and only staff may write it off.
+ */
+const GUEST_CANCEL_WINDOW_SECONDS = 120;
+const GUEST_CANCELLABLE_STATUSES = new Set(["pending", "new", "confirmed"]);
+
+router.post("/public/orders/:orderId/cancel", async (req, res): Promise<void> => {
+  const orderId = parseInt(String(req.params.orderId), 10);
+  const order = await loadOwnedOrder(req, orderId);
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (order.status === "cancelled") {
+    res.json({ cancelled: true, alreadyCancelled: true, order });
+    return;
+  }
+
+  if (!GUEST_CANCELLABLE_STATUSES.has(order.status)) {
+    res.status(409).json({
+      error: "The kitchen has already started this order. Please ask a team member to cancel it.",
+      status: order.status,
+    });
+    return;
+  }
+
+  if (order.paymentStatus === "paid") {
+    res.status(409).json({ error: "This order has been paid for. Please ask a team member for a refund." });
+    return;
+  }
+
+  const placedAt = order.createdAt instanceof Date ? order.createdAt.getTime() : Date.parse(String(order.createdAt));
+  const elapsedSeconds = Number.isFinite(placedAt) ? Math.floor((Date.now() - placedAt) / 1000) : Number.POSITIVE_INFINITY;
+  if (elapsedSeconds > GUEST_CANCEL_WINDOW_SECONDS) {
+    res.status(409).json({
+      error: `Orders can only be cancelled within ${GUEST_CANCEL_WINDOW_SECONDS} seconds of placing them. Please ask a team member.`,
+      elapsedSeconds,
+      windowSeconds: GUEST_CANCEL_WINDOW_SECONDS,
+    });
+    return;
+  }
+
+  const reason = String(req.body?.reason ?? "").trim().slice(0, 200) || "Cancelled by guest";
+  const meta = (typeof order.metadata === "object" && order.metadata !== null ? order.metadata : {}) as OrderTrackingMetadata & Record<string, unknown>;
+  const updates = Array.isArray(meta.tracking?.kitchenUpdates) ? meta.tracking!.kitchenUpdates! : [];
+
+  const [updated] = await db.update(ordersTable).set({
+    status: "cancelled",
+    cancelledReason: reason,
+    metadata: {
+      ...meta,
+      cancelledBy: "guest",
+      cancelledAt: new Date().toISOString(),
+      tracking: {
+        ...(meta.tracking ?? {}),
+        kitchenUpdates: [...updates, { at: new Date().toISOString(), type: "warning", message: `Cancelled by the guest — ${reason}` }],
+      },
+    },
+  }).where(eq(ordersTable.id, orderId)).returning();
+
+  // The kitchen display and the waiter board both listen on this stream; without the
+  // broadcast a cancelled ticket stays on the pass until someone reloads.
+  broadcastOrderEvent(orderId, "status", { id: orderId, status: "cancelled", cancelledReason: reason });
+
+  res.json({ cancelled: true, order: updated, windowSeconds: GUEST_CANCEL_WINDOW_SECONDS });
+});
+
+/**
+ * Has anybody picked up the waiter call?
+ *
+ * `POST /public/waiter-call` wrote a row and returned it, and that was the end of it —
+ * the guest pressed the button and then stared at a screen that never changed, with no
+ * way to tell a call that a waiter had answered from one nobody had seen. The staff
+ * panel already resolves these rows; this simply lets the table read that back.
+ */
+router.get("/public/waiter-calls", async (req, res): Promise<void> => {
+  const restaurantId = parseInt(String(req.query.restaurantId ?? "0"), 10);
+  const tableName = String(req.query.table ?? req.query.tableName ?? "").trim();
+  if (!restaurantId || !tableName) {
+    res.status(400).json({ error: "restaurantId and table are required" });
+    return;
+  }
+
+  // Scoped to one table: without the table filter this would hand every diner the whole
+  // venue's call list.
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  const calls = await db.select().from(waiterCallsTable).where(
+    and(
+      eq(waiterCallsTable.restaurantId, restaurantId),
+      eq(waiterCallsTable.tableName, tableName),
+      gte(waiterCallsTable.createdAt, since),
+    ),
+  ).orderBy(desc(waiterCallsTable.createdAt)).limit(20);
+
+  res.json(calls.map(c => ({
+    id: c.id,
+    type: c.type,
+    message: c.message,
+    createdAt: c.createdAt,
+    acknowledged: c.isResolved,
+    acknowledgedAt: c.isResolved ? c.updatedAt : null,
+    statusLabel: c.isResolved ? "A team member has attended this" : "Waiting for a team member",
+  })));
 });
 
 router.post("/public/orders/:orderId/message", async (req, res): Promise<void> => {

@@ -140,7 +140,10 @@ function mapApiItem(i: Record<string, unknown>, categorySlug: string, categoryGr
     dietaryTags: tags,
     rating: restaurantRating > 0 ? restaurantRating : 0,
     reviews: (i.orderCount as number) || 0,
-    cookTime: i.prepTime ? `${i.prepTime} min` : "15 min",
+    // A dish with no prep time recorded used to be labelled "15 min" on the card and
+    // in the detail sheet. That number came from nowhere: the guest was told how long
+    // their food would take by a literal in the source.
+    cookTime: i.prepTime ? `${i.prepTime} min` : "",
     calories: (i.calories as number) || 0,
     protein: (i.protein as number) || 0,
     carbs: (i.carbs as number) || 0,
@@ -288,7 +291,7 @@ function ItemDetail({ item, onClose, onAdd, readOnly }: ItemDetailProps) {
               { label: "Calories", value: item.calories ? `${item.calories}` : "—", unit: "kcal", icon: "🔥" },
               { label: "Protein", value: item.protein ? `${item.protein}` : "—", unit: "g", icon: "💪" },
               { label: "Carbs", value: item.carbs ? `${item.carbs}` : "—", unit: "g", icon: "🌾" },
-              { label: "Cook Time", value: item.cookTime.replace(" min", ""), unit: "min", icon: "⏱️" },
+              { label: "Cook Time", value: item.cookTime ? item.cookTime.replace(" min", "") : "—", unit: item.cookTime ? "min" : "", icon: "⏱️" },
             ].map(info => (
               <div key={info.label} className="rounded-xl bg-white/5 p-2.5 text-center">
                 <div className="text-sm">{info.icon}</div>
@@ -484,6 +487,9 @@ export default function MenuPage() {
   // sitting at a table. resolveGuestSlug returns null only when neither the URL nor the
   // saved scan knows a real venue.
   const isDemo = resolveGuestSlug((venue as { restaurantSlug?: string })?.restaurantSlug || undefined) === null;
+  // Whether the kitchen is actually open, from the venue's own open/close times. A
+  // venue that has published no hours is treated as open, which is what the server says.
+  const venueClosed = venue.hours.hoursPublished && !venue.hours.isOpen;
   const { t, speakMenuItem, accessibility, announce } = useLocaleAccessibility();
   const { loadMenuWithCache, isOnline, connectionStatus, settings, pendingOrders } = useOffline();
   const { canInstall, isStandalone, installApp } = usePwa();
@@ -780,6 +786,19 @@ export default function MenuPage() {
         </div>
       </header>
 
+      {!venue.hours.isOpen && venue.hours.hoursPublished && (
+        /* Nothing anywhere told a guest the venue was shut. The kitchen's own opening
+           hours were in the database and unread, so a 4 a.m. order was taken in silence. */
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3" role="status">
+          <Info className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-300">Kitchen closed</p>
+            <p className="text-xs text-white/60 mt-0.5">{venue.hours.message}</p>
+            <p className="text-[11px] text-white/40 mt-1">You can browse the menu — ordering opens at {venue.hours.openTime}.</p>
+          </div>
+        </div>
+      )}
+
       <nav className="menu-app__cats" aria-label="Categories">
         <div className="menu-app__cats-track thin-scroll">
           {visibleCategories.map(cat => (
@@ -997,12 +1016,13 @@ export default function MenuPage() {
             <button
               type="button"
               onClick={() => navigate("/user/cart")}
-              disabled={cartCount === 0}
+              disabled={cartCount === 0 || venueClosed}
+              title={venueClosed ? venue.hours.message : undefined}
               className="guest-btn-primary flex-1 h-12 justify-between px-4 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
             >
               <span className="flex items-center gap-2 text-sm font-bold">
                 <ShoppingCart className="h-4 w-4" />
-                {cartCount} {cartCount === 1 ? "item" : "items"}
+                {venueClosed ? `Opens ${venue.hours.openTime}` : `${cartCount} ${cartCount === 1 ? "item" : "items"}`}
               </span>
               <span className="text-sm font-bold">₹{cartTotal}</span>
             </button>
