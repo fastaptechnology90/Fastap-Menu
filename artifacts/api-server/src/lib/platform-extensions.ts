@@ -174,15 +174,22 @@ export async function listVendorWallets() {
     // penalties, and it grows as paid orders come in. The old code filtered strictly on
     // paymentStatus = "paid" (missed most orders → 0) and then applied an arbitrary
     // ×0.15 estimate — both wrong. Now there is one source of truth.
-    const { finalPayout, penalties } = await computeVendorSettlement(r.id, commissionRate);
+    const { gross, commission, refunds, penalties, finalPayout } = await computeVendorSettlement(r.id, commissionRate);
     const balance = w.balance ?? finalPayout;
+    // finalPayout is floored at zero (a payout is never negative), so testing it for
+    // "< 0" could never be true and the Negative Balances tile always read 0 — even for
+    // a venue whose refunds have overtaken its sales. Measure the shortfall on the
+    // un-floored net instead, which is what "this vendor owes the platform" means.
+    const netPosition = roundMoney(gross - commission - refunds - penalties);
+    const shortfall = netPosition < 0 ? Math.abs(netPosition) : 0;
     return {
       vendorId: r.id, vendorName: r.name, plan: r.plan,
       walletBalance: balance,
       lockedBalance: w.locked ?? 0,
       reserveBalance: w.reserve ?? 0,
       penaltyDeductions: penalties,
-      negativeBalance: balance < 0,
+      negativeBalance: w.balance !== undefined ? balance < 0 : netPosition < 0,
+      shortfall,
       payoutsFrozen: w.frozen ?? false,
       lastPayout: null,
     };
@@ -325,6 +332,9 @@ export async function getArchivalPolicies() {
 export async function runArchival(policyId: string) {
   const data = await getArchivalPolicies();
   const policy = (data.policies as { id: string; type: string; retentionDays?: number }[]).find(p => p.id === policyId);
+  // An unknown policy id used to fall through to a 365-day default and report a
+  // completed run, so a mistyped policy came back as a successful archive of nothing.
+  if (!policy) return null;
   const retentionDays = policy?.retentionDays ?? 365;
   const cutoff = new Date(Date.now() - retentionDays * 86400000);
   let records = 0;

@@ -582,17 +582,30 @@ export async function getRevenueTimeSeries(months = 12) {
     }));
 }
 
-export async function listPayments(limit = 100, status?: string) {
+/**
+ * `scope` narrows the rows in SQL before the limit is applied. Master Search needs that:
+ * filtering a page of the newest transactions can only ever find what happens to be on
+ * that page.
+ */
+export async function listPayments(
+  limit = 100,
+  status?: string,
+  scope?: { restaurantIds?: number[]; orderIds?: number[] },
+) {
   const commissionRate = await getCommissionRate();
-  let query = db.select({
+  const base = db.select({
     order: ordersTable,
     restaurantName: restaurantsTable.name,
   }).from(ordersTable)
-    .innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
-    .orderBy(desc(ordersTable.createdAt))
-    .limit(limit);
+    .innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id));
 
-  const rows = await query;
+  const scoped = scope?.orderIds?.length
+    ? base.where(inArray(ordersTable.id, scope.orderIds))
+    : scope?.restaurantIds?.length
+      ? base.where(inArray(ordersTable.restaurantId, scope.restaurantIds))
+      : base;
+
+  const rows = await scoped.orderBy(desc(ordersTable.createdAt)).limit(limit);
   return rows
     .filter(r => !status || r.order.paymentStatus === status || r.order.status === status)
     .map(({ order, restaurantName }) => {
@@ -949,13 +962,18 @@ export async function getTaxReports(months = 6) {
     .orderBy(sql`to_char(${ordersTable.createdAt}, 'YYYY-MM') DESC`)
     .limit(months);
 
-  return rows.map((r, i) => {
+  return rows.map((r) => {
     const d = r.month ? new Date(`${r.month}-01`) : new Date();
     return {
       month: d.toLocaleString("default", { month: "long", year: "numeric" }),
+      period: r.month ?? "",
       totalSales: parseMoney(r.totalSales ?? 0),
       taxCollected: parseMoney(r.taxCollected ?? 0),
-      status: i === 0 ? "Pending" : "Filed",
+      // Every month but the newest used to be labelled "Filed". Nothing on the platform
+      // records a GST return, so that green badge was an invented compliance claim on a
+      // screen an accountant would take at face value. Report the figures; say plainly
+      // that the filing itself is not tracked here.
+      status: "Not tracked",
     };
   });
 }
@@ -1339,8 +1357,11 @@ export async function listAdminSessions() {
   }
 }
 
-export async function revokeAdminSession(sessionId: string) {
-  await pool.query(`DELETE FROM user_sessions WHERE sid = $1`, [sessionId]);
+/** True when a session row was actually removed, so the caller can tell a real
+ *  revocation from a no-op on an id that is not in the session store. */
+export async function revokeAdminSession(sessionId: string): Promise<boolean> {
+  const result = await pool.query(`DELETE FROM user_sessions WHERE sid = $1`, [sessionId]);
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function getWebhooks() {
@@ -1400,9 +1421,23 @@ export async function masterSearch(query: string) {
     r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q) || String(r.id) === q,
   ).slice(0, 10).map(r => ({ id: r.id, name: r.name, plan: r.plan, isActive: r.isActive }));
 
-  const payments = (await listPayments(50)).filter(p =>
-    p.id.toLowerCase().includes(q) || p.vendorName.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q),
-  ).slice(0, 10);
+  // Payments were filtered out of the newest 50 rows platform-wide, so a search for a
+  // venue with 44 transactions returned none as soon as other venues had 50 newer ones.
+  // Gather candidates in SQL — the matching vendors' own payments, plus any transaction
+  // whose number is in the query — then match over that.
+  const idInQuery = Number(q.replace(/[^0-9]/g, ""));
+  const pool = [
+    ...(vendorHits.length ? await listPayments(50, undefined, { restaurantIds: vendorHits.map(v => v.id) }) : []),
+    ...(Number.isFinite(idInQuery) && idInQuery > 0 ? await listPayments(2, undefined, { orderIds: [idInQuery] }) : []),
+    ...await listPayments(50),
+  ];
+  const seenPayments = new Set<string>();
+  const payments = pool.filter(p => {
+    if (seenPayments.has(p.id)) return false;
+    if (!(p.id.toLowerCase().includes(q) || p.vendorName.toLowerCase().includes(q) || p.orderId.toLowerCase().includes(q))) return false;
+    seenPayments.add(p.id);
+    return true;
+  }).slice(0, 10);
 
   const refunds = await db.select().from(platformRefundsTable).orderBy(desc(platformRefundsTable.requestedAt)).limit(100);
   const refundHits = refunds.filter(r => String(r.id).includes(q) || r.status.includes(q)).slice(0, 8).map(r => ({
