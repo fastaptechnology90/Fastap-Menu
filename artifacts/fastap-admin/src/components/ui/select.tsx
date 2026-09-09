@@ -19,8 +19,10 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-input bg-background/80 px-3 py-2 text-sm shadow-sm ring-offset-background transition-colors",
-      "data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-ring/50",
+      // Same height, radius, fill and focus treatment as Input, so a select and a
+      // text field side by side in a toolbar read as one control family.
+      "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors",
+      "data-[placeholder]:text-muted-foreground focus:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25",
       "disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 [&>span]:text-left",
       className
     )}

@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/Page";
+import { EmptyState as SharedEmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
 
 type Accent = "primary" | "emerald" | "amber" | "rose" | "violet" | "cyan" | "orange";
@@ -25,6 +27,13 @@ interface PageShellProps {
   className?: string;
 }
 
+/**
+ * The standard page frame: header, then content.
+ *
+ * The header itself is `PageHeader` from ./Page — this wrapper adds the icon tile,
+ * the refresh button and the loading state that its ~18 call sites already pass.
+ * New screens should use `PageHeader` directly.
+ */
 export function PageShell({
   title,
   description,
@@ -39,40 +48,49 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div className={cn("space-y-6", className)}>
-      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          {icon && (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground [&_svg]:size-5 [&_svg]:text-muted-foreground">
+      <PageHeader
+        title={title}
+        description={description}
+        badge={badge ? <Badge variant="secondary">{badge}</Badge> : undefined}
+        eyebrow={
+          icon ? (
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-muted text-muted-foreground [&_svg]:size-4">
               {icon}
             </div>
-          )}
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-              {badge && <Badge variant="secondary" className="text-xs">{badge}</Badge>}
-            </div>
-            {description && <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{description}</p>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {onRefresh && (
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
-              <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} /> Refresh
-            </Button>
-          )}
-          {actions}
-        </div>
-      </div>
+          ) : undefined
+        }
+        actions={
+          <>
+            {onRefresh && (
+              <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                Refresh
+              </Button>
+            )}
+            {actions}
+          </>
+        }
+      />
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading data…</p>
+        <div
+          className="flex flex-col items-center justify-center gap-3 py-24"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">Loading…</p>
         </div>
-      ) : children}
+      ) : (
+        children
+      )}
     </div>
   );
 }
 
+/**
+ * A titled panel inside a page. Lighter than `<Card>`: no shadow, and the title
+ * strip is part of the frame rather than a separate header block.
+ */
 export function PanelCard({ title, description, action, children, className }: {
   title?: string;
   description?: string;
@@ -81,12 +99,12 @@ export function PanelCard({ title, description, action, children, className }: {
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-md border bg-card text-card-foreground overflow-hidden", className)}>
+    <div className={cn("min-w-0 overflow-hidden rounded-md border bg-card text-card-foreground", className)}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b">
-          <div>
-            {title && <h3 className="font-semibold text-sm">{title}</h3>}
-            {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="min-w-0">
+            {title && <h3 className="text-sm font-semibold tracking-tight">{title}</h3>}
+            {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
           </div>
           {action}
         </div>
@@ -96,12 +114,8 @@ export function PanelCard({ title, description, action, children, className }: {
   );
 }
 
-export function EmptyState({ icon, title, description }: { icon?: ReactNode; title: string; description?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      {icon && <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-md border bg-muted text-muted-foreground">{icon}</div>}
-      <p className="font-medium">{title}</p>
-      {description && <p className="text-sm text-muted-foreground mt-1 max-w-sm">{description}</p>}
-    </div>
-  );
-}
+/**
+ * Kept as a re-export so the call sites that import `EmptyState` from here keep
+ * working. There is one empty state in the product and it lives in ./EmptyState.
+ */
+export const EmptyState = SharedEmptyState;
