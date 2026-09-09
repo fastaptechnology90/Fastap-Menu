@@ -1,8 +1,10 @@
 import { eq, and, desc, inArray, gte, sql } from "drizzle-orm";
-import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable } from "@workspace/db";
+import { db, ordersTable, roomServiceRequestsTable, housekeepingTasksTable, tablesMapTable, staffTable } from "@workspace/db";
+import { mapDbRoleToMobile, sectionForRole } from "./permissions.js";
 import { autoAssignWaiterToOrder } from "../staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../order-payment-ledger.js";
 import { broadcastEvent, broadcastOrderEvent } from "../sse.js";
+import { canTransition } from "../order-status.js";
 
 export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar", "Dessert", "Bakery", "Floor"];
 
@@ -43,7 +45,18 @@ function dbToMobileStatus(status: string, meta: Record<string, unknown>): string
   }
 }
 
-function mobileToDbStatus(action: string, current: string): { status: string; meta?: Record<string, unknown> } {
+// `currentDbStatus` is the value straight off the row, not the mobile-facing one.
+// It used to be the mobile status, which meant "hold" (and any action this switch did
+// not recognise) wrote a mobile word — "new", "accepted", "on_hold" — into
+// orders.status. Those are not in DISPLAY_DB here, nor in tables.ts
+// ACTIVE_ORDER_STATUSES, so a held ticket dropped off the kitchen display and the
+// waiter board and freed its table, with no screen left to press Release on.
+// Returning null for an unrecognised action lets the caller answer 400 instead of
+// writing a status nobody asked for.
+function mobileToDbStatus(
+  action: string,
+  currentDbStatus: string,
+): { status: string; meta?: Record<string, unknown> } | null {
   switch (action) {
     case "accept": return { status: "confirmed" };
     case "prepare": return { status: "preparing" };
@@ -51,14 +64,119 @@ function mobileToDbStatus(action: string, current: string): { status: string; me
     case "delay": return { status: "delayed" };
     case "reject":
     case "cancel": return { status: "cancelled" };
-    case "hold": return { status: current, meta: { kitchenHold: true } };
+    // A hold parks the ticket where it is; it is the metadata flag that holds it,
+    // so the row keeps the status it already had.
+    case "hold": return { status: currentDbStatus, meta: { kitchenHold: true } };
     case "release": return { status: "preparing", meta: { kitchenHold: false } };
     case "refire": return { status: "preparing", meta: { reFire: true } };
     // Waiter delivery flow: pick up a ready order (on the way), then deliver it.
     case "serve": return { status: "serving" };
     case "deliver": return { status: "completed" };
-    default: return { status: current };
+    default: return null;
   }
+}
+
+// ─── Guest-facing tracking ─────────────────────────────────────────────────
+// The browser KDS goes through PUT /restaurants/:id/orders/:id (routes/orders.ts),
+// which appends a line to metadata.tracking.kitchenUpdates on every status change and
+// stamps chefAssignedAt / cookingStartedAt. The app's KDS comes through here and used
+// to write nothing but the status column, so the guest's live tracker sat on "Order
+// received — sent to kitchen" from the moment the order was placed until it arrived at
+// the table, however many buttons the kitchen pressed. Same wording as the web path, so
+// a guest sees the same timeline whichever screen the kitchen worked from.
+const GUEST_STATUS_MESSAGES: Record<string, string> = {
+  confirmed: "Order accepted by kitchen",
+  accepted: "Order accepted by kitchen",
+  preparing: "Kitchen started preparing your order",
+  ready: "Order ready for pickup",
+  serving: "Waiter is on the way",
+  delivered: "Order delivered to table",
+  completed: "Order completed",
+  cancelled: "Order cancelled",
+  delayed: "Order marked as delayed",
+};
+
+function updateType(status: string): string {
+  if (status === "delayed") return "delay";
+  if (status === "ready") return "ready";
+  return "info";
+}
+
+/**
+ * Append the guest-visible timeline entry for a status change and stamp the kitchen's
+ * own timings on the order. Returns the new metadata object; the caller writes it.
+ *
+ * The timings are what makes prep time measurable at all — before this the only time on
+ * an order was createdAt, so "average preparation time" was really "average age of the
+ * open queue".
+ */
+export function withGuestTracking(
+  meta: Record<string, unknown>,
+  fromStatus: string,
+  toStatus: string,
+  who: { chefName?: string; waiterName?: string } = {},
+): Record<string, unknown> {
+  if (fromStatus === toStatus) return meta;
+  const tracking = (meta.tracking && typeof meta.tracking === "object"
+    ? { ...(meta.tracking as Record<string, unknown>) }
+    : {}) as Record<string, unknown>;
+  const updates = Array.isArray(tracking.kitchenUpdates) ? [...tracking.kitchenUpdates] : [];
+  const now = new Date().toISOString();
+
+  // A waiter confirming the handover lands the order on "completed"; to the guest that
+  // moment is the food arriving, not an accounting state.
+  const message = toStatus === "completed" && who.waiterName
+    ? GUEST_STATUS_MESSAGES.delivered
+    : GUEST_STATUS_MESSAGES[toStatus];
+  if (message) updates.unshift({ at: now, message, type: updateType(toStatus) });
+
+  if ((toStatus === "confirmed" || toStatus === "accepted") && !tracking.acceptedAt) {
+    tracking.acceptedAt = now;
+  }
+  if (toStatus === "preparing" && !tracking.chefAssignedAt) {
+    tracking.chefAssignedAt = now;
+    const chef = who.chefName ?? (tracking.chefName as string | undefined) ?? "Head Chef";
+    tracking.chefName = chef;
+    // Staff are often already named "Chef <name>" on the roster; don't say it twice.
+    const label = /^chef/i.test(chef) ? chef : `Chef ${chef}`;
+    updates.unshift({ at: now, message: `${label} assigned`, type: "chef" });
+  }
+  if (toStatus === "preparing" || toStatus === "ready") {
+    tracking.cookingStartedAt = tracking.cookingStartedAt ?? now;
+  }
+  if (toStatus === "ready" && !tracking.readyAt) tracking.readyAt = now;
+  if (toStatus === "serving") tracking.waiterStatus = "on_the_way";
+  if (toStatus === "delivered" || toStatus === "completed") {
+    tracking.waiterStatus = "delivered";
+    tracking.deliveredAt = tracking.deliveredAt ?? now;
+  }
+  // The kitchen pressing Delay is what tells the guest their order is running late —
+  // buildTrackingSnapshot reads tracking.isDelayed. And once the food is actually up,
+  // the flag has to come off, or the tracker keeps showing "delayed" over a plated dish.
+  if (toStatus === "delayed") {
+    tracking.isDelayed = true;
+    tracking.delayReason = tracking.delayReason ?? "Kitchen delay — your order is being prioritised";
+  } else if (["ready", "serving", "served", "delivered", "completed"].includes(toStatus)) {
+    delete tracking.isDelayed;
+    delete tracking.delayReason;
+  }
+  if (who.waiterName) tracking.waiterName = who.waiterName;
+
+  tracking.kitchenUpdates = updates;
+  return { ...meta, tracking };
+}
+
+/** Seconds actually spent cooking, from the moment prep started to the ready bump. */
+function measuredPrepSeconds(meta: Record<string, unknown>): number | null {
+  const tracking = (meta.tracking && typeof meta.tracking === "object"
+    ? meta.tracking
+    : {}) as Record<string, unknown>;
+  const started = typeof tracking.cookingStartedAt === "string" ? Date.parse(tracking.cookingStartedAt) : NaN;
+  if (!Number.isFinite(started)) return null;
+  const ready = typeof tracking.readyAt === "string" ? Date.parse(tracking.readyAt) : NaN;
+  const end = Number.isFinite(ready) ? ready : Date.now();
+  const seconds = Math.floor((end - started) / 1000);
+  return seconds >= 0 ? seconds : null;
 }
 
 function timerSeconds(createdAt: Date, status: string): number {
@@ -161,6 +279,10 @@ function mapOrderRow(row: typeof ordersTable.$inferSelect) {
     priority,
     timerSeconds: seconds,
     timer: formatDuration(seconds),
+    // How long this ticket has actually been on the pass, measured from the stamps the
+    // kitchen's own actions leave. Null until someone starts prep — the dashboard
+    // averages only the tickets that have a real measurement.
+    prepSeconds: measuredPrepSeconds(meta),
     progress: progressFor(status, seconds),
     sortOrder: row.id,
     vip,
@@ -215,7 +337,28 @@ function filterSection(orders: ReturnType<typeof mapOrderRow>[], section: string
   return orders.filter(o => o.section === section);
 }
 
-function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[]) {
+/**
+ * How many staff are actually rostered to each kitchen section, from the staff table.
+ * The dashboard used to print "N orders · 2 staff" where the staff figure was derived
+ * from the order count (0 -> 1, 1-3 -> 2, 4+ -> 3) and had never been near the roster.
+ */
+async function staffPerSection(restaurantId: number): Promise<Record<string, number>> {
+  const rows = await db.select({ role: staffTable.role })
+    .from(staffTable)
+    .where(and(eq(staffTable.restaurantId, restaurantId), eq(staffTable.isActive, true)));
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    const sectionName = sectionForRole(mapDbRoleToMobile(r.role));
+    counts[sectionName] = (counts[sectionName] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function buildDashboard(
+  section: string,
+  orders: ReturnType<typeof mapOrderRow>[],
+  sectionStaff: Record<string, number> = {},
+) {
   const filtered = filterSection(orders, section);
   const active = filtered.filter(o => KITCHEN_ACTIVE.has(o.status)).length;
   const delayed = filtered.filter(o => o.status === "delayed").length;
@@ -225,9 +368,14 @@ function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[
   const completed = filtered.filter(o => o.status === "ready" || o.status === "served").length;
   const rejected = filtered.filter(o => o.status === "rejected").length;
   const rushCount = filtered.filter(o => o.status === "delayed" || o.priority === "express" || o.timerSeconds > 600).length;
-  const avgSeconds = filtered.length
-    ? Math.round(filtered.reduce((s, o) => s + o.timerSeconds, 0) / filtered.length)
-    : 780;
+  // "Average preparation time" now averages time actually spent cooking (prep started
+  // -> ready), not the age of whatever is on the board. It also no longer falls back to
+  // a fixed 780 seconds, which put a confident "13:00" on the dashboard of a kitchen
+  // that had not cooked anything.
+  const measured = filtered.map(o => o.prepSeconds).filter((n): n is number => n != null);
+  const avgSeconds = measured.length
+    ? Math.round(measured.reduce((s, n) => s + n, 0) / measured.length)
+    : 0;
   const delayRatio = filtered.length ? Math.round((delayed / filtered.length) * 100) : 0;
   const efficiency = Math.max(60, Math.min(99, 100 - delayRatio));
 
@@ -247,13 +395,13 @@ function buildDashboard(section: string, orders: ReturnType<typeof mapOrderRow>[
     ],
     metrics: [
       { key: "kitchenEfficiency", label: "Kitchen efficiency", value: `${efficiency}%`, detail: "Live", tone: "primary" },
-      { key: "avgPrepTime", label: "Average preparation time", value: formatDuration(avgSeconds), detail: "Live queue", tone: "info" },
+      { key: "avgPrepTime", label: "Average preparation time", value: formatDuration(avgSeconds), detail: measured.length ? `${measured.length} order(s) timed` : "Nothing cooked yet", tone: "info" },
       { key: "delayRatio", label: "Delay ratio", value: `${delayRatio}%`, detail: delayed > 2 ? "Above target" : "On target", tone: "warning" },
       { key: "orderBacklog", label: "Order backlog", value: String(pending + active), detail: "Queue depth", tone: "danger" },
     ],
     sectionWorkload: KITCHEN_SECTIONS.map(name => {
       const count = filtered.filter(o => o.section === name && KITCHEN_ACTIVE.has(o.status)).length;
-      return { section: name, activeOrders: count, load: Math.min(1, count / 6), staffAssigned: count > 3 ? 3 : count > 0 ? 2 : 1 };
+      return { section: name, activeOrders: count, load: Math.min(1, count / 6), staffAssigned: sectionStaff[name] ?? 0 };
     }),
     rushAlerts: filtered.filter(o => o.status === "delayed" || o.vip).slice(0, 4).map(o => ({
       id: `ALERT-${o.id}`,
@@ -432,6 +580,8 @@ function roomRequestOrder(p: {
     priority: "normal",
     timerSeconds: seconds,
     timer: formatDuration(seconds),
+    // Room requests are not cooked, so there is no prep time to measure.
+    prepSeconds: null as number | null,
     progress: progressFor(status, seconds),
     sortOrder: 0,
     vip: false,
@@ -494,7 +644,7 @@ export async function getDashboard(
   if (assignee?.role === "housekeeping" && assignee.name) {
     orders = [...orders, ...await fetchRoomRequests(restaurantId, assignee.name)];
   }
-  return buildDashboard(section, orders);
+  return buildDashboard(section, orders, await staffPerSection(restaurantId));
 }
 
 export async function getKds(restaurantId: number, section = "All", view = "queue", filter = "all") {
@@ -545,7 +695,14 @@ async function applyRoomRequestAction(restaurantId: number, orderIdRaw: string, 
   return roomRequestOrder({ id: orderIdRaw, roomNumber: u.roomNumber ?? u.location, itemNames: [u.title], message: u.notes ?? u.description, statusMobile: requestMobileStatus(u.status), assignedTo: u.assignedTo, section: "Housekeeping", createdAt: u.createdAt });
 }
 
-export async function applyKdsAction(restaurantId: number, orderIdRaw: string, action: string) {
+export async function applyKdsAction(
+  restaurantId: number,
+  orderIdRaw: string,
+  action: string,
+  /** The staff member who pressed the button, so the guest sees a name rather than
+   *  the "Head Chef" placeholder the web path falls back to. */
+  performedBy?: string,
+) {
   if (orderIdRaw.startsWith("RSR-") || orderIdRaw.startsWith("HKT-")) {
     return applyRoomRequestAction(restaurantId, orderIdRaw, action);
   }
@@ -619,21 +776,29 @@ export async function applyKdsAction(restaurantId: number, orderIdRaw: string, a
   }
 
   const meta = (existing.metadata && typeof existing.metadata === "object" ? existing.metadata : {}) as Record<string, unknown>;
-  const mobileStatus = dbToMobileStatus(existing.status, meta);
-  const mapped = mobileToDbStatus(action, mobileStatus);
-  const nextMeta = { ...meta, ...(mapped.meta ?? {}) };
+  const mapped = mobileToDbStatus(action, existing.status);
+  // An action this endpoint does not know used to fall through to "keep the current
+  // status", which meant a typo or a stale app build silently rewrote the status column.
+  // Say so instead.
+  if (!mapped) throw new Error("UNKNOWN_ACTION");
+
+  // The same guard the browser KDS goes through (routes/orders.ts). Without it the app
+  // could walk a settled order backwards — a delivered order pressed "Accept" reappeared
+  // in the queue as a fresh ticket and would have been cooked twice.
+  if (mapped.status !== existing.status) {
+    const allowed = canTransition(existing.status, mapped.status);
+    if (!allowed.ok) throw new Error(`INVALID_TRANSITION: ${allowed.reason}`);
+  }
+
+  let nextMeta = { ...meta, ...(mapped.meta ?? {}) };
   if (mapped.meta?.kitchenHold === false) delete nextMeta.kitchenHold;
   if (mapped.meta?.reFire) nextMeta.reFire = true;
-  // Reflect the waiter's delivery step in the guest-facing tracking snapshot.
-  if (action === "serve" || action === "deliver") {
-    const tracking = (nextMeta.tracking && typeof nextMeta.tracking === "object"
-      ? nextMeta.tracking
-      : {}) as Record<string, unknown>;
-    nextMeta.tracking = {
-      ...tracking,
-      waiterStatus: action === "serve" ? "on_the_way" : "delivered",
-    };
-  }
+  // Everything the guest's live tracker shows — the timeline, the chef's name, the
+  // waiter's progress — plus the kitchen's own timings.
+  nextMeta = withGuestTracking(nextMeta, existing.status, mapped.status, {
+    chefName: performedBy,
+    waiterName: action === "serve" || action === "deliver" ? performedBy : undefined,
+  });
 
   let [updated] = await db.update(ordersTable).set({
     status: mapped.status,

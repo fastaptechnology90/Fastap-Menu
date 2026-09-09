@@ -99,8 +99,21 @@ export function revokeMobileSession(token?: string | null) {
   if (token) sessions.delete(token);
 }
 
-export function revokeAllMobileSessions() {
-  sessions.clear();
+/**
+ * "Emergency logout" on a handset means "sign me out of every device I am on" — the
+ * phone was lost, or handed to the next shift. It used to clear the whole map, so one
+ * line cook tapping it signed out every staff member at every restaurant on the
+ * platform, mid-service, with no way to tell what had happened.
+ */
+export function revokeStaffMobileSessions(staffId: number) {
+  let revoked = 0;
+  for (const [token, session] of sessions) {
+    if (session.staffId === staffId) {
+      sessions.delete(token);
+      revoked++;
+    }
+  }
+  return revoked;
 }
 
 export function requireMobileAuth(req: Request, res: Response, next: NextFunction) {

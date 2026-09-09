@@ -90,8 +90,11 @@ export async function buildHygieneBoardFromDb(restaurantId: number, section: str
       id: `HK-${t.id}`,
       title: t.title,
       section: t.roomNumber ? `Room ${t.roomNumber}` : t.location,
-      itemsCompleted: t.status === "in_progress" ? 2 : 0,
-      totalItems: 4,
+      // A housekeeping task is one piece of work; nothing in the schema breaks it into
+      // checklist lines. It used to report "2 of 4 done" for anything in progress and
+      // "0 of 4" for anything else, which was a progress bar nobody had measured.
+      itemsCompleted: t.status === "completed" ? 1 : 0,
+      totalItems: 1,
       status: t.status === "completed" ? "completed" : "pending",
       availableActions: hygieneActions(t.status),
     }));
@@ -188,12 +191,22 @@ export async function buildRoomServiceBoardFromDb(
       roomNumber: o.roomNumber!,
       section: o.section,
       guestType: o.vip ? "vip" : "standard",
-      itemSummary: o.items.map((i) => i.name).join(", ") || "Room order",
+      // o.items is already a list of "2x Masala Dosa" strings, so reading .name off each
+      // one produced undefined and the card's item line rendered as bare commas.
+      itemSummary: o.items.join(", ") || "Room order",
       status: o.status === "ready" ? "ready" : o.status === "serving" ? "delivering" : "preparing",
       priority: o.vip ? "vip" : "normal",
-      timerSeconds: 0,
-      timerLabel: o.status,
-      availableActions: roomActions(o.status === "ready" ? "accepted" : "in_progress"),
+      // The ticket's real age, not a hardcoded zero.
+      timerSeconds: o.timerSeconds,
+      timerLabel: o.timer,
+      // Only offer to take the tray once the kitchen has actually finished. This used to
+      // resolve to the same two buttons whatever the kitchen was doing, so a room order
+      // still being cooked could be marked delivered from the housekeeping app.
+      availableActions: o.status === "ready"
+        ? ["assign_tray", "mark_delivered"]
+        : o.status === "serving"
+          ? ["mark_delivered"]
+          : [],
     }));
 
   const dbRoomOrders = activeRequests.map((r) => ({
@@ -331,7 +344,11 @@ export async function buildWaiterBoardFromDb(
     tableNumber: c.tableName ?? "—",
     status: "new",
     createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : now(),
-    availableActions: ["acknowledge", "resolve_call"],
+    // One button, because there is only one outcome the server can record: the call is
+    // closed. "Acknowledge" sat next to it and did exactly the same thing, so a waiter
+    // meaning "seen it, on my way" cleared the guest's request off every board — the
+    // owner's included — before anyone had been to the table.
+    availableActions: ["resolve_call"],
   }));
 
   return {

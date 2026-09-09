@@ -8,7 +8,7 @@ import {
   mobileSession,
   sessionPayload,
   revokeMobileSession,
-  revokeAllMobileSessions,
+  revokeStaffMobileSessions,
   type MobileSession,
 } from "../lib/mobile-kitchen/session.js";
 import {
@@ -120,9 +120,11 @@ router.post("/auth/logout", requireMobileAuth, (req, res) => {
   res.json({ success: true });
 });
 
-router.post("/auth/emergency-logout", requireMobileAuth, (_req, res) => {
-  revokeAllMobileSessions();
-  res.json({ success: true });
+router.post("/auth/emergency-logout", requireMobileAuth, (req, res) => {
+  // Scoped to the staff member who asked. See revokeStaffMobileSessions.
+  const s = mobileSession(req);
+  const revoked = revokeStaffMobileSessions(s.staffId);
+  res.json({ success: true, sessionsEnded: revoked });
 });
 
 router.get("/auth/session", requireMobileAuth, async (req, res) => {
@@ -277,14 +279,34 @@ router.get("/kds", requireMobileAuth, async (req, res) => {
   });
 });
 
+// Every failure used to come back as a flat 404 "Order not found", so a rejected
+// transition or an action the server does not know read on the handset as "that ticket
+// is gone". Tell the app which of the three it was.
+function kdsError(res: Response, err: unknown) {
+  const msg = err instanceof Error ? err.message : "Action failed";
+  if (msg.startsWith("INVALID_TRANSITION")) {
+    res.status(409).json({ message: msg.replace("INVALID_TRANSITION: ", ""), code: "INVALID_TRANSITION" });
+    return;
+  }
+  if (msg === "UNKNOWN_ACTION") {
+    res.status(400).json({ message: "That action is not available on this order", code: "UNKNOWN_ACTION" });
+    return;
+  }
+  if (msg === "INVALID_SECTION") {
+    res.status(400).json({ message: "Unknown kitchen section", code: "INVALID_SECTION" });
+    return;
+  }
+  res.status(404).json({ message: "Order not found" });
+}
+
 router.post("/kds/orders/:orderId/action", requireMobileAuth, async (req, res) => {
   if (!(await gateModuleAccess(req, res, "/kds"))) return;
   const s = mobileSession(req);
   try {
-    const order = await applyKdsAction(s.restaurantId, req.params.orderId, String(req.body?.action ?? ""));
+    const order = await applyKdsAction(s.restaurantId, req.params.orderId, String(req.body?.action ?? ""), s.user.name);
     res.json({ success: true, order });
-  } catch {
-    res.status(404).json({ message: "Order not found" });
+  } catch (err) {
+    kdsError(res, err);
   }
 });
 
@@ -300,10 +322,10 @@ router.post("/orders/:orderId/process", requireMobileAuth, async (req, res) => {
   try {
     const order = action === "reassign"
       ? await reassignKdsSection(s.restaurantId, req.params.orderId, String(req.body?.targetSection ?? ""))
-      : await applyKdsAction(s.restaurantId, req.params.orderId, action);
+      : await applyKdsAction(s.restaurantId, req.params.orderId, action, s.user.name);
     res.json({ success: true, order });
-  } catch {
-    res.status(404).json({ message: "Order not found" });
+  } catch (err) {
+    kdsError(res, err);
   }
 });
 
