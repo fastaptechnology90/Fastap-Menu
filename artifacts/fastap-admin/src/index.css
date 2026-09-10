@@ -462,6 +462,53 @@
   --muted: var(--n-100);
   --accent: var(--n-100);
 
+  /* Every role :root derives from the ramp, restated so it resolves against THIS
+     scope's ramp.
+
+     A custom property holding var() is substituted on the element that declares it,
+     and descendants inherit the finished value. `--foreground: var(--n-800)` lives on
+     :root, so it was settled on <html> — using whichever ramp <html> had. Re-pointing
+     `--n-800` on a descendant scope did nothing to it.
+
+     On <html class="dark"> that coincidence hid the bug: both sides resolved dark. The
+     day/night switch stores its choice for the whole domain, so a browser that had set
+     light anywhere opened the guest web with a dark ramp under light roles — dark text
+     on a dark ground, near-white borders, a dark-blue button. The scan page's own title
+     was unreadable.
+
+     Restated here, `.guest-page` and `.menu-page` are dark whatever <html> says, and
+     `.dark` on <html> is unchanged because it is the same element. */
+  --background: var(--n-0);
+  --foreground: var(--n-800);
+  --border: var(--n-200);
+  --input: var(--n-200);
+  --ring: var(--brand-600);
+  --primary: var(--brand-600);
+  --card-foreground: var(--n-800);
+  --card-border: var(--n-200);
+  --popover-foreground: var(--n-800);
+  --popover-border: var(--n-200);
+  --secondary-foreground: var(--n-700);
+  --muted-foreground: var(--n-600);
+  --accent-foreground: var(--n-800);
+  --destructive: var(--danger);
+  --sidebar-foreground: var(--n-700);
+  --sidebar-border: var(--n-200);
+  --sidebar-primary: var(--brand-600);
+  --sidebar-accent: var(--n-100);
+  --sidebar-accent-foreground: var(--n-800);
+  --sidebar-ring: var(--brand-600);
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --secondary-border: hsl(var(--secondary));
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --muted-border: hsl(var(--muted));
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --accent-border: hsl(var(--accent));
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --destructive-border: hsl(var(--destructive));
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
   /* Fills are light here, so their labels have to go dark. */
   --primary-foreground: var(--n-0);
   --sidebar-primary-foreground: var(--n-0);
