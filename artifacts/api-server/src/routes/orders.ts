@@ -630,7 +630,10 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
   const { menuItemId, delta } = req.body;
   const d = parseInt(String(delta), 10);
   if (Number.isNaN(orderId) || !menuItemId || !d) { res.status(400).json({ error: "orderId, menuItemId and delta required" }); return; }
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // Ownership, on the same terms as cancel/pay/read. Loading by id alone let anyone who
+  // could guess a number — they are sequential — rewrite a stranger's bill in any venue,
+  // including emptying it to zero, and read the diner's name and phone off the response.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
   const OPEN = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
   if (!OPEN.includes(String(order.status))) { res.status(409).json({ error: "Order can no longer be changed — it's already prepared or billed." }); return; }
@@ -678,11 +681,33 @@ router.post("/public/orders/:orderId/adjust-item", async (req, res): Promise<voi
 router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(String(req.params.orderId), 10);
   if (Number.isNaN(orderId)) { res.status(400).json({ error: "Invalid order ID" }); return; }
-  const [original] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // Reorder copies the original diner's name, phone and email onto the new order and
+  // returns it. Without an ownership check that made this an address book: count up
+  // through the ids and every venue's customers come back, one call each — the same hole
+  // that was closed on the read route and left open here. It also pushed priced tickets
+  // onto any kitchen's board, unauthenticated, in someone else's name.
+  const original = await loadOwnedOrder(req, orderId);
   if (!original) { res.status(404).json({ error: "Order not found" }); return; }
 
   const items = Array.isArray(original.items) ? original.items as Record<string, unknown>[] : [];
   if (!items.length) { res.status(400).json({ error: "Order has no items to reorder" }); return; }
+
+  // A reorder is a new order, so it answers to the same gates as one placed from the
+  // menu. This route skipped all of them, which let a repeat order land at a venue that
+  // was closed, or had never been approved to trade.
+  const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, original.restaurantId)).limit(1);
+  if (!venue) { res.status(404).json({ error: "Restaurant not found" }); return; }
+  if (isDemoVenue(venue)) {
+    res.status(403).json({ error: "This is the demo menu — orders cannot be placed here.", demoVenue: true });
+    return;
+  }
+  if (!isRestaurantPublished(venue)) {
+    const status = getPublicationStatus(venue);
+    res.status(403).json({ error: guestVenueAccessError(status), publicationStatus: status });
+    return;
+  }
+  const gate = ordersAllowed(venue);
+  if (!gate.allowed) { res.status(409).json(closedResponse(gate.hours)); return; }
 
   const menuItems = await db.select().from(menuItemsTable).where(eq(menuItemsTable.restaurantId, original.restaurantId));
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
@@ -749,7 +774,35 @@ router.get("/public/orders/:orderId", async (req, res): Promise<void> => {
 router.post("/public/feedback", async (req, res): Promise<void> => {
   const { restaurantId, orderId, customerName, rating, foodRating, serviceRating, ambienceRating, comment } = req.body;
   if (!restaurantId || !rating) { res.status(400).json({ error: "restaurantId and rating required" }); return; }
-  const [fb] = await db.insert(feedbackTable).values({ restaurantId, orderId, customerName, rating, foodRating, serviceRating, ambienceRating, comment }).returning();
+
+  // A review has to come from someone who actually ate here. Nothing was checked before:
+  // the rating, the venue and the order id were all taken from the body, so a script could
+  // drive any venue's public rating to one star, and cite an order belonging to a
+  // different restaurant while doing it.
+  const score = Number(rating);
+  if (!Number.isFinite(score) || score < 1 || score > 5) {
+    res.status(400).json({ error: "Rating must be between 1 and 5" });
+    return;
+  }
+  const venueId = Number(restaurantId);
+  const orderRef = orderId != null ? Number(orderId) : null;
+  if (orderRef != null && Number.isFinite(orderRef)) {
+    // Cited an order? Then it must be yours, and it must belong to the venue being rated.
+    const owned = await loadOwnedOrder(req, orderRef);
+    if (!owned || owned.restaurantId !== venueId) {
+      res.status(403).json({ error: "That order is not yours to review." });
+      return;
+    }
+  } else if (!req.session.guestSessionId && !req.session.guestUserId) {
+    // No order cited and no session at all is an anonymous drive-by.
+    res.status(403).json({ error: "Scan the code at your table before leaving a review." });
+    return;
+  }
+
+  const [fb] = await db.insert(feedbackTable).values({
+    restaurantId: venueId, orderId: orderRef, customerName,
+    rating: score, foodRating, serviceRating, ambienceRating, comment,
+  }).returning();
   res.status(201).json(fb);
 });
 
