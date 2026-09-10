@@ -277,7 +277,15 @@ router.get("/public/venue/:slug", async (req, res): Promise<void> => {
         sessionType: q.share ? "table_share" : detectedTable ? "shared_table" : "personal",
         tableId: detectedTable?.id ?? null,
         tableName: detectedTable?.name ?? tableParam ?? null,
-        roomNumber: detectedRoom?.number ?? roomParam ?? null,
+        // Bind ONLY a room that exists. The raw `?? roomParam` fallback bound the session
+        // to whatever string was in ?room=, real or not — so a caller who had never
+        // scanned anything could type ?room=777, become "in room 777", and then read that
+        // room's service history and post charges to its folio. callerIsInRoom trusts this
+        // value, so an unverified bind defeats the ownership check on every hotel endpoint.
+        // A real in-room QR still binds, because its room resolves in `detectedRoom`.
+        // (Residual: a real, occupied room number is still guessable with a number-only QR —
+        // the durable fix is a per-room secret in the QR. Flagged separately.)
+        roomNumber: detectedRoom?.number ?? null,
         sectionName: detectedSection?.name ?? null,
         entryMethod: accessMethod,
         serviceMode,
