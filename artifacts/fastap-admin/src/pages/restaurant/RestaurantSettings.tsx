@@ -20,6 +20,16 @@ const SETTING_SECTIONS = [
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+/** Common venue timezones — guest open/closed uses this same IANA id. */
+const TIMEZONES = [
+  { value: "Asia/Kolkata", label: "India (Asia/Kolkata, IST)" },
+  { value: "Asia/Dubai", label: "UAE (Asia/Dubai, GST)" },
+  { value: "Asia/Singapore", label: "Singapore (Asia/Singapore)" },
+  { value: "Europe/London", label: "UK (Europe/London)" },
+  { value: "America/New_York", label: "US Eastern (America/New_York)" },
+  { value: "UTC", label: "UTC" },
+];
+
 /** Used where a section has nothing real to show yet — better than inventing a status. */
 function EmptyPanel({ title, message }: { title: string; message: string }) {
   return (
@@ -51,6 +61,7 @@ export default function RestaurantSettings() {
     totalSeats: restaurant.totalSeats,
   });
   const [hours, setHours] = useState(DAYS.map(d => ({ day: d, open: true, from: d === "Sunday" ? "12:00" : "11:00", to: d === "Sunday" ? "21:00" : "23:00" })));
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [notifs, setNotifs] = useState({
     newOrder: true, orderReady: true, lowStock: true, newReservation: true,
     staffAlert: false, dailyReport: true, smsAlerts: false, whatsappAlerts: true, emailAlerts: true,
@@ -61,10 +72,14 @@ export default function RestaurantSettings() {
   useEffect(() => {
     if (!restaurantId) return;
     restaurantApi.get(restaurantId).then((data: any) => {
-      if (data) setProfile(prev => ({ ...prev, name: data.name || prev.name, address: data.address || prev.address, phone: data.phone || prev.phone, email: data.email || prev.email, gstNumber: data.gstNumber || prev.gstNumber, fssaiNumber: data.fssaiNumber || prev.fssaiNumber, cuisineType: data.cuisineType || prev.cuisineType, totalTables: data.totalTables || prev.totalTables, totalSeats: data.totalSeats || prev.totalSeats }));
+      if (data) {
+        setProfile(prev => ({ ...prev, name: data.name || prev.name, address: data.address || prev.address, phone: data.phone || prev.phone, email: data.email || prev.email, gstNumber: data.gstNumber || prev.gstNumber, fssaiNumber: data.fssaiNumber || prev.fssaiNumber, cuisineType: data.cuisineType || prev.cuisineType, totalTables: data.totalTables || prev.totalTables, totalSeats: data.totalSeats || prev.totalSeats }));
+        if (data.timezone) setTimezone(String(data.timezone));
+      }
     }).catch(() => {});
     restaurantSettingsApi.getApp(restaurantId).then((data: any) => {
       if (data?.hours) setHours(data.hours);
+      if (data?.timezone) setTimezone(String(data.timezone));
       if (data?.notifications) setNotifs(data.notifications);
       if (data?.security) setSecurity(data.security);
       if (data?.payments) setPayments(data.payments);
@@ -93,14 +108,19 @@ export default function RestaurantSettings() {
   async function handleSave() {
     if (!restaurantId) return;
     try {
-      // Owner profile persists name/address/phone/email; app settings persist the rest incl. branding.
-      await Promise.all([
-        restaurantApi.update(restaurantId, profile),
-        restaurantSettingsApi.updateApp(restaurantId, { hours, notifications: notifs, security, payments, branding }),
-      ]);
+      // Serial writes: both endpoints RMW the same settings jsonb — Promise.all can drop hours.
+      await restaurantApi.update(restaurantId, profile);
+      const savedApp = await restaurantSettingsApi.updateApp(restaurantId, {
+        hours, timezone, notifications: notifs, security, payments, branding,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      toast({ title: "Settings saved" });
+      const guestOpen = savedApp?.openTime ?? hours.find(h => h.open)?.from ?? "?";
+      const guestClose = savedApp?.closeTime ?? hours.find(h => h.open)?.to ?? "?";
+      toast({
+        title: "Settings saved",
+        description: `Guest/QR hours now ${guestOpen}–${guestClose} (${savedApp?.timezone ?? timezone}).`,
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Save failed", description: e?.message || "Could not save settings. Please try again." });
     }
@@ -177,6 +197,25 @@ export default function RestaurantSettings() {
           {/* Operating Hours */}
           {activeSection === "hours" && (
             <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+                <label className="block text-xs text-muted-foreground">Venue timezone</label>
+                <select
+                  className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40"
+                  value={timezone}
+                  onChange={e => setTimezone(e.target.value)}
+                >
+                  {!TIMEZONES.some(t => t.value === timezone) && (
+                    <option value={timezone}>{timezone}</option>
+                  )}
+                  {TIMEZONES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Guest menu and QR ordering open/close against this timezone — not the guest&apos;s phone clock.
+                  Save Changes updates guest hours immediately.
+                </p>
+              </div>
               {hours.map((h, i) => (
                 <div key={h.day} className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border">
                   <button onClick={() => setHours(p => p.map((x, j) => j === i ? { ...x, open: !x.open } : x))} className={`w-10 h-5 rounded-full transition-colors relative ${h.open ? "bg-primary" : "bg-muted"}`}>

@@ -24,6 +24,7 @@ import {
 import { PLATFORM_CURRENCY } from "../lib/currency.js";
 import { invalidateRestaurantAnalyticsCache } from "../lib/analytics-cache.js";
 import { sumOrderTotals, isPaidOrder } from "../lib/payment-calculations.js";
+import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { getSpaRevenue, getSpaRevenueByRestaurant, getBanquetRevenue, getBanquetRevenueByRestaurant } from "../lib/ancillary-revenue.js";
 import {
   listApprovals, createApproval, updateApproval, listPlatformReservations, updatePlatformReservation,
@@ -719,19 +720,38 @@ router.get("/superadmin/analytics/summary", ...admin, async (req, res) => {
   });
 });
 
-router.get("/superadmin/audit-logs", ...admin, async (_req, res) => {
+router.get("/superadmin/audit-logs", ...admin, async (req, res) => {
+  const vendorId = req.query.vendorId != null && String(req.query.vendorId).trim() !== ""
+    ? String(req.query.vendorId).trim()
+    : null;
   const logs = await db.select().from(platformAuditLogsTable).orderBy(desc(platformAuditLogsTable.createdAt)).limit(200);
-  res.json(logs.map(l => ({
+  const mapped = logs.map(l => ({
     id: `LOG-${l.id}`, user: l.userName, action: l.action, module: l.module,
     target: l.target ?? "", dateTime: l.createdAt.toISOString(),
     ipAddress: l.ipAddress ?? "", severity: l.severity,
-  })));
+  }));
+  // Vendor profile used to load the platform-wide feed and filter client-side. Bulk
+  // targets like "1,2,3" and payment/settlement ids that happen to contain digits
+  // leaked other vendors' activity onto this screen.
+  if (!vendorId) {
+    res.json(mapped);
+    return;
+  }
+  res.json(mapped.filter(l =>
+    String(l.target ?? "").split(",").map(t => t.trim()).includes(vendorId),
+  ));
 });
 
 router.get("/superadmin/payments", ...admin, async (req, res) => {
   const limit = parseInt(String(req.query.limit ?? 100), 10);
   const status = req.query.status ? String(req.query.status) : undefined;
-  res.json(await listPayments(limit, status));
+  const vendorIdRaw = req.query.vendorId != null ? parseInt(String(req.query.vendorId), 10) : NaN;
+  const scope = Number.isFinite(vendorIdRaw) && vendorIdRaw > 0
+    ? { restaurantIds: [vendorIdRaw] }
+    : undefined;
+  // Without restaurant scope, limit=100 is the newest platform-wide rows — a quiet
+  // vendor's paid orders never appear and revenue on their profile reads as ₹0.
+  res.json(await listPayments(limit, status, scope));
 });
 
 router.get("/superadmin/payments/:id", ...admin, async (req, res) => {
@@ -774,7 +794,8 @@ router.post("/superadmin/payments/:id/retry", ...admin, async (req, res) => {
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
     });
-    if (result.success) {
+    // Demo / unconfigured gateway must never settle — same rule as guest checkout.
+    if (result.success && result.mode !== "demo") {
       paymentStatus = "paid";
       gatewayMeta = {
         gatewayId: result.gatewayId,
@@ -785,13 +806,29 @@ router.post("/superadmin/payments/:id/retry", ...admin, async (req, res) => {
       };
     }
   } else {
-    paymentStatus = method === "cash" ? "pending" : "paid";
+    // Retry must not invent a paid bill for a non-gateway / unknown method.
+    paymentStatus = "pending";
   }
 
+  const wasPaid = order.paymentStatus === "paid";
   await db.update(ordersTable).set({
     paymentStatus,
     metadata: { ...meta, ...gatewayMeta, retryCount, lastRetryAt: new Date().toISOString() },
   }).where(eq(ordersTable.id, orderId));
+
+  if (!wasPaid && paymentStatus === "paid") {
+    const [updated] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+    if (updated) {
+      await recordOrderPaymentInLedger({
+        restaurantId: updated.restaurantId,
+        order: updated,
+        method: updated.paymentMethod || method,
+        reference: typeof gatewayMeta.utr === "string" ? gatewayMeta.utr : null,
+        performedBy: "Super Admin retry",
+      });
+    }
+  }
+
   await logPlatformAudit(req, "Payment Retry", "Payments", req.params.id);
   res.json({ success: true, retryCount, paymentStatus });
 });
@@ -902,13 +939,16 @@ router.get("/superadmin/refunds", ...admin, async (_req, res) => {
 
   const dbRefunds = rows.map(({ refund, vendorName }) => ({
     id: `REF-${refund.id}`, orderId: refund.orderId ? `ORD-${refund.orderId}` : "—",
+    vendorId: String(refund.restaurantId),
     vendorName, customerName: refund.customerName ?? "Guest",
     amount: parseFloat(String(refund.amount)), reason: refund.reason ?? "",
     status: refund.status, requestedAt: refund.requestedAt.toISOString(), type: refund.refundType,
   }));
 
   const orderRefunds = fromOrders.map(({ order, vendorName }) => ({
-    id: `REF-ORD-${order.id}`, orderId: `ORD-${order.id}`, vendorName,
+    id: `REF-ORD-${order.id}`, orderId: `ORD-${order.id}`,
+    vendorId: String(order.restaurantId),
+    vendorName,
     customerName: order.customerName ?? "Guest", amount: parseFloat(String(order.total)),
     reason: order.cancelledReason ?? "Order refunded", status: "completed",
     requestedAt: order.updatedAt.toISOString(), type: "full",
@@ -949,6 +989,7 @@ router.get("/superadmin/support", ...admin, async (_req, res) => {
 
   res.json(tickets.map(({ ticket, vendorName }) => ({
     id: `TKT-${ticket.id}`,
+    vendorId: ticket.restaurantId != null ? String(ticket.restaurantId) : null,
     vendorName: vendorName ?? ticket.guestName ?? "Guest",
     subject: ticket.subject ?? ticket.message.slice(0, 80),
     priority: ticket.priority,

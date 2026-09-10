@@ -217,7 +217,7 @@ export const FEATURE_MODULES: FeatureModule[] = [
     minPlan: "pro",
   }),
   mod(29, "Cleaning & Hygiene Management", "Compliance", {
-    apiPath: "/cleaning-hygiene/board",
+    apiPath: "/hygiene/board",
     restaurantPaths: ["/restaurant/housekeeping"],
     linkedSystems: [44],
     minPlan: "pro",

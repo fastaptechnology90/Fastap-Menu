@@ -5,7 +5,9 @@ import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-const ACTIVE_ORDER_STATUSES = ["pending", "confirmed", "preparing", "ready", "served", "billing"];
+// Include the "just arrived" aliases the guest/web paths write — without `new` /
+// `accepted`, a fresh ticket with no currentOrderId link never showed on the floor map.
+const ACTIVE_ORDER_STATUSES = ["pending", "new", "confirmed", "accepted", "preparing", "ready", "serving", "served", "billing"];
 
 type OrderItem = { name?: string; quantity?: number };
 

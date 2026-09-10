@@ -54,14 +54,84 @@ router.get("/public/reservations/slots", async (req, res): Promise<void> => {
   });
 });
 
+function phoneDigits(raw: unknown): string {
+  return String(raw ?? "").replace(/\D/g, "");
+}
+
+/** Same person whether they typed 98765…, +91 98765…, or 9198765…. */
+function phonesMatch(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const shortA = a.length > 10 ? a.slice(-10) : a;
+  const shortB = b.length > 10 ? b.slice(-10) : b;
+  return shortA.length >= 8 && shortA === shortB;
+}
+
+/**
+ * "My Bookings".
+ *
+ * `restaurantId` used to be mandatory, which made this the guest's bookings *at the venue
+ * whose QR they are currently standing in front of* rather than their bookings. A guest
+ * who opened Bookings from the profile — no scan, no venue in context — got a 400 and an
+ * empty list, and a booking made at one venue was invisible from any other.
+ *
+ * It is now optional, and the venue's name travels with each row so a list spanning two
+ * venues can be read. Scoping is unchanged where it is given, so the in-venue call
+ * behaves exactly as before.
+ *
+ * Identification is still the phone number on the booking, or the signed-in guest's own
+ * number. That is the same test as before; dropping the venue filter does not widen who
+ * can be looked up, only how much of one person's own history comes back at once.
+ */
 router.get("/public/reservations", async (req, res): Promise<void> => {
-  const phone = req.query.phone as string;
   const restaurantId = parseInt(String(req.query.restaurantId || "0"), 10);
-  if (!phone || !restaurantId) { res.status(400).json({ error: "phone and restaurantId required" }); return; }
-  const list = await db.select().from(reservationsTable).where(
-    and(eq(reservationsTable.restaurantId, restaurantId), eq(reservationsTable.customerPhone, phone)),
-  ).orderBy(desc(reservationsTable.createdAt));
-  res.json(list.map(r => ({ ...r, bookingToken: r.bookingToken ?? generateBookingToken(r.id) })));
+
+  // Prefer the phone the guest typed; fall back to the signed-in guest session so
+  // "My Bookings" can list without a second search step.
+  let phone = String(req.query.phone ?? "").trim();
+  if (!phone && req.session.guestUserId) {
+    const [guest] = await db.select().from(guestUsersTable)
+      .where(eq(guestUsersTable.id, req.session.guestUserId)).limit(1);
+    phone = String(guest?.phone ?? "").trim();
+  }
+  if (!phone) {
+    res.status(400).json({ error: "phone required (or sign in as a guest)" });
+    return;
+  }
+
+  const want = phoneDigits(phone);
+  const filterQ = String(req.query.q ?? "").trim().toLowerCase();
+
+  const rows = await db.select().from(reservationsTable)
+    .where(restaurantId ? eq(reservationsTable.restaurantId, restaurantId) : undefined)
+    .orderBy(desc(reservationsTable.date), desc(reservationsTable.createdAt));
+
+  let list = rows.filter(r => phonesMatch(phoneDigits(r.customerPhone), want));
+  if (filterQ) {
+    list = list.filter(r => {
+      const token = (r.bookingToken ?? generateBookingToken(r.id)).toLowerCase();
+      return token.includes(filterQ)
+        || String(r.id).includes(filterQ)
+        || String(r.date ?? "").includes(filterQ)
+        || String(r.customerName ?? "").toLowerCase().includes(filterQ)
+        || String(r.time ?? "").toLowerCase().includes(filterQ);
+    });
+  }
+
+  // One lookup for the handful of venues actually present, rather than a join on every row.
+  const venueIds = [...new Set(list.map(r => r.restaurantId))];
+  const venues = venueIds.length
+    ? await db.select({ id: restaurantsTable.id, name: restaurantsTable.name, slug: restaurantsTable.slug })
+        .from(restaurantsTable)
+    : [];
+  const venueById = new Map(venues.map(v => [v.id, v]));
+
+  res.json(list.map(r => ({
+    ...r,
+    bookingToken: r.bookingToken ?? generateBookingToken(r.id),
+    restaurantName: venueById.get(r.restaurantId)?.name ?? null,
+    restaurantSlug: venueById.get(r.restaurantId)?.slug ?? null,
+  })));
 });
 
 router.get("/public/reservation-slots", async (req, res): Promise<void> => {
@@ -107,10 +177,19 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
   const {
     restaurantId, customerName, customerPhone, customerEmail, date, time,
     guestCount, notes, reservationType, zone, specialRequest, depositAmount,
-    tableId, payDeposit, serviceId,
+    tableId, payDeposit: _payDepositIgnored, serviceId,
   } = req.body;
-  if (!restaurantId || !customerName || !customerPhone || !date || !time) {
-    res.status(400).json({ error: "Required fields missing" });
+  const missing: string[] = [];
+  if (!restaurantId) missing.push("restaurant");
+  if (!String(customerName ?? "").trim()) missing.push("name");
+  if (!String(customerPhone ?? "").trim()) missing.push("mobile number");
+  if (!date) missing.push("date");
+  if (!time) missing.push("time");
+  if (missing.length) {
+    res.status(400).json({
+      error: `Please fill mandatory fields: ${missing.join(", ")}`,
+      fields: missing,
+    });
     return;
   }
 
@@ -161,9 +240,12 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
     zone: zone ?? null,
     specialRequest: specialRequest ?? null,
     depositAmount: String(deposit),
-    depositStatus: deposit > 0 ? (payDeposit ? "paid" : "pending") : "none",
+    // Client `payDeposit: true` used to mark the deposit paid with no money moving.
+    // Online deposit is refused on POST /:id/deposit until a gateway capture exists —
+    // create always leaves deposit pending when one is required.
+    depositStatus: deposit > 0 ? "pending" : "none",
     tableId: tableId ?? null,
-    status: deposit > 0 && !payDeposit ? "pending" : "confirmed",
+    status: deposit > 0 ? "pending" : "confirmed",
   }).returning();
 
   const token = generateBookingToken(reservation.id);
@@ -184,7 +266,7 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
       price: svc?.price ?? "0",
       notes: specialRequest ?? notes,
       status: "booked",
-      paymentStatus: payDeposit ? "paid" : "pending",
+      paymentStatus: "pending",
     }).catch(() => {});
   }
 
@@ -194,6 +276,9 @@ router.post("/public/reservations", async (req, res): Promise<void> => {
     restaurantName: venue.name,
     depositRequired: deposit,
     depositStatus: updated?.depositStatus,
+    depositNote: deposit > 0
+      ? "Deposit is due at the venue (or via the deposit endpoint once online payments are live). It is not marked paid on booking."
+      : undefined,
   });
 });
 
@@ -211,16 +296,16 @@ async function loadOwnedReservation(req: Request, id: number) {
   const [reservation] = await db.select().from(reservationsTable).where(eq(reservationsTable.id, id));
   if (!reservation) return null;
 
-  const claimedPhone = String(req.body?.phone ?? req.query?.phone ?? "").replace(/\D/g, "");
-  const bookedPhone = String(reservation.customerPhone ?? "").replace(/\D/g, "");
-  if (claimedPhone && bookedPhone && claimedPhone === bookedPhone) return reservation;
+  const claimedPhone = phoneDigits(req.body?.phone ?? req.query?.phone ?? "");
+  const bookedPhone = phoneDigits(reservation.customerPhone);
+  // Same normalization as GET /public/reservations — +91 vs local 10-digit must both own.
+  if (phonesMatch(claimedPhone, bookedPhone)) return reservation;
 
   const guestUserId = req.session.guestUserId;
   if (guestUserId) {
     const [guest] = await db.select().from(guestUsersTable).where(eq(guestUsersTable.id, guestUserId)).limit(1);
     if (guest) {
-      const guestPhone = String(guest.phone ?? "").replace(/\D/g, "");
-      if (guestPhone && bookedPhone && guestPhone === bookedPhone) return reservation;
+      if (phonesMatch(phoneDigits(guest.phone), bookedPhone)) return reservation;
       if (guest.email && reservation.customerEmail && guest.email === reservation.customerEmail) return reservation;
     }
   }

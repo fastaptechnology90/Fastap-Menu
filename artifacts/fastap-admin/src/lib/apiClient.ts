@@ -156,8 +156,14 @@ export const api = {
       request<{ updated: number; action: string }>("/superadmin/vendors/bulk-action", { method: "POST", body: JSON.stringify({ vendorIds, action }) }),
   },
   payments: {
-    list: (params?: { status?: string; limit?: number }) => {
-      const qs = params ? "?" + new URLSearchParams(params as any).toString() : "";
+    list: (params?: { status?: string; limit?: number; vendorId?: number | string }) => {
+      const qs = params ? "?" + new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null && v !== "")
+            .map(([k, v]) => [k, String(v)]),
+        ),
+      ).toString() : "";
       return request<Payment[]>(`/superadmin/payments${qs}`);
     },
     get: (id: string) => request<PaymentDetail>(`/superadmin/payments/${id}`),
@@ -192,7 +198,12 @@ export const api = {
     update: (id: string, data: any) => request<any>(`/superadmin/roles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   },
   auditLogs: {
-    list: () => request<AuditLog[]>("/superadmin/audit-logs"),
+    list: (params?: { vendorId?: number | string }) => {
+      const qs = params?.vendorId != null && params.vendorId !== ""
+        ? `?vendorId=${encodeURIComponent(String(params.vendorId))}`
+        : "";
+      return request<AuditLog[]>(`/superadmin/audit-logs${qs}`);
+    },
   },
   plans: {
     list: () => request<Plan[]>("/superadmin/plans"),
@@ -630,13 +641,28 @@ export interface KYCRecord {
 }
 
 export interface Refund {
-  id: string; orderId: string; vendorName: string; customerName: string;
-  amount: number; reason: string; status: string; requestedAt: string; type: string;
+  id: string;
+  orderId: string;
+  vendorId?: string | null;
+  vendorName: string;
+  customerName: string;
+  amount: number;
+  reason: string;
+  status: string;
+  requestedAt: string;
+  type: string;
 }
 
 export interface SupportTicket {
-  id: string; vendorName: string; subject: string; priority: string;
-  status: string; createdAt: string; assignedTo: string | null; slaDeadline: string;
+  id: string;
+  vendorId?: string | null;
+  vendorName: string;
+  subject: string;
+  priority: string;
+  status: string;
+  createdAt: string;
+  assignedTo: string | null;
+  slaDeadline: string;
 }
 
 export interface Coupon {
@@ -852,6 +878,7 @@ export interface CreateVendorData {
 export interface Payment {
   id: string;
   orderId: string;
+  vendorId?: string;
   vendorName: string;
   grossAmount: number;
   commission: number;
@@ -859,6 +886,8 @@ export interface Payment {
   paymentMode: string;
   status: string;
   dateTime: string;
+  /** Same paid-order rule as dashboard / settlements — unpaid rows must not inflate revenue. */
+  isPaid?: boolean;
 }
 
 export interface Settlement {

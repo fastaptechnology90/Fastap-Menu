@@ -5,8 +5,8 @@ import { getSettingsSection } from "../lib/restaurant-settings.js";
 import { parseDeviceInfo } from "../lib/guestAuthLogic.js";
 import {
   getDigitalExperienceCatalog, mapCampaignToOffer,
-  mapSignageToBanners, getPromotionsConfig, spinWheel,
-  getFestivalThemes, getSeasonalAnimations,
+  mapSignageToBanners, getPromotionsConfig, spinWheel, claimOffer,
+  getFestivalThemes, getSeasonalAnimations, PRIZES_COLLECTABLE,
 } from "../lib/digitalExperienceLogic.js";
 
 const router: IRouter = Router();
@@ -91,31 +91,34 @@ router.get("/public/digital-experience/promotions/:slug", async (req, res): Prom
 router.post("/public/digital-experience/promotions/spin", async (req, res): Promise<void> => {
   const { key, digital, guestId } = await loadGuestDigital(req);
   const result = spinWheel(key);
-  const next = {
-    ...digital,
-    spinHistory: [{ prize: result.prize, at: new Date().toISOString() }, ...(digital.spinHistory ?? [])].slice(0, 20),
-  };
-  if (guestId) await saveGuestDigital(guestId, next);
-  res.json(result);
+  // Do not persist a "win" when prizes cannot be collected — that list looked like a wallet.
+  if (PRIZES_COLLECTABLE && guestId && result.prize) {
+    const next = {
+      ...digital,
+      spinHistory: [{ prize: result.prize, at: new Date().toISOString() }, ...(digital.spinHistory ?? [])].slice(0, 20),
+    };
+    await saveGuestDigital(guestId, next);
+  }
+  res.status(PRIZES_COLLECTABLE ? 200 : 503).json(result);
 });
 
 router.post("/public/digital-experience/promotions/claim", async (req, res): Promise<void> => {
   const offerId = String(req.body.offerId ?? "");
   if (!offerId) { res.status(400).json({ error: "offerId required" }); return; }
   const { key, digital, guestId } = await loadGuestDigital(req);
+  const result = claimOffer(offerId, key);
+  if (!result.success || !PRIZES_COLLECTABLE) {
+    res.status(PRIZES_COLLECTABLE ? 200 : 503).json(result);
+    return;
+  }
   const claimKey = `${key}:${offerId}`;
-  const already = (digital.claimedOffers ?? []).includes(claimKey);
-  if (!already && guestId) {
+  if (!result.alreadyClaimed && guestId) {
     await saveGuestDigital(guestId, {
       ...digital,
       claimedOffers: [...(digital.claimedOffers ?? []), claimKey],
     });
   }
-  res.json({
-    success: true,
-    alreadyClaimed: already,
-    message: already ? "Offer already in your wallet" : "Offer claimed — apply at checkout",
-  });
+  res.json(result);
 });
 
 router.get("/public/digital-experience/themes", (_req, res) => {

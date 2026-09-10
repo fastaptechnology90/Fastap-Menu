@@ -7,6 +7,7 @@ import { getSettingsSection } from "../lib/restaurant-settings";
 import { autoAssignRoomServiceRequest } from "../lib/staff-auto-assignment.js";
 import { computeRoomFolio, mergeRoomBilling, readRoomBilling } from "../lib/hotel-folio.js";
 import { parseMoney } from "../lib/payment-calculations.js";
+import { broadcastEvent, broadcastOrderEvent } from "../lib/sse.js";
 
 const router: IRouter = Router();
 
@@ -223,6 +224,21 @@ router.post("/restaurants/:restaurantId/room-service", requireAuth, async (req, 
         notes: notes ?? null, paymentMethod: paymentMethod ?? "room_bill", paymentStatus: "pending",
         orderSource: "room_service",
         metadata: { roomNumber, roomServiceRequestId: request.id, folioMirror: true, source: type },
+      }).returning().then(([order]) => {
+        if (!order) return;
+        broadcastEvent("new_order", {
+          id: order.id,
+          restaurantId: id,
+          tableName: order.tableName,
+          total: order.total,
+          status: "pending",
+          type: "room_service",
+        });
+        broadcastOrderEvent(order.id, "order_status", {
+          id: order.id,
+          status: "pending",
+          tableName: order.tableName,
+        });
       });
     } catch (e) { console.error("room-service kitchen mirror order failed", e); }
   }

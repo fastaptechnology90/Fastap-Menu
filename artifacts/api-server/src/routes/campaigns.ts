@@ -24,10 +24,12 @@ router.get("/restaurants/:restaurantId/campaigns", requireAuth, async (req, res)
     return customers.length;
   }
 
+  // `sent` used to equal the segment size whenever isActive — so an owner saw
+  // "247 sent" with no WhatsApp/SMS transport. Until delivery is logged, report zero.
   res.json(campaigns.map(c => ({
     ...c,
     audience: segmentCount(c.targetSegment),
-    sent: c.isActive ? segmentCount(c.targetSegment) : 0,
+    sent: 0,
     opened: 0,
     clicks: 0,
     revenue: 0,

@@ -18,7 +18,8 @@ type Campaign = {
 function mapCampaign(c: any): Campaign {
   const channel = c.type?.includes("sms") ? "sms" : c.type?.includes("email") ? "email" : c.type?.includes("push") ? "push" : "whatsapp";
   let status = "draft";
-  if (c.isActive) status = c.endDate && new Date(c.endDate) < new Date() ? "sent" : "active";
+  // "sent" used to mean "active and past end date" — not that messages left the building.
+  if (c.isActive) status = c.endDate && new Date(c.endDate) < new Date() ? "ended" : "active";
   else status = "draft";
   if (c.startDate && new Date(c.startDate) > new Date()) status = "scheduled";
   return {
@@ -52,7 +53,7 @@ const CHANNEL_CFG: Record<string,{icon:LucideIcon;color:string;bg:string}> = {
 const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
   active:    {label:"Active",   color:"text-success",bg:"bg-success-subtle"},
   scheduled: {label:"Scheduled",color:"text-info",   bg:"bg-info-subtle"},
-  sent:      {label:"Sent",     color:"text-success",   bg:"bg-success-subtle"},
+  ended:     {label:"Ended",    color:"text-muted-foreground", bg:"bg-muted"},
   draft:     {label:"Draft",    color:"text-muted-foreground",   bg:"bg-muted"},
   paused:    {label:"Paused",   color:"text-warning", bg:"bg-warning-subtle"},
 };
@@ -137,17 +138,20 @@ export default function MarketingAutomation() {
     } finally { setBusyId(null); }
   }
 
-  // Send Now — activate a scheduled campaign immediately (clear future start date)
+  // Activate now — marks the campaign active. No WhatsApp/SMS/email transport exists yet.
   async function handleSendNow(c: Campaign) {
     if (!restaurantId) return;
     setBusyId(c.id);
     try {
       await marketingApi.updateCampaign(restaurantId, Number(c.id), { isActive: true, startDate: new Date().toISOString() });
       await loadCampaigns();
-      toast({ title: "Campaign sent", description: `“${c.name}” is now sending.` });
+      toast({
+        title: "Campaign activated",
+        description: `“${c.name}” is marked active. Messages are not delivered — no WhatsApp, SMS or email transport is connected.`,
+      });
     } catch (e) {
       console.error(e);
-      toast({ title: "Failed to send campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      toast({ title: "Failed to activate campaign", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
     } finally { setBusyId(null); }
   }
 
@@ -234,9 +238,6 @@ export default function MarketingAutomation() {
 
   const totalSent = campaigns.reduce((s,c)=>s+c.sent,0);
   const totalRevenue = campaigns.reduce((s,c)=>s+c.revenue,0);
-  const sentCampaigns = campaigns.filter(c=>c.sent>0);
-  const avgOpenRate = sentCampaigns.length ? sentCampaigns.reduce((s,c)=>s+(c.opened/c.sent),0) / sentCampaigns.length : 0;
-  const avgCTR = sentCampaigns.length ? sentCampaigns.reduce((s,c)=>s+(c.clicks/c.sent),0) / sentCampaigns.length : 0;
 
   if (loading && campaigns.length === 0) {
     return <div className="p-6 text-center text-muted-foreground text-sm">Loading campaigns…</div>;
@@ -247,20 +248,27 @@ export default function MarketingAutomation() {
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-xl font-semibold">Marketing Automation</h1>
-          <p className="text-xs text-muted-foreground">Campaigns, triggers and customer engagement</p>
+          <p className="text-xs text-muted-foreground">Campaign drafts and schedules — delivery is not connected yet</p>
         </div>
         <button onClick={()=>setShowAdd(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-sm transition-colors">
           <Plus className="h-4 w-4"/>New Campaign
         </button>
       </div>
 
-      {/* KPIs */}
+      <div className="rounded-lg border border-warning-border bg-warning-subtle p-4">
+        <p className="text-sm font-semibold text-warning">No WhatsApp, SMS or email delivery</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Activating a campaign saves it as active on this venue. Nothing is messaged to guests until a transport is connected. Open and click rates stay at zero because sends are not logged.
+        </p>
+      </div>
+
+      {/* KPIs — counts of campaigns only; delivery metrics stay zero until a transport exists */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {label:"Total Sent",value:totalSent.toLocaleString(),icon:Send,color:"text-info",bg:"bg-info-subtle"},
-          {label:"Avg Open Rate",value:`${Math.round(avgOpenRate*100)}%`,icon:Bell,color:"text-success",bg:"bg-success-subtle"},
-          {label:"Avg Click Rate",value:`${Math.round(avgCTR*100)}%`,icon:Target,color:"text-muted-foreground",bg:"bg-muted"},
-          {label:"Revenue Driven",value:`₹${(totalRevenue/1000).toFixed(0)}K`,icon:TrendingUp,color:"text-primary",bg:"bg-primary/10"},
+          {label:"Campaigns",value:campaigns.length.toLocaleString(),icon:Megaphone,color:"text-info",bg:"bg-info-subtle"},
+          {label:"Active",value:campaigns.filter(c=>c.status==="active").length.toLocaleString(),icon:Zap,color:"text-success",bg:"bg-success-subtle"},
+          {label:"Messages delivered",value:"0",icon:Send,color:"text-muted-foreground",bg:"bg-muted"},
+          {label:"Tracked opens",value:"0",icon:Target,color:"text-muted-foreground",bg:"bg-muted"},
         ].map(s=>(
           <div key={s.label} className={`rounded-lg ${s.bg} border border-border p-4 flex items-center gap-3`}>
             <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}><s.icon className="h-5 w-5"/></div>
@@ -314,8 +322,8 @@ export default function MarketingAutomation() {
                   <div className="flex flex-col gap-2 shrink-0">
                     {c.status==="active"&&<button onClick={()=>setCampaignActive(c,false,"paused")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-warning-subtle text-warning text-xs font-semibold hover-elevate disabled:opacity-40">Pause</button>}
                     {c.status==="paused"&&<button onClick={()=>setCampaignActive(c,true,"resumed")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-success-subtle text-success text-xs font-semibold hover-elevate disabled:opacity-40">Resume</button>}
-                    {c.status==="draft"&&<button onClick={()=>setCampaignActive(c,true,"launched")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate disabled:opacity-40">Launch</button>}
-                    {c.status==="scheduled"&&<button onClick={()=>handleSendNow(c)} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 disabled:opacity-40">Send Now</button>}
+                    {c.status==="draft"&&<button onClick={()=>setCampaignActive(c,true,"activated")} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-info-subtle text-info text-xs font-semibold hover-elevate disabled:opacity-40">Activate</button>}
+                    {c.status==="scheduled"&&<button onClick={()=>handleSendNow(c)} disabled={busyId===c.id} className="px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-xs font-semibold hover:bg-primary/30 disabled:opacity-40">Activate now</button>}
                     <button onClick={()=>openEdit(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-muted text-muted-foreground text-xs font-semibold hover-elevate disabled:opacity-40"><Pencil className="h-3 w-3"/>Edit</button>
                     <button onClick={()=>handleDeleteCampaign(c)} disabled={busyId===c.id} className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg border border-danger-border bg-danger-subtle text-danger text-xs font-semibold hover-elevate disabled:opacity-40"><Trash2 className="h-3 w-3"/>Delete</button>
                   </div>
@@ -540,7 +548,7 @@ export default function MarketingAutomation() {
               <div className="flex gap-3">
                 <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-semibold">Cancel</button>
                 <button onClick={() => handleCreateCampaign(false)} className="px-4 py-2.5 rounded-lg border border-border bg-muted text-sm font-semibold">Save Draft</button>
-                <button onClick={() => handleCreateCampaign(true)} disabled={!newCampaign.name} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">Launch Campaign</button>
+                <button onClick={() => handleCreateCampaign(true)} disabled={!newCampaign.name} className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm disabled:opacity-40">Save & activate</button>
               </div>
             </div>
           </div>

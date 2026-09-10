@@ -27,7 +27,7 @@ export default function CashCounter() {
   const [transactions, setTransactions] = useState<{ id: string; type: string; amount: number; method: string; note: string; time: string }[]>([]);
   const [showClose, setShowClose] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
-  const [openBalance, setOpenBalance] = useState("5000");
+  const [openBalance, setOpenBalance] = useState("0");
   const [closing, setClosing] = useState(false);
   const [denom, setDenom] = useState(DEFAULT_DENOMINATION.map(d => ({ ...d })));
   const [tab, setTab] = useState<"shift" | "transactions" | "denominations">("shift");

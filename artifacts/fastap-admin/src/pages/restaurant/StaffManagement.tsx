@@ -211,14 +211,14 @@ export default function StaffManagement() {
   const SHIFTS = ["Morning (7AM-3PM)", "Afternoon (3PM-11PM)", "Night (11PM-7AM)", "Split (10AM-2PM, 6PM-10PM)"];
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
-      {/* Header */}
+    <div className="min-w-0 space-y-5">
+      {/* Header — RestaurantLayout already pads the page */}
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">Staff Management</h1>
           <p className="text-xs text-muted-foreground">{staff.filter(s => s.status === "active").length} active · {staff.filter(s => s.status === "on-break").length} on break · {staff.filter(s => s.status === "offline").length} offline</p>
         </div>
-        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors">
+        <button onClick={() => setAddMode(true)} className="flex min-h-10 w-full items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors sm:w-auto">
           <Plus className="h-4 w-4" /> Add Staff
         </button>
       </div>
@@ -231,18 +231,18 @@ export default function StaffManagement() {
           { label: "On Break", value: staff.filter(s => s.status === "on-break").length, icon: Coffee, color: "text-warning", bg: "bg-warning-subtle/40" },
           { label: "Orders Served", value: staff.reduce((s, m) => s + m.ordersServed, 0), icon: Receipt, color: "text-primary", bg: "bg-primary/10" },
         ].map(card => (
-          <div key={card.label} className={`rounded-lg ${card.bg} border border-border p-4`}>
+          <div key={card.label} className={`rounded-lg ${card.bg} border border-border p-3 sm:p-4`}>
             <card.icon className={`h-5 w-5 mb-2 ${card.color}`} />
-            <p className={`text-2xl font-semibold ${card.color}`}>{card.value}</p>
+            <p className={`text-xl sm:text-2xl font-semibold ${card.color}`}>{card.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{card.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+      <div className="flex min-w-0 max-w-full gap-1 overflow-x-auto overscroll-x-contain bg-muted p-1 rounded-lg no-scrollbar">
         {(["list", "schedule", "attendance"] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`min-h-10 shrink-0 px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             {tab}
           </button>
         ))}
@@ -252,29 +252,31 @@ export default function StaffManagement() {
       {activeTab === "list" && (
         <>
           {/* Filters */}
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0 w-full sm:flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input className="bg-muted border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground w-56" placeholder="Search staff..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input className="min-h-10 w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" placeholder="Search staff..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <select className="bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40 text-foreground" value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}>
+            <select className="min-h-10 w-full sm:w-auto bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40 text-foreground" value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}>
               <option value="all">All Roles</option>
               {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            {(["all", "active", "on-break", "offline"] as const).map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${statusFilter === s ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
-                {s === "all" ? "All" : s === "active" ? "Active" : s === "on-break" ? "Break" : "Offline"}
-              </button>
-            ))}
+            <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain no-scrollbar">
+              {(["all", "active", "on-break", "offline"] as const).map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)} className={`min-h-10 shrink-0 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${statusFilter === s ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                  {s === "all" ? "All" : s === "active" ? "Active" : s === "on-break" ? "Break" : "Offline"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loadError && (
-            <div role="alert" className="rounded-lg border border-danger-border bg-danger-subtle p-4 flex items-center justify-between gap-3">
-              <div>
+            <div role="alert" className="rounded-lg border border-danger-border bg-danger-subtle p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-danger">We could not load your team.</p>
                 <p className="text-xs text-danger">{loadError} This is not an empty roster.</p>
               </div>
-              <button onClick={loadStaff} className="shrink-0 px-3 py-1.5 rounded-lg bg-danger-subtle text-danger text-xs font-semibold">Try again</button>
+              <button onClick={loadStaff} className="shrink-0 min-h-10 px-3 py-2 rounded-lg bg-danger-subtle text-danger text-xs font-semibold">Try again</button>
             </div>
           )}
 
@@ -355,7 +357,7 @@ export default function StaffManagement() {
                     <p className="text-sm font-medium truncate">{s.name.split(" ")[0]}</p>
                     <p className="text-xs text-muted-foreground">{roleCfg.label}</p>
                   </div>
-                  <button onClick={() => openEditFor(s)} title="Edit shift / schedule" className="shrink-0 h-7 w-7 flex items-center justify-center rounded-lg text-primary hover:bg-primary/15 transition-colors">
+                  <button onClick={() => openEditFor(s)} title="Edit shift / schedule" className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-primary hover:bg-primary/15 transition-colors">
                     <Edit2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -382,11 +384,11 @@ export default function StaffManagement() {
 
       {/* Add Staff Modal */}
       {addMode && (
-        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card rounded-lg border border-border p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full max-w-md bg-card rounded-t-lg sm:rounded-lg border border-border p-5 space-y-4 max-h-[calc(100dvh-0.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Add Staff Member</h3>
-              <button onClick={() => setAddMode(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
+              <button type="button" className="flex h-10 w-10 items-center justify-center" onClick={() => setAddMode(false)} aria-label="Close"><X className="h-5 w-5 text-muted-foreground" /></button>
             </div>
             {[
               { key: "name", label: "Full Name", type: "text" },
@@ -400,17 +402,17 @@ export default function StaffManagement() {
                   type={f.type}
                   value={(addForm as any)[f.key]}
                   onChange={e => setAddForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
                 />
               </div>
             ))}
             <div>
               <label className="text-xs text-muted-foreground">Role</label>
-              <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
+              <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm">
                 {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
-            <button onClick={submitAddStaff} disabled={saving || !addForm.name || !addForm.email || addForm.password.length < 6} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-40">
+            <button type="button" onClick={submitAddStaff} disabled={saving || !addForm.name || !addForm.email || addForm.password.length < 6} className="min-h-11 w-full rounded-lg bg-primary py-3 text-sm font-semibold hover:bg-primary/90 disabled:opacity-40">
               {saving ? "Creating…" : "Create Staff"}
             </button>
           </div>
@@ -419,13 +421,13 @@ export default function StaffManagement() {
 
       {/* Staff Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card rounded-lg border border-border max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4">
+          <div className="max-h-[calc(100dvh-0.5rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-lg border border-border bg-card sm:max-h-[90vh] sm:rounded-lg">
+            <div className="flex items-center justify-between border-b border-border p-4 sm:p-5">
               <h3 className="font-semibold">Staff Profile</h3>
-              <button onClick={() => setSelected(null)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
+              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg" onClick={() => setSelected(null)} aria-label="Close"><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="space-y-4 p-4 sm:p-5">
               <div className="flex items-center gap-4">
                 <div className={`h-16 w-16 rounded-lg bg-muted flex items-center justify-center ${roleCfgOf(selected.role).color}`}>
                   {(() => { const RoleIcon = roleCfgOf(selected.role).icon; return <RoleIcon className="h-8 w-8" />; })()}
@@ -466,12 +468,12 @@ export default function StaffManagement() {
                   </div>
                 </div>
               )}
-              <div className="flex gap-2">
-                <button onClick={deleteStaff} disabled={deleting} className="py-3 px-4 rounded-lg border border-danger-border bg-danger-subtle text-danger hover-elevate text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40" title="Remove staff">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={deleteStaff} disabled={deleting} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-sm font-semibold text-danger hover-elevate disabled:opacity-40 sm:order-first" title="Remove staff">
                   <Trash2 className="h-4 w-4" /> {deleting ? "Removing…" : "Remove"}
                 </button>
-                <button onClick={() => setSelected(null)} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted text-sm font-semibold">Close</button>
-                <button onClick={openEditStaff} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setSelected(null)} className="min-h-11 flex-1 rounded-lg border border-border py-3 text-sm font-semibold hover:bg-muted">Close</button>
+                <button type="button" onClick={openEditStaff} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-semibold hover:bg-primary/90">
                   <Edit2 className="h-4 w-4" /> Edit Profile
                 </button>
               </div>
@@ -482,11 +484,11 @@ export default function StaffManagement() {
 
       {/* Edit Staff Modal */}
       {editMode && selected && (
-        <div className="fixed inset-0 z-[60] bg-foreground/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card rounded-lg border border-border p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold flex items-center gap-2"><Edit2 className="h-4 w-4" /> Edit {selected.name}</h3>
-              <button onClick={() => setEditMode(false)}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/40 p-0 sm:items-center sm:p-4">
+          <div className="max-h-[calc(100dvh-0.5rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-t-lg border border-border bg-card p-4 sm:max-h-[90vh] sm:rounded-lg sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="flex min-w-0 items-center gap-2 font-semibold"><Edit2 className="h-4 w-4 shrink-0" /> <span className="truncate">Edit {selected.name}</span></h3>
+              <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" onClick={() => setEditMode(false)} aria-label="Close"><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
             </div>
             {[
               { key: "name", label: "Full Name", type: "text" },
@@ -500,31 +502,31 @@ export default function StaffManagement() {
                   type={f.type}
                   value={(editForm as any)[f.key]}
                   onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary/40"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm focus:border-primary/40 focus:outline-none"
                 />
               </div>
             ))}
             <div>
               <label className="text-xs text-muted-foreground">Role</label>
-              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
+              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value as StaffRole }))} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm">
                 {Object.entries(ROLE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Shift (by time)</label>
-              <select value={editForm.shift} onChange={e => setEditForm(p => ({ ...p, shift: e.target.value }))} className="w-full mt-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm">
+              <select value={editForm.shift} onChange={e => setEditForm(p => ({ ...p, shift: e.target.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm">
                 {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
                 {/* keep whatever was stored even if it's an old plain label */}
                 {editForm.shift && !SHIFTS.includes(editForm.shift) && <option value={editForm.shift}>{editForm.shift}</option>}
               </select>
-              <p className="text-2xs text-muted-foreground mt-1">This is the base / default shift — used when a day has no specific setting.</p>
+              <p className="mt-1 text-2xs text-muted-foreground">This is the base / default shift — used when a day has no specific setting.</p>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Weekly schedule (day-wise)</label>
               <p className="text-2xs text-muted-foreground mb-1.5">Set a different shift for each day — e.g. Monday Night, Tuesday Morning. "Off" means a day off.</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {DAYS.map(d => (
-                  <div key={d} className="flex items-center gap-2 bg-card border border-border rounded-lg px-2 py-1.5">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {DAYS.map(d => (
+                  <div key={d} className="flex items-center gap-2 bg-card border border-border rounded-lg px-2 py-1.5 min-w-0">
                     <span className="text-xs font-semibold text-muted-foreground w-8 shrink-0">{d}</span>
                     <select
                       value={editForm.weeklySchedule[d] || defaultDayShift({ shift: editForm.shift, role: editForm.role }, d)}

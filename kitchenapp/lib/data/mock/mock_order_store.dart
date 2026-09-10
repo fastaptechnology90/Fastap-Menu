@@ -111,10 +111,40 @@ class MockOrderStore {
     String? targetSection,
     String? itemName,
     String? modification,
+    String? paymentReference,
   }) {
     final order = findById(id);
     if (order == null) {
       throw StateError('Order not found');
+    }
+
+    // Same rule as live API: cash can be marked paid by staff attestation;
+    // online methods need a UPI ID / UTR / card RRN before they count as paid.
+    if (action == 'collect' || action.startsWith('collect_')) {
+      final method = action.contains('_') ? action.split('_').last : 'cash';
+      const onlineAtTable = {
+        'upi',
+        'card',
+        'nfc',
+        'qr',
+        'wallet',
+        'netbanking',
+      };
+      final ref = (paymentReference ?? '').trim();
+      if (onlineAtTable.contains(method) && ref.isEmpty) {
+        throw ArgumentError('PAYMENT_REFERENCE_REQUIRED');
+      }
+      order['paymentStatus'] = 'paid';
+      order['paymentMethod'] = method;
+      if (ref.isNotEmpty) {
+        order['paymentReference'] = ref;
+        if (method == 'upi') {
+          order['upiId'] = ref;
+        } else {
+          order['utr'] = ref;
+        }
+      }
+      return Map<String, dynamic>.from(order);
     }
 
     switch (action) {
@@ -166,6 +196,15 @@ class MockOrderStore {
           modified[itemName] = modification;
           order['modifiedItems'] = modified;
         }
+      case 'serve':
+        order['status'] = 'serving';
+      case 'deliver':
+        order['status'] = 'served';
+      case 'request_payment':
+        order['billRequested'] = true;
+      case 'clear_table':
+        order['status'] = 'completed';
+        order['tableCleared'] = true;
       default:
         throw ArgumentError('Unknown processing action: $action');
     }

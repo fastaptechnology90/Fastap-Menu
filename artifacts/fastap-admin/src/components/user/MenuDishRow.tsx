@@ -96,7 +96,10 @@ export function MenuDishRow({
         </button>
       </div>
 
-      <div className="relative w-[104px] shrink-0">
+      {/* The add control overlaps the image by a few pixels but stays IN FLOW, so the row
+          grows to contain it. Positioned absolutely it hung past the row's own bottom
+          padding and sat on top of the next dish. */}
+      <div className="w-[104px] shrink-0">
         <button
           type="button"
           onClick={onOpen}
@@ -114,7 +117,7 @@ export function MenuDishRow({
         </button>
 
         {!readOnly && (
-          <div className="absolute -bottom-3 left-1/2 w-[92px] -translate-x-1/2">
+          <div className="relative z-10 -mt-3 mx-auto w-[92px]">
             {quantity > 0 ? (
               <div className="flex h-9 items-center justify-between rounded-md border border-primary bg-card px-1 shadow-sm">
                 <button
@@ -174,7 +177,7 @@ export function MenuDishRow({
           </div>
         )}
         {!readOnly && canCustomise && quantity === 0 && orderedQty === 0 && (
-          <p className="absolute -bottom-7 left-0 w-full text-center text-[10px] text-muted-foreground">
+          <p className="mt-1 w-full text-center text-[10px] text-muted-foreground">
             customisable
           </p>
         )}

@@ -5,17 +5,40 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { DataTable } from "@/components/shared/DataTable";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { api } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2, TrendingUp, Bell } from "lucide-react";
 import { PageHeader } from "@/components/shared/Page";
+
+type SlaTile = {
+  name: string;
+  target: string;
+  current: string;
+  /** null = not measured — never treat as 0% breach or 100% healthy */
+  compliance: number | null;
+  icon: React.ReactNode;
+};
+
+function complianceLabel(c: number | null) {
+  if (c == null) return { text: "Not measured", variant: "secondary" as const, tone: "text-muted-foreground" };
+  if (c >= 95) return { text: "On track", variant: "default" as const, tone: "text-success" };
+  if (c >= 90) return { text: "Warning", variant: "outline" as const, tone: "text-warning" };
+  return { text: "Breached", variant: "destructive" as const, tone: "text-danger" };
+}
+
+/** Breach rows use display ids like TKT-12; the escalate API needs the numeric ticket id. */
+function ticketIdFromBreach(id: string) {
+  const m = String(id).match(/(\d+)/);
+  return m ? m[1] : id;
+}
 
 export default function SLAMonitoring() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const escalateMutation = useMutation({
-    mutationFn: (ticketId: string) => api.support.escalate(ticketId),
+    mutationFn: (ticketId: string) => api.support.escalate(ticketIdFromBreach(ticketId)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["sla"] }); toast({ title: "Ticket escalated" }); },
     onError: () => toast({ title: "Escalation failed", variant: "destructive" }),
   });
@@ -26,24 +49,26 @@ export default function SLAMonitoring() {
     refetchInterval: 60000,
   });
 
-  const slaTypes = [
-    { name: "Support SLA", target: "< 4 hours", current: sla?.supportAvg || "—", compliance: sla?.supportCompliance || 0, icon: <Clock className="h-4 w-4 text-info" /> },
-    { name: "Refund SLA", target: "< 24 hours", current: sla?.refundAvg || "—", compliance: sla?.refundCompliance || 0, icon: <Clock className="h-4 w-4 text-success" /> },
-    { name: "Settlement SLA", target: "< 48 hours", current: sla?.settlementAvg || "—", compliance: sla?.settlementCompliance || 0, icon: <Clock className="h-4 w-4 text-warning" /> },
-    { name: "Downtime SLA", target: "99.9% uptime", current: sla?.uptimeActual || "—", compliance: sla?.uptimeCompliance || 0, icon: <CheckCircle className="h-4 w-4 text-muted-foreground" /> },
+  const slaTypes: SlaTile[] = [
+    { name: "Support SLA", target: "< 4 hours", current: sla?.supportAvg || "—", compliance: sla?.supportCompliance ?? null, icon: <Clock className="h-4 w-4 text-info" /> },
+    { name: "Refund SLA", target: "< 24 hours", current: sla?.refundAvg || "—", compliance: sla?.refundCompliance ?? null, icon: <Clock className="h-4 w-4 text-success" /> },
+    { name: "Settlement SLA", target: "< 48 hours", current: sla?.settlementAvg || "—", compliance: sla?.settlementCompliance ?? null, icon: <Clock className="h-4 w-4 text-warning" /> },
+    // Uptime is not recorded — never show a compliance % or "Healthy" badge for it.
+    { name: "Platform uptime", target: "Not instrumented", current: sla?.uptimeActual || "Not measured", compliance: null, icon: <CheckCircle className="h-4 w-4 text-muted-foreground" /> },
   ];
 
   const breaches = sla?.breaches || [];
   const warnings = sla?.warnings || [];
   const totalBreaches = breaches.length;
   const criticalBreaches = breaches.filter((b: any) => b.severity === "critical").length;
-  const avgCompliance = slaTypes.reduce((s, t) => s + t.compliance, 0) / slaTypes.length;
+  const measured = slaTypes.map(t => t.compliance).filter((c): c is number => c != null);
+  const avgCompliance = measured.length ? measured.reduce((s, t) => s + t, 0) / measured.length : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="SLA Monitoring System"
-        description="Track refund SLA, support SLA, settlement SLA, and uptime SLA in real-time."
+        title="SLA Monitoring"
+        description="Support ticket deadlines and settlement due dates from live records. Uptime and refund due-by are not measured here."
         actions={
           <>
             <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
@@ -53,41 +78,61 @@ export default function SLAMonitoring() {
         }
       />
 
+      <Alert variant="warning">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Only measured figures appear as percentages</AlertTitle>
+        <AlertDescription>
+          Refund SLA has no due-by date on the record, and platform uptime is not logged — those tiles
+          stay “Not measured”. A blank compliance is not an all-clear.
+        </AlertDescription>
+      </Alert>
+
       <div className="grid gap-4 md:grid-cols-4">
-        <KpiCard title="Overall Compliance" value={`${avgCompliance.toFixed(1)}%`} icon={<TrendingUp className="h-4 w-4 text-success" />} />
+        <KpiCard
+          title="Measured compliance"
+          value={avgCompliance != null ? `${avgCompliance.toFixed(1)}%` : "—"}
+          icon={<TrendingUp className="h-4 w-4 text-success" />}
+        />
         <KpiCard title="Active Warnings" value={warnings.length} icon={<Bell className="h-4 w-4 text-warning" />} />
         <KpiCard title="SLA Breaches" value={totalBreaches} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
         <KpiCard title="Critical Breaches" value={criticalBreaches} icon={<XCircle className="h-4 w-4 text-danger" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {slaTypes.map((slaType, i) => (
-          <Card key={i} className={`${slaType.compliance < 90 ? "border-danger-border" : slaType.compliance < 95 ? "border-warning-border" : ""}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                {slaType.icon}
-                <Badge variant={slaType.compliance >= 95 ? "default" : slaType.compliance >= 90 ? "outline" : "destructive"} className="text-xs">
-                  {slaType.compliance >= 95 ? "Healthy" : slaType.compliance >= 90 ? "Warning" : "Breached"}
-                </Badge>
-              </div>
-              <CardTitle className="text-base mt-2">{slaType.name}</CardTitle>
-              <CardDescription className="text-xs">Target: {slaType.target}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Avg Response</span>
-                  <span className="font-bold">{slaType.current}</span>
+        {slaTypes.map((slaType, i) => {
+          const label = complianceLabel(slaType.compliance);
+          return (
+            <Card key={i} className={`${slaType.compliance != null && slaType.compliance < 90 ? "border-danger-border" : slaType.compliance != null && slaType.compliance < 95 ? "border-warning-border" : ""}`}>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  {slaType.icon}
+                  <Badge variant={label.variant} className="text-xs">{label.text}</Badge>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Compliance</span>
-                  <span className={`font-bold ${slaType.compliance >= 95 ? "text-success" : slaType.compliance >= 90 ? "text-warning" : "text-danger"}`}>{slaType.compliance}%</span>
+                <CardTitle className="text-base mt-2">{slaType.name}</CardTitle>
+                <CardDescription className="text-xs">Target: {slaType.target}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className="font-bold">{slaType.current}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Compliance</span>
+                    <span className={`font-bold ${label.tone}`}>
+                      {slaType.compliance != null ? `${slaType.compliance}%` : "—"}
+                    </span>
+                  </div>
+                  {slaType.compliance != null ? (
+                    <Progress value={slaType.compliance} className={`h-2 mt-2 ${slaType.compliance < 90 ? "[&>div]:bg-danger" : slaType.compliance < 95 ? "[&>div]:bg-warning" : ""}`} />
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-2">No sensor or deadline to score against.</p>
+                  )}
                 </div>
-                <Progress value={slaType.compliance} className={`h-2 mt-2 ${slaType.compliance < 90 ? "[&>div]:bg-danger" : slaType.compliance < 95 ? "[&>div]:bg-warning" : ""}`} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -114,7 +159,7 @@ export default function SLAMonitoring() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0" disabled={escalateMutation.isPending} onClick={() => escalateMutation.mutate(breach.id)}>Escalate</Button>
                   </div>
                 ))}
-                {breaches.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-success">No SLA breaches detected</p>}
+                {breaches.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">No open support tickets past their SLA deadline</p>}
               </div>
             )}
           </CardContent>
@@ -139,7 +184,7 @@ export default function SLAMonitoring() {
                     </div>
                   </div>
                 ))}
-                {warnings.length === 0 && <p className="text-center text-sm text-muted-foreground py-6 text-success">No SLA warnings</p>}
+                {warnings.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">No tickets within 4 hours of deadline</p>}
               </div>
             )}
           </CardContent>
@@ -147,20 +192,20 @@ export default function SLAMonitoring() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>SLA Breach History</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Recent resolved tickets (timing)</CardTitle></CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
             <DataTable data={sla?.history || []} pageSize={10} columns={[
-              { header: "Breach ID", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
+              { header: "Ticket", cell: (row: any) => <span className="font-mono text-xs">{row.id}</span> },
               { header: "SLA Type", cell: (row: any) => <span className="font-medium">{row.slaType}</span> },
-              { header: "Vendor / Ticket", cell: (row: any) => <span className="text-sm">{row.reference}</span> },
+              { header: "Subject", cell: (row: any) => <span className="text-sm">{row.reference}</span> },
               { header: "Target", cell: (row: any) => <span className="text-muted-foreground text-sm">{row.target}</span> },
-              { header: "Actual", cell: (row: any) => <span className="text-danger font-medium">{row.actual}</span> },
-              { header: "Overdue By", cell: (row: any) => <span className="text-danger font-bold">{row.overdueBy}</span> },
+              { header: "Actual", cell: (row: any) => <span className="font-medium">{row.actual}</span> },
+              { header: "Over target", cell: (row: any) => <span className={row.overdueBy !== "—" ? "text-danger font-bold" : "text-muted-foreground"}>{row.overdueBy}</span> },
               { header: "Severity", cell: (row: any) => <Badge variant={row.severity === "critical" ? "destructive" : "outline"} className="text-xs">{row.severity}</Badge> },
-              { header: "Breached At", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.breachedAt).toLocaleDateString()}</span> },
+              { header: "Closed", cell: (row: any) => <span className="text-xs text-muted-foreground">{new Date(row.breachedAt).toLocaleDateString()}</span> },
             ]} />
           )}
         </CardContent>

@@ -524,6 +524,9 @@ const DB_PATH_HANDLERS: Record<
   (restaurantId: number, section: string, orders: MappedKitchenOrder[]) => Promise<unknown>
 > = {
   "/hygiene/board": (rid, sec) => buildHygieneBoardFromDb(rid, sec),
+  // Catalog historically advertised /cleaning-hygiene/board; alias so that path
+  // returns the real housekeeping board instead of an empty generic stub.
+  "/cleaning-hygiene/board": (rid, sec) => buildHygieneBoardFromDb(rid, sec),
   "/room-service/board": (rid, sec, orders) => buildRoomServiceBoardFromDb(rid, sec, orders),
   "/waiter-auto-assignment/board": (rid, sec, orders) => buildWaiterBoardFromDb(rid, sec, orders),
   "/inventory/board": (rid, sec) => buildInventoryBoardFromDb(rid, sec),
@@ -547,7 +550,7 @@ export async function resolveDbModuleGet(
   const handler = DB_PATH_HANDLERS[path];
   if (!handler) return undefined;
 
-  if (path === "/hygiene/board") {
+  if (path === "/hygiene/board" || path === "/cleaning-hygiene/board") {
     await autoAssignPendingHousekeeping(restaurantId);
   } else if (path === "/room-service/board") {
     await autoAssignPendingRoomService(restaurantId);

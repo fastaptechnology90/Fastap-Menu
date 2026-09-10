@@ -245,7 +245,15 @@ export default function OrderManagement() {
         qty: Number(i.quantity ?? i.qty ?? 1) || 1,
         price: Number(i.price ?? 0),
         subtotal: Number(i.subtotal ?? 0),
-        status: "pending" as const,
+        status: (() => {
+          const s = String(i.status ?? "").toLowerCase();
+          if (s === "ready" || s === "served" || s === "completed") return "ready" as const;
+          if (s === "preparing" || s === "cooking") return "preparing" as const;
+          const orderSt = String(updated.status ?? prev.status).toLowerCase();
+          if (["ready", "served", "delivered", "completed", "billed", "billing"].includes(orderSt)) return "ready" as const;
+          if (["preparing", "accepted", "confirmed"].includes(orderSt)) return "preparing" as const;
+          return "pending" as const;
+        })(),
         variant: i.variant || undefined,
         addons: Array.isArray(i.addons) ? i.addons.map((a: any) => ({ name: String(a?.name ?? a), price: Number(a?.price) || 0 })) : undefined,
         customizations: Array.isArray(i.customizations) ? i.customizations.map(String) : undefined,

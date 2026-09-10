@@ -165,16 +165,16 @@ function DocUploadField({
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs text-foreground leading-snug">
+        <p className="text-xs text-foreground leading-snug min-w-0">
           {docDef.label}
           {docDef.required && <span className="text-danger ml-1">*</span>}
         </p>
         {doc?.fileName && (
-          <button type="button" onClick={onClear} className="text-2xs text-danger shrink-0">Remove</button>
+          <button type="button" onClick={onClear} className="min-h-9 shrink-0 px-2 text-xs text-danger">Remove</button>
         )}
       </div>
       <label className={`flex items-center gap-2 ${uploading ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}>
-        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25">
+        <span className="inline-flex min-h-10 items-center gap-1.5 px-3 py-2 rounded-lg bg-primary/15 border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/25">
           <Icon name="upload_file" size={16} />
           {uploading ? "Processing…" : doc?.fileName ? "Replace file" : "Choose file"}
         </span>
@@ -388,9 +388,9 @@ export default function RestaurantRegister() {
   }
 
   return (
-    <div className="restaurant-panel min-h-screen flex flex-col lg:flex-row">
+    <div className="restaurant-panel min-h-dvh flex flex-col lg:flex-row">
       {submitted ? (
-        <div className="flex-1 flex items-center justify-center px-4 py-16">
+        <div className="flex-1 flex items-center justify-center px-4 py-12 sm:py-16">
           <div className="max-w-md w-full text-center space-y-5">
             <div className="mx-auto w-16 h-16 rounded-full bg-success-subtle border border-success-border flex items-center justify-center">
               <Icon name="check_circle" size={36} className="text-success" />
@@ -405,7 +405,7 @@ export default function RestaurantRegister() {
             </p>
             <Link
               href="/restaurant/login"
-              className="inline-flex items-center justify-center w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm"
+              className="inline-flex items-center justify-center w-full min-h-11 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm"
             >
               Go to sign in
             </Link>
@@ -432,7 +432,7 @@ export default function RestaurantRegister() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-10">
+      <div className="flex-1 overflow-y-auto px-4 py-8 sm:py-10 pb-28 lg:pb-10">
         <div className="max-w-lg mx-auto">
           <div className="text-center mb-6 lg:hidden">
             <div className="flex justify-center mb-3"><PanelLogo panel="restaurant" size="lg" /></div>
@@ -445,7 +445,7 @@ export default function RestaurantRegister() {
             <p className="text-sm text-muted-foreground mt-1">Complete all steps to submit your venue for approval</p>
           </div>
 
-          <div className="flex gap-1 mb-6 overflow-x-auto">
+          <div className="flex gap-1.5 mb-6 overflow-x-auto overscroll-x-contain no-scrollbar pb-0.5">
             {STEPS.map((label, i) => (
               <button
                 type="button"
@@ -457,7 +457,7 @@ export default function RestaurantRegister() {
                   setError("");
                   setStep((i + 1) as Step);
                 }}
-                className={`flex-shrink-0 flex-1 min-w-[4rem] text-center text-2xs sm:text-xs py-2 px-1 rounded-lg border transition-colors cursor-pointer hover:border-border ${
+                className={`flex-shrink-0 flex-1 min-w-[4.5rem] min-h-10 text-center text-xs py-2 px-1.5 rounded-lg border transition-colors cursor-pointer hover:border-border ${
                   step === i + 1 ? "border-primary/50 bg-primary/15 text-primary" : step > i + 1 ? "border-success-border text-success" : "border-border text-muted-foreground"
                 }`}
               >
@@ -488,7 +488,7 @@ export default function RestaurantRegister() {
                 <input className="field w-full" placeholder="PIN code (auto-fills city & state)" value={pincode} onChange={e => handlePincode(e.target.value)} inputMode="numeric" maxLength={6} />
                 {pinLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary">…</span>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input className="field" placeholder="City" value={city} onChange={e => setCity(e.target.value)} />
                 <input className="field" placeholder="State" value={state} onChange={e => setState(e.target.value)} />
               </div>
@@ -508,7 +508,7 @@ export default function RestaurantRegister() {
               <input className="field" placeholder="GST number (optional)" value={gstNumber} onChange={e => setGstNumber(e.target.value)} />
               <input className="field" placeholder="FSSAI license number (optional)" value={fssaiNumber} onChange={e => setFssaiNumber(e.target.value)} />
               <input className="field" placeholder="PAN number (optional)" value={panNumber} onChange={e => setPanNumber(e.target.value)} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input className="field" placeholder="Bank account *" value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
                 <input className="field" placeholder="IFSC code *" value={ifsc} onChange={e => setIfsc(e.target.value)} />
               </div>
@@ -543,28 +543,30 @@ export default function RestaurantRegister() {
             </div>
           )}
 
-          {error && <p className="text-xs text-danger mt-3">{error}</p>}
+          {error && <p className="text-xs text-danger mt-3" role="alert">{error}</p>}
 
-          <div className="flex gap-3 mt-8">
-            {step > 1 && (
-              <button type="button" onClick={() => setStep((step - 1) as Step)} className="flex-1 py-3 rounded-lg border border-border text-sm font-semibold text-foreground">
-                Back
-              </button>
-            )}
-            {step < STEPS.length ? (
-              <button type="button" onClick={handleContinue} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">
-                Continue
-              </button>
-            ) : (
-              <button type="button" onClick={handleSubmit} disabled={loading} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm">
-                {loading ? "Submitting…" : "Submit for approval"}
-              </button>
-            )}
+          <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background/95 backdrop-blur px-4 py-3 lg:static lg:border-0 lg:bg-transparent lg:backdrop-blur-none lg:px-0 lg:py-0 lg:mt-8">
+            <div className="mx-auto flex max-w-lg gap-3">
+              {step > 1 && (
+                <button type="button" onClick={() => setStep((step - 1) as Step)} className="flex-1 min-h-11 py-3 rounded-lg border border-border text-sm font-semibold text-foreground">
+                  Back
+                </button>
+              )}
+              {step < STEPS.length ? (
+                <button type="button" onClick={handleContinue} className="flex-1 min-h-11 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">
+                  Continue
+                </button>
+              ) : (
+                <button type="button" onClick={handleSubmit} disabled={loading} className="flex-1 min-h-11 py-3 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm">
+                  {loading ? "Submitting…" : "Submit for approval"}
+                </button>
+              )}
+            </div>
           </div>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already registered?{" "}
-            <Link href="/restaurant/login" className="text-primary hover:text-primary font-semibold">Sign in</Link>
+            <Link href="/restaurant/login" className="text-primary hover:text-primary font-semibold inline-block py-1">Sign in</Link>
           </p>
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Staff members should ask their manager for access — this page is for restaurant owners only.
@@ -572,7 +574,7 @@ export default function RestaurantRegister() {
         </div>
       </div>
 
-      <style>{`.field{width:100%;background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:var(--radius-control);padding:.875rem 1rem;font-size:.875rem;color:hsl(var(--foreground))}.field:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}select.field{padding-right:2.5rem;min-height:2.75rem;cursor:pointer}`}</style>
+      <style>{`.field{width:100%;background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:var(--radius-control);padding:.875rem 1rem;min-height:2.75rem;font-size:.875rem;color:hsl(var(--foreground))}.field:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}select.field{padding-right:2.5rem;min-height:2.75rem;cursor:pointer}`}</style>
       </>
       )}
     </div>

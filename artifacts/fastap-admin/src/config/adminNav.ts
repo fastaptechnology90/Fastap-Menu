@@ -8,7 +8,8 @@ export const adminNavGroups: AdminNavGroup[] = [
       { title: "Dashboard", href: "/dashboard", icon: "dashboard" },
       { title: "Live Monitoring", href: "/live-monitoring", icon: "monitoring" },
       { title: "Master Search", href: "/search", icon: "search" },
-      { title: "Revenue Leakage", href: "/revenue-leakage", icon: "trending_down" },
+      // Revenue Leakage: expected vs recorded commission are the same formula, so the
+      // gap is always ₹0 — hiding until a real leakage detector exists.
       { title: "Restaurant Revenues", href: "/restaurant-revenues", icon: "trending_up" },
     ],
   },

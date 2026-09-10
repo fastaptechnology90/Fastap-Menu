@@ -342,7 +342,7 @@ class HomeOrderPreview extends StatelessWidget {
 
   final List<KitchenOrder> orders;
   final VoidCallback onViewAll;
-  final Future<void> Function(String orderId, String action)? onAction;
+  final Future<void> Function(String orderId, String action, {String? reference})? onAction;
   // Waiter app: show only the orders assigned to me that are ready/on-the-way,
   // with Start Delivery / Delivered actions.
   final bool deliveryMode;
@@ -353,23 +353,31 @@ class HomeOrderPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final preview = deliveryMode
-        ? (orders
-            .where(
-              (o) =>
-                  (o.rawStatus == 'ready' ||
-                      o.rawStatus == 'serving' ||
-                      o.rawStatus == 'served') &&
-                  (roomDeliveries ? o.isRoom : !o.isRoom) &&
+        ? (orders.where((o) {
+              final status = o.rawStatus;
+              if (status != 'ready' &&
+                  status != 'serving' &&
+                  status != 'served') {
+                return false;
+              }
+              if (roomDeliveries ? !o.isRoom : o.isRoom) return false;
+
+              final mine = myName != null &&
                   o.waiterName != null &&
-                  myName != null &&
                   o.waiterName!.trim().toLowerCase() ==
-                      myName!.trim().toLowerCase(),
-            )
-            .toList()
-          // Delivered orders sink to the bottom; still-to-deliver stay on top.
-          ..sort((a, b) =>
-              (a.rawStatus == 'served' ? 1 : 0) -
-              (b.rawStatus == 'served' ? 1 : 0)))
+                      myName!.trim().toLowerCase();
+              // Ready with no assignee: any floor waiter/housekeeper can claim.
+              // Without this, "My deliveries" stayed empty even when food was
+              // waiting on the pass (assignment lag / unassigned ready tickets).
+              final claimable = status == 'ready' &&
+                  (o.waiterName == null || o.waiterName!.trim().isEmpty);
+              if (status == 'ready') return mine || claimable;
+              return mine;
+            }).toList()
+              // Delivered orders sink to the bottom; still-to-deliver stay on top.
+              ..sort((a, b) =>
+                  (a.rawStatus == 'served' ? 1 : 0) -
+                  (b.rawStatus == 'served' ? 1 : 0)))
         : orders;
 
     return Column(
@@ -384,17 +392,15 @@ class HomeOrderPreview extends StatelessWidget {
               : (preview.isEmpty
                   ? 'Queue is clear'
                   : '${orders.length} KOT${orders.length == 1 ? '' : 's'} in progress'),
-          trailing: deliveryMode
-              ? null
-              : TextButton.icon(
-                  onPressed: onViewAll,
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: const Text('KDS'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
+          trailing: TextButton.icon(
+            onPressed: onViewAll,
+            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+            label: Text(deliveryMode ? 'All orders' : 'KDS'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         if (preview.isEmpty)
@@ -436,7 +442,7 @@ class HomeOrderPreview extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   deliveryMode
-                      ? 'Orders assigned to you will show here once the kitchen marks them ready.'
+                      ? 'When kitchen marks food ready, unassigned tickets and yours show here. Use All orders to browse the floor queue.'
                       : 'No active orders right now.',
                   textAlign: TextAlign.center,
                   style: TextStyle(

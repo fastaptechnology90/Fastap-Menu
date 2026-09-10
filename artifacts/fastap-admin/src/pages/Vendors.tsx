@@ -200,18 +200,18 @@ export default function Vendors() {
                   <div className="space-y-2"><Label htmlFor="v-name">Business name *</Label><Input id="v-name" placeholder="The Grand Hotel" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required /></div>
                   <div className="space-y-2"><Label htmlFor="v-owner">Owner name</Label><Input id="v-owner" placeholder="John Smith" value={form.ownerName} onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))} /></div>
                   <div className="space-y-2"><Label htmlFor="v-email">Owner email *</Label><Input id="v-email" type="email" placeholder="owner@hotel.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required /></div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Business type</Label>
                       <Select value={form.businessType} onValueChange={v => setForm(f => ({ ...f, businessType: v }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="min-h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>{["Restaurant", "Hotel", "Café", "Bar", "Resort", "Cloud Kitchen", "Lounge", "Food Court"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Plan</Label>
                       <Select value={form.plan} onValueChange={v => setForm(f => ({ ...f, plan: v }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="min-h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>{PLANS.map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
@@ -229,7 +229,7 @@ export default function Vendors() {
 
       {/* The state of the estate, as one row of controls rather than a row of tiles that
           restate what the table already shows. Every number here is a filter. */}
-      <div className="flex flex-wrap gap-2 border-b pb-3">
+      <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain border-b pb-3 no-scrollbar">
         {TABS.map(t => {
           const on = state === t.key;
           return (
@@ -239,8 +239,8 @@ export default function Vendors() {
               onClick={() => { setState(t.key); setSelected([]); }}
               aria-pressed={on}
               className={on
-                ? "flex items-baseline gap-2 rounded-md border border-primary bg-primary/10 px-3 py-1.5 text-sm font-medium text-foreground"
-                : "flex items-baseline gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"}
+                ? "flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-foreground"
+                : "flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-transparent px-3 py-2 text-sm text-muted-foreground hover:bg-muted"}
             >
               {t.label}
               <span className="tabular-nums text-xs font-semibold">{counts[t.key]}</span>
@@ -250,38 +250,38 @@ export default function Vendors() {
       </div>
 
       {counts.awaiting > 0 && state !== "awaiting" && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning-border bg-warning-subtle px-4 py-3">
-          <p className="text-sm text-warning">
+        <div className="flex flex-col gap-3 rounded-md border border-warning-border bg-warning-subtle px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <p className="min-w-0 text-sm text-warning">
             <span className="font-semibold">{counts.awaiting} {counts.awaiting === 1 ? "venue is" : "venues are"} waiting to be approved.</span>{" "}
             Their owners cannot sign in until you do.
           </p>
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setState("awaiting")}>Review them</Button>
+          <Button variant="outline" size="sm" className="w-full sm:ml-auto sm:w-auto" onClick={() => setState("awaiting")}>Review them</Button>
         </div>
       )}
 
       <Toolbar>
-        <div className="relative w-full max-w-xs">
+        <div className="relative w-full min-w-0 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search venue, owner, email or id…" className="pl-8" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search venues" />
+          <Input placeholder="Search venue, owner, email or id…" className="min-h-10 pl-8" value={search} onChange={e => setSearch(e.target.value)} aria-label="Search venues" />
         </div>
         <Select value={planFilter} onValueChange={setPlanFilter}>
-          <SelectTrigger className="w-[130px]" aria-label="Filter by plan"><SelectValue placeholder="Plan" /></SelectTrigger>
+          <SelectTrigger className="min-h-10 w-full sm:w-[130px]" aria-label="Filter by plan"><SelectValue placeholder="Plan" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Any plan</SelectItem>
             {PLANS.map(p => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[140px]" aria-label="Filter by type"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectTrigger className="min-h-10 w-full sm:w-[140px]" aria-label="Filter by type"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Any type</SelectItem>
             {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
         {filtered && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setPlanFilter("all"); setTypeFilter("all"); }}>Clear</Button>
+          <Button variant="ghost" size="sm" className="min-h-10" onClick={() => { setSearch(""); setPlanFilter("all"); setTypeFilter("all"); }}>Clear</Button>
         )}
-        <span className="ml-auto text-sm text-muted-foreground tabular-nums">{rows.length} shown</span>
+        <span className="w-full text-sm text-muted-foreground tabular-nums sm:ml-auto sm:w-auto">{rows.length} shown</span>
       </Toolbar>
 
       {selected.length > 0 && (

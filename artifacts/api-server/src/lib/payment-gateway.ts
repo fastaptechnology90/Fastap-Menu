@@ -38,6 +38,12 @@ export function hasLivePaymentGateway(integrations: IntegrationsConfig): boolean
   return gatewayId !== null && gatewayHasCredentials(integrations, gatewayId);
 }
 
+/**
+ * `intent` = create a charge the client still has to complete (order / PaymentIntent).
+ * `capture` = confirm money actually moved. Callers that mark an order paid must use capture.
+ */
+export type GatewayPhase = "intent" | "capture";
+
 export type GatewayProcessInput = {
   gatewayId: string;
   integrations: IntegrationsConfig;
@@ -45,6 +51,8 @@ export type GatewayProcessInput = {
   amount: number;
   currency?: string;
   paymentMethod: string;
+  /** Defaults to capture — safer than inventing a paid bill from an intent create. */
+  phase?: GatewayPhase;
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -242,20 +250,73 @@ async function createStripePaymentIntent(input: GatewayProcessInput): Promise<Ga
   }
 }
 
+/**
+ * Paytm / PhonePe / Cashfree are listed in settings but this server has no real capture
+ * path for them. Credentials alone used to invent a txn id and UTR, and the order was
+ * marked paid — the same class of lie as the old demo gateway. Fail clearly instead.
+ */
 async function processRegionalGateway(input: GatewayProcessInput): Promise<GatewayProcessResult> {
-  const { gatewayId, orderId } = input;
+  const { gatewayId } = input;
   if (!gatewayHasCredentials(input.integrations, gatewayId)) {
     return unconfiguredGateway(gatewayId);
   }
-  const ts = Date.now();
   return {
-    success: true,
+    success: false,
     mode: "live",
     gatewayId,
-    gatewayTxnId: `${gatewayId}_${orderId}_${ts}`,
-    gatewayOrderId: `order_${orderId}`,
-    utr: `${gatewayId.toUpperCase()}${orderId}`,
+    gatewayTxnId: "",
+    error: `${gatewayId} online checkout is not connected yet. Please pay at the counter.`,
   };
+}
+
+/**
+ * Confirm a Stripe PaymentIntent actually succeeded. Creating an intent is not payment —
+ * that used to mark the bill settled the moment the intent was opened.
+ */
+async function captureStripePayment(input: GatewayProcessInput): Promise<GatewayProcessResult> {
+  const secretKey = resolveIntegrationValue(input.integrations, "stripe", "secretKey", process.env.STRIPE_SECRET_KEY);
+  if (!secretKey) return unconfiguredGateway("stripe");
+
+  const intentId = input.stripePaymentIntentId?.trim();
+  if (!intentId) {
+    return {
+      success: false,
+      mode: "live",
+      gatewayId: "stripe",
+      gatewayTxnId: "",
+      error: "Payment was not confirmed by the gateway.",
+    };
+  }
+
+  try {
+    const res = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(intentId)}`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, mode: "live", gatewayId: "stripe", gatewayTxnId: "", error: `Stripe: ${err}` };
+    }
+    const intent = await res.json() as { id: string; status: string; amount_received?: number };
+    if (intent.status !== "succeeded") {
+      return {
+        success: false,
+        mode: "live",
+        gatewayId: "stripe",
+        gatewayTxnId: intent.id,
+        error: `Stripe payment is ${intent.status}, not succeeded.`,
+      };
+    }
+    return {
+      success: true,
+      mode: "live",
+      gatewayId: "stripe",
+      gatewayTxnId: intent.id,
+      gatewayOrderId: intent.id,
+      utr: `STR${intent.id.slice(-10)}`,
+    };
+  } catch (e) {
+    return { success: false, mode: "live", gatewayId: "stripe", gatewayTxnId: "", error: String(e) };
+  }
 }
 
 export async function processGatewayPayment(
@@ -267,13 +328,14 @@ export async function processGatewayPayment(
     return { success: false, mode: "demo", gatewayId: "", gatewayTxnId: "", error: "No payment gateway enabled in Super Admin" };
   }
 
-  const fullInput = { ...input, gatewayId };
+  const phase: GatewayPhase = input.phase ?? "capture";
+  const fullInput = { ...input, gatewayId, phase };
 
   switch (gatewayId) {
     case "razorpay":
-      return captureRazorpayPayment(fullInput);
+      return phase === "intent" ? createRazorpayOrder(fullInput) : captureRazorpayPayment(fullInput);
     case "stripe":
-      return createStripePaymentIntent(fullInput);
+      return phase === "intent" ? createStripePaymentIntent(fullInput) : captureStripePayment(fullInput);
     case "paytm":
     case "phonepe":
     case "cashfree":
@@ -309,10 +371,13 @@ export function getPaymentsPublicConfig(integrations: IntegrationsConfig) {
   const normalized = normalizePaymentIntegrations(integrations);
   const enabledGateways = getEnabledPaymentGateways(normalized);
   const activeGateway = resolveActiveGateway(normalized);
+  const liveReady = hasLivePaymentGateway(normalized);
   return {
     paymentGateways: enabledGateways,
     defaultPaymentGateway: normalized.defaultPaymentGateway,
     activeGateway,
+    /** True only when a gateway is on *and* has credentials that can take money. */
+    onlineCheckoutReady: liveReady,
     clientConfig: activeGateway ? getGatewayClientConfig(normalized) : null,
   };
 }

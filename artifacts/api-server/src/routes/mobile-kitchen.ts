@@ -40,6 +40,12 @@ import {
   filterPermissionsByEntitlements,
 } from "../lib/feature-modules/entitlements.js";
 import { permissionsForRole } from "../lib/mobile-kitchen/permissions.js";
+import {
+  canTakeOrder,
+  listWaiterMenu,
+  listWaiterTables,
+  placeWaiterOrder,
+} from "../lib/mobile-kitchen/waiter-take-order.js";
 
 const router: IRouter = Router();
 
@@ -296,6 +302,13 @@ function kdsError(res: Response, err: unknown) {
     res.status(400).json({ message: "Unknown kitchen section", code: "INVALID_SECTION" });
     return;
   }
+  if (msg === "PAYMENT_REFERENCE_REQUIRED") {
+    res.status(400).json({
+      message: "Enter the UPI ID / UTR (or card RRN) before marking this bill paid.",
+      code: "PAYMENT_REFERENCE_REQUIRED",
+    });
+    return;
+  }
   res.status(404).json({ message: "Order not found" });
 }
 
@@ -303,7 +316,14 @@ router.post("/kds/orders/:orderId/action", requireMobileAuth, async (req, res) =
   if (!(await gateModuleAccess(req, res, "/kds"))) return;
   const s = mobileSession(req);
   try {
-    const order = await applyKdsAction(s.restaurantId, req.params.orderId, String(req.body?.action ?? ""), s.user.name);
+    const reference = String(req.body?.reference ?? req.body?.utr ?? req.body?.upiId ?? "").trim() || null;
+    const order = await applyKdsAction(
+      s.restaurantId,
+      req.params.orderId,
+      String(req.body?.action ?? ""),
+      s.user.name,
+      reference,
+    );
     res.json({ success: true, order });
   } catch (err) {
     kdsError(res, err);
@@ -319,10 +339,11 @@ router.post("/orders/:orderId/process", requireMobileAuth, async (req, res) => {
   if (!(await gateModuleAccess(req, res, "/orders/processing"))) return;
   const s = mobileSession(req);
   const action = String(req.body?.action ?? "");
+  const reference = String(req.body?.reference ?? req.body?.utr ?? req.body?.upiId ?? "").trim() || null;
   try {
     const order = action === "reassign"
       ? await reassignKdsSection(s.restaurantId, req.params.orderId, String(req.body?.targetSection ?? ""))
-      : await applyKdsAction(s.restaurantId, req.params.orderId, action, s.user.name);
+      : await applyKdsAction(s.restaurantId, req.params.orderId, action, s.user.name, reference);
     res.json({ success: true, order });
   } catch (err) {
     kdsError(res, err);
@@ -339,6 +360,75 @@ router.get("/live-alerts/board", requireMobileAuth, async (req, res) => {
   if (!(await gateModuleAccess(req, res, "/live-alerts/board"))) return;
   const s = mobileSession(req);
   res.json({ success: true, data: await getLiveAlerts(s.restaurantId, String(req.query.section ?? "All")) });
+});
+
+function takeOrderError(res: Response, err: unknown) {
+  const msg = err instanceof Error ? err.message : "Order failed";
+  if (msg.startsWith("FORBIDDEN:")) {
+    res.status(403).json({ message: msg.replace(/^FORBIDDEN:\s*/, ""), code: "FORBIDDEN" });
+    return;
+  }
+  if (msg.startsWith("MISSING_FIELDS:")) {
+    res.status(400).json({ message: msg.replace(/^MISSING_FIELDS:\s*/, ""), code: "MISSING_FIELDS" });
+    return;
+  }
+  if (msg === "TABLE_NOT_FOUND") {
+    res.status(404).json({ message: "Table not found", code: "TABLE_NOT_FOUND" });
+    return;
+  }
+  if (msg.startsWith("MENU_ITEM_NOT_FOUND")) {
+    res.status(400).json({ message: "A menu item was not found", code: "MENU_ITEM_NOT_FOUND" });
+    return;
+  }
+  if (msg.startsWith("UNAVAILABLE:")) {
+    res.status(409).json({ message: msg.replace(/^UNAVAILABLE:\s*/, ""), code: "UNAVAILABLE" });
+    return;
+  }
+  if (msg.startsWith("INVALID_QUANTITY:")) {
+    res.status(400).json({ message: msg.replace(/^INVALID_QUANTITY:\s*/, ""), code: "INVALID_QUANTITY" });
+    return;
+  }
+  res.status(500).json({ message: msg, code: "ORDER_FAILED" });
+}
+
+/** Waiter take-order: floor tables for seating. */
+router.get("/waiter/tables", requireMobileAuth, async (req, res) => {
+  const s = mobileSession(req);
+  if (!canTakeOrder(s.user.role)) {
+    res.status(403).json({ message: "Your role cannot place table orders", code: "FORBIDDEN" });
+    return;
+  }
+  res.json({ success: true, data: { tables: await listWaiterTables(s.restaurantId) } });
+});
+
+/** Waiter take-order: available menu (display prices from DB). */
+router.get("/waiter/menu", requireMobileAuth, async (req, res) => {
+  const s = mobileSession(req);
+  if (!canTakeOrder(s.user.role)) {
+    res.status(403).json({ message: "Your role cannot place table orders", code: "FORBIDDEN" });
+    return;
+  }
+  res.json({ success: true, data: { items: await listWaiterMenu(s.restaurantId) } });
+});
+
+/**
+ * Waiter take-order: create dine-in order with server-side pricing.
+ * Body: { tableId, items: [{ menuItemId, quantity }], notes?, guestCount? }
+ */
+router.post("/waiter/orders", requireMobileAuth, async (req, res) => {
+  const s = mobileSession(req);
+  try {
+    const result = await placeWaiterOrder(s, (req.body ?? {}) as {
+      tableId?: number;
+      tableName?: string;
+      items?: { menuItemId: number; quantity: number; notes?: string }[];
+      notes?: string;
+      guestCount?: number;
+    });
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    takeOrderError(res, err);
+  }
 });
 
 router.get(/.*/, requireMobileAuth, async (req, res) => {
@@ -374,6 +464,21 @@ router.post(/.*/, requireMobileAuth, async (req, res) => {
   }
 
   const action = String(req.body?.action ?? "");
+  // Housekeeping boards must never report success for an unhandled path —
+  // Room service / Cleaning used to look "done" while nothing was saved.
+  if (
+    req.path.startsWith("/room-service") ||
+    req.path.startsWith("/hygiene") ||
+    req.path.startsWith("/cleaning-hygiene") ||
+    req.path.startsWith("/waiter/")
+  ) {
+    res.status(404).json({
+      success: false,
+      message: "That staff action is not available on this server",
+      code: "ENDPOINT_NOT_FOUND",
+    });
+    return;
+  }
   if (req.path.includes("/optimize") || req.path.includes("/sync") || req.path.includes("/allocate")) {
     res.json({ success: true, message: "Operation completed", movedOrders: 0 });
     return;

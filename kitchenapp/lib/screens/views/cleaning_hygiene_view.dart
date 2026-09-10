@@ -24,7 +24,8 @@ class CleaningHygieneView extends StatelessWidget {
     if (snapshot == null) {
       return _EmptyState(
         message: controller.cleaningHygieneErrorMessage ??
-            'Cleaning & hygiene system unavailable',
+            'Cleaning & hygiene is not available right now. '
+            'Check your connection or ask your manager if this module is enabled.',
         onRetry: () => controller.refreshCleaningHygiene(),
       );
     }

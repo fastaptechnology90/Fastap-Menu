@@ -1,91 +1,25 @@
-import { useState, useEffect } from "react";
-import { FlaskConical, Save, Check, CreditCard, Loader } from "lucide-react";
-import { useRestaurant } from "@/contexts/RestaurantContext";
-import { platformApi } from "@/lib/api";
-import { toast } from "@/hooks/use-toast";
+import FeatureUnavailable from "@/pages/FeatureUnavailable";
 
+/**
+ * Sandbox toggles stored flags only. They did not isolate payments or clone a trial
+ * venue — switching to "Sandbox" left live data and real gateways untouched in name only.
+ */
 export default function SandboxDemo() {
-  const { restaurantId, restaurant } = useRestaurant();
-  const [settings, setSettings] = useState<any>(null);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (!restaurantId) return;
-    platformApi.sandbox(restaurantId).then(setSettings).catch(e => toast({ title: "Could not load the sandbox settings", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" }));
-  }, [restaurantId]);
-
-  async function save() {
-    if (!restaurantId || !settings) return;
-    try {
-      await platformApi.updateSandbox(restaurantId, settings);
-    } catch (e) {
-      // "Saved" must only ever appear after the server has it.
-      toast({ title: "Sandbox settings not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
-      return;
-    }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  if (!settings) {
-    return <div className="p-6 flex items-center gap-2 text-muted-foreground"><Loader className="h-4 w-4 animate-spin" />Loading sandbox…</div>;
-  }
-
   return (
-    <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">Sandbox / Demo Environment</h1>
-          <p className="text-xs text-muted-foreground">Test payments & trial restaurant without affecting live data</p>
-        </div>
-        <button onClick={save} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold">
-          {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saved ? "Saved" : "Save"}
-        </button>
-      </div>
-
-      <div className={`rounded-lg border p-5 ${settings.environment === "sandbox" ? "bg-muted border-border" : "bg-card border-border"}`}>
-        <div className="flex items-center gap-3 mb-4">
-          <FlaskConical className="h-6 w-6 text-muted-foreground" />
-          <div>
-            <p className="font-semibold">Environment: {settings.environment === "sandbox" ? "Sandbox" : "Production"}</p>
-            <p className="text-xs text-muted-foreground">Venue: {restaurant.name}</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setSettings((s: any) => ({ ...s, environment: s.environment === "sandbox" ? "production" : "sandbox", enabled: s.environment !== "sandbox" }))}
-          className="px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm font-semibold"
-        >
-          Switch to {settings.environment === "sandbox" ? "Production" : "Sandbox"}
-        </button>
-      </div>
-
-      <div className="rounded-lg bg-card border border-border p-5 space-y-4">
-        <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4 text-success" /> Test Payments</h3>
-        {[
-          { key: "demoPayments", label: "Demo payment mode" },
-          { key: "testUpi", label: "Test UPI (no real charge)" },
-          { key: "testCard", label: "Test card gateway" },
-        ].map(t => (
-          <div key={t.key} className="flex items-center justify-between">
-            <span className="text-sm">{t.label}</span>
-            <button
-              onClick={() => setSettings((s: any) => ({ ...s, [t.key]: !s[t.key] }))}
-              className={`h-7 w-12 rounded-full ${settings[t.key] ? "bg-success" : "bg-muted"}`}
-            >
-              <span className={`block h-5 w-5 rounded-full bg-white transition-transform ${settings[t.key] ? "translate-x-6" : "translate-x-1"}`} />
-            </button>
-          </div>
-        ))}
-        <div>
-          <label className="text-xs text-muted-foreground">Demo restaurant slug</label>
-          <input
-            value={settings.trialRestaurantSlug || ""}
-            onChange={e => setSettings((s: any) => ({ ...s, trialRestaurantSlug: e.target.value }))}
-            className="mt-1 w-full max-w-sm bg-muted border border-border rounded-lg px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
-    </div>
+    <FeatureUnavailable
+      title="Sandbox / Demo Environment"
+      summary="There is no isolated sandbox here. These switches never redirected payments or protected live data."
+      details={[
+        "Demo payment / test UPI / test card flags were saved as settings only — they did not change the payment path.",
+        "Environment switches did not create a separate restaurant or database.",
+        "Using this screen during a demo would imply safe test charges that were never isolated.",
+      ]}
+      workaround={
+        <>
+          <span className="font-semibold text-foreground">Until this ships:</span> use a dedicated
+          test venue and your payment provider’s test mode from their dashboard, not this page.
+        </>
+      }
+    />
   );
 }

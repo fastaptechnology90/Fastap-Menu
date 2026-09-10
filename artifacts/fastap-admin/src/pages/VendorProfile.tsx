@@ -17,6 +17,7 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
 import { ShieldBan, CheckCircle, PauseCircle, Loader2, ArrowLeft, Download, FileText, Shield, Users, Smartphone, BarChart2, CreditCard, Package, MessageSquare, Activity, Edit2, Save, AlertTriangle, Key, RefreshCw, LogOut, Trash2, QrCode, Nfc, ShoppingCart, Eye, Wrench, Rocket} from "lucide-react";
 import { api } from "@/lib/apiClient";
+import type { Payment } from "@/lib/apiClient";
 import { FeatureControlPanel } from "@/components/features/FeatureControlPanel";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -65,8 +66,9 @@ export default function VendorProfile() {
   });
 
   const { data: payments = [] } = useQuery({
-    queryKey: ["superadmin-payments"],
-    queryFn: () => api.payments.list({ limit: 100 }),
+    queryKey: ["vendor-payments", id],
+    queryFn: () => api.payments.list({ limit: 500, vendorId: id }),
+    enabled: !!id,
   });
 
   const { data: supportTickets = [] } = useQuery({
@@ -85,8 +87,9 @@ export default function VendorProfile() {
   });
 
   const { data: auditLogs = [] } = useQuery({
-    queryKey: ["superadmin-audit-logs"],
-    queryFn: api.auditLogs.list,
+    queryKey: ["vendor-audit-logs", id],
+    queryFn: () => api.auditLogs.list({ vendorId: id }),
+    enabled: !!id,
   });
 
   const { data: vendorStaff = [] } = useQuery({
@@ -344,19 +347,24 @@ export default function VendorProfile() {
     );
   }
 
-  const vendorTx = payments.filter(t => t.vendorName === vendor.name);
-  const vendorTickets = supportTickets.filter(t => t.vendorName === vendor.name);
-  const vendorKyc = kyc.find((k: any) => k.vendorId === String(vendor.id));
-  const vendorRefunds = refunds.filter((r: any) => r.vendorName === vendor.name);
-  const vendorLogs = auditLogs.filter((l: any) =>
-    String(l.target ?? "").split(",").map(t => t.trim()).includes(String(vendor.id)));
+  const vendorKey = String(vendor.id);
+  // Scope by vendor id only — name matching mixed other restaurants (and guest ticket
+  // fallbacks) into this profile's revenue and activity.
+  const vendorTx = payments.filter(t => String((t as Payment & { vendorId?: string }).vendorId ?? "") === vendorKey);
+  const vendorTickets = supportTickets.filter((t: any) =>
+    t.vendorId != null && String(t.vendorId) === vendorKey);
+  const vendorKyc = kyc.find((k: any) => k.vendorId === vendorKey || k.vendorId === String(vendor.id));
+  const vendorRefunds = refunds.filter((r: any) =>
+    r.vendorId != null && String(r.vendorId) === vendorKey);
+  const vendorLogs = auditLogs;
 
   const planPriceMap = Object.fromEntries((plans as any[]).map(p => [p.id, p.price]));
   const mrr = planPriceMap[vendor.plan] ?? 0;
   const healthScore = vendor.isActive ? Math.min(95, 50 + (vendor.totalOrders > 50 ? 25 : vendor.totalOrders > 10 ? 15 : 5) + (vendor.plan === "enterprise" ? 20 : vendor.plan === "pro" ? 10 : 0)) : 20;
   // Paid transactions only, so this matches the vendor-list revenue and the dashboard.
-  const totalRevenue = vendorTx.reduce((s, t) => s + ((t as any).isPaid ? t.grossAmount : 0), 0);
-  const totalCommission = vendorTx.reduce((s, t) => s + t.commission, 0);
+  const paidTx = vendorTx.filter(t => (t as Payment).isPaid === true);
+  const totalRevenue = paidTx.reduce((s, t) => s + t.grossAmount, 0);
+  const totalCommission = paidTx.reduce((s, t) => s + t.commission, 0);
   const openTickets = vendorTickets.filter(t => t.status === "Open" || t.status === "In Progress" || t.status === "open" || t.status === "in_progress").length;
   const lastSettlement = vendorSettlements[0];
   const pendingSettlements = vendorSettlements.filter((s: any) => s.status === "pending");
@@ -451,23 +459,25 @@ export default function VendorProfile() {
         <KpiCard title="Open tickets" value={openTickets} icon={<AlertTriangle />} />
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex-wrap h-auto gap-1 justify-start">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="financials">Financials</TabsTrigger>
-          <TabsTrigger value="subscription">Subscription</TabsTrigger>
-          <TabsTrigger value="kitchen-features">Kitchen Features</TabsTrigger>
-          <TabsTrigger value="branches">Branches</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions ({vendorTx.length})</TabsTrigger>
-          <TabsTrigger value="refunds">Refunds ({vendorRefunds.length})</TabsTrigger>
-          <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="qrnfc">QR/NFC</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="support">Support ({vendorTickets.length})</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="activity">Activity Logs</TabsTrigger>
-          <TabsTrigger value="notes">Internal Notes</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="overview" className="w-full min-w-0">
+        <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain no-scrollbar">
+          <TabsList className="inline-flex h-auto min-h-10 w-max max-w-none flex-nowrap justify-start gap-1 p-1">
+            <TabsTrigger value="overview" className="min-h-9 shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="financials" className="min-h-9 shrink-0">Financials</TabsTrigger>
+            <TabsTrigger value="subscription" className="min-h-9 shrink-0">Subscription</TabsTrigger>
+            <TabsTrigger value="kitchen-features" className="min-h-9 shrink-0">Kitchen Features</TabsTrigger>
+            <TabsTrigger value="branches" className="min-h-9 shrink-0">Branches</TabsTrigger>
+            <TabsTrigger value="transactions" className="min-h-9 shrink-0">Transactions ({vendorTx.length})</TabsTrigger>
+            <TabsTrigger value="refunds" className="min-h-9 shrink-0">Refunds ({vendorRefunds.length})</TabsTrigger>
+            <TabsTrigger value="staff" className="min-h-9 shrink-0">Staff</TabsTrigger>
+            <TabsTrigger value="qrnfc" className="min-h-9 shrink-0">QR/NFC</TabsTrigger>
+            <TabsTrigger value="documents" className="min-h-9 shrink-0">Documents</TabsTrigger>
+            <TabsTrigger value="support" className="min-h-9 shrink-0">Support ({vendorTickets.length})</TabsTrigger>
+            <TabsTrigger value="analytics" className="min-h-9 shrink-0">Analytics</TabsTrigger>
+            <TabsTrigger value="activity" className="min-h-9 shrink-0">Activity Logs</TabsTrigger>
+            <TabsTrigger value="notes" className="min-h-9 shrink-0">Internal Notes</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="mt-4 space-y-4">
@@ -791,24 +801,24 @@ export default function VendorProfile() {
             <CardContent>
               <div className="space-y-3">
                 {DOCUMENTS.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-sm">{doc.type}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{doc.number}</p>
+                  <div key={i} className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{doc.type}</p>
+                        <p className="break-all text-xs font-mono text-muted-foreground">{doc.number}</p>
                         <p className="text-xs text-muted-foreground">Uploaded: {doc.uploaded}{doc.expires ? ` · Expires: ${doc.expires}` : ""}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                       <StatusBadge status={doc.status} />
                       {(doc as any).fileUrl && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="View document" onClick={() => setPreviewDoc(doc)}><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-10 w-10" title="View document" onClick={() => setPreviewDoc(doc)}><Eye className="h-3.5 w-3.5" /></Button>
                       )}
                       {doc.id && doc.status !== "Verified" && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-success" title="Approve this document" disabled={docApproveMutation.isPending} onClick={() => docApproveMutation.mutate(doc.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 text-success" title="Approve this document" disabled={docApproveMutation.isPending} onClick={() => docApproveMutation.mutate(doc.id)}><CheckCircle className="h-3.5 w-3.5" /></Button>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Download" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10" title="Download" onClick={() => doc.id && api.documents.download(`DOC-${doc.id}`).catch(() => toast({ title: "Download failed", variant: "destructive" }))}><Download className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                 ))}
@@ -857,7 +867,7 @@ export default function VendorProfile() {
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { label: "Paid Transactions", value: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0, color: "text-success" },
+                    { label: "Paid Transactions", value: paidTx.length ? Math.round((paidTx.length / Math.max(vendorTx.length, 1)) * 100) : 0, color: "text-success" },
                     { label: "Refund Rate", value: vendorTx.length ? Math.round((vendorRefunds.length / vendorTx.length) * 100) : 0, color: "text-warning" },
                   ].map((item, i) => (
                     <div key={i}>
@@ -874,7 +884,7 @@ export default function VendorProfile() {
                 <div className="space-y-3">
                   {[
                     { label: "Order Volume", score: Math.min(100, vendor.totalOrders > 500 ? 100 : vendor.totalOrders > 100 ? 80 : 50) },
-                    { label: "Payment Health", score: vendorTx.length ? Math.round((vendorTx.filter((t: any) => t.isPaid).length / vendorTx.length) * 100) : 0 },
+                    { label: "Payment Health", score: vendorTx.length ? Math.round((paidTx.length / vendorTx.length) * 100) : 0 },
                     { label: "KYC Compliance", score: String(vendorKyc?.status ?? "").toLowerCase() === "approved" ? 100 : 0 },
                     { label: "Support Quality", score: Math.max(40, 100 - vendorTickets.length * 5) },
                     { label: "Refund Control", score: Math.max(60, 100 - vendorRefunds.length * 3) },

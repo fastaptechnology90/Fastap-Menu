@@ -76,7 +76,16 @@ export default function Refunds() {
     onSuccess: (_, id) => { toast.warning(`Refund ${id} escalated to approvals`); invalidate(); },
   });
 
-  const filtered = refunds.filter(r => r.id.toLowerCase().includes(search.toLowerCase()) || r.vendorName.toLowerCase().includes(search.toLowerCase()) || r.customerName.toLowerCase().includes(search.toLowerCase()));
+  const q = search.toLowerCase().trim();
+  const filtered = refunds.filter(r => {
+    if (!q) return true;
+    return (
+      r.id.toLowerCase().includes(q)
+      || r.vendorName.toLowerCase().includes(q)
+      || r.customerName.toLowerCase().includes(q)
+      || String(r.vendorId ?? "").includes(q)
+    );
+  });
   const pendingRefunds = refunds.filter(isPending);
   const totalPending = pendingRefunds.reduce((s, r) => s + r.amount, 0);
 
@@ -109,7 +118,16 @@ export default function Refunds() {
             emptyDescription="Refunds raised by vendors or customers will appear here."
             columns={[
               { header: "Refund ID", cell: (row: Refund) => <span className="font-mono text-xs">{row.id}</span> },
-              { header: "Vendor", accessorKey: "vendorName", sortable: true },
+              { header: "Vendor", sortable: true, sortValue: (row: Refund) => row.vendorName, cell: (row: Refund) => (
+                <div>
+                  <p className="text-sm font-medium">{row.vendorName}</p>
+                  {row.vendorId ? (
+                    <p className="font-mono text-[10px] text-muted-foreground">#{row.vendorId}</p>
+                  ) : (
+                    <p className="text-[10px] text-warning">No vendor id</p>
+                  )}
+                </div>
+              ) },
               { header: "Customer", accessorKey: "customerName", sortable: true },
               { header: "Amount", sortable: true, sortValue: (row: Refund) => row.amount, cell: (row: Refund) => <span className="font-medium text-destructive">{fmtINRFull(row.amount)}</span> },
               { header: "Type", cell: (row: Refund) => <span className="text-xs px-2 py-0.5 rounded-full bg-muted">{row.type}</span> },

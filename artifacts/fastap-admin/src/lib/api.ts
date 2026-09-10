@@ -319,6 +319,11 @@ export function openPrintWindow(html: string, fallbackUrl?: string): boolean {
 // ─── Day-end readings (X / Z) ─────────────────────────────────────
 export type DayEndReport = {
   reading: "X" | "Z";
+  /** True only after POST /reports/z/close has frozen the day. */
+  closed?: boolean;
+  zNumber?: number;
+  closedAt?: string;
+  closedBy?: string;
   date: string;
   orders: { placed: number; settled: number; cancelled: number; refunded: number };
   sales: { subtotal: number; tax: number; tips: number; discounts: number; total: number; averageOrder: number };
@@ -332,14 +337,19 @@ export type DayEndReport = {
     drawerCounted: number;
     variance: number;
     shiftsOpen: number;
+    shiftsUncounted?: number;
+    uncountedShifts?: { id: number; staffName: string; cashSales: number }[];
   };
 };
 
 export const dayEnd = {
   x: (rid: number, date: string) => get<DayEndReport>(`/restaurants/${rid}/reports/x?date=${date}`),
-  /** Refuses with 409 while a cash shift is open unless `force` is set. */
+  /** Provisional Z look. Refuses with 409 while a cash shift is open unless `force` is set. */
   z: (rid: number, date: string, force = false) =>
     get<DayEndReport>(`/restaurants/${rid}/reports/z?date=${date}${force ? "&force=true" : ""}`),
+  /** Freeze the business day. Refuses while drawers are open or uncounted. */
+  close: (rid: number, date: string) =>
+    post<DayEndReport>(`/restaurants/${rid}/reports/z/close`, { date }),
 };
 
 // ─── Attendance ───────────────────────────────────────────────────
@@ -419,6 +429,7 @@ export const customers = {
   list: (rid: number) => get<any[]>(`/restaurants/${rid}/customers`),
   create: (rid: number, body: any) => post<any>(`/restaurants/${rid}/customers`, body),
   update: (rid: number, id: number, body: any) => put<any>(`/restaurants/${rid}/customers/${id}`, body),
+  delete: (rid: number, id: number) => del<any>(`/restaurants/${rid}/customers/${id}`),
 };
 
 // ─── Reservations ─────────────────────────────────────────────────
@@ -540,6 +551,8 @@ export const loyalty = {
 export const promoCodesApi = {
   list: (rid: number) => get<any[]>(`/restaurants/${rid}/promo-codes`),
   create: (rid: number, body: any) => post<any>(`/restaurants/${rid}/promo-codes`, body),
+  update: (rid: number, id: number, body: any) => put<any>(`/restaurants/${rid}/promo-codes/${id}`, body),
+  delete: (rid: number, id: number) => del<any>(`/restaurants/${rid}/promo-codes/${id}`),
 };
 
 export const aiApi = {
@@ -710,6 +723,8 @@ export const publicApi = {
     const q = qs.toString();
     return get<any>(`/public/venue/${slug}${q ? `?${q}` : ""}`);
   },
+  /** Open/closed only — cheap enough to poll, so the guest sees a hours change without a reload. */
+  venueHours: (slug: string) => get<{ hours: Record<string, unknown> }>(`/public/venue/${slug}/hours`),
   session: {
     init: (body: Record<string, unknown>) => post<any>("/public/session/init", body),
     restore: (token?: string) => get<any>(`/public/session/restore${token ? `?token=${encodeURIComponent(token)}` : ""}`),
@@ -731,7 +746,7 @@ export const publicApi = {
       post<{ user: any }>("/public/auth/social", body),
     oneTap: (body: { phone: string; deviceId: string; restaurantId?: number }) =>
       post<{ user: any }>("/public/auth/one-tap", body),
-    oauthConfig: () => get<{ google: boolean; apple: boolean; manualSocialFlow?: boolean }>("/public/auth/oauth-config"),
+    oauthConfig: () => get<{ google: boolean; apple: boolean; smsOtp?: boolean; manualSocialFlow?: boolean }>("/public/auth/oauth-config"),
     guestTypes: () => get<{ types: { id: string; label: string; desc: string }[] }>("/public/auth/guest-types"),
     setGuestType: (guestType: string) => request<{ user: any }>("PATCH", "/public/auth/guest-type", { guestType }),
     devices: () => get<{ devices: unknown[]; currentDeviceId: string }>("/public/auth/devices"),
@@ -749,6 +764,11 @@ export const publicApi = {
   adjustOrderItem: (orderId: number | string, menuItemId: number, delta: number) =>
     post<any>(`/public/orders/${orderId}/adjust-item`, { menuItemId, delta }),
   orderStatus: (orderId: number | string) => get<OrderTrackingResponse>(`/public/orders/${orderId}/status`),
+  cancelOrder: (orderId: number | string, reason?: string) =>
+    post<{ cancelled: boolean; alreadyCancelled?: boolean; order?: unknown; windowSeconds?: number; error?: string }>(
+      `/public/orders/${orderId}/cancel`,
+      { reason: reason ?? "Cancelled by guest" },
+    ),
   orderMessage: (orderId: number | string, body: { message: string }) =>
     post<{ success: boolean; callId?: number }>(`/public/orders/${orderId}/message`, body),
   orderLiveUrl: (orderId: number | string) => `${BASE}/public/orders/${orderId}/live`,
@@ -761,14 +781,26 @@ export const publicApi = {
   queueStatus: (token: string) => get<any>(`/public/queue/${token}`),
   leaveQueue: (token: string) => request<any>("DELETE", `/public/queue/${token}`),
   createReservation: (body: any) => post<any>("/public/reservations", body),
-  reservations: (restaurantId: number, phone: string) => get<any[]>(`/public/reservations?restaurantId=${restaurantId}&phone=${encodeURIComponent(phone)}`),
+  /** List this guest's bookings. Phone optional when a guest session exists; `q` filters the list. */
+  // restaurantId is optional: My Bookings has to work when the guest opened it from the
+  // profile with no venue scanned, and a booking made at one venue must not vanish
+  // because the guest is now standing in another.
+  reservations: (restaurantId: number | null | undefined, phone?: string, q?: string) => {
+    const qs = new URLSearchParams();
+    if (restaurantId) qs.set("restaurantId", String(restaurantId));
+    if (phone?.trim()) qs.set("phone", phone.trim());
+    if (q?.trim()) qs.set("q", q.trim());
+    return get<any[]>(`/public/reservations?${qs}`);
+  },
   reservationTypes: () => get<{ types: unknown[] }>("/public/reservations/types"),
   reservationSlots: (restaurantId: number, date: string, reservationType: string) =>
     get<{ slots: { time: string; label: string; available: boolean; remaining: number }[]; deposit: number; availableCount: number }>(
       `/public/reservations/slots?restaurantId=${restaurantId}&date=${encodeURIComponent(date)}&reservationType=${encodeURIComponent(reservationType)}`,
     ),
-  payReservationDeposit: (id: number, body: { paymentMethod?: string }) => post<any>(`/public/reservations/${id}/deposit`, body),
-  cancelReservation: (id: number) => request<any>("PATCH", `/public/reservations/${id}/cancel`),
+  payReservationDeposit: (id: number, body: { paymentMethod?: string; phone?: string }) =>
+    post<any>(`/public/reservations/${id}/deposit`, body),
+  cancelReservation: (id: number, phone?: string) =>
+    request<any>("PATCH", `/public/reservations/${id}/cancel`, phone ? { phone } : {}),
   updateReservation: (id: number, body: any) => put<any>(`/public/reservations/${id}`, body),
   validateCoupon: (body: { restaurantId: number; code: string; subtotal: number }) => post<{ code: string; discount: number }>("/public/coupons/validate", body),
   wallet: () => get<any>("/public/me/wallet"),
@@ -857,7 +889,8 @@ export const publicApi = {
       post<any>("/public/spa/membership", body),
     bookings: (restaurantId: number, phone: string) =>
       get<any[]>(`/public/spa/bookings?restaurantId=${restaurantId}&phone=${encodeURIComponent(phone)}`),
-    cancel: (id: number) => request<any>("PATCH", `/public/spa/bookings/${id}/cancel`),
+    cancel: (id: number, phone: string) =>
+      request<any>("PATCH", `/public/spa/bookings/${id}/cancel`, { phone }),
   },
   // legacy aliases
   spaServices: (restaurantId: number) => get<any[]>(`/public/spa/services/${restaurantId}`),
@@ -883,14 +916,31 @@ export const publicApi = {
       get<any>(`/public/events/catalog/${restaurantId}${eventType ? `?eventType=${eventType}` : ""}`),
     quotation: (body: { hallId: string; guestCount: number; cateringPackageId?: string; decorationPackageId?: string }) =>
       post<any>("/public/events/quotation", body),
-    list: (restaurantId: number) => get<any[]>(`/public/events/${restaurantId}`),
+    list: (restaurantId: number, phone: string) =>
+      get<any[]>(`/public/events/${restaurantId}?phone=${encodeURIComponent(phone)}`),
     my: (restaurantId: number, phone: string) =>
       get<any[]>(`/public/events/my?restaurantId=${restaurantId}&phone=${encodeURIComponent(phone)}`),
     enquiry: (body: any) => post<any>("/public/events/enquiry", body),
-    sendInvitations: (eventId: number, invitations: { name: string; phone?: string; email?: string }[]) =>
-      post<any>(`/public/events/${eventId}/invitations`, { invitations }),
-    updateInvitation: (eventId: number, inviteId: string, status: string) =>
-      request<any>("PATCH", `/public/events/${eventId}/invitations/${inviteId}`, { status }),
+    detail: (eventId: number, opts: { phone?: string; token?: string }) => {
+      const qs = new URLSearchParams();
+      if (opts.phone) qs.set("phone", opts.phone);
+      if (opts.token) qs.set("token", opts.token);
+      const q = qs.toString();
+      return get<any>(`/public/events/detail/${eventId}${q ? `?${q}` : ""}`);
+    },
+    sendInvitations: (
+      eventId: number,
+      invitations: { name: string; phone?: string; email?: string }[],
+      proof: { phone?: string; token?: string },
+    ) =>
+      post<any>(`/public/events/${eventId}/invitations`, { invitations, ...proof }),
+    updateInvitation: (
+      eventId: number,
+      inviteId: string,
+      status: string,
+      proof: { phone?: string; token?: string },
+    ) =>
+      request<any>("PATCH", `/public/events/${eventId}/invitations/${inviteId}`, { status, ...proof }),
   },
   locale: {
     catalog: () => get<any>("/public/locale/catalog"),

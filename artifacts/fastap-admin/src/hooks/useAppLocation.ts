@@ -27,6 +27,9 @@ export function useAppLocation(): [string, (to: string, opts?: AppNavigateOption
   const navigate = useCallback((to: string, opts?: AppNavigateOptions) => {
     if (!opts?.restoreScroll && !opts?.replace) prepareGuestForwardNavigation();
     wouterNavigate(to, opts);
+    // wouter updates history without a native event; our store listens for these.
+    // Needed so query-only changes (e.g. /user/reserve?tab=my) notify subscribers.
+    queueMicrotask(() => window.dispatchEvent(new Event("pushState")));
   }, []);
   return [pathname, navigate];
 }

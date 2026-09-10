@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import {
   RESTAURANT_LOGIN_ROLES,
   defaultPathForRole,
+  devDemoCredentialsForRole,
 } from "@/config/restaurantLoginRoles";
 
 type LoginMethod = "password" | "otp";
@@ -79,6 +80,15 @@ export default function RestaurantLogin() {
   function pickRole(role: StaffRole) {
     setSelectedRole(role);
     setError("");
+    // Production builds never pre-fill — credentials only exist behind Vite DEV.
+    const demo = devDemoCredentialsForRole(role);
+    if (demo && loginMethod === "password") {
+      setEmail(demo.email);
+      setPassword(demo.password);
+    } else if (!import.meta.env.DEV) {
+      setEmail("");
+      setPassword("");
+    }
   }
 
   function handleOtpChange(i: number, val: string) {
@@ -110,10 +120,14 @@ export default function RestaurantLogin() {
       });
       setStep("otp-verify");
     } catch (e: unknown) {
-      const err = e as Error & { restaurants?: VenueOption[] };
+      const err = e as Error & { restaurants?: VenueOption[]; detail?: { code?: string }; status?: number };
       if (err.restaurants?.length) {
         setVenueOptions(err.restaurants);
         setError("Select your restaurant to continue");
+      } else if (err.detail?.code === "SMS_NOT_CONNECTED" || err.detail?.code === "SMS_SEND_FAILED" || err.status === 503) {
+        setError(err.message || "Phone OTP is not available. Sign in with email and password.");
+        setLoginMethod("password");
+        setStep("form");
       } else {
         setError(err.message || "Failed to send OTP");
       }
@@ -316,13 +330,14 @@ export default function RestaurantLogin() {
           {step === "otp-verify" && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Enter the OTP sent to {countryCode} {mobile.slice(0, 5)}xxxxx</p>
-              <div className="flex gap-2 justify-between">
+              <div className="flex gap-1.5 sm:gap-2">
                 {otp.map((v, i) => (
                   <input
                     key={i}
                     id={`r-otp-${i}`}
-                    className="w-12 h-12 text-center text-lg font-semibold rounded-lg border border-border bg-muted focus:border-primary focus:outline-none"
+                    className="h-12 min-w-0 flex-1 max-w-12 text-center text-lg font-semibold rounded-lg border border-border bg-muted focus:border-primary focus:outline-none"
                     maxLength={1}
+                    inputMode="numeric"
                     value={v}
                     onChange={e => handleOtpChange(i, e.target.value)}
                   />

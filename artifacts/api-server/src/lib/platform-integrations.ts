@@ -363,7 +363,15 @@ export function getPublicIntegrationsConfig(integrations: IntegrationsConfig) {
       ? { enabled: true }
       : { enabled: false },
     messaging: {
-      sms: integrations.services.twilio?.enabled === true || integrations.services.msg91?.enabled === true,
+      // Toggle alone used to claim SMS was live. Require real credentials (platform or env).
+      sms: Boolean(
+        (
+          resolveIntegrationValue(integrations, "twilio", "accountSid", process.env.TWILIO_ACCOUNT_SID)
+          && resolveIntegrationValue(integrations, "twilio", "authToken", process.env.TWILIO_AUTH_TOKEN)
+          && resolveIntegrationValue(integrations, "twilio", "fromNumber", process.env.TWILIO_FROM_NUMBER)
+        )
+        || resolveIntegrationValue(integrations, "msg91", "authKey", process.env.MSG91_AUTH_KEY),
+      ),
       whatsapp: integrations.services.whatsapp_meta?.enabled === true || integrations.services.twilio?.enabled === true,
       email: integrations.services.sendgrid?.enabled === true || integrations.services.smtp?.enabled === true,
     },

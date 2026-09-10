@@ -65,7 +65,16 @@ export default function Support() {
 
   const getPriorityColor = (p: string) => { const n = norm(p); return n === "critical" ? "bg-danger-subtle text-danger" : n === "high" ? "bg-warning-subtle text-warning" : n === "medium" ? "bg-warning-subtle text-warning" : "bg-info-subtle text-info"; };
 
-  const filtered = tickets.filter(t => t.vendorName.toLowerCase().includes(search.toLowerCase()) || t.subject.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()));
+  const q = search.toLowerCase().trim();
+  const filtered = tickets.filter(t => {
+    if (!q) return true;
+    return (
+      t.vendorName.toLowerCase().includes(q)
+      || t.subject.toLowerCase().includes(q)
+      || t.id.toLowerCase().includes(q)
+      || String(t.vendorId ?? "").includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -91,7 +100,16 @@ export default function Support() {
               emptyDescription="Venues have no way to raise a ticket from their panel yet, so this queue stays empty."
               columns={[
               { header: "Ticket ID", cell: (row: SupportTicket) => <span className="font-mono text-xs">{row.id}</span> },
-              { header: "Vendor", accessorKey: "vendorName" },
+              { header: "Vendor", cell: (row: SupportTicket) => (
+                <div>
+                  <p className="text-sm font-medium">{row.vendorName}</p>
+                  {row.vendorId ? (
+                    <p className="font-mono text-[10px] text-muted-foreground">#{row.vendorId}</p>
+                  ) : (
+                    <p className="text-[10px] text-warning">No vendor id</p>
+                  )}
+                </div>
+              ) },
               { header: "Subject", cell: (row: SupportTicket) => <span className="text-sm">{row.subject}</span> },
               { header: "Priority", cell: (row: SupportTicket) => <Badge className={`text-xs ${getPriorityColor(row.priority)}`} variant="outline">{pretty(row.priority)}</Badge> },
               { header: "Status", cell: (row: SupportTicket) => <StatusBadge status={pretty(row.status)} /> },

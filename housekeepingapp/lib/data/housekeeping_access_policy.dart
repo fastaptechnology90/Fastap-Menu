@@ -13,7 +13,12 @@ class HousekeepingAccessPolicy {
     'roomservice.deliver',
   };
 
+  /// System numbers for Ops catalog (not nav indices).
+  /// Room service = 28 → nav 27; Cleaning = 29 → nav 28.
   static const quickActionSystems = <int>[28, 29, 35, 36];
+
+  /// Nav indices used by the shared HomeTab quick-action strip.
+  static const quickActionNavIndices = <int>[27, 28, 35, 0];
 
   static String systemViewPermission(int systemNumber) =>
       'system.$systemNumber.view';

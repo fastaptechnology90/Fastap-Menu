@@ -33,7 +33,7 @@ export default function PaymentPage() {
   const billBeforeTip = Math.max(0, subtotal - discount);
   const [tip, setTip] = useState(0);
   const [customTip, setCustomTip] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentModeId>("upi");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentModeId>("cash");
   const [billingTab, setBillingTab] = useState<BillingTab>("standard");
   const [splitCount, setSplitCount] = useState(2);
   const [splitMode, setSplitMode] = useState<"equal" | "multi">("equal");
@@ -48,7 +48,6 @@ export default function PaymentPage() {
   // The order went through but the payment did not. This is a real and common outcome —
   // it deserves its own screen rather than being folded into the success one.
   const [unpaid, setUnpaid] = useState<{ orderId: string; reason: string } | null>(null);
-  const [showQr, setShowQr] = useState(false);
 
   const localQuote = useMemo(() => computeBillQuote({
     subtotal,
@@ -64,16 +63,29 @@ export default function PaymentPage() {
     paymentGateways?: string[];
     defaultPaymentGateway?: string;
     activeGateway?: string;
-    clientConfig?: { gatewayId?: string; demoMode?: boolean; keyId?: string } | null;
+    onlineCheckoutReady?: boolean;
+    clientConfig?: { gatewayId?: string; demoMode?: boolean; keyId?: string; publishableKey?: string } | null;
   } | null>(null);
+  const [catalogError, setCatalogError] = useState("");
+  const [quoteError, setQuoteError] = useState("");
 
   useEffect(() => {
-    publicApi.payments.catalog().then(setPaymentCatalog).catch(() => setPaymentCatalog(null));
+    publicApi.payments.catalog()
+      .then(c => {
+        setPaymentCatalog(c);
+        setCatalogError("");
+      })
+      .catch(e => {
+        // Failure used to look like "no gateways / cash only" with no hint the catalog call died.
+        setPaymentCatalog(null);
+        setCatalogError(e instanceof Error ? e.message : "Could not load payment options.");
+      });
   }, []);
 
   useEffect(() => {
     if (!venue.restaurantId) {
       setServerQuote(null);
+      setQuoteError("");
       return;
     }
     const tipVal = customTip ? parseFloat(customTip) || tip : tip;
@@ -84,7 +96,14 @@ export default function PaymentPage() {
       splitCount: billingTab === "split" && splitMode === "equal" ? splitCount : undefined,
       partialPayNow: billingTab === "partial" && partialPayNow ? parseFloat(partialPayNow) : undefined,
       advanceAmount: billingTab === "advance" && advanceAmount ? parseFloat(advanceAmount) : undefined,
-    }).then(setServerQuote).catch(() => setServerQuote(null));
+    }).then(q => {
+      setServerQuote(q);
+      setQuoteError("");
+    }).catch(e => {
+      // Local quote still works; tell the guest the server total could not be confirmed.
+      setServerQuote(null);
+      setQuoteError(e instanceof Error ? e.message : "Could not confirm the bill total with the venue.");
+    });
   }, [venue.restaurantId, subtotal, discount, tip, customTip, billingTab, splitCount, splitMode, partialPayNow, advanceAmount]);
 
   const quote = serverQuote ?? localQuote;
@@ -106,19 +125,30 @@ export default function PaymentPage() {
       : quote.grandTotal;
 
   const activeGateway = paymentCatalog?.activeGateway ?? paymentCatalog?.defaultPaymentGateway;
-  const gatewayReady = (paymentCatalog?.paymentGateways?.length ?? 0) > 0;
+  // A gateway listed without keys (demoMode) cannot take money — treat that as
+  // offline checkout, same as no gateway at all. Prefer cash at the counter over
+  // a half-wired "Pay with UPI" that invents success or always fails after order.
+  const onlineCheckoutReady = paymentCatalog?.onlineCheckoutReady === true
+    && paymentCatalog?.clientConfig?.demoMode !== true;
+  const gatewayListed = (paymentCatalog?.paymentGateways?.length ?? 0) > 0;
   const isDemoGateway = paymentCatalog?.clientConfig?.demoMode === true;
-  const onlineMethodsBlocked = !gatewayReady && paymentMethod !== "cash";
+  const onlineMethodsBlocked = !onlineCheckoutReady && paymentMethod !== "cash";
+
+  useEffect(() => {
+    if (!onlineCheckoutReady && paymentMethod !== "cash") {
+      setPaymentMethod("cash");
+    }
+  }, [onlineCheckoutReady, paymentMethod]);
 
   async function handlePay() {
     if (cart.length === 0) {
       toast({ title: "Cart is empty", description: "Add items before checkout.", variant: "destructive" });
       return;
     }
-    if (paymentMethod !== "cash" && !gatewayReady) {
+    if (paymentMethod !== "cash" && !onlineCheckoutReady) {
       toast({
-        title: "Payments unavailable",
-        description: "Enable a payment gateway in Super Admin → Settings → Integrations.",
+        title: "Online payment unavailable",
+        description: "Pay at the counter, or ask staff to enable a live payment gateway.",
         variant: "destructive",
       });
       return;
@@ -258,11 +288,11 @@ export default function PaymentPage() {
         <h2 className="text-2xl font-semibold">Payment Successful</h2>
         <p className="text-muted-foreground">₹{payAmount.toLocaleString()} via {paymentModeLabel(paymentMethod)}</p>
         {success.invoiceNumber && <p className="text-sm text-success font-mono">{success.invoiceNumber}</p>}
-        <div className="flex gap-3 mt-4">
-          <button onClick={() => downloadInvoice("gst")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted border border-border text-sm">
+        <div className="mt-4 flex w-full max-w-sm flex-col gap-2 sm:flex-row sm:justify-center">
+          <button onClick={() => downloadInvoice("gst")} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-muted px-4 py-2.5 text-sm">
             <FileText className="h-4 w-4" /> GST Invoice
           </button>
-          <button onClick={() => downloadInvoice("pdf")} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted border border-primary text-primary text-sm">
+          <button onClick={() => downloadInvoice("pdf")} className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-muted px-4 py-2.5 text-sm text-primary">
             <Download className="h-4 w-4" /> PDF Invoice
           </button>
         </div>
@@ -274,26 +304,32 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-foreground pb-32">
-      <div className="guest-header px-4 py-3 flex items-center gap-3">
+    <div className="guest-page thin-scroll min-h-screen max-w-[100vw] overflow-x-hidden text-foreground pb-32">
+      <div className="guest-header flex items-center gap-3 px-4 py-3">
         <GuestBackButton onClick={goBack} />
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Payment System</p>
-          <h1 className="text-base font-semibold">Checkout & Billing</h1>
+          <h1 className="truncate text-base font-semibold">Checkout & Billing</h1>
         </div>
       </div>
 
-      <div className="px-4 pt-4 space-y-4">
-        {gatewayReady && (
-          <div className={`rounded-xl border px-3 py-2 text-xs ${isDemoGateway ? "border-warning-border bg-warning-subtle text-warning" : "border-success-border bg-success-subtle text-success"}`}>
-            {isDemoGateway
-              ? `Demo payments via ${activeGateway ?? "gateway"} — add API keys in Super Admin for live processing.`
-              : `Secured by ${activeGateway ?? "payment gateway"}`}
+      <div className="mx-auto max-w-lg space-y-4 px-4 pt-4">
+        {(catalogError || quoteError) && (
+          <div className="rounded-xl border border-danger-border bg-danger-subtle px-3 py-2 text-xs text-danger space-y-1">
+            {catalogError && <p>{catalogError}</p>}
+            {quoteError && <p>{quoteError} Showing an estimated total on this device.</p>}
           </div>
         )}
-        {!gatewayReady && (
-          <div className="rounded-xl border border-danger-border bg-danger-subtle px-3 py-2 text-xs text-danger">
-            No payment gateway enabled. Cash payments only, or enable Razorpay in Super Admin → Integrations.
+        {onlineCheckoutReady && (
+          <div className="rounded-xl border border-success-border bg-success-subtle px-3 py-2 text-xs text-success">
+            Secured by {activeGateway ?? "payment gateway"}
+          </div>
+        )}
+        {!onlineCheckoutReady && !catalogError && (
+          <div className="rounded-xl border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+            {gatewayListed || isDemoGateway
+              ? "Online payment is not live yet (gateway keys missing). Cash at the counter only — your order still goes to the kitchen."
+              : "No live payment gateway. Cash at the counter only — your order still goes to the kitchen."}
           </div>
         )}
         {/* Bill with GST breakdown */}
@@ -331,7 +367,7 @@ export default function PaymentPage() {
         {/* Advanced Billing tabs */}
         <div className="rounded-2xl bg-muted border border-border p-4">
           <p className="text-sm font-semibold mb-3">Advanced Billing</p>
-          <div className="flex gap-1 mb-3 overflow-x-auto">
+          <div className="mb-3 flex gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {([
               { id: "standard" as const, label: "Full", icon: Receipt },
               { id: "split" as const, label: "Split", icon: Split },
@@ -339,7 +375,7 @@ export default function PaymentPage() {
               { id: "advance" as const, label: "Advance", icon: Clock },
             ]).map(t => (
               <button key={t.id} onClick={() => setBillingTab(t.id)}
-                className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-xs border ${billingTab === t.id ? "bg-muted border-primary" : "border-border"}`}>
+                className={`flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 py-2 text-xs ${billingTab === t.id ? "border-primary bg-muted" : "border-border"}`}>
                 <t.icon className="h-3 w-3" /> {t.label}
               </button>
             ))}
@@ -352,11 +388,11 @@ export default function PaymentPage() {
                 <button onClick={() => setSplitMode("multi")} className={`flex-1 py-2 rounded-xl text-xs border ${splitMode === "multi" ? "bg-muted border-primary" : "border-border"}`}>Multi-method split</button>
               </div>
               {splitMode === "equal" ? (
-                <div className="flex items-center gap-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <button onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="h-8 w-8 rounded-lg bg-muted">−</button>
-                  <span className="flex-1 text-center font-semibold">{splitCount} people · ₹{quote.splitPerPerson}/each</span>
-                  <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-muted">+</button>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 shrink-0 text-primary" />
+                  <button type="button" onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-label="Fewer people">−</button>
+                  <span className="min-w-0 flex-1 text-center text-sm font-semibold leading-snug">{splitCount} people · ₹{quote.splitPerPerson}/each</span>
+                  <button type="button" onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-label="More people">+</button>
                 </div>
               ) : (
                 splitLines.map((line, i) => (
@@ -409,29 +445,29 @@ export default function PaymentPage() {
             {PAYMENT_MODES.map(m => {
               const Icon = MODE_ICONS[m.id];
               const needsGateway = m.id !== "cash";
-              const disabled = needsGateway && !gatewayReady;
+              // QR has no mint/intent path yet — keep it off even when a gateway is live,
+              // otherwise guests pick "QR" and see a dead panel instead of paying.
+              const qrUnavailable = m.id === "qr";
+              const disabled = (needsGateway && !onlineCheckoutReady) || qrUnavailable;
               const walletSub = m.id === "wallet" && user?.walletTotal != null ? `Balance: ₹${user.walletTotal}` : m.desc;
+              const sub = qrUnavailable ? "Scan-to-pay is not available yet — pay at the counter" : walletSub;
               return (
-                <button key={m.id} disabled={disabled} onClick={() => { if (!disabled) { setPaymentMethod(m.id); if (m.id === "qr") setShowQr(true); else setShowQr(false); } }}
+                <button key={m.id} disabled={disabled} onClick={() => { if (!disabled) setPaymentMethod(m.id); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === m.id ? "bg-muted border-primary" : "border-border bg-muted"} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
                   <Icon className={`h-5 w-5 ${paymentMethod === m.id ? "text-primary" : "text-muted-foreground"}`} />
                   <div className="text-left flex-1">
                     <p className="text-sm font-semibold">{m.label}</p>
-                    <p className="text-xs text-muted-foreground">{walletSub}</p>
+                    <p className="text-xs text-muted-foreground">{sub}</p>
                   </div>
                   <div className={`h-4 w-4 rounded-full border-2 ${paymentMethod === m.id ? "border-primary bg-primary" : "border-border"}`} />
                 </button>
               );
             })}
           </div>
-          {showQr && paymentMethod === "qr" && (
-            // A grid of coloured squares used to be drawn here under the caption
-            // "Scan to pay ₹…". It was decorative — no scanner could read it, and a
-            // guest holding up their phone in front of a waiter got nothing. A real QR
-            // belongs here once a gateway is connected and can mint a payment intent.
-            <div className="mt-3 p-4 rounded-xl border border-border bg-muted text-center">
-              <p className="text-sm text-muted-foreground">Scan-to-pay is not available yet.</p>
-              <p className="text-xs text-muted-foreground mt-1">Please pay at the counter — your order is confirmed either way.</p>
+          {paymentMethod === "qr" && (
+            <div className="mt-3 p-4 rounded-xl border border-warning-border bg-warning-subtle text-center">
+              <p className="text-sm text-warning">Scan-to-pay is not available yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Please choose cash or another live method, or pay at the counter.</p>
             </div>
           )}
           {paymentMethod === "nfc" && smartEntry?.detection?.entryMethod === "nfc" && (
@@ -442,8 +478,12 @@ export default function PaymentPage() {
 
       <div className="guest-bottom-bar">
         <button onClick={handlePay} disabled={submitting || onlineMethodsBlocked}
-          className="w-full py-4 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-60 font-semibold text-base">
-          {submitting ? "Processing…" : `Pay ₹${payAmount} · ${paymentModeLabel(paymentMethod)}`}
+          className="mx-auto block w-full max-w-lg rounded-xl bg-primary py-4 text-base font-semibold hover:bg-primary/90 disabled:opacity-60">
+          {submitting
+            ? "Processing…"
+            : paymentMethod === "cash" || !onlineCheckoutReady
+              ? `Confirm order · pay ₹${payAmount} at counter`
+              : `Pay ₹${payAmount} · ${paymentModeLabel(paymentMethod)}`}
         </button>
       </div>
     </div>

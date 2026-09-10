@@ -36,10 +36,13 @@ export default function UserAuth() {
   const [socialProvider, setSocialProvider] = useState<"google" | "apple" | null>(null);
   const [socialName, setSocialName] = useState("");
   const [socialEmail, setSocialEmail] = useState("");
-  const [oauthReady, setOauthReady] = useState<{ google: boolean; apple: boolean } | null>(null);
+  const [oauthReady, setOauthReady] = useState<{ google: boolean; apple: boolean; smsOtp: boolean } | null>(null);
+  const [smsUnavailable, setSmsUnavailable] = useState(false);
+  const [otpResendSec, setOtpResendSec] = useState(0);
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [venues, setVenues] = useState<{ id: number; name: string; slug: string; publicationStatus?: string }[]>([]);
   const [venuesLoaded, setVenuesLoaded] = useState(false);
+  const [venuesError, setVenuesError] = useState("");
   const [selectedSlug, setSelectedSlug] = useState("");
 
   async function afterAuth(path: string) {
@@ -55,26 +58,43 @@ export default function UserAuth() {
           table: params.get("table") || undefined,
           room: params.get("room") || undefined,
         });
-      } catch {
-        /* GuestVenueRequired retries on the target page */
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load venue after sign-in. Try selecting it again.");
+        return;
       }
     }
     navigate(withGuestQuery(path, venue));
   }
 
   useEffect(() => {
-    publicApi.auth.guestTypes().then(r => setGuestTypes(r.types as typeof guestTypes)).catch(() => {});
-    publicApi.auth.oauthConfig().then(r => setOauthReady({ google: r.google, apple: r.apple })).catch(() => {});
+    publicApi.auth.guestTypes().then(r => setGuestTypes(r.types as typeof guestTypes)).catch(() => {
+      // Guest-type picker stays empty; registration still works with the default "regular".
+      setGuestTypes([]);
+    });
+    publicApi.auth.oauthConfig().then(r => setOauthReady({
+      google: r.google,
+      apple: r.apple,
+      smsOtp: r.smsOtp === true,
+    })).catch(() => {
+      // Hide social buttons rather than claiming providers are ready.
+      setOauthReady({ google: false, apple: false, smsOtp: false });
+    });
     publicApi.venues().then(r => {
       const list = Array.isArray(r.venues) ? r.venues : [];
       setVenues(list);
+      setVenuesError("");
       const fromUrl = resolveGuestSlug();
       const initial = fromUrl || (list.length === 1 ? list[0].slug : "");
       if (initial) {
         setSelectedSlug(initial);
-        loadVenue(initial).catch(() => {});
+        loadVenue(initial).catch(e => {
+          setError(e instanceof Error ? e.message : "Could not load the selected venue.");
+        });
       }
-    }).catch(() => setVenues([])).finally(() => setVenuesLoaded(true));
+    }).catch(e => {
+      setVenues([]);
+      setVenuesError(e instanceof Error ? e.message : "We could not load restaurants. Check your connection and try again.");
+    }).finally(() => setVenuesLoaded(true));
     const savedPhone = localStorage.getItem("fastap_trusted_phone");
     if (savedPhone) setOneTapAvailable(true);
   }, [loadVenue]);
@@ -84,8 +104,8 @@ export default function UserAuth() {
     setError("");
     try {
       await loadVenue(slug);
-    } catch {
-      setError("Could not load selected venue.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load selected venue.");
     }
   }
 
@@ -177,17 +197,45 @@ export default function UserAuth() {
     }
   }
 
+  const phoneSmsBlocked = smsUnavailable || (oauthReady?.smsOtp === false && !import.meta.env.DEV);
+
+  function startGuestPath() {
+    setError("");
+    setSelectedGuestType("regular");
+    // Skip VIP/hotel type picker when SMS is down — those labels imply live service
+    // tiers that the guest path does not actually apply.
+    setMode(phoneSmsBlocked ? "guest" : "guest-type");
+  }
+
+  useEffect(() => {
+    if (mode !== "otp-verify" || otpResendSec <= 0) return;
+    const t = window.setTimeout(() => setOtpResendSec(s => Math.max(0, s - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [mode, otpResendSec]);
+
   async function sendOtp() {
     if (!mobile) return;
     setLoading(true);
     setError("");
+    setSmsUnavailable(false);
     try {
       const phone = mobile.replace(/\D/g, "");
       const result = await publicApi.auth.sendOtp(phone);
       if (result.devOtp) setDevOtpHint(result.devOtp);
+      setOtpResendSec(30);
       setMode("otp-verify");
-    } catch (e: any) {
-      setError(e.message || "Failed to send OTP");
+    } catch (e: unknown) {
+      const err = e as { message?: string; detail?: { code?: string }; status?: number };
+      const code = err.detail?.code;
+      if (code === "SMS_NOT_CONNECTED" || code === "SMS_SEND_FAILED" || err.status === 503) {
+        setSmsUnavailable(true);
+        setError(
+          err.message
+            || "Phone sign-in is not available yet. Continue as guest, or use email.",
+        );
+      } else {
+        setError(err.message || "Failed to send OTP");
+      }
     } finally {
       setLoading(false);
     }
@@ -260,20 +308,27 @@ export default function UserAuth() {
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col px-4 py-12">
-      <div className="w-full max-w-sm mx-auto mb-4">
+    <div className="guest-page thin-scroll flex min-h-dvh flex-col px-4 py-8 text-foreground sm:py-12">
+      <div className="mx-auto mb-4 w-full max-w-sm">
         <GuestBackButton onClick={() => (mode === "select" ? goBack() : setMode("select"))} />
       </div>
-      <div className="w-full max-w-sm mx-auto flex-1 flex items-center justify-center">
-        <div className="w-full">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5">
+      <div className="mx-auto flex w-full max-w-sm flex-1 items-start justify-center sm:items-center">
+        <div className="w-full pb-8">
+        <div className="mb-8 text-center">
+          <div className="mb-5 flex justify-center">
             <GuestLogo size="lg" />
           </div>
           <h1 className="font-display text-2xl font-semibold">Welcome to FastMenu</h1>
-          <p className="text-muted-foreground text-sm mt-1">Sign in to unlock personalized dining</p>
-          {error && <p className="text-danger text-sm mt-2">{error}</p>}
-          {venuesLoaded && venues.length === 0 && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {(smsUnavailable || (oauthReady && oauthReady.smsOtp === false && !import.meta.env.DEV))
+              ? "Phone OTP is not set up yet — continue as guest or use email"
+              : "Sign in to unlock personalized dining"}
+          </p>
+          {error && <p role="alert" className="text-danger text-sm mt-2">{error}</p>}
+          {venuesLoaded && venuesError && (
+            <p role="alert" className="text-danger text-sm mt-2">{venuesError}</p>
+          )}
+          {venuesLoaded && !venuesError && venues.length === 0 && (
             <div className="mt-4">
               <GuestEmpty
                 title="No restaurants found"
@@ -291,7 +346,7 @@ export default function UserAuth() {
               <label className="text-2xs text-muted-foreground block mb-1.5">Venue</label>
               <select
                 value={selectedSlug}
-                onChange={e => { pickVenue(e.target.value).catch(() => {}); }}
+                onChange={e => { void pickVenue(e.target.value); }}
                 className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
               >
                 <option value="">Select venue</option>
@@ -305,6 +360,21 @@ export default function UserAuth() {
 
         {mode === "select" && (
           <div className="space-y-3">
+            {phoneSmsBlocked && (
+              <div className="rounded-xl border border-border bg-muted/50 p-3 space-y-2" role="status">
+                <p className="text-sm text-muted-foreground">
+                  Phone OTP is not available on this venue yet. You can still order — continue as guest (no SMS needed), or use email.
+                </p>
+                <button
+                  type="button"
+                  onClick={startGuestPath}
+                  className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                >
+                  Continue as Guest · no OTP
+                </button>
+              </div>
+            )}
+
             {oneTapAvailable && (
               <button
                 onClick={oneTapLogin}
@@ -322,19 +392,21 @@ export default function UserAuth() {
               </button>
             )}
 
-            <button
-              onClick={() => setMode("otp-input")}
-              className="guest-card guest-card-interactive w-full flex items-center gap-4 p-4"
-            >
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                <Smartphone className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="text-sm font-semibold">Mobile OTP Login</div>
-                <div className="text-xs text-muted-foreground">Quick & secure</div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </button>
+            {!phoneSmsBlocked && (
+              <button
+                onClick={() => setMode("otp-input")}
+                className="guest-card guest-card-interactive w-full flex items-center gap-4 p-4"
+              >
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="text-sm font-semibold">Mobile OTP Login</div>
+                  <div className="text-xs text-muted-foreground">Quick & secure</div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
 
             <button
               onClick={() => setMode("email")}
@@ -350,35 +422,44 @@ export default function UserAuth() {
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
 
-            <button
-              onClick={() => openSocial("google")}
-              disabled={loading}
-              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
-            >
-              <div className="h-10 w-10 rounded-lg bg-danger-subtle flex items-center justify-center">
-                <Chrome className="h-5 w-5 text-danger" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="text-sm font-semibold">Continue with Google</div>
-                <div className="text-xs text-muted-foreground">One-tap login</div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </button>
+            {/* Fake email-only "social" is local convenience only — production needs real OAuth. */}
+            {(import.meta.env.DEV || oauthReady?.google) && (
+              <button
+                onClick={() => openSocial("google")}
+                disabled={loading}
+                className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
+              >
+                <div className="h-10 w-10 rounded-lg bg-danger-subtle flex items-center justify-center">
+                  <Chrome className="h-5 w-5 text-danger" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="text-sm font-semibold">Continue with Google</div>
+                  <div className="text-xs text-muted-foreground">
+                    {oauthReady?.google ? "One-tap login" : "Dev only — OAuth not wired"}
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
 
-            <button
-              onClick={() => openSocial("apple")}
-              disabled={loading}
-              className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
-            >
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                <Apple className="h-5 w-5 text-foreground" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="text-sm font-semibold">Continue with Apple</div>
-                <div className="text-xs text-muted-foreground">Sign in with Apple ID</div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </button>
+            {(import.meta.env.DEV || oauthReady?.apple) && (
+              <button
+                onClick={() => openSocial("apple")}
+                disabled={loading}
+                className="w-full flex items-center gap-4 rounded-xl border border-border bg-muted hover:bg-muted transition-all p-4"
+              >
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Apple className="h-5 w-5 text-foreground" />
+                </div>
+                <div className="text-left flex-1">
+                  <div className="text-sm font-semibold">Continue with Apple</div>
+                  <div className="text-xs text-muted-foreground">
+                    {oauthReady?.apple ? "Sign in with Apple ID" : "Dev only — OAuth not wired"}
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
 
             <button
               onClick={() => setMode("register")}
@@ -399,13 +480,14 @@ export default function UserAuth() {
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs text-muted-foreground">
-                <span className="bg-[#0b1120] px-3">or</span>
+                <span className="bg-background px-3">or</span>
               </div>
             </div>
 
+            {!phoneSmsBlocked && (
             <button
-              onClick={() => setMode("guest-type")}
-              className="w-full flex items-center gap-4 rounded-xl border border-dashed border-border bg-transparent hover:bg-muted transition-all p-4"
+              onClick={startGuestPath}
+              className="w-full flex items-center gap-4 rounded-xl border border-dashed border-border bg-transparent hover:bg-muted transition-all p-4 min-h-[3.5rem]"
             >
               <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
                 <User2 className="h-5 w-5 text-muted-foreground" />
@@ -416,6 +498,7 @@ export default function UserAuth() {
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>
+            )}
           </div>
         )}
 
@@ -429,11 +512,34 @@ export default function UserAuth() {
               <h2 className="text-xl font-semibold mb-1">Enter your mobile</h2>
               <p className="text-muted-foreground text-sm">We'll send a 6-digit OTP to verify</p>
             </div>
+            {smsUnavailable && (
+              <div className="rounded-xl border border-border bg-muted/50 p-3 space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Phone verification is not available on this venue yet. You can still order from the menu as a guest, or sign in with email.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMode("guest-type")}
+                    className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
+                  >
+                    Continue as Guest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("email")}
+                    className="w-full py-2.5 rounded-lg border border-border text-sm font-semibold"
+                  >
+                    Use email instead
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex rounded-xl border border-border bg-muted overflow-hidden">
               <div className="flex items-center px-4 border-r border-border text-sm text-muted-foreground">🇮🇳 +91</div>
               <input
                 className="flex-1 bg-transparent px-4 py-3.5 text-sm focus:outline-none"
-                placeholder="98765 43210"
+                placeholder="10-digit mobile number"
                 value={mobile}
                 onChange={e => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 maxLength={10}
@@ -471,6 +577,11 @@ export default function UserAuth() {
                 />
               ))}
             </div>
+            {import.meta.env.DEV && devOtpHint && (
+              <p className="text-center text-xs text-muted-foreground">
+                Dev OTP: <span className="font-mono text-foreground">{devOtpHint}</span>
+              </p>
+            )}
             <button
               onClick={verifyOtpSubmit}
               disabled={otp.some(v => !v) || loading}

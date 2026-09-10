@@ -4,6 +4,7 @@ import { db, staffAttendanceTable, staffTable, ordersTable } from "@workspace/db
 import { requireAuth } from "../middlewares/auth";
 import { round2 } from "../lib/order-pricing.js";
 import { logger } from "../lib/logger.js";
+import { isPaidOrder } from "../lib/payment-calculations.js";
 
 /**
  * Clock in, clock out, and who is on the floor.
@@ -138,7 +139,7 @@ router.post("/restaurants/:restaurantId/attendance/clock-out", requireAuth, asyn
   ));
   const theirs = sold.filter(o =>
     (o.waiterName ?? "").toLowerCase() === open.staffName.toLowerCase()
-    && (o.paymentStatus === "paid" || o.status === "completed"));
+    && isPaidOrder(o));
   const sales = round2(theirs.reduce((t, o) => t + num(o.total), 0));
 
   const [closed] = await db.update(staffAttendanceTable).set({

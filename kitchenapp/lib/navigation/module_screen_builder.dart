@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../state/auth_controller.dart';
@@ -140,13 +142,11 @@ class ModuleScreenBuilder {
     required KitchenCommandController controller,
     required AuthController auth,
   }) {
-    if (!auth.canAccessNav(navIndex)) {
-      final reason = auth.navAccessBlockReason(navIndex) ??
-          'This module is not available.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(reason)),
-      );
-      return Future.value();
+    // Always push a real screen. Blocked modules render RoleAccessDenied inside
+    // ModuleDetailScreen — never a snackbar-only dead end (Room service /
+    // Cleaning used to look like a failed tap / "404" with no board).
+    if (auth.canAccessNav(navIndex)) {
+      unawaited(refreshModule(controller, navIndex));
     }
 
     return Navigator.of(context).push(

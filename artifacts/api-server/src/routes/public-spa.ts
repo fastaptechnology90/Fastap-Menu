@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
-import { db, spaServicesTable, spaBookingsTable, restaurantsTable } from "@workspace/db";
+import { db, spaServicesTable, spaBookingsTable, restaurantsTable, guestUsersTable } from "@workspace/db";
 import {
   computeAvailableSlots, getCatalog, couplePrice, membershipPlansFor, therapistsFor,
 } from "../lib/spaWellnessLogic.js";
@@ -188,6 +188,33 @@ router.get("/public/spa/bookings", async (req, res): Promise<void> => {
 
 router.patch("/public/spa/bookings/:id/cancel", async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
+  if (!Number.isInteger(id) || id <= 0) { res.status(404).json({ error: "Booking not found" }); return; }
+
+  // Cancel used to take the integer id alone — counting upward cancelled other guests'
+  // appointments. Match the phone that was stored on the booking (or the signed-in guest).
+  const [existing] = await db.select().from(spaBookingsTable).where(eq(spaBookingsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Booking not found" }); return; }
+
+  const claimed = String(req.body?.phone ?? req.query?.phone ?? "").replace(/\D/g, "");
+  const booked = String(existing.guestPhone ?? "").replace(/\D/g, "");
+  const phoneOk = Boolean(claimed && booked && claimed === booked);
+
+  let sessionOk = false;
+  const guestUserId = req.session.guestUserId;
+  if (!phoneOk && guestUserId) {
+    const [guest] = await db.select().from(guestUsersTable).where(eq(guestUsersTable.id, guestUserId)).limit(1);
+    if (guest) {
+      const guestPhone = String(guest.phone ?? "").replace(/\D/g, "");
+      if (guestPhone && booked && guestPhone === booked) sessionOk = true;
+      if (guest.email && existing.guestEmail && guest.email === existing.guestEmail) sessionOk = true;
+    }
+  }
+
+  if (!phoneOk && !sessionOk) {
+    res.status(404).json({ error: "Booking not found" });
+    return;
+  }
+
   const [booking] = await db.update(spaBookingsTable).set({ status: "cancelled" }).where(eq(spaBookingsTable.id, id)).returning();
   if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
   res.json(booking);

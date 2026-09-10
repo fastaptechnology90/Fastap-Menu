@@ -66,6 +66,12 @@ router.get("/public/hotel/catalog/:restaurantId", async (req, res): Promise<void
 router.get("/public/hotel/room/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
+  // Room status and control state used to be readable by guessing the number. Same
+  // binding as the mutate routes: only the browser that scanned this room's QR.
+  if (!(await callerIsInRoom(req, restaurantId, roomNumber))) {
+    res.status(403).json({ error: "Scan the QR code in your room to see this room." });
+    return;
+  }
   // A read must not write. This used to create the room when the number was unknown, so
   // any request for /public/hotel/room/5/9999 added a room to the hotel's inventory —
   // and a stranger's room number is the only thing a caller needs to guess.
@@ -87,46 +93,18 @@ router.patch("/public/hotel/room/:restaurantId/:roomNumber/controls", async (req
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   const roomNumber = req.params.roomNumber;
 
-  // Anyone who could type a room number could switch a stranger's lights off, set their
-  // air conditioning and turn on Do Not Disturb from the other side of the world. This
-  // is not a full credential — the binding is only the room QR this browser opened —
-  // but it stops the room number alone being the whole key. A real fix needs the room
-  // to carry a secret the guest is given at check-in; see the guest audit note.
+  // Anyone who could type a room number — or POST /public/session/init with that room —
+  // used to switch lights, AC and DND. There is no live hardware link behind this write
+  // (the guest UI itself says so), so the honest answer is closed, not a fake toggle.
   if (!(await callerIsInRoom(req, restaurantId, roomNumber))) {
     res.status(403).json({ error: "Scan the QR code in your room to use the room controls." });
     return;
   }
 
-  const patch = req.body?.roomControls ?? req.body;
-  let [room] = await db.select().from(hotelRoomsTable).where(
-    and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
-  );
-  if (!room) {
-    // Adjusting the lights in a room that does not exist is a mistake, not a reason to
-    // add a room to the hotel's inventory.
-    res.status(404).json({ error: "Room not found" });
-    return;
-  } else {
-    const current = parseControls(room.roomControls);
-    const merged = { ...current, ...patch };
-    // Each control is an object ({on, temp} and so on). Spreading a bare number or
-    // boolean over it produced `{}` and wiped the setting — so sending `{ac: 22}` left
-    // the room with no AC state at all rather than 22 degrees.
-    const isObj = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
-    if (isObj(patch.ac)) merged.ac = { ...current.ac, ...patch.ac };
-    else if (patch.ac !== undefined) merged.ac = { ...current.ac, ...(typeof patch.ac === "boolean" ? { on: patch.ac } : { temp: Number(patch.ac) }) };
-    if (isObj(patch.lights)) merged.lights = { ...current.lights, ...patch.lights };
-    else if (patch.lights !== undefined) merged.lights = { ...current.lights, ...(typeof patch.lights === "boolean" ? { on: patch.lights } : { brightness: Number(patch.lights) }) };
-    if (patch.curtain !== undefined) merged.curtains = { open: patch.curtain };
-    if (isObj(patch.curtains)) merged.curtains = { ...current.curtains, ...patch.curtains };
-    else if (patch.curtains !== undefined) merged.curtains = { open: Number(patch.curtains) };
-    if (isObj(patch.tv)) merged.tv = { ...current.tv, ...patch.tv };
-    else if (patch.tv !== undefined) merged.tv = { ...current.tv, on: Boolean(patch.tv) };
-    if (typeof patch.dnd === "boolean") merged.dnd = patch.dnd;
-    if (patch.cleaningStatus) merged.cleaningStatus = patch.cleaningStatus;
-    [room] = await db.update(hotelRoomsTable).set({ roomControls: merged }).where(eq(hotelRoomsTable.id, room.id)).returning();
-  }
-  res.json({ roomControls: parseControls(room.roomControls) });
+  res.status(503).json({
+    error: "In-room controls are not connected to hotel hardware yet. Use the panel by the door.",
+    demo: true,
+  });
 });
 
 router.post("/public/hotel/wake-up-call", async (req, res): Promise<void> => {
@@ -135,18 +113,25 @@ router.post("/public/hotel/wake-up-call", async (req, res): Promise<void> => {
     res.status(400).json({ error: "restaurantId, roomNumber, and scheduledAt required" });
     return;
   }
+  const rid = parseInt(String(restaurantId), 10);
+  const room = String(roomNumber);
+  // Same as controls: a wake-up call for room 102 must not be bookable by guessing 102.
+  if (!(await callerIsInRoom(req, rid, room))) {
+    res.status(403).json({ error: "Scan the QR code in your room to set a wake-up call." });
+    return;
+  }
   const [task] = await db.insert(housekeepingTasksTable).values({
-    restaurantId,
+    restaurantId: rid,
     type: "wake_up",
-    title: `Wake-up call — Room ${roomNumber}`,
+    title: `Wake-up call — Room ${room}`,
     description: notes ?? `Wake-up call for ${guestName ?? "guest"}`,
-    location: `Room ${roomNumber}`,
-    roomNumber,
+    location: `Room ${room}`,
+    roomNumber: room,
     priority: "high",
     status: "pending",
     scheduledAt: new Date(scheduledAt),
   }).returning();
-  const assigned = await autoAssignHousekeepingTask(restaurantId, task.id);
+  const assigned = await autoAssignHousekeepingTask(rid, task.id);
   res.status(201).json(assigned ?? task);
 });
 

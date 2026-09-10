@@ -269,9 +269,16 @@ export async function updateIncident(id: string, patch: Record<string, unknown>)
 }
 
 export async function getDRStatus() {
+  // Defaults used to claim backupIntegrity "verified" and status "healthy" with no
+  // failover test and no recovery points — a green DR panel with nothing behind it.
   return getJson("drStatus", {
-    primaryRegion: "IN-Mumbai", backupRegion: "IN-Bangalore", lastFailoverTest: null,
-    backupIntegrity: "verified", rpo: "1 hour", rto: "4 hours", status: "healthy",
+    primaryRegion: null,
+    backupRegion: null,
+    lastFailoverTest: null,
+    backupIntegrity: "not_configured",
+    rpo: null,
+    rto: null,
+    status: "not_configured",
     recoveryPoints: [],
   });
 }

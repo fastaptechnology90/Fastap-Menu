@@ -98,7 +98,7 @@ export function GuestTabBar() {
     if (key === "home") return guestHomePath(venue, activeTable);
     if (key === "menu") return withGuestQuery("/user/menu", venue, activeTable);
     if (key === "cart") return withGuestQuery("/user/cart", venue, activeTable);
-    return withGuestQuery("/user/reserve", venue, activeTable);
+    return withGuestQuery("/user/reserve?tab=my", venue, activeTable);
   };
 
   return (
@@ -311,7 +311,7 @@ export function GuestRow({
       )}
       <span className="min-w-0 flex-1 text-left">
         <span className="block truncate text-sm font-medium">{title}</span>
-        {detail && <span className="mt-0.5 block text-xs text-muted-foreground">{detail}</span>}
+        {detail && <span className="mt-0.5 block break-words text-xs text-muted-foreground">{detail}</span>}
       </span>
       {trailing ?? (onClick ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null)}
     </>

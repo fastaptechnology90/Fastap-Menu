@@ -40,20 +40,20 @@ cd mobileapp
 
 flutter pub get
 
-# Quick run against production API
+# Local API (preferred): pnpm dev:kitchenapp
+flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=http://127.0.0.1:8080
+
+# Production API
 .\scripts\run_production.ps1
+# Or: flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app --dart-define=APP_ENV=production
 
-# Or manually:
-flutter run --dart-define=API_MODE=external --dart-define=API_BASE_URL=https://digitalrestuarants.thefingo.com --dart-define=APP_ENV=production
-
-# Release APK for store / sideload
-.\scripts\build_production.ps1
+# Release APK: pnpm build:apk:kitchen  (or .\scripts\build_production.ps1)
 
 ```
 
 
 
-**Production defaults:** Release builds automatically use `API_MODE=external` and `https://digitalrestuarants.thefingo.com`. Auth tokens are stored in encrypted secure storage on device.
+**Production defaults:** Prefer `pnpm build:apk:kitchen` (passes Railway `API_BASE_URL`). A bare release without a define falls back to `https://fastap-menu-production.up.railway.app`. Auth tokens are stored in encrypted secure storage on device.
 
 
 

@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
-$apiUrl = if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "https://digitalrestuarants.thefingo.com" }
+$apiUrl = if ($env:API_BASE_URL) { $env:API_BASE_URL } else { "https://fastap-menu-production.up.railway.app" }
 
 Write-Host "Building release APK with live API: $apiUrl"
 flutter pub get

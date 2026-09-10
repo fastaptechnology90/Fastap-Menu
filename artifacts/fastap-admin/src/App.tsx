@@ -17,6 +17,7 @@ import { GuestVenueRequired } from "@/components/user/GuestVenueRequired";
 import { GuestScrollRestore } from "@/components/user/GuestScrollRestore";
 import { Loader2 } from "lucide-react";
 import { canAccessAdminPath, type PermissionKey } from "@/lib/adminRbac";
+import { canAccessRestaurantRoute } from "@/lib/restaurantRbac";
 import { defaultPathForRole } from "@/config/restaurantLoginRoles";
 
 import Landing from "@/pages/Landing";
@@ -34,6 +35,7 @@ import OfflineModePage from "@/pages/user/OfflineModePage";
 import SmartEntryPage from "@/pages/user/SmartEntryPage";
 import VenueScanPage from "@/pages/user/VenueScanPage";
 import SmartDiningPage from "@/pages/user/SmartDiningPage";
+import DigitalExperiencePage from "@/pages/user/DigitalExperiencePage";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Blog from "@/pages/Blog";
@@ -165,7 +167,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function RestaurantProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { currentStaff, authBootstrapping, hasActiveSubscription } = useRestaurant();
+  const { currentStaff, authBootstrapping, hasActiveSubscription, rolePermissions } = useRestaurant();
   const [location] = useLocation();
   if (authBootstrapping && !currentStaff) {
     return (
@@ -189,6 +191,11 @@ function RestaurantProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!hasActiveSubscription) return <Redirect to="/restaurant/subscription" />;
+  // Sidebar already hid off-role pages; URLs used to ignore that and open anything.
+  const restaurantPath = location.split("?")[0];
+  if (!canAccessRestaurantRoute(currentStaff.role, rolePermissions, restaurantPath)) {
+    return <Redirect to={defaultPathForRole(currentStaff.role)} />;
+  }
   return (
     <RestaurantLayout>
       <RestaurantPageErrorBoundary page={location}>{children}</RestaurantPageErrorBoundary>
@@ -262,6 +269,7 @@ function AppRoutes() {
       <Route path="/user/payment">{() => <GuestRoute component={PaymentPage} />}</Route>
       <Route path="/user/support">{() => <GuestRoute component={UserSupport} />}</Route>
       <Route path="/user/offline">{() => <GuestRoute component={OfflineModePage} />}</Route>
+      <Route path="/user/experience">{() => <GuestRoute component={DigitalExperiencePage} />}</Route>
 
       {/* ── Restaurant / Manager panel ─────────────────────────── */}
       <Route path="/restaurant">{() => <RestaurantHomeRedirect />}</Route>

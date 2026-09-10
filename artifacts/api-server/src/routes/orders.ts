@@ -1,21 +1,22 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, inArray, gte } from "drizzle-orm";
-import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable, restaurantsTable } from "@workspace/db";
+import { db, ordersTable, menuItemsTable, customersTable, feedbackTable, tablesMapTable, financeTransactionsTable, cashShiftsTable, restaurantsTable, roomServiceRequestsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastEvent, broadcastOrderEvent } from "../lib/sse";
 import { initialTrackingMetadata } from "../lib/orderTracking.js";
 import { resolvePaymentStatus } from "../lib/paymentLogic.js";
-import { autoAssignWaiterToOrder } from "../lib/staff-auto-assignment.js";
+import { autoAssignWaiterToOrder, autoAssignRoomServiceRequest } from "../lib/staff-auto-assignment.js";
 import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, taxRatesFor, taxForOrderItems, computeBasketTax, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 import { canTransition } from "../lib/order-status.js";
-import { venueHours, closedResponse } from "../lib/venue-hours.js";
+import { closedResponse, ordersAllowed } from "../lib/venue-hours.js";
 import {
   isRestaurantPublished,
   getPublicationStatus,
   guestVenueAccessError,
 } from "../lib/restaurant-publication.js";
+import { loadOwnedOrder } from "../lib/guest-order-access.js";
 
 const router: IRouter = Router();
 
@@ -80,6 +81,7 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
       preparing: "Kitchen started preparing your order",
       ready: "Order ready for pickup",
       serving: "Waiter is on the way",
+      served: "Order served to your table",
       delivered: "Order delivered to table",
       completed: "Order completed",
       cancelled: "Order cancelled",
@@ -96,10 +98,10 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     if (status === "preparing" || status === "ready") {
       tracking.cookingStartedAt = tracking.cookingStartedAt ?? now;
     }
-    if (status === "serving") {
+  if (status === "serving" || status === "served") {
       tracking.waiterStatus = "on_the_way";
     }
-    if (status === "delivered" || status === "completed") {
+    if (status === "delivered" || status === "completed" || status === "served") {
       tracking.waiterStatus = "delivered";
     }
   }
@@ -133,7 +135,24 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     metadata: { ...meta, tracking, ...(hasPaymentDetail ? { payment: paymentDetail } : {}) },
   };
   if (paymentMethod) orderPatch.paymentMethod = paymentMethod;
-  if (paymentStatus) orderPatch.paymentStatus = paymentStatus;
+  if (paymentStatus) {
+    // Online methods at the till are attested by staff — but an empty reference with
+    // `paymentStatus: "paid"` was enough to book UPI/card revenue with no UTR at all.
+    // Cash still needs no reference (notes in the drawer). Gateway capture is a
+    // different path (public payments); this is counter collection only.
+    const methodForPay = String(paymentMethod ?? existing.paymentMethod ?? "").toLowerCase();
+    const onlineAtCounter = ["upi", "card", "nfc", "qr", "wallet", "netbanking", "online", "razorpay", "gateway"].includes(methodForPay);
+    if (paymentStatus === "paid" && onlineAtCounter) {
+      const ref = String(utr ?? upiId ?? "").trim();
+      if (!ref) {
+        res.status(400).json({
+          error: "Enter the UPI ID / UTR (or card RRN) before marking this bill paid.",
+        });
+        return;
+      }
+    }
+    orderPatch.paymentStatus = paymentStatus;
+  }
   if (tipAmount !== undefined) orderPatch.tipAmount = String(tipAmount);
   // Persist the exact amount collected at the POS (incl. any discount/tip) so the order
   // total = what was collected = what every revenue view shows. Keeps subtotal+tax+tip = total.
@@ -189,8 +208,12 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
   // Single write path: when an order first becomes paid, record it in the finance ledger
   // (so Finance / Owner / Super-admin all see the same money) and, for cash, bump the open
   // cash shift so the Cash Counter reflects real collections — not just seed data.
-  const wasPaid = existing.paymentStatus === "paid" || existing.status === "completed";
-  const nowPaid = order.paymentStatus === "paid" || order.status === "completed";
+  //
+  // Only `paymentStatus === "paid"` means money moved. Treating kitchen/waiter
+  // `status: "completed"` (food done / guest left) as paid booked revenue for every
+  // finished meal that was still owing at the counter.
+  const wasPaid = existing.paymentStatus === "paid";
+  const nowPaid = order.paymentStatus === "paid";
   if (!wasPaid && nowPaid) {
     await recordOrderPaymentInLedger({
       restaurantId,
@@ -232,21 +255,44 @@ router.put("/restaurants/:restaurantId/orders/:orderId", requireAuth, async (req
     const auto = await autoAssignWaiterToOrder(restaurantId, orderId);
     if (auto) order = auto;
   }
+
+  // Use the status actually stored on the row — not the request body field, which is
+  // undefined on payment-only updates and was forcing every settle back to "occupied".
+  const effectiveStatus = String(order.status ?? existing.status ?? "");
+  let tableFreed = false;
   if (order.tableId) {
-    const tableStatus = status === "billing" ? "billing" : ["delivered", "completed", "cancelled"].includes(status) ? "free" : "occupied";
+    // Settle frees the cover: completed/delivered/cancelled, or paid after the meal is
+    // done (served / billed). Prepaid pending+paid stays occupied — guests are still seated.
+    const mealDone = ["served", "delivered", "billing", "billed", "completed"].includes(effectiveStatus);
+    const shouldFree =
+      ["delivered", "completed", "cancelled"].includes(effectiveStatus)
+      || (!wasPaid && nowPaid && mealDone);
+    const tableStatus = shouldFree
+      ? "free"
+      : effectiveStatus === "billing" || effectiveStatus === "billed"
+        ? "billing"
+        : "occupied";
     const tableUpdate: Record<string, unknown> = { status: tableStatus };
     if (tableStatus === "free") {
       tableUpdate.currentOrderId = null;
       tableUpdate.currentCustomerName = null;
       tableUpdate.currentGuestCount = 0;
       tableUpdate.occupiedSince = null;
-    } else if (status === "billing") {
-      tableUpdate.status = "billing";
+      tableFreed = true;
     }
     await db.update(tablesMapTable).set(tableUpdate).where(and(eq(tablesMapTable.id, order.tableId), eq(tablesMapTable.restaurantId, restaurantId)));
   }
-  broadcastEvent("order_status", { id: order.id, restaurantId, tableName: order.tableName, status });
-  broadcastOrderEvent(order.id, "order_status", { id: order.id, status, tableName: order.tableName });
+
+  const statusForBroadcast = status ?? order.status;
+  broadcastEvent("order_status", { id: order.id, restaurantId, tableName: order.tableName, status: statusForBroadcast });
+  broadcastOrderEvent(order.id, "order_status", { id: order.id, status: statusForBroadcast, tableName: order.tableName });
+  if (!wasPaid && nowPaid) {
+    broadcastEvent("order_paid", { id: order.id, restaurantId, tableName: order.tableName, paymentStatus: "paid" });
+    broadcastOrderEvent(order.id, "order_paid", { id: order.id, paymentStatus: "paid" });
+  }
+  if (tableFreed) {
+    broadcastEvent("table_cleared", { restaurantId, tableName: order.tableName, orderId: order.id });
+  }
   res.json(parseOrder(order));
 });
 
@@ -275,14 +321,13 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     return;
   }
 
-  // Trading hours, on the one route that matters most. The kiosk and room service
-  // already checked them; the main guest order route did not, so a 4 a.m. order still
-  // reached a kitchen with nobody in it. A scheduled order is exempt — booking ahead
-  // for tomorrow lunch is the whole point of one.
+  // Trading hours gate. Scheduled orders skip it (booking ahead). Local/dev and
+  // restaurant settings can still accept dine-in while the clock says closed —
+  // see ordersAllowed() in venue-hours.ts.
   if (!scheduledAt) {
-    const hours = venueHours(venue);
-    if (!hours.isOpen) {
-      res.status(409).json(closedResponse(hours));
+    const gate = ordersAllowed(venue);
+    if (!gate.allowed) {
+      res.status(409).json(closedResponse(gate.hours));
       return;
     }
   }
@@ -342,6 +387,21 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   const prepMinutes = Math.min(45, Math.max(15, orderItems.reduce((s, i) => s + (i.quantity ?? 1) * 5, 10)));
   const baseMeta = typeof metadata === "object" && metadata !== null ? metadata : {};
   const roomFromTable = tableName?.match(/room\s+(\S+)/i)?.[1];
+  const roomNumberRaw = baseMeta.roomNumber ?? roomFromTable;
+  const roomNumber = typeof roomNumberRaw === "string" && roomNumberRaw.trim()
+    ? roomNumberRaw.trim()
+    : roomFromTable
+      ? String(roomFromTable)
+      : null;
+  const typeNorm = String(type ?? "dine_in").toLowerCase().replace(/-/g, "_");
+  // A room QR / "Room N" table is room service even if the cart still said dine_in.
+  const resolvedType = roomNumber || typeNorm === "room_service" ? "room_service" : (type ?? "dine_in");
+  if (resolvedType === "room_service" && !roomNumber) {
+    res.status(400).json({
+      error: "Room service needs a room number. Scan the QR in your room, or ask reception to place the order.",
+    });
+    return;
+  }
   const enrichedMeta = {
     ...baseMeta,
     // Stamp the browser session that placed this order. It is what later proves the
@@ -349,10 +409,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     // walking the sequential order ids.
     ...(req.session.guestSessionId ? { guestSessionId: req.session.guestSessionId } : {}),
     ...(appliedCoupon ? { couponCode: appliedCoupon, couponDiscount: discount } : {}),
-    ...(roomFromTable ? { roomNumber: roomFromTable } : {}),
-    ...((type === "room_service" || roomFromTable) && !baseMeta.roomNumber && roomFromTable
-      ? { roomNumber: roomFromTable }
-      : {}),
+    ...(roomNumber ? { roomNumber } : {}),
   };
   const trackingMeta = initialTrackingMetadata(prepMinutes);
 
@@ -389,8 +446,8 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // with its own Accept/Start/Ready buttons, and each guest tracks their own order's progress.
   // They're tagged with a shared `tabId` so the owner / cashier panels can group a table's
   // orders into one combined tab, bill and total. Only for seated dine-in / room orders.
-  const OPEN_STATUSES = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "served"];
-  const isSeated = (type ?? "dine_in") === "dine_in" || String(type ?? "").includes("room");
+  const OPEN_STATUSES = ["new", "pending", "accepted", "confirmed", "preparing", "ready", "serving", "served", "delivered"];
+  const isSeated = resolvedType === "dine_in" || resolvedType === "room_service";
   // A table left idle longer than this window starts a brand-new tab (new party), instead of
   // linking to the previous party's stale tab. Configurable via ORDER_MERGE_WINDOW_MIN (120m).
   const TAB_WINDOW_MS = (parseInt(process.env.ORDER_MERGE_WINDOW_MIN ?? "120", 10) || 120) * 60 * 1000;
@@ -426,7 +483,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   const [order] = await db.insert(ordersTable).values({
     restaurantId, tableId: resolvedTableId, tableName: tableName ?? null,
     customerName: customerName ?? null, customerPhone: customerPhone ?? null, customerEmail: customerEmail ?? null,
-    type: type ?? "dine_in", status: "pending", items: orderItems,
+    type: resolvedType, status: "pending", items: orderItems,
     subtotal: String(subtotal.toFixed(2)), tax: String(tax), total: String(total.toFixed(2)),
     notes: notes ?? null, deliveryAddress: deliveryAddress ?? null,
     // Left null until someone actually collects; the guest's cart choice is kept
@@ -436,7 +493,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
     tipAmount: String(tip.toFixed(2)),
     discountAmount: String(discount.toFixed(2)),
     guestCount: guestCount ?? 1,
-    orderSource: "user_web",
+    orderSource: resolvedType === "room_service" ? "room_service" : "user_web",
     nfcTagId: nfcTagId ?? null,
     qrCodeId: qrCodeId ?? null,
     metadata: {
@@ -451,6 +508,44 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // from the venue's consecutive series when the bill is actually settled, so cancelled
   // and abandoned orders no longer leave holes in it.
 
+  // Guest cart room food used to write only to `orders`. Kitchen and Live Orders saw it;
+  // Reception / Room Service / folio read `room_service_requests` and never did — the desk
+  // had nothing to deliver against and the charge never hit the room bill.
+  let placed = order;
+  if (resolvedType === "room_service" && roomNumber) {
+    try {
+      const [request] = await db.insert(roomServiceRequestsTable).values({
+        restaurantId,
+        roomNumber,
+        guestName: customerName ?? null,
+        guestPhone: customerPhone ?? null,
+        type: "food",
+        items: orderItems,
+        notes: notes ?? null,
+        total: String(total.toFixed(2)),
+        paymentMethod: paymentMethod || "room_bill",
+        status: "pending",
+      }).returning();
+      if (request) {
+        const prevMeta = (typeof order.metadata === "object" && order.metadata !== null
+          ? order.metadata : {}) as Record<string, unknown>;
+        const [linked] = await db.update(ordersTable).set({
+          metadata: {
+            ...prevMeta,
+            roomNumber,
+            roomServiceRequestId: request.id,
+            folioMirror: true,
+            source: "food",
+          },
+        }).where(eq(ordersTable.id, order.id)).returning();
+        if (linked) placed = linked;
+        await autoAssignRoomServiceRequest(restaurantId, request.id);
+      }
+    } catch (err) {
+      console.error("room-service desk mirror failed for order", order.id, err);
+    }
+  }
+
   for (const item of items) {
     const mi = menuMap.get(item.menuItemId);
     if (mi) await db.update(menuItemsTable).set({ orderCount: mi.orderCount + item.quantity }).where(eq(menuItemsTable.id, mi.id));
@@ -461,7 +556,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // stock, so the Inventory page only ever moved when someone typed a restock in by hand.
   await consumeStockForOrder(
     restaurantId,
-    order.id,
+    placed.id,
     orderItems.map(i => ({ name: i.name, quantity: i.quantity })),
   );
 
@@ -486,7 +581,7 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   if (resolvedTableId) {
     await db.update(tablesMapTable).set({
       status: "occupied",
-      currentOrderId: order.id,
+      currentOrderId: placed.id,
       currentCustomerName: customerName ?? null,
       currentGuestCount: req.body.guestCount ?? 1,
       occupiedSince: new Date(),
@@ -497,10 +592,17 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // merely typed into the box.
   if (appliedCoupon) await redeemCoupon(promoId);
 
-  broadcastEvent("new_order", { id: order.id, restaurantId, tableName, total, status: "pending" });
-  broadcastOrderEvent(order.id, "order_status", { id: order.id, status: "pending", tableName });
+  broadcastEvent("new_order", {
+    id: placed.id,
+    restaurantId,
+    tableName,
+    total,
+    status: "pending",
+    type: resolvedType,
+  });
+  broadcastOrderEvent(placed.id, "order_status", { id: placed.id, status: "pending", tableName });
   res.status(201).json({
-    ...parseOrder(order),
+    ...parseOrder(placed),
     // A code that quietly did nothing leaves the guest staring at the full price. Say so.
     ...(couponReason ? { couponNotApplied: couponReason } : {}),
   });
@@ -574,20 +676,23 @@ router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> =
   for (const item of items) {
     const menuItemId = Number(item.menuItemId ?? item.id);
     const mi = menuMap.get(menuItemId);
-    if (!mi) continue;
-    const qty = Number(item.quantity ?? 1);
-    const price = parseFloat(String(mi.discountedPrice || mi.price));
-    const lineTotal = price * qty;
+    if (!mi || !mi.isAvailable) continue;
+    const qty = Math.floor(Number(item.quantity ?? 1));
+    if (!Number.isInteger(qty) || qty < 1 || qty > 99) continue;
+    // Re-price from the live menu — never reuse stored line prices or client add-on amounts.
+    const { unitPrice, addons, variant } = priceMenuItem(mi, item);
+    const lineTotal = round2(unitPrice * qty);
     subtotal += lineTotal;
     orderItems.push({
-      id: mi.id, menuItemId: mi.id, name: mi.name, price, quantity: qty,
-      variant: item.variant, addons: item.addons, notes: item.notes, course: item.course ?? "main",
+      id: mi.id, menuItemId: mi.id, name: mi.name, price: unitPrice, quantity: qty,
+      variant, addons, notes: item.notes, course: item.course ?? "main",
       taxCategory: mi.taxCategory ?? "food", subtotal: lineTotal,
     });
   }
   if (!orderItems.length) { res.status(400).json({ error: "Menu items no longer available" }); return; }
 
   // Same treatment as a first order at this venue — a reorder is not taxed differently.
+  subtotal = round2(subtotal);
   const tax = (await taxForOrderItems(original.restaurantId, orderItems)).tax;
   const total = round2(subtotal + tax);
   const prepMinutes = Math.min(45, Math.max(15, orderItems.reduce((s, i) => s + (Number(i.quantity) ?? 1) * 5, 10)));
@@ -619,7 +724,9 @@ router.post("/public/orders/reorder/:orderId", async (req, res): Promise<void> =
 
 router.get("/public/orders/:orderId", async (req, res): Promise<void> => {
   const orderId = parseInt(String(req.params.orderId), 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // Ids are sequential — returning any order by id alone leaked every diner's name,
+  // phone, items and total. Same ownership check as cancel/pay.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
   res.json(parseOrder(order));
 });

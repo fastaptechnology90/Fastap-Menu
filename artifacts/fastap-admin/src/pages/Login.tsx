@@ -73,7 +73,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full flex bg-background">
+    <div className="min-h-dvh w-full flex bg-background">
       <div className="hidden lg:flex flex-col flex-1 p-12 justify-between relative overflow-hidden">
         <img src={IMAGES.adminMission} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-black/70" />
@@ -102,7 +102,7 @@ export default function Login() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/10">
                   <Icon name={icon} size={22} className="text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-white">{title}</p>
                   <p className="mt-0.5 text-xs text-white/70">{desc}</p>
                 </div>
@@ -116,15 +116,15 @@ export default function Login() {
         </p>
       </div>
 
-      <div className="flex flex-1 items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md space-y-8">
-          <div className="lg:hidden mb-6">
+      <div className="flex flex-1 items-start sm:items-center justify-center px-4 py-8 sm:p-6 lg:p-12 overflow-y-auto">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8">
+          <div className="lg:hidden mb-2">
             <PanelLogo panel="admin" showLabel label="Fastap OS" />
           </div>
 
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>
-            <p className="text-muted-foreground mt-2">Sign in to the Super Admin Panel</p>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">Sign in to the Super Admin Panel</p>
           </div>
 
           <Card>
@@ -194,7 +194,7 @@ export default function Login() {
                       placeholder="admin@fastap.io"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
+                      className="min-h-11 pl-10"
                       required
                       autoComplete="email"
                     />
@@ -211,14 +211,14 @@ export default function Login() {
                       placeholder="••••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10"
+                      className="min-h-11 pl-10"
                       required
                       autoComplete="current-password"
                     />
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                <Button type="submit" className="w-full min-h-11" size="lg" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -235,7 +235,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowForgot(true)}
-                  className="w-full text-center text-sm text-muted-foreground hover:text-primary font-medium"
+                  className="flex min-h-10 w-full items-center justify-center text-center text-sm text-muted-foreground hover:text-primary font-medium"
                 >
                   Forgot password?
                 </button>
@@ -243,20 +243,22 @@ export default function Login() {
             </CardContent>
           </Card>
 
-          <Card className="border-dashed border-border/50 bg-muted/30">
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs text-muted-foreground text-center font-medium mb-3">First time? Set up the super admin account:</p>
-              <SetupForm />
-            </CardContent>
-          </Card>
+          {import.meta.env.DEV && (
+            <Card className="border-dashed border-border/50 bg-muted/30">
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs text-muted-foreground text-center font-medium mb-3">First time? Set up the super admin account:</p>
+                <SetupForm />
+              </CardContent>
+            </Card>
+          )}
 
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground leading-relaxed px-1">
             Restaurant staff?{" "}
-            <Link href="/restaurant/login" className="text-primary font-semibold hover:underline">
+            <Link href="/restaurant/login" className="text-primary font-semibold hover:underline inline-block py-1">
               Role-based staff login
             </Link>
-            {" · "}
-            <Link href="/restaurant/register" className="text-primary font-semibold hover:underline">
+            <span className="mx-1 text-border">·</span>
+            <Link href="/restaurant/register" className="text-primary font-semibold hover:underline inline-block py-1">
               Register restaurant
             </Link>
           </p>

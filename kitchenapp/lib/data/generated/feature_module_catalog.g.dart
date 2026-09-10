@@ -582,10 +582,10 @@ class FeatureModuleCatalog {
       surfaces: const [
       'mobile',
     ],
-      apiPath: '/cleaning-hygiene/board',
+      apiPath: '/hygiene/board',
       restaurantPaths: const [
-      '/restaurant/housekeeping',
-    ],
+        '/restaurant/housekeeping',
+      ],
       linkedSystems: const [
       44,
     ],

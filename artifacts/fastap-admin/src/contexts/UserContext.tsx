@@ -138,11 +138,16 @@ export interface VenueHours {
   localTime: string;
   overnight: boolean;
   message: string;
+  /** Server may still accept orders (local/dev bypass). Never treat as “open” on the clock. */
+  ordersAllowed?: boolean;
+  ordersBypass?: string;
+  demoOpenMessage?: string;
 }
 
 const OPEN_UNTIL_TOLD_OTHERWISE: VenueHours = {
   isOpen: true, hoursPublished: false, openTime: null, closeTime: null,
   timezone: "Asia/Kolkata", localTime: "", overnight: false, message: "",
+  ordersAllowed: true,
 };
 
 interface UserContextValue {
@@ -455,6 +460,62 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setVenueLoading(false);
     }
   }, []);
+
+  /**
+   * Keep the open/closed state live.
+   *
+   * `loadVenue` runs when a guest screen mounts, so `venue.hours` was a snapshot of the
+   * moment the page opened. Two things went wrong with that. An owner who changed the
+   * times in Settings → Operating Hours saw no change on a phone that already had the
+   * menu open — which reads as "the hours setting does nothing". And a menu left open
+   * across closing time carried on saying "Open until 23:00" and taking orders.
+   *
+   * A one-minute poll on the cheap hours endpoint, plus an immediate re-check whenever
+   * the tab comes back to the foreground, covers both. It only ever replaces `hours`,
+   * so nothing else in the venue context is disturbed mid-order.
+   */
+  useEffect(() => {
+    const slug = venue.restaurantSlug;
+    if (!slug) return;
+    let cancelled = false;
+
+    async function check() {
+      if (cancelled || typeof document !== "undefined" && document.hidden) return;
+      try {
+        const data = await publicApi.venueHours(slug!);
+        if (cancelled || !data?.hours || typeof data.hours !== "object") return;
+        const next = { ...OPEN_UNTIL_TOLD_OTHERWISE, ...data.hours } as VenueHours;
+        setVenue(prev => {
+          // Same slug only: a guest who has moved to another venue must not have the
+          // previous one's hours written over the new ones by an in-flight response.
+          if (prev.restaurantSlug !== slug) return prev;
+          const cur = prev.hours;
+          if (
+            cur.isOpen === next.isOpen
+            && cur.hoursPublished === next.hoursPublished
+            && cur.openTime === next.openTime
+            && cur.closeTime === next.closeTime
+            && cur.ordersAllowed === next.ordersAllowed
+            && cur.message === next.message
+          ) return prev;
+          return { ...prev, hours: next };
+        });
+      } catch {
+        // Offline or a blip — keep showing the last known state rather than guessing.
+      }
+    }
+
+    const timer = window.setInterval(check, 60_000);
+    const onVisible = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [venue.restaurantSlug]);
 
   const joinShareSession = useCallback(async (shareCode: string) => {
     const result = await publicApi.session.join(shareCode, getDeviceId());

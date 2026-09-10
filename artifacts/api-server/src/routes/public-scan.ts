@@ -10,7 +10,7 @@ import {
 } from "@workspace/db";
 import { buildScanUrl } from "../lib/scan-urls.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
-import { venueHours } from "../lib/venue-hours.js";
+import { publicHoursPayload } from "../lib/venue-hours.js";
 
 const router: IRouter = Router();
 
@@ -114,7 +114,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
     res.json({
       type: "venue",
       scannedAt: new Date().toISOString(),
-      hours: venueHours(restaurant),
+      hours: publicHoursPayload(restaurant),
       restaurant: {
         id: restaurant.id,
         name: restaurant.name,
@@ -154,7 +154,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
     res.json({
       type: "table",
       scannedAt: new Date().toISOString(),
-      hours: venueHours(restaurant),
+      hours: publicHoursPayload(restaurant),
       restaurant: {
         id: restaurant.id,
         name: restaurant.name,
@@ -208,7 +208,7 @@ router.get("/public/scan/:slug", async (req, res): Promise<void> => {
   res.json({
     type: "room",
     scannedAt: new Date().toISOString(),
-    hours: venueHours(restaurant),
+    hours: publicHoursPayload(restaurant),
     restaurant: {
       id: restaurant.id,
       name: restaurant.name,

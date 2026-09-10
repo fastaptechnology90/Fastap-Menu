@@ -51,10 +51,15 @@ export default function Notifications() {
 
   const createMutation = useMutation({
     mutationFn: api.notifications.create,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       setOpen(false);
-      toast({ title: "Notification sent successfully" });
+      const ch = (variables as { channel?: string })?.channel;
+      toast({
+        title: ch === "sms" || ch === "whatsapp"
+          ? "Notification recorded (delivery needs provider keys)"
+          : "Notification sent successfully",
+      });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -69,7 +74,6 @@ export default function Notifications() {
   });
 
   const alertTypes = ["Failed Payment", "Refund Request", "Settlement Due", "Expiring Subscription", "Fraud Alert", "KYC Rejected", "Server Alert", "General"];
-  const channels = ["email", "sms", "push", "whatsapp"];
 
   const activeAlerts = notifications.filter((n: any) => ["active", "sent"].includes(norm(n.status))).length;
   const failedCount = notifications.filter((n: any) => norm(n.status) === "failed").length;
@@ -89,7 +93,7 @@ export default function Notifications() {
     <div className="space-y-6">
       <PageHeader
         title="Notification Center"
-        description="Manage platform alerts across all channels (Push, Email, SMS, WhatsApp)."
+        description="In-app alert log for the platform. SMS and WhatsApp only leave this screen if those providers are configured — otherwise the row is recorded here only."
         actions={
           <>
             <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching}>
@@ -122,8 +126,16 @@ export default function Notifications() {
             <Label>Channel</Label>
             <Select value={form.channel} onValueChange={v => setForm(f => ({ ...f, channel: v }))}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{channels.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              <SelectItem value="email">email</SelectItem>
+              <SelectItem value="push">push</SelectItem>
+              <SelectItem value="sms">sms (needs SMS keys)</SelectItem>
+              <SelectItem value="whatsapp">whatsapp (needs WhatsApp keys)</SelectItem>
+            </SelectContent>
             </Select>
+            {(form.channel === "sms" || form.channel === "whatsapp") && (
+              <p className="text-xs text-warning">Without provider keys this is logged in the panel only — nothing is delivered to a phone.</p>
+            )}
             </div>
             <div className="space-y-2">
             <Label>Priority</Label>
@@ -140,7 +152,7 @@ export default function Notifications() {
             </div>
             <Button type="submit" className="w-full" disabled={createMutation.isPending}>
             {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Send Notification
+            {form.channel === "sms" || form.channel === "whatsapp" ? "Record notification" : "Send Notification"}
             </Button>
             </form>
             </DialogContent>
