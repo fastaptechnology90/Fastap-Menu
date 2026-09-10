@@ -4,7 +4,7 @@ class ApiConstants {
 
   static const apiVersion = 'v1';
   static const defaultProductionBaseUrl =
-      'https://digitalrestuarants.thefingo.com';
+      'https://fastap-menu-production.up.railway.app';
 
   static const connectTimeoutSeconds = 20;
   static const sessionTimeoutMinutes = 480;

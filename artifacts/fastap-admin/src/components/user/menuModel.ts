@@ -98,7 +98,13 @@ export function matchesDietaryFilter(tags: string[], filter: DietaryFilter): boo
  */
 function parseCustomization(raw: unknown): CustomizationOpts {
   if (typeof raw !== "object" || raw === null) return {};
-  return { ...(raw as CustomizationOpts) };
+  const o = raw as CustomizationOpts;
+  // Priced extras (cheese, toppings, combos) belong on `addons` — the only list the
+  // server bills. Keep free "leave out" notes when the menu API sends them.
+  const remove = Array.isArray(o.removeIngredients)
+    ? o.removeIngredients.map(String).map(s => s.trim()).filter(Boolean)
+    : [];
+  return remove.length > 0 ? { removeIngredients: remove } : {};
 }
 
 export function mapApiItem(

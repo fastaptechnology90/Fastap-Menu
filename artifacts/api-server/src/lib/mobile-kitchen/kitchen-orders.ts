@@ -12,7 +12,7 @@ export const KITCHEN_SECTIONS = ["Main", "Tandoor", "Chinese", "Beverage", "Bar"
 // rest of the API already treats it as an open order (orders.ts OPEN_STATUSES,
 // tables.ts ACTIVE_ORDER_STATUSES). Leaving it out made an order pressed "Served" on the
 // browser KDS vanish from the waiter's phone before anyone had delivered it.
-const ACTIVE_DB = ["pending", "confirmed", "preparing", "ready", "serving", "served", "delayed", "billing"];
+const ACTIVE_DB = ["pending", "new", "confirmed", "accepted", "preparing", "ready", "serving", "served", "delivered", "delayed", "billing"];
 // Orders the apps display: the active ones plus recently "completed" (delivered),
 // so the waiter keeps a "Delivered" record. Everything auto-clears from both apps
 // after 24h (a display window — the rows stay in the DB, just stop showing).
@@ -29,7 +29,9 @@ function dbToMobileStatus(status: string, meta: Record<string, unknown>): string
   if (meta.reFire) return "re_fire";
   switch (status.toLowerCase()) {
     case "pending": return "new";
+    case "new": return "new";
     case "confirmed": return "accepted";
+    case "accepted": return "accepted";
     case "preparing": return "preparing";
     case "delayed": return "delayed";
     case "ready": return "ready";
@@ -702,6 +704,8 @@ export async function applyKdsAction(
   /** The staff member who pressed the button, so the guest sees a name rather than
    *  the "Head Chef" placeholder the web path falls back to. */
   performedBy?: string,
+  /** UPI ID / UTR / card RRN — required before online methods can be marked paid. */
+  paymentReference?: string | null,
 ) {
   if (orderIdRaw.startsWith("RSR-") || orderIdRaw.startsWith("HKT-")) {
     return applyRoomRequestAction(restaurantId, orderIdRaw, action);
@@ -718,10 +722,40 @@ export async function applyKdsAction(
   // bill paid with the ACTUAL method the waiter chose ("collect_cash" etc.), so
   // the owner's live-order page shows the real method — not the order's default.
   if (action === "collect" || action.startsWith("collect_")) {
+    // Already settled — return as-is. Re-collect used to re-broadcast and re-hit
+    // the ledger path; the helper de-duplicates income, but staff earnings and
+    // floor events must not fire again for the same bill.
+    if (existing.paymentStatus === "paid") {
+      return mapOrderRow(existing);
+    }
+
     const method = action.includes("_") ? action.split("_")[1] : "cash";
+    const onlineAtTable = ["upi", "card", "nfc", "qr", "wallet", "netbanking"].includes(method);
+    const ref = String(paymentReference ?? "").trim();
+    if (onlineAtTable && !ref) {
+      throw new Error("PAYMENT_REFERENCE_REQUIRED");
+    }
+
+    const meta = (typeof existing.metadata === "object" && existing.metadata !== null
+      ? existing.metadata : {}) as Record<string, unknown>;
+    const existingPayment = (typeof meta.payment === "object" && meta.payment !== null
+      ? meta.payment : {}) as Record<string, unknown>;
+    const paymentDetail = onlineAtTable || ref ? {
+      ...existingPayment,
+      method,
+      status: "paid",
+      ...(method === "upi" ? { upiId: ref } : { utr: ref || undefined }),
+      collectedBy: performedBy ?? existing.waiterName ?? null,
+      collectedFrom: "Waiter app",
+      collectedAt: new Date().toISOString(),
+    } : existingPayment;
+
     const [paid] = await db.update(ordersTable).set({
       paymentStatus: "paid",
       paymentMethod: method,
+      ...(onlineAtTable || ref
+        ? { metadata: { ...meta, payment: paymentDetail } }
+        : {}),
     }).where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId))).returning();
     // Put it in the finance ledger too, exactly like the web panel does —
     // otherwise money a waiter collects in the app never reaches Finance or the
@@ -731,7 +765,8 @@ export async function applyKdsAction(
       restaurantId,
       order: paid,
       method,
-      performedBy: paid.waiterName ?? null,
+      reference: ref || null,
+      performedBy: performedBy ?? paid.waiterName ?? null,
     });
     broadcastEvent("order_paid", { id: orderId, restaurantId, tableName: existing.tableName });
     broadcastOrderEvent(orderId, "order_paid", { id: orderId, paymentStatus: "paid" });
@@ -781,6 +816,21 @@ export async function applyKdsAction(
   // status", which meant a typo or a stale app build silently rewrote the status column.
   // Say so instead.
   if (!mapped) throw new Error("UNKNOWN_ACTION");
+
+  // Waiter pickup/delivery must not skip the kitchen. Shared canTransition still
+  // allows new→serving for legacy web paths; mobile refuses that shortcut.
+  if (action === "serve") {
+    const from = String(existing.status ?? "").toLowerCase();
+    if (!["ready", "serving", "served"].includes(from)) {
+      throw new Error("INVALID_TRANSITION: Order must be ready before starting delivery");
+    }
+  }
+  if (action === "deliver") {
+    const from = String(existing.status ?? "").toLowerCase();
+    if (!["serving", "served"].includes(from)) {
+      throw new Error("INVALID_TRANSITION: Start delivery before marking delivered");
+    }
+  }
 
   // The same guard the browser KDS goes through (routes/orders.ts). Without it the app
   // could walk a settled order backwards — a delivered order pressed "Accept" reappeared

@@ -35,10 +35,15 @@ class KdsService {
   Future<void> performAction({
     required String orderId,
     required String action,
+    String? reference,
   }) async {
     await _api.post(
       KdsEndpoints.orderAction(orderId),
-      body: {'action': action},
+      body: {
+        'action': action,
+        if (reference != null && reference.trim().isNotEmpty)
+          'reference': reference.trim(),
+      },
     );
   }
 

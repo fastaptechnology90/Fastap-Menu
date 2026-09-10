@@ -51,9 +51,9 @@ function VariantEditor({ label, hint, rows, onChange }: {
       <label className="block text-xs text-muted-foreground mb-1.5">{label}</label>
       <div className="space-y-2">
         {rows.map((row, idx) => (
-          <div key={idx} className="flex gap-2">
+          <div key={idx} className="flex min-w-0 gap-2">
             <input
-              className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground"
+              className="min-h-10 min-w-0 flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground"
               placeholder="Name"
               value={row.name}
               onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
@@ -61,7 +61,7 @@ function VariantEditor({ label, hint, rows, onChange }: {
             <input
               type="number"
               min={0}
-              className="w-28 bg-muted border border-border rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground"
+              className="h-10 w-20 shrink-0 bg-muted border border-border rounded-lg px-2 py-2 text-sm placeholder:text-muted-foreground sm:w-24"
               placeholder="₹"
               value={row.price}
               onChange={e => onChange(rows.map((r, i) => i === idx ? { ...r, price: Number(e.target.value) || 0 } : r))}
@@ -69,7 +69,7 @@ function VariantEditor({ label, hint, rows, onChange }: {
             <button
               type="button"
               onClick={() => onChange(rows.filter((_, i) => i !== idx))}
-              className="px-3 rounded-lg border border-border hover:bg-muted text-muted-foreground"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"
               aria-label={`Remove ${label.toLowerCase()} row`}
             >
               ×
@@ -79,7 +79,7 @@ function VariantEditor({ label, hint, rows, onChange }: {
         <button
           type="button"
           onClick={() => onChange([...rows, { name: "", price: 0 }])}
-          className="text-xs text-primary hover:text-primary"
+          className="min-h-9 text-xs text-primary hover:text-primary"
         >
           + Add {label.toLowerCase().replace(/s$/, "")}
         </button>
@@ -267,45 +267,45 @@ export default function MenuManagement() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
-      {/* Header */}
+    <div className="min-w-0 space-y-5">
+      {/* Header — RestaurantLayout already pads the page */}
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">Menu Management</h1>
           <p className="text-xs text-muted-foreground">{items.filter(i => i.available).length} available · {items.filter(i => !i.available).length} hidden</p>
         </div>
-        <button onClick={() => setAddMode(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors">
+        <button onClick={() => setAddMode(true)} className="flex min-h-10 w-full items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-semibold shadow-sm transition-colors sm:w-auto">
           <Plus className="h-4 w-4" /> Add Item
         </button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-col gap-3">
-        <div className="relative">
+        <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
-            className="w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
+            className="min-h-10 w-full bg-muted border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
             placeholder="Search menu items..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain no-scrollbar">
           {categoryNames.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${category === cat ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+            <button key={cat} onClick={() => setCategory(cat)} className={`shrink-0 min-h-10 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${category === cat ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
               {cat}
             </button>
           ))}
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain no-scrollbar">
           {(["all", "veg", "non-veg"] as const).map(f => (
-            <button key={f} onClick={() => setFilterDiet(f)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterDiet === f ? "bg-success-subtle border-success-border text-success" : "border-border bg-muted text-muted-foreground"}`}>
+            <button key={f} onClick={() => setFilterDiet(f)} className={`shrink-0 min-h-10 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${filterDiet === f ? "bg-success-subtle border-success-border text-success" : "border-border bg-muted text-muted-foreground"}`}>
               {f === "all" ? "All Diets" : f === "veg" ? "Veg" : "Non-veg"}
             </button>
           ))}
           <div className="h-px w-px shrink-0" />
           {(["all", "available", "unavailable"] as const).map(f => (
-            <button key={f} onClick={() => setFilterAvail(f)} className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filterAvail === f ? "bg-muted border-border text-foreground" : "border-border bg-muted text-muted-foreground"}`}>
+            <button key={f} onClick={() => setFilterAvail(f)} className={`shrink-0 min-h-10 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${filterAvail === f ? "bg-muted border-border text-foreground" : "border-border bg-muted text-muted-foreground"}`}>
               {f === "all" ? "All Status" : f === "available" ? "Available" : "Hidden"}
             </button>
           ))}
@@ -313,9 +313,63 @@ export default function MenuManagement() {
         <p className="text-xs text-muted-foreground">Showing {filtered.length} of {items.length} items</p>
       </div>
 
-      {/* Menu Items Table */}
-      <div className="rounded-lg border border-border">
-        <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="space-y-3 md:hidden">
+        {filtered.length === 0 && (
+          <EmptyState
+            tone={items.length ? "search" : "empty"}
+            title={items.length ? "No dishes match this filter" : "No dishes on the menu yet"}
+            description={items.length ? "Clear the search or pick another category." : "Add your first dish and it appears on the guest menu straight away."}
+          />
+        )}
+        {filtered.map(item => {
+          const margin = item.cost > 0 ? Math.round(((item.price - item.cost) / item.price) * 100) : null;
+          return (
+            <div key={`m-${item.id}`} className={`rounded-lg border border-border bg-card p-3 ${!item.available ? "opacity-60" : ""}`}>
+              <div className="flex items-start gap-3">
+                <div className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center ${item.dietary === "veg" || item.dietary === "vegan" ? "bg-success-subtle" : "bg-danger-subtle"}`}>
+                  {(() => { const CatIcon = item.category === "Starters" ? Soup : item.category === "Desserts" ? CakeSlice : item.category === "Beverages" ? CupSoda : UtensilsCrossed; return <CatIcon className="h-5 w-5 text-muted-foreground" />; })()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.category} · {item.dietary}</p>
+                    </div>
+                    <p className="shrink-0 font-semibold text-primary">₹{item.price}</p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {margin !== null && <span className={margin >= 60 ? "text-success" : margin >= 40 ? "text-warning" : "text-danger"}>{margin}% margin</span>}
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{item.prepTime}m</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <PermissionGate permission="hide_menu">
+                      <button type="button" onClick={() => handleToggle(item.id)} className={`flex min-h-10 items-center gap-1.5 px-3 rounded-lg text-xs font-semibold ${item.available ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground"}`}>
+                        {item.available ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                        {item.available ? "Visible" : "Hidden"}
+                      </button>
+                    </PermissionGate>
+                    <PermissionGate permission="edit_pricing">
+                      <button type="button" onClick={() => setEditItem({ ...item })} className="flex h-10 w-10 items-center justify-center rounded-lg bg-info-subtle text-info" aria-label={`Edit ${item.name}`}>
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    </PermissionGate>
+                    <PermissionGate permission="add_menu">
+                      <button type="button" onClick={() => handleDelete(item.id)} className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger-subtle text-danger" aria-label={`Delete ${item.name}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </PermissionGate>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden min-w-0 rounded-lg border border-border md:block">
+        <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-card">
@@ -327,7 +381,7 @@ export default function MenuManagement() {
             <tbody className="divide-y divide-border">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-0">
+                  <td colSpan={9} className="p-0">
                     <EmptyState
                       tone={items.length ? "search" : "empty"}
                       title={items.length ? "No dishes match this filter" : "No dishes on the menu yet"}
@@ -345,7 +399,7 @@ export default function MenuManagement() {
                         <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-base ${item.dietary === "veg" ? "bg-success-subtle" : item.dietary === "vegan" ? "bg-success-subtle" : "bg-danger-subtle"}`}>
                           {(() => { const CatIcon = item.category === "Starters" ? Soup : item.category === "Desserts" ? CakeSlice : item.category === "Beverages" ? CupSoda : UtensilsCrossed; return <CatIcon className="h-5 w-5 text-muted-foreground" />; })()}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-semibold text-sm">{item.name}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             {item.featured && <Star className="h-3 w-3 fill-warning text-warning" />}
@@ -380,7 +434,7 @@ export default function MenuManagement() {
                     </td>
                     <td className="px-4 py-3">
                       <PermissionGate permission="hide_menu">
-                      <button onClick={() => handleToggle(item.id)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${item.available ? "bg-success-subtle text-success hover-elevate" : "bg-muted text-muted-foreground hover-elevate"}`}>
+                      <button onClick={() => handleToggle(item.id)} className={`flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${item.available ? "bg-success-subtle text-success hover-elevate" : "bg-muted text-muted-foreground hover-elevate"}`}>
                         {item.available ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                         {item.available ? "Visible" : "Hidden"}
                       </button>
@@ -389,13 +443,13 @@ export default function MenuManagement() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <PermissionGate permission="edit_pricing">
-                        <button onClick={() => setEditItem({ ...item })} className="h-7 w-7 rounded-lg bg-info-subtle text-info flex items-center justify-center hover-elevate transition-colors">
-                          <Edit2 className="h-3 w-3" />
+                        <button onClick={() => setEditItem({ ...item })} className="h-9 w-9 rounded-lg bg-info-subtle text-info flex items-center justify-center hover-elevate transition-colors" aria-label={`Edit ${item.name}`}>
+                          <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         </PermissionGate>
                         <PermissionGate permission="add_menu">
-                        <button onClick={() => handleDelete(item.id)} className="h-7 w-7 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate transition-colors">
-                          <Trash2 className="h-3 w-3" />
+                        <button onClick={() => handleDelete(item.id)} className="h-9 w-9 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate transition-colors" aria-label={`Delete ${item.name}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                         </PermissionGate>
                       </div>
@@ -410,13 +464,13 @@ export default function MenuManagement() {
 
       {/* Edit Modal */}
       {(editItem || addMode) && (
-        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-card rounded-lg border border-border max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border">
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="flex w-full max-w-lg max-h-[calc(100dvh-0.5rem)] sm:max-h-[calc(100dvh-2rem)] flex-col overflow-hidden bg-card rounded-t-lg sm:rounded-lg border border-border">
+            <div className="flex shrink-0 items-center justify-between p-4 sm:p-5 border-b border-border">
               <h3 className="font-semibold">{addMode ? "Add New Item" : "Edit Item"}</h3>
-              <button onClick={() => { setEditItem(null); setAddMode(false); }}><X className="h-5 w-5 text-muted-foreground hover:text-foreground" /></button>
+              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground" onClick={() => { setEditItem(null); setAddMode(false); }} aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4">
               {[
                 { label: "Item Name", field: "name", type: "text", placeholder: "e.g. Paneer Tikka" },
                 { label: "Description", field: "description", type: "textarea", placeholder: "Brief description..." },
@@ -440,7 +494,7 @@ export default function MenuManagement() {
                     />
                   ) : type === "select" ? (
                     <select
-                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 text-foreground"
+                      className="min-h-10 w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 text-foreground"
                       value={(editItem || newItem)[field as keyof MenuItem] as string || ""}
                       onChange={e => editItem ? setEditItem({ ...editItem, [field]: e.target.value }) : setNewItem({ ...newItem, [field]: e.target.value })}
                     >
@@ -452,7 +506,7 @@ export default function MenuManagement() {
                   ) : (
                     <input
                       type={type}
-                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
+                      className="min-h-10 w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
                       placeholder={placeholder}
                       value={(editItem || newItem)[field as keyof MenuItem] as string | number || ""}
                       onChange={e => editItem ? setEditItem({ ...editItem, [field]: type === "number" ? Number(e.target.value) : e.target.value }) : setNewItem({ ...newItem, [field]: type === "number" ? Number(e.target.value) : e.target.value })}
@@ -516,9 +570,9 @@ export default function MenuManagement() {
               {/* Spice Level */}
               <div>
                 <label className="block text-xs text-muted-foreground mb-2">Spice Level</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {[0, 1, 2, 3].map(l => (
-                    <button key={l} onClick={() => editItem ? setEditItem({ ...editItem, spiceLevel: l }) : setNewItem({ ...newItem, spiceLevel: l })} className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${(editItem?.spiceLevel || newItem.spiceLevel || 0) === l ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                    <button key={l} type="button" onClick={() => editItem ? setEditItem({ ...editItem, spiceLevel: l }) : setNewItem({ ...newItem, spiceLevel: l })} className={`min-h-10 rounded-lg text-xs font-semibold border transition-colors ${(editItem?.spiceLevel || newItem.spiceLevel || 0) === l ? "bg-primary/20 border-primary/40 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
                       {l === 0 ? "None" : l === 1 ? "Mild" : l === 2 ? "Medium" : "Hot"}
                     </button>
                   ))}
@@ -526,22 +580,21 @@ export default function MenuManagement() {
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <label className="flex min-h-10 items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={editItem?.featured || newItem.featured || false} onChange={e => editItem ? setEditItem({ ...editItem, featured: e.target.checked }) : setNewItem({ ...newItem, featured: e.target.checked })} />
                   <span className="text-muted-foreground">Mark as Featured</span>
                 </label>
               </div>
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setEditItem(null); setAddMode(false); }} className="flex-1 py-3 rounded-lg border border-border hover:bg-muted font-semibold text-sm">
-                  Cancel
-                </button>
-                <PermissionGate permission={addMode ? "add_menu" : "edit_pricing"}>
-                <button onClick={editItem ? handleSaveEdit : handleAddItem} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
-                  <Save className="h-4 w-4" /> {addMode ? "Add Item" : "Save Changes"}
-                </button>
-                </PermissionGate>
-              </div>
+            </div>
+            <div className="flex shrink-0 gap-3 border-t border-border p-4 sm:p-5">
+              <button type="button" onClick={() => { setEditItem(null); setAddMode(false); }} className="flex-1 min-h-11 py-3 rounded-lg border border-border hover:bg-muted font-semibold text-sm">
+                Cancel
+              </button>
+              <PermissionGate permission={addMode ? "add_menu" : "edit_pricing"}>
+              <button type="button" onClick={editItem ? handleSaveEdit : handleAddItem} className="flex-1 min-h-11 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
+                <Save className="h-4 w-4" /> {addMode ? "Add Item" : "Save Changes"}
+              </button>
+              </PermissionGate>
             </div>
           </div>
         </div>

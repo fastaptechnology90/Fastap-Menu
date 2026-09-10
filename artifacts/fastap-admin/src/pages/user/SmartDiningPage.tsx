@@ -42,8 +42,8 @@ export default function SmartDiningPage() {
   const [apiLines, setApiLines] = useState<RunningBillLine[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [payToast, setPayToast] = useState<string | null>(null);
-  const [payingGroup, setPayingGroup] = useState(false);
   const [apiSplit, setApiSplit] = useState<{ splits?: { person: number; amount: number }[]; seats?: { seat: number; amount: number }[] } | null>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(billStorageKey(activeTable), JSON.stringify(billConfig));
@@ -171,12 +171,24 @@ export default function SmartDiningPage() {
     const unpaid = allLines.filter(l => !l.paid);
     const modeMap: Record<string, string> = { split: "equal", seat_wise: "seat_wise", item_wise: "item_wise" };
     if (modeMap[mode]) {
+      setSplitError(null);
       publicApi.dining.splitBill({
         lines: unpaid,
         splitCount: billConfig.splitCount,
         seatCount: billConfig.seatCount,
         mode: modeMap[mode],
-      }).then(setApiSplit).catch(() => setApiSplit(null));
+      }).then(data => {
+        setApiSplit(data);
+        setSplitError(null);
+      }).catch(e => {
+        // Failure used to clear the split quietly so the UI fell back to a local
+        // estimate with no hint that the server share was wrong.
+        setApiSplit(null);
+        setSplitError(e instanceof Error ? e.message : "Could not calculate the bill split.");
+      });
+    } else {
+      setSplitError(null);
+      setApiSplit(null);
     }
   }
 
@@ -194,51 +206,8 @@ export default function SmartDiningPage() {
     }));
   }
 
-  async function payGroup() {
-    if (payingGroup) return;
-    const total = summary.total;
-    if (!venue.restaurantId) {
-      setPayToast("We do not know which restaurant you are in. Scan the QR code on your table and try again.");
-      setTimeout(() => setPayToast(null), 5000);
-      return;
-    }
-    setPayingGroup(true);
-    try {
-      // `dining.groupPayment` only works the arithmetic out — it takes no money and
-      // records nothing. The bill was still being marked paid afterwards, so the whole
-      // table could be shown a settled bill and walk out owing every rupee of it. Until
-      // there is an endpoint that actually collects, the honest thing is to tell the
-      // floor one person is settling and let the counter take the payment.
-      await publicApi.waiterCall({
-        restaurantId: venue.restaurantId,
-        tableId: venue.tableId,
-        tableName: activeTable,
-        type: "group_payment",
-        message: `One bill for the table — ₹${total}${billConfig.groupPayerName ? ` (paying: ${billConfig.groupPayerName})` : ""}`,
-      });
-    } catch (e) {
-      setPayToast(e instanceof Error ? e.message : "We could not reach the staff. Please settle at the counter.");
-      setTimeout(() => setPayToast(null), 5000);
-      setPayingGroup(false);
-      return;
-    }
-    setPayToast(`Staff notified — one bill of ₹${total} for the table${billConfig.groupPayerName ? `, paying: ${billConfig.groupPayerName}` : ""}. Nothing has been charged yet.`);
-    setTimeout(() => setPayToast(null), 6000);
-    setPayingGroup(false);
-  }
-
-  function paySelectedItems() {
-    if (selectedTotal <= 0) {
-      setPayToast("Tick the dishes that are yours first.");
-      setTimeout(() => setPayToast(null), 4000);
-      return;
-    }
-    // This used to announce "Item-wise payment: ₹…" and then do nothing at all — no
-    // request, no record, nothing marked paid. A guest could walk out believing their
-    // share was settled. There is no per-item payment endpoint, so say so plainly.
-    setPayToast(`Your share is ₹${selectedWithGst}. Paying for individual items in the app isn't available yet — please settle it at the counter.`);
-    setTimeout(() => setPayToast(null), 6000);
-  }
+  // In-app Pay Selected / Group Pay used to look like checkout. There is still no
+  // endpoint that collects money here — keep the controls disabled and labelled.
 
   return (
     <div className="guest-page thin-scroll min-h-screen text-foreground pb-10">
@@ -333,6 +302,9 @@ export default function SmartDiningPage() {
               <span className="flex-1 text-center text-sm font-semibold">{billConfig.splitCount} guests · ₹{apiSplit?.splits?.[0]?.amount ?? summary.perPerson} each</span>
               <button onClick={() => setBillConfig(c => ({ ...c, splitCount: Math.min(12, c.splitCount + 1) }))} className="h-7 w-7 rounded-lg bg-muted">+</button>
             </div>
+          )}
+          {splitError && (
+            <p role="alert" className="mb-3 text-xs text-danger bg-danger-subtle border border-danger-border rounded-xl px-3 py-2">{splitError}</p>
           )}
           {apiSplit?.splits && billConfig.mode === "split" && (
             <div className="mb-3 space-y-1">
@@ -434,24 +406,43 @@ export default function SmartDiningPage() {
             </div>
           </div>
 
-          {/* Payment actions */}
-          <div className="flex gap-2">
-            {billConfig.mode === "item_wise" ? (
-              <button onClick={paySelectedItems} disabled={summary.unpaidCount === 0} className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm flex items-center justify-center gap-2">
-                <CreditCard className="h-4 w-4" /> My share · ₹{selectedWithGst}
+          {/* Payment actions — item/group pay have no collection endpoint yet */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {billConfig.mode === "item_wise" ? (
+                <button
+                  type="button"
+                  disabled
+                  title="In-app item payment is not available yet"
+                  className="flex-1 py-3 rounded-xl bg-muted text-muted-foreground border border-border font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
+                >
+                  <CreditCard className="h-4 w-4" /> Pay Selected · unavailable
+                </button>
+              ) : billConfig.mode === "group" ? (
+                <button
+                  type="button"
+                  disabled
+                  title="In-app group payment is not available yet"
+                  className="flex-1 py-3 rounded-xl bg-muted text-muted-foreground border border-border font-semibold text-sm flex items-center justify-center gap-2 cursor-not-allowed opacity-70"
+                >
+                  <Users className="h-4 w-4" /> Group Pay · unavailable
+                </button>
+              ) : (
+                <button onClick={() => navigate("/user/cart")} className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
+                  <ShoppingBag className="h-4 w-4" /> Checkout · ₹{billConfig.mode === "split" ? summary.perPerson : summary.total}
+                </button>
+              )}
+              <button onClick={() => sendRequest("Request Bill", "request_bill")} className="px-4 py-3 rounded-xl border border-border bg-muted text-sm font-semibold">
+                Bill
               </button>
-            ) : billConfig.mode === "group" ? (
-              <button onClick={payGroup} className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
-                <Users className="h-4 w-4" /> Group Pay · ₹{summary.total}
-              </button>
-            ) : (
-              <button onClick={() => navigate("/user/cart")} className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
-                <ShoppingBag className="h-4 w-4" /> Checkout · ₹{billConfig.mode === "split" ? summary.perPerson : summary.total}
-              </button>
+            </div>
+            {(billConfig.mode === "item_wise" || billConfig.mode === "group") && (
+              <p className="text-xs text-muted-foreground">
+                {billConfig.mode === "item_wise"
+                  ? `Your selected share is ₹${selectedWithGst} (incl. GST). Paying for individual items in the app isn’t available yet — request the bill or settle at the counter.`
+                  : `Table total ₹${summary.total}. Group pay in the app isn’t available yet — request the bill or settle at the counter.`}
+              </p>
             )}
-            <button onClick={() => sendRequest("Request Bill", "request_bill")} className="px-4 py-3 rounded-xl border border-border bg-muted text-sm font-semibold">
-              Bill
-            </button>
           </div>
         </div>
 

@@ -2757,9 +2757,14 @@ class KitchenCommandController extends ChangeNotifier {
       );
       _roomServiceErrorMessage = null;
     } on ApiException catch (error) {
-      _roomServiceErrorMessage = error.message;
+      _roomServiceErrorMessage = _moduleLoadError(
+        label: 'Room service',
+        error: error,
+      );
+      if (!silent) _roomService = null;
     } catch (_) {
       _roomServiceErrorMessage = 'Unable to load room service board.';
+      if (!silent) _roomService = null;
     }
 
     _roomServiceLoading = false;
@@ -2821,13 +2826,33 @@ class KitchenCommandController extends ChangeNotifier {
       );
       _cleaningHygieneErrorMessage = null;
     } on ApiException catch (error) {
-      _cleaningHygieneErrorMessage = error.message;
+      _cleaningHygieneErrorMessage = _moduleLoadError(
+        label: 'Cleaning & hygiene',
+        error: error,
+      );
+      if (!silent) _cleaningHygiene = null;
     } catch (_) {
       _cleaningHygieneErrorMessage = 'Unable to load cleaning hygiene board.';
+      if (!silent) _cleaningHygiene = null;
     }
 
     _cleaningHygieneLoading = false;
     notifyListeners();
+  }
+
+  /// Honest load failure copy for housekeeping boards — never pretend success.
+  static String _moduleLoadError({
+    required String label,
+    required ApiException error,
+  }) {
+    if (error.code == 'MODULE_DISABLED' || error.statusCode == 403) {
+      return '$label is not enabled for this restaurant.';
+    }
+    if (error.statusCode == 404) {
+      return '$label endpoint was not found on the server.';
+    }
+    if (error.message.trim().isNotEmpty) return error.message;
+    return 'Unable to load $label.';
   }
 
   Future<void> performCleaningHygieneAction({
@@ -4990,7 +5015,7 @@ class KitchenCommandController extends ChangeNotifier {
     );
   }
 
-  Future<void> performKdsAction(String orderId, String action) async {
+  Future<void> performKdsAction(String orderId, String action, {String? reference}) async {
     // Reflect the transition locally first so the tap feels instant and the
     // card moves through its states in place — instead of freezing (or looking
     // like it vanished) until the server round-trip and follow-up sync finish.
@@ -5009,7 +5034,7 @@ class KitchenCommandController extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      await _kdsService.performAction(orderId: orderId, action: action);
+      await _kdsService.performAction(orderId: orderId, action: action, reference: reference);
     } catch (error) {
       // Roll back the optimistic change if the server rejected the action.
       if (nextRaw != null) {

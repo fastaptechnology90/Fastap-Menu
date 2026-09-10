@@ -61,7 +61,7 @@ async function applyAdjustment(
   items: OrderItem[],
   entry: Record<string, unknown>,
 ) {
-  const wasSettled = order.paymentStatus === "paid" || order.status === "completed";
+  const wasSettled = order.paymentStatus === "paid";
   const totalBefore = parseFloat(String(order.total ?? 0)) || 0;
   const subtotal = billableTotal(items);
   const discount = parseFloat(String(order.discountAmount ?? 0)) || 0;
@@ -194,7 +194,7 @@ router.post("/restaurants/:restaurantId/orders/:orderId/refund", requireAuth, as
     .where(and(eq(ordersTable.id, orderId), eq(ordersTable.restaurantId, restaurantId)));
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
-  const paid = order.paymentStatus === "paid" || order.status === "completed";
+  const paid = order.paymentStatus === "paid";
   if (!paid) { res.status(409).json({ error: "Nothing has been collected on this order yet." }); return; }
 
   const total = parseFloat(String(order.total ?? 0)) || 0;

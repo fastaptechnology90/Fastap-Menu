@@ -103,22 +103,27 @@ export default function HotelGuest() {
     if (patch.tv) merged.tv = { ...controls.tv, ...patch.tv };
     setControls(merged);
     saveLocalControls(roomNumber, merged);
-    if (venue.restaurantId && roomNumber) {
-      try {
-        const res = await publicApi.hotel.updateControls(venue.restaurantId, roomNumber, merged);
-        if (res.roomControls) setControls({ ...DEFAULT_ROOM_CONTROLS, ...res.roomControls });
-      } catch (e) {
-        // "Room updated" was shown whether or not anything reached the room. A guest who
-        // turned the lights off and walked away had no idea nothing had happened.
-        setControls(controls);
-        saveLocalControls(roomNumber, controls);
-        setToast(e instanceof Error ? e.message : "The room did not respond — please use the panel by the door.");
-        setTimeout(() => setToast(null), 4000);
-        return;
-      }
+    if (!venue.restaurantId || !roomNumber) {
+      setControls(controls);
+      saveLocalControls(roomNumber, controls);
+      setToast("Scan the QR code in your room to change controls. Nothing was sent to the room.");
+      setTimeout(() => setToast(null), 4000);
+      return;
     }
-    setToast("Room updated");
-    setTimeout(() => setToast(null), 2000);
+    try {
+      const res = await publicApi.hotel.updateControls(venue.restaurantId, roomNumber, merged);
+      if (res.roomControls) setControls({ ...DEFAULT_ROOM_CONTROLS, ...res.roomControls });
+    } catch (e) {
+      // "Room updated" was shown whether or not anything reached the room. A guest who
+      // turned the lights off and walked away had no idea nothing had happened.
+      setControls(controls);
+      saveLocalControls(roomNumber, controls);
+      setToast(e instanceof Error ? e.message : "The room did not respond — please use the panel by the door.");
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    setToast("Preferences saved for this room — not a live hardware control.");
+    setTimeout(() => setToast(null), 2500);
   }
 
   async function submitService() {
@@ -141,8 +146,14 @@ export default function HotelGuest() {
       return;
     }
 
+    if (!venue.restaurantId) {
+      setSubmittingService(false);
+      setRequestError("We do not know which venue you are in. Scan the QR code in your room and try again.");
+      return;
+    }
+
     const payload = {
-      restaurantId: venue.restaurantId ?? 1,
+      restaurantId: venue.restaurantId,
       roomNumber,
       guestName: user?.name,
       guestPhone: user?.mobile,
@@ -345,6 +356,9 @@ export default function HotelGuest() {
           </>
         ) : (
           <>
+            <div className="rounded-xl border border-warning-border bg-warning-subtle p-3 text-xs text-muted-foreground">
+              Smart controls save preferences for staff and the room record. They do not switch physical AC, lights or TV unless your hotel has wired that hardware.
+            </div>
             {/* Cleaning status */}
             <div className={`rounded-xl border p-4 flex items-center gap-3 ${
               controls.cleaningStatus === "clean" ? "bg-success-subtle border-success-border" :

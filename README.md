@@ -44,18 +44,22 @@ bash deploy/*.sh
 
 ### Why rule #4 exists (the actual reason)
 
-`kitchenapp/lib/core/config/api_config.dart` line 36:
+`kitchenapp/lib/core/config/api_config.dart`:
 
 ```dart
-static const defaultExternalBaseUrl = 'https://digitalrestuarants.thefingo.com';
+static const defaultExternalBaseUrl = 'http://127.0.0.1:8080';
+// Release without --dart-define falls back to Railway:
+// static const productionExternalBaseUrl =
+//   'https://fastap-menu-production.up.railway.app';
 ```
 
-If you run plain `flutter run` with no `--dart-define`, the app falls back to this
-and connects **straight to the live production server**. Real orders. Real data.
+A bare `flutter run` (no `--dart-define`) targets the **local** API. Release
+builds without a define use Railway. Never the decommissioned VPS
+(`digitalrestuarants.thefingo.com`).
 
 `pnpm dev:kitchenapp` passes `--dart-define=API_BASE_URL=http://127.0.0.1:8080`,
 so it stays on your laptop. Same for `dev:waiterapp` and `dev:housekeepingapp`.
-
+`pnpm build:apk:*` / `build:ios:*` pass the Railway URL.
 ---
 
 ## ⚠️ The VPS is SHARED — 18 projects live on it

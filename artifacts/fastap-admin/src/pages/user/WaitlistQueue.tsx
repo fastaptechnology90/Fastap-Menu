@@ -38,11 +38,14 @@ export default function WaitlistQueue() {
   const [digitalList, setDigitalList] = useState<{ displayToken: string; partySize: number; priority: string; position: number }[]>([]);
   const [alertSent, setAlertSent] = useState<{ sms?: boolean; whatsapp?: boolean }>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [joining, setJoining] = useState(false);
 
   const fetchStats = useCallback(async () => {
     if (!venue.restaurantId) {
-      setApiError("Restaurant not loaded.");
+      setApiError("Restaurant not loaded. Open the menu from a venue QR or link first.");
       setLoadingStats(false);
       return;
     }
@@ -59,12 +62,17 @@ export default function WaitlistQueue() {
         predictionLabel: data.predictionLabel,
         liveWaitTime: data.liveWaitTime ?? data.estimatedWait,
       });
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Could not load queue data.");
+      setStats(null);
+    }
+    try {
       const wl = await publicApi.queueWaitlist(venue.restaurantId);
       setDigitalList(wl.entries?.slice(0, 8) ?? []);
-    } catch {
-      setApiError("Could not load queue data.");
-      setStats(null);
+      setListError(null);
+    } catch (e) {
       setDigitalList([]);
+      setListError(e instanceof Error ? e.message : "Could not load the waiting list.");
     } finally {
       setLoadingStats(false);
     }
@@ -97,7 +105,11 @@ export default function WaitlistQueue() {
           restaurantName: data.restaurantName || activeRestaurant,
           status: data.status,
         });
-      } catch { /* polling optional */ }
+        setPollError(null);
+      } catch (e) {
+        // Keep the last known position on screen, but tell the guest tracking stalled.
+        setPollError(e instanceof Error ? e.message : "Live position could not be refreshed.");
+      }
     };
     poll();
     const t = setInterval(poll, 5000);
@@ -106,7 +118,11 @@ export default function WaitlistQueue() {
 
   async function joinQueue() {
     if (!venue.restaurantId) {
-      toast({ title: "Error", description: "Restaurant not available.", variant: "destructive" });
+      toast({ title: "Restaurant not available", description: "Open this page from a venue QR or menu link.", variant: "destructive" });
+      return;
+    }
+    if (!guestName.trim()) {
+      toast({ title: "Name required", description: "Enter your name so the host can call you.", variant: "destructive" });
       return;
     }
 
@@ -123,6 +139,7 @@ export default function WaitlistQueue() {
       membershipTier: queueType === "membership" ? user?.tier : undefined,
     };
 
+    setJoining(true);
     try {
       const data = await publicApi.joinQueue(body);
       setJoined(true);
@@ -131,6 +148,7 @@ export default function WaitlistQueue() {
       setDisplayToken(data.displayToken);
       setPriority(data.priority ?? "normal");
       setAlertSent({ sms: data.alerts?.sms, whatsapp: data.alerts?.whatsapp });
+      setPollError(null);
       setWaitlist({
         token: data.token,
         tokenNumber: data.tokenNumber,
@@ -139,8 +157,14 @@ export default function WaitlistQueue() {
         restaurantName: data.restaurantName || activeRestaurant,
       });
       fetchStats();
-    } catch {
-      toast({ title: "Error", description: "Could not join queue. Please try again.", variant: "destructive" });
+    } catch (e) {
+      toast({
+        title: "Could not join the queue",
+        description: e instanceof Error ? e.message : "Please try again or ask the host.",
+        variant: "destructive",
+      });
+    } finally {
+      setJoining(false);
     }
   }
 
@@ -148,10 +172,12 @@ export default function WaitlistQueue() {
     if (waitlist?.token && !waitlist.token.startsWith("local")) {
       try {
         await publicApi.leaveQueue(waitlist.token);
-      } catch {
-        // Clearing the screen while the host still holds their place would send
-        // the guest away from a table that is about to be called.
-        toast({ title: "Could not leave the queue", description: "You are still in line. Please try again or tell the host.", variant: "destructive" });
+      } catch (e) {
+        toast({
+          title: "Could not leave the queue",
+          description: e instanceof Error ? e.message : "You are still in line. Please try again or tell the host.",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -161,6 +187,7 @@ export default function WaitlistQueue() {
     setEta(stats?.estimatedWait ?? 0);
     setNotified(false);
     setAlertSent({});
+    setPollError(null);
     fetchStats();
   }
 
@@ -233,7 +260,9 @@ export default function WaitlistQueue() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-4">No one waiting — join now for instant seating</p>
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  {listError ?? "No one waiting — join now for instant seating"}
+                </p>
               )}
             </div>
 
@@ -315,9 +344,9 @@ export default function WaitlistQueue() {
               )}
             </div>
 
-            <button onClick={joinQueue} className="w-full py-4 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-base shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2">
+            <button onClick={joinQueue} disabled={joining} className="w-full py-4 rounded-xl bg-primary hover:bg-primary/90 font-semibold text-base shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 disabled:opacity-50">
               <Ticket className="h-5 w-5" />
-              Join Queue — est. #{(stats?.queueLength ?? 0) + 1} · ~{stats?.estimatedWait ?? 0} min
+              {joining ? "Joining…" : `Join Queue — est. #${(stats?.queueLength ?? 0) + 1} · ~${stats?.estimatedWait ?? 0} min`}
             </button>
               </>
             )}
@@ -357,9 +386,14 @@ export default function WaitlistQueue() {
                 </div>
               </div>
               <div className="flex items-center justify-center gap-1.5 mt-4">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-xs text-success font-medium">Live tracking · updates every 5s</span>
+                <div className={`h-2 w-2 rounded-full ${pollError ? "bg-warning" : "bg-primary animate-pulse"}`} />
+                <span className={`text-xs font-medium ${pollError ? "text-warning" : "text-success"}`}>
+                  {pollError ? "Live update paused — showing last known place" : "Live tracking · updates every 5s"}
+                </span>
               </div>
+              {pollError && (
+                <p role="alert" className="mt-2 text-xs text-warning text-center">{pollError}</p>
+              )}
             </div>
 
             {/* Queue prediction */}

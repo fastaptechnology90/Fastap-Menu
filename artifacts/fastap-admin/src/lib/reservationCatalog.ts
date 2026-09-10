@@ -65,4 +65,7 @@ export interface ReservationRecord {
   depositStatus?: string | null;
   bookingToken?: string | null;
   status: string;
+  /** Present on My Bookings, where the list can span more than one venue. */
+  restaurantName?: string | null;
+  restaurantSlug?: string | null;
 }

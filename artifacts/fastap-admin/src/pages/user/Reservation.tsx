@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { DEMO_SLUG } from "@/lib/guestDemo";
+import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from "react";
+import { DEMO_SLUG, withGuestQuery } from "@/lib/guestDemo";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { GuestBackButton } from "@/components/user/GuestUI";
 import { useToast } from "@/hooks/use-toast";
@@ -21,19 +21,53 @@ type Step = "type" | "details" | "deposit" | "success";
 type Tab = "new" | "my";
 
 const TYPE_ICONS: Record<string, string> = Object.fromEntries(RESERVATION_TYPES.map(t => [t.id, t.icon]));
+/** Remembers the number used on the last booking so My Bookings can list without re-asking. */
+const BOOKING_PHONE_KEY = "fastap_reservation_phone";
+
+type FieldErrors = Partial<Record<"date" | "time" | "name" | "phone" | "spa", string>>;
+
+function subscribeUrl(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  window.addEventListener("pushState", onChange);
+  window.addEventListener("replaceState", onChange);
+  return () => {
+    window.removeEventListener("popstate", onChange);
+    window.removeEventListener("pushState", onChange);
+    window.removeEventListener("replaceState", onChange);
+  };
+}
+
+function readSearch() {
+  return typeof window !== "undefined" ? window.location.search : "";
+}
+
+function readSavedBookingPhone(): string {
+  try {
+    return localStorage.getItem(BOOKING_PHONE_KEY)?.trim() || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveBookingPhone(phone: string) {
+  const trimmed = phone.trim();
+  if (!trimmed) return;
+  try { localStorage.setItem(BOOKING_PHONE_KEY, trimmed); } catch { /* ignore */ }
+}
 
 export default function Reservation() {
-  const [, navigate] = useAppLocation();
+  const [location, navigate] = useAppLocation();
+  const search = useSyncExternalStore(subscribeUrl, readSearch, () => "");
   const goBack = useGuestBack();
-  const { venue, user, activeRestaurant } = useUser();
-  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const { venue, user, activeRestaurant, activeTable } = useUser();
+  const params = new URLSearchParams(search || (typeof window !== "undefined" ? window.location.search : ""));
   // The neutral demo alias, not a real venue's slug: hardcoding "spice-garden" here
   // pinned every unresolved page to one live restaurant and put its slug in the URL.
   const slug = venue.restaurantSlug || params.get("slug") || DEMO_SLUG;
   const prefilledTable = params.get("table") || undefined;
   const prefilledRoom = params.get("room") || undefined;
 
-  const [tab, setTab] = useState<Tab>("new");
+  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "my" ? "my" : "new"));
   const [step, setStep] = useState<Step>(() => (prefilledTable || prefilledRoom ? "details" : "type"));
   const [bookingType, setBookingType] = useState<ReservationTypeId>(() => (prefilledRoom ? "table" : "table"));
   const [date, setDate] = useState("");
@@ -53,6 +87,7 @@ export default function Reservation() {
   const [createdStatus, setCreatedStatus] = useState<string>("pending");
   const [depositNotice, setDepositNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingBookings, setLoadingBookings] = useState(false);
   const { toast } = useToast();
   const [editBooking, setEditBooking] = useState<ReservationRecord | null>(null);
   const [spaServices, setSpaServices] = useState<{ id: number; name: string; price: number }[]>([]);
@@ -68,9 +103,12 @@ export default function Reservation() {
    * simply turn the bug into a 400. So ask.
    */
   const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [lookupPhone, setLookupPhone] = useState("");
-  const [lookupTried, setLookupTried] = useState(false);
+  const [guestPhone, setGuestPhone] = useState(() => readSavedBookingPhone());
+  /** Optional list filter (booking # / date / name) — not the only way to find bookings. */
+  const [listFilter, setListFilter] = useState("");
+  const [identityPhone, setIdentityPhone] = useState(() => readSavedBookingPhone());
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formBanner, setFormBanner] = useState<string | null>(null);
 
   const contactName = (user?.name || guestName).trim();
   const contactPhone = (user?.mobile || guestPhone).trim();
@@ -79,6 +117,29 @@ export default function Reservation() {
   const contactUsable = contactName.length > 0
     && phoneDigits.length >= 8 && phoneDigits.length <= 15
     && new Set(phoneDigits).size > 1;
+  const knownPhone = (user?.mobile || guestPhone || identityPhone || readSavedBookingPhone()).trim();
+
+  // Upcoming first, then history. A booking counts as past once its own date has gone by,
+  // and a cancelled one is history whatever its date says — there is nothing left to modify.
+  const bookingGroups = useMemo(() => {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const upcoming: ReservationRecord[] = [];
+    const past: ReservationRecord[] = [];
+    for (const b of myBookings) {
+      const date = String(b.date ?? "").slice(0, 10);
+      const done = (date !== "" && date < todayKey) || b.status === "cancelled" || b.status === "completed";
+      if (done) past.push(b);
+      else upcoming.push(b);
+    }
+    // Soonest first while it is still ahead of you; most recent first once it is behind you.
+    upcoming.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    past.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    return [
+      { key: "upcoming" as const, label: "Upcoming", rows: upcoming },
+      { key: "past" as const, label: "Past bookings", rows: past },
+    ];
+  }, [myBookings]);
 
   useEffect(() => {
     if (prefilledTable) {
@@ -89,6 +150,14 @@ export default function Reservation() {
       setStep("details");
     }
   }, [prefilledTable, prefilledRoom]);
+
+  // Bottom "Bookings" tab navigates to ?tab=my without remounting this page.
+  useEffect(() => {
+    if (new URLSearchParams(search).get("tab") === "my") {
+      setTab("my");
+      setStep("type");
+    }
+  }, [search]);
 
   const scanLabel = prefilledTable
     ? `Table ${prefilledTable}`
@@ -131,18 +200,47 @@ export default function Reservation() {
     if (guests > lim.max) setGuests(lim.max);
   }, [bookingType, guests, seating]);
 
-  const loadMyBookings = useCallback(async (phoneOverride?: string) => {
-    // A guest who booked without signing in has a phone number but no account, so the
-    // lookup takes whichever number we know: theirs from the session, the one they just
-    // booked with, or the one they type in.
-    const phone = (phoneOverride ?? user?.mobile ?? guestPhone ?? "").trim();
-    if (!venue.restaurantId || !phone) return;
+  const loadMyBookings = useCallback(async (phoneOverride?: string, filterOverride?: string) => {
+    // Prefer: override → signed-in mobile → form phone → identity → remembered phone.
+    //
+    // This was written as a chain mixing `??` and `||`, which is a syntax error the build
+    // was carrying: whichever way it resolved, an empty-string mobile on a signed-in guest
+    // short-circuited the whole chain and My Bookings looked up "". First non-empty is
+    // what was meant, so that is what it does.
+    //
+    // Session-only (no phone at all) still works: the API reads guestUserId.
+    const phone = [phoneOverride, user?.mobile, guestPhone, identityPhone, readSavedBookingPhone()]
+      .map(v => String(v ?? "").trim())
+      .find(v => v) ?? "";
+    if (!phone && !user) {
+      setMyBookings([]);
+      return;
+    }
+    setLoadingBookings(true);
     try {
-      const list = await publicApi.reservations(venue.restaurantId, phone);
-      setMyBookings(list);
-    } catch { setMyBookings([]); }
-    setLookupTried(true);
-  }, [venue.restaurantId, user?.mobile, guestPhone]);
+      // No venue id when the guest has not scanned anything — the list then spans every
+      // venue they have booked at, which is what "my bookings" means to them.
+      const list = await publicApi.reservations(
+        venue.restaurantId,
+        phone || undefined,
+        (filterOverride ?? listFilter).trim() || undefined,
+      );
+      setMyBookings(Array.isArray(list) ? list : []);
+      if (phone) {
+        saveBookingPhone(phone);
+        setIdentityPhone(phone);
+      }
+    } catch (e) {
+      setMyBookings([]);
+      toast({
+        title: "Could not load bookings",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingBookings(false);
+    }
+  }, [venue.restaurantId, user, user?.mobile, guestPhone, identityPhone, listFilter, toast]);
 
   useEffect(() => {
     if (tab === "my") loadMyBookings();
@@ -150,6 +248,59 @@ export default function Reservation() {
 
   function toggleTag(tag: string) {
     setSpecialTags(p => p.includes(tag) ? p.filter(x => x !== tag) : [...p, tag]);
+  }
+
+  function validateBookingFields(): FieldErrors {
+    const next: FieldErrors = {};
+    if (!date) next.date = "Pick a date";
+    if (!time && !timeLabel) next.time = "Pick an available time slot";
+    if (!user?.mobile) {
+      if (!guestName.trim()) next.name = "Enter the name on the booking";
+      const digits = guestPhone.replace(/\D/g, "");
+      if (!digits) next.phone = "Enter a mobile number";
+      else if (digits.length < 8 || digits.length > 15 || new Set(digits).size <= 1) {
+        next.phone = "Enter a real mobile the venue can call";
+      }
+    } else if (!contactUsable) {
+      if (!contactName) next.name = "Your profile needs a name";
+      else next.phone = "Your profile needs a valid mobile";
+    }
+    if (bookingType === "spa" && spaServices.length > 0 && !spaServiceId) {
+      next.spa = "Choose a spa service";
+    }
+    return next;
+  }
+
+  function attemptBook(withDeposit: boolean) {
+    const errors = validateBookingFields();
+    setFieldErrors(errors);
+    const missing = Object.entries(errors).map(([key]) => {
+      const labels: Record<string, string> = {
+        date: "Date", time: "Time", name: "Name", phone: "Mobile number", spa: "Spa service",
+      };
+      return labels[key] ?? key;
+    });
+    if (missing.length > 0) {
+      const banner = `Please fill mandatory fields: ${missing.join(", ")}`;
+      setFormBanner(banner);
+      toast({ title: "Please fill mandatory fields", description: missing.join(", "), variant: "destructive" });
+      // Jump to the first missing field so a long form does not look like a silent fail.
+      const focusOrder = ["date", "time", "name", "phone", "spa"] as const;
+      const first = focusOrder.find(k => errors[k]);
+      const idMap: Record<string, string> = {
+        date: "res-date", time: "res-time-slot", name: "res-name", phone: "res-phone", spa: "res-spa",
+      };
+      if (first) {
+        requestAnimationFrame(() => {
+          document.getElementById(idMap[first])?.scrollIntoView({ behavior: "smooth", block: "center" });
+          const el = document.getElementById(idMap[first]);
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.focus();
+        });
+      }
+      return;
+    }
+    setFormBanner(null);
+    void submitReservation(withDeposit);
   }
 
   async function submitReservation(withDeposit: boolean) {
@@ -180,6 +331,8 @@ export default function Reservation() {
 
     try {
       const res = await publicApi.createReservation(payload);
+      saveBookingPhone(contactPhone);
+      setIdentityPhone(contactPhone);
       setCreatedId(res.id);
       setBookingToken(res.bookingToken ?? `#REV${res.id}`);
       // A booking that still owes a deposit comes back as "pending", not confirmed. The
@@ -205,7 +358,10 @@ export default function Reservation() {
     if (!createdId) { setStep("success"); return; }
     setSubmitting(true);
     try {
-      await publicApi.payReservationDeposit(createdId, { paymentMethod });
+      await publicApi.payReservationDeposit(createdId, {
+        paymentMethod,
+        phone: contactPhone || undefined,
+      });
       setCreatedStatus("confirmed");
       setStep("success");
     } catch (e) {
@@ -222,7 +378,8 @@ export default function Reservation() {
 
   async function cancelBooking(id: number) {
     try {
-      await publicApi.cancelReservation(id);
+      // Ownership is phone- or session-based; anonymous guests must send the booking phone.
+      await publicApi.cancelReservation(id, knownPhone || contactPhone || undefined);
       toast({ title: "Booking cancelled" });
     } catch (e) {
       // The guest has to know their table is still held, or they will not turn up.
@@ -242,6 +399,7 @@ export default function Reservation() {
         notes: editBooking.notes,
         specialRequest: editBooking.specialRequest,
         zone: editBooking.zone,
+        phone: knownPhone || contactPhone || undefined,
       });
     } catch (e) {
       // The dialog stays open with the edits intact so they can be retried.
@@ -296,13 +454,24 @@ export default function Reservation() {
             <p className="text-xs text-muted-foreground mt-2">Show this token when you arrive</p>
             {contactPhone && (
               <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
-                Booked under {contactName} · {contactPhone}. Look it up under My bookings with that number.
+                Booked under {contactName} · {contactPhone}. It appears under My Bookings for this number.
               </p>
             )}
           </div>
           <div className="flex gap-3 w-full max-w-sm">
             <button onClick={() => navigate(`/user/menu?slug=${slug}`)} className="flex-1 py-3 rounded-xl bg-primary font-semibold text-sm">Menu</button>
-            <button onClick={() => { resetNew(); setTab("my"); setStep("type"); }} className="flex-1 py-3 rounded-xl border border-border text-sm">My Bookings</button>
+            <button
+              onClick={() => {
+                resetNew();
+                setTab("my");
+                setStep("type");
+                void loadMyBookings(contactPhone);
+                navigate(withGuestQuery("/user/reserve?tab=my", venue, activeTable));
+              }}
+              className="flex-1 py-3 rounded-xl border border-border text-sm"
+            >
+              My Bookings
+            </button>
           </div>
         </div>
       )}
@@ -340,7 +509,21 @@ export default function Reservation() {
         <>
           <div className="mx-4 mt-4 flex gap-1 bg-muted p-1 rounded-xl">
             {(["new", "my"] as Tab[]).map(t => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setTab(t);
+                  if (t === "my") {
+                    const next = withGuestQuery("/user/reserve?tab=my", venue, activeTable);
+                    if (next !== location) navigate(next);
+                  } else {
+                    const next = withGuestQuery("/user/reserve", venue, activeTable);
+                    if (next !== location) navigate(next);
+                  }
+                }}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
                 {t === "new" ? "New Booking" : "My Bookings"}
               </button>
             ))}
@@ -348,68 +531,148 @@ export default function Reservation() {
 
           {tab === "my" && (
             <div className="px-4 mt-4 space-y-3">
-              {/* Bookings are found by the phone number they were made with. A guest who
-                  booked without an account has that number but no session, so let them
-                  type it rather than telling them to sign in for an account they
-                  never made. */}
-              {!user?.mobile && (
+              {/* List first for the current guest (session / remembered phone). Optional
+                  filter narrows that list — it is not the only way to find a booking. */}
+              {!knownPhone && !user && (
                 <div className="guest-section-card space-y-2">
-                  <label htmlFor="res-lookup" className="text-sm font-semibold block">Find a booking</label>
+                  <label htmlFor="res-identity" className="text-sm font-semibold block">
+                    Your mobile <span className="text-danger">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the number used when booking to see your reservations.
+                  </p>
                   <div className="flex gap-2">
                     <input
-                      id="res-lookup"
-                      value={lookupPhone || guestPhone}
-                      onChange={e => setLookupPhone(e.target.value)}
+                      id="res-identity"
+                      value={identityPhone}
+                      onChange={e => setIdentityPhone(e.target.value)}
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
-                      placeholder="The number you booked with"
+                      placeholder="10-digit mobile"
                       className="guest-input flex-1"
                     />
                     <button
-                      onClick={() => loadMyBookings(lookupPhone || guestPhone)}
-                      disabled={!(lookupPhone || guestPhone).trim()}
-                      className="guest-btn-primary px-5 disabled:opacity-40"
+                      type="button"
+                      onClick={() => {
+                        if (!identityPhone.trim()) {
+                          toast({
+                            title: "Please fill mandatory fields",
+                            description: "Mobile number",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        saveBookingPhone(identityPhone);
+                        void loadMyBookings(identityPhone);
+                      }}
+                      className="guest-btn-primary px-5"
                     >
-                      Find
+                      Show
                     </button>
                   </div>
                 </div>
               )}
-              {myBookings.length === 0 && (
-                <p className="text-center text-muted-foreground py-8 text-sm">
-                  {user?.mobile || lookupTried
-                    ? "No bookings found for that number."
-                    : "Enter the number you booked with to see your bookings."}
-                </p>
-              )}
-              {myBookings.map(b => (
-                <div key={b.id} className="rounded-2xl bg-card border border-border p-4">
-                  <div className="flex justify-between mb-2">
-                    <div>
-                      <p className="font-semibold flex items-center gap-2">
-                        {RESERVATION_TYPES.find(t => t.id === b.reservationType)?.label ?? b.reservationType}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{b.date} · {b.time} · {b.guestCount} guests</p>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full h-fit ${b.status === "confirmed" ? "bg-success-subtle text-success" : b.status === "cancelled" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"}`}>
-                      {b.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-3">
-                    <span className="font-mono text-primary text-sm">{b.bookingToken ?? `#REV${b.id}`}</span>
-                    {b.status !== "cancelled" && (
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditBooking({ ...b })} className="text-xs border border-border px-3 py-1.5 rounded-lg flex items-center gap-1">
-                          <Edit3 className="h-3 w-3" /> Modify
-                        </button>
-                        <button onClick={() => cancelBooking(b.id)} className="text-xs border border-danger-border text-danger px-3 py-1.5 rounded-lg">Cancel</button>
-                      </div>
+
+              {(knownPhone || user) && (
+                <div className="guest-section-card space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Your bookings</p>
+                    {knownPhone && (
+                      <p className="text-xs text-muted-foreground truncate">{knownPhone}</p>
                     )}
                   </div>
-                  {parseFloat(b.depositAmount ?? "0") > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">Deposit: ₹{b.depositAmount} · {b.depositStatus ?? "pending"}</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={listFilter}
+                      onChange={e => setListFilter(e.target.value)}
+                      placeholder="Filter by booking #, date, name…"
+                      className="guest-input flex-1"
+                      aria-label="Filter bookings"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => loadMyBookings(knownPhone || undefined, listFilter)}
+                      className="guest-btn-primary px-4 text-sm shrink-0"
+                    >
+                      Filter
+                    </button>
+                  </div>
+                  {listFilter && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary"
+                      onClick={() => { setListFilter(""); void loadMyBookings(knownPhone || undefined, ""); }}
+                    >
+                      Clear filter
+                    </button>
                   )}
+                </div>
+              )}
+
+              {loadingBookings && (
+                <p className="text-center text-muted-foreground py-6 text-sm">Loading your bookings…</p>
+              )}
+              {!loadingBookings && myBookings.length === 0 && (knownPhone || user) && (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  {listFilter
+                    ? "No bookings match that filter."
+                    : "No bookings found on this number yet."}
+                </p>
+              )}
+              {!loadingBookings && myBookings.length === 0 && !knownPhone && !user && (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Enter your mobile above to see your bookings.
+                </p>
+              )}
+
+              {/* Split rather than one undated pile. A booking that has already happened is
+                  history — it is the thing the guest came here to look up — but it must not
+                  still be offering Modify and Cancel on a table from last month. */}
+              {bookingGroups.map(group => group.rows.length > 0 && (
+                <div key={group.key} className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+                    {group.label} · {group.rows.length}
+                  </p>
+                  {group.rows.map(b => (
+                    <div
+                      key={b.id}
+                      className={`rounded-2xl bg-card border border-border p-4 ${group.key === "past" ? "opacity-75" : ""}`}
+                    >
+                      <div className="flex justify-between mb-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold flex items-center gap-2">
+                            {RESERVATION_TYPES.find(t => t.id === b.reservationType)?.label ?? b.reservationType}
+                          </p>
+                          {/* The list can span venues now, so each row has to say which one. */}
+                          {b.restaurantName && (
+                            <p className="text-xs text-primary truncate">{b.restaurantName}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground">{b.date} · {b.time} · {b.guestCount} guests</p>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full h-fit shrink-0 ${b.status === "confirmed" ? "bg-success-subtle text-success" : b.status === "cancelled" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"}`}>
+                          {b.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 gap-2">
+                        <span className="font-mono text-primary text-sm">{b.bookingToken ?? `#REV${b.id}`}</span>
+                        {group.key === "upcoming" && b.status !== "cancelled" && (
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditBooking({ ...b })} className="text-xs border border-border px-3 py-1.5 rounded-lg flex items-center gap-1">
+                              <Edit3 className="h-3 w-3" /> Modify
+                            </button>
+                            <button onClick={() => cancelBooking(b.id)} className="text-xs border border-danger-border text-danger px-3 py-1.5 rounded-lg">Cancel</button>
+                          </div>
+                        )}
+                        {group.key === "past" && (
+                          <span className="text-xs text-muted-foreground">Completed</span>
+                        )}
+                      </div>
+                      {parseFloat(b.depositAmount ?? "0") > 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">Deposit: ₹{b.depositAmount} · {b.depositStatus ?? "pending"}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -455,37 +718,78 @@ export default function Reservation() {
               </div>
 
               {bookingType === "spa" && spaServices.length > 0 && (
-                <div className="rounded-2xl bg-card border border-border p-4">
-                  <p className="text-sm font-semibold mb-2">Spa service</p>
+                <div id="res-spa" className={`rounded-2xl bg-card border p-4 ${fieldErrors.spa ? "border-danger" : "border-border"}`}>
+                  <p className="text-sm font-semibold mb-2">
+                    Spa service <span className="text-danger">*</span>
+                  </p>
                   <div className="space-y-2">
                     {spaServices.map(s => (
-                      <button key={s.id} onClick={() => setSpaServiceId(s.id)} className={`w-full text-left p-3 rounded-xl border text-sm ${spaServiceId === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setSpaServiceId(s.id);
+                          setFieldErrors(e => ({ ...e, spa: undefined }));
+                        }}
+                        className={`w-full text-left p-3 rounded-xl border text-sm ${spaServiceId === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}
+                      >
                         {s.name} · ₹{s.price}
                       </button>
                     ))}
                   </div>
+                  {fieldErrors.spa && <p className="text-xs text-danger mt-2">{fieldErrors.spa}</p>}
                 </div>
               )}
 
-              <div className="rounded-2xl bg-card border border-border p-4">
-                <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /> Date</p>
-                <input type="date" value={date} onChange={e => { setDate(e.target.value); setTime(""); setTimeLabel(""); }}
+              <div className={`rounded-2xl bg-card border p-4 ${fieldErrors.date ? "border-danger" : "border-border"}`}>
+                <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-primary" /> Date <span className="text-danger">*</span>
+                </p>
+                <input
+                  id="res-date"
+                  type="date"
+                  value={date}
+                  onChange={e => {
+                    setDate(e.target.value);
+                    setTime("");
+                    setTimeLabel("");
+                    setFieldErrors(err => ({ ...err, date: undefined, time: undefined }));
+                    setFormBanner(null);
+                  }}
                   min={new Date().toISOString().split("T")[0]}
-                  className="w-full bg-muted border border-border rounded-xl px-4 py-3 text-sm [color-scheme:dark]" />
+                  className={`w-full bg-muted border rounded-xl px-4 py-3 text-sm [color-scheme:dark] ${fieldErrors.date ? "border-danger" : "border-border"}`}
+                  aria-invalid={!!fieldErrors.date}
+                  aria-required
+                />
+                {fieldErrors.date && <p className="text-xs text-danger mt-2">{fieldErrors.date}</p>}
               </div>
 
-              {date && (
-                <div className="rounded-2xl bg-card border border-border p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Live slot availability</p>
-                    <button onClick={fetchSlots} className="text-muted-foreground"><RefreshCw className={`h-4 w-4 ${loadingSlots ? "animate-spin" : ""}`} /></button>
-                  </div>
+              <div id="res-time-slot" className={`rounded-2xl bg-card border p-4 ${fieldErrors.time ? "border-danger" : "border-border"}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" /> Time slot <span className="text-danger">*</span>
+                  </p>
+                  {date && (
+                    <button type="button" onClick={fetchSlots} className="text-muted-foreground">
+                      <RefreshCw className={`h-4 w-4 ${loadingSlots ? "animate-spin" : ""}`} />
+                    </button>
+                  )}
+                </div>
+                {!date ? (
+                  <p className="text-xs text-muted-foreground">Pick a date first to see available slots.</p>
+                ) : (
                   <div className="grid grid-cols-3 gap-2">
                     {slots.map(slot => (
                       <button
                         key={slot.time}
+                        type="button"
                         disabled={!slot.available}
-                        onClick={() => { setTime(slot.time); setTimeLabel(slot.label); }}
+                        onClick={() => {
+                          setTime(slot.time);
+                          setTimeLabel(slot.label);
+                          setFieldErrors(e => ({ ...e, time: undefined }));
+                          setFormBanner(null);
+                        }}
                         className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${!slot.available ? "opacity-30 line-through bg-muted border-border" : time === slot.time ? "bg-muted border-primary text-primary" : "bg-muted border-border"}`}
                       >
                         {slot.label}
@@ -493,18 +797,19 @@ export default function Reservation() {
                       </button>
                     ))}
                   </div>
-                  {slots.length === 0 && !loadingSlots && (
-                    <p className="text-xs text-muted-foreground text-center py-4">Select a date to see available slots</p>
-                  )}
-                </div>
-              )}
+                )}
+                {date && slots.length === 0 && !loadingSlots && (
+                  <p className="text-xs text-muted-foreground text-center py-4">No slots for this date</p>
+                )}
+                {fieldErrors.time && <p className="text-xs text-danger mt-2">{fieldErrors.time}</p>}
+              </div>
 
               <div className="rounded-2xl bg-card border border-border p-4">
                 <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Guest count</p>
                 <div className="flex items-center gap-4 justify-center">
-                  <button onClick={() => setGuests(g => Math.max(limits.min, g - 1))} className="h-10 w-10 rounded-xl bg-muted text-lg">−</button>
+                  <button type="button" onClick={() => setGuests(g => Math.max(limits.min, g - 1))} className="h-10 w-10 rounded-xl bg-muted text-lg">−</button>
                   <span className="text-2xl font-semibold">{guests}</span>
-                  <button onClick={() => setGuests(g => Math.min(limits.max, g + 1))} className="h-10 w-10 rounded-xl bg-primary text-lg">+</button>
+                  <button type="button" onClick={() => setGuests(g => Math.min(limits.max, g + 1))} className="h-10 w-10 rounded-xl bg-primary text-lg">+</button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center mt-2">{limits.min}–{limits.max} guests for this type</p>
               </div>
@@ -514,7 +819,7 @@ export default function Reservation() {
                   <p className="text-sm font-semibold mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Seating preference</p>
                   <div className="grid grid-cols-3 gap-2">
                     {seatingOptions.map(s => (
-                      <button key={s.id} onClick={() => setSeating(s.id)} className={`flex flex-col items-center gap-1 py-2 rounded-xl text-xs border ${seating === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
+                      <button key={s.id} type="button" onClick={() => setSeating(s.id)} className={`flex flex-col items-center gap-1 py-2 rounded-xl text-xs border ${seating === s.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
                         <GuestIcon id={s.id} className="h-4 w-4" />{s.label}
                       </button>
                     ))}
@@ -526,7 +831,7 @@ export default function Reservation() {
                 <p className="text-sm font-semibold mb-3">Special requests</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {SPECIAL_OCCASIONS.map(occ => (
-                    <button key={occ} onClick={() => toggleTag(occ)} className={`px-3 py-1.5 rounded-full text-xs border ${specialTags.includes(occ) ? "bg-muted border-primary" : "border-border bg-muted"}`}>
+                    <button key={occ} type="button" onClick={() => toggleTag(occ)} className={`px-3 py-1.5 rounded-full text-xs border ${specialTags.includes(occ) ? "bg-muted border-primary" : "border-border bg-muted"}`}>
                       {occ}
                     </button>
                   ))}
@@ -540,31 +845,49 @@ export default function Reservation() {
                 <div className="guest-section-card space-y-3">
                   <p className="text-sm font-semibold">Who is the table for?</p>
                   <div>
-                    <label htmlFor="res-name" className="text-xs text-muted-foreground mb-1 block">Name</label>
+                    <label htmlFor="res-name" className="text-xs text-muted-foreground mb-1 block">
+                      Name <span className="text-danger">*</span> <span className="text-muted-foreground">(required)</span>
+                    </label>
                     <input
                       id="res-name"
                       value={guestName}
-                      onChange={e => setGuestName(e.target.value)}
+                      onChange={e => {
+                        setGuestName(e.target.value);
+                        setFieldErrors(err => ({ ...err, name: undefined }));
+                        setFormBanner(null);
+                      }}
                       autoComplete="name"
                       placeholder="The name on the booking"
-                      className="guest-input"
+                      className={`guest-input ${fieldErrors.name ? "border-danger" : ""}`}
+                      aria-invalid={!!fieldErrors.name}
+                      aria-required
                     />
+                    {fieldErrors.name && <p className="text-xs text-danger mt-1">{fieldErrors.name}</p>}
                   </div>
                   <div>
-                    <label htmlFor="res-phone" className="text-xs text-muted-foreground mb-1 block">Mobile number</label>
+                    <label htmlFor="res-phone" className="text-xs text-muted-foreground mb-1 block">
+                      Mobile number <span className="text-danger">*</span> <span className="text-muted-foreground">(required)</span>
+                    </label>
                     <input
                       id="res-phone"
                       value={guestPhone}
-                      onChange={e => setGuestPhone(e.target.value)}
+                      onChange={e => {
+                        setGuestPhone(e.target.value);
+                        setFieldErrors(err => ({ ...err, phone: undefined }));
+                        setFormBanner(null);
+                      }}
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
                       placeholder="10-digit mobile"
                       aria-describedby="res-phone-help"
-                      className="guest-input"
+                      className={`guest-input ${fieldErrors.phone ? "border-danger" : ""}`}
+                      aria-invalid={!!fieldErrors.phone}
+                      aria-required
                     />
+                    {fieldErrors.phone && <p className="text-xs text-danger mt-1">{fieldErrors.phone}</p>}
                     <p id="res-phone-help" className="text-xs text-muted-foreground mt-1">
-                      The venue calls this number if anything changes, and it is how you find this booking again.
+                      The venue calls this number if anything changes, and My Bookings lists reservations for it.
                     </p>
                   </div>
                 </div>
@@ -577,6 +900,7 @@ export default function Reservation() {
                     <p className="text-xs text-muted-foreground">₹{deposit} — pay now or at the venue</p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setPayDepositNow(!payDepositNow)}
                     role="switch"
                     aria-checked={payDepositNow}
@@ -588,15 +912,16 @@ export default function Reservation() {
                 </div>
               )}
 
-              {!contactUsable && date && time && (
-                <p className="text-xs text-warning">
-                  {!contactName ? "Add the name the booking is under." : "Enter a mobile number the venue can reach you on."}
-                </p>
+              {formBanner && (
+                <div className="rounded-xl border border-danger-border bg-danger-subtle px-3 py-2.5 text-sm text-danger" role="alert">
+                  {formBanner}
+                </div>
               )}
 
               <button
-                onClick={() => submitReservation(payDepositNow)}
-                disabled={!date || !time || !contactUsable || submitting}
+                type="button"
+                onClick={() => attemptBook(payDepositNow)}
+                disabled={submitting}
                 className="guest-btn-primary w-full py-4 disabled:opacity-40"
               >
                 {submitting ? "Booking…" : deposit > 0 && payDepositNow ? `Book and pay ₹${deposit}` : "Confirm reservation"}

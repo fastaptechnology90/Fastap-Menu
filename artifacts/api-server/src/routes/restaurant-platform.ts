@@ -7,6 +7,7 @@ import { getOfflineCatalog } from "../lib/offlineModeLogic.js";
 import { getLocaleCatalog } from "../lib/localeAccessibilityLogic.js";
 import { parseMoney } from "../lib/payment-calculations.js";
 import { mergeRoomBilling } from "../lib/hotel-folio.js";
+import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 import crypto from "crypto";
 
 const router: IRouter = Router();
@@ -92,9 +93,11 @@ router.post("/restaurants/:restaurantId/platform/communications/broadcast", requ
     message,
     channel: channel || "internal",
     target: target || "all-staff",
-    status: "sent",
+    // Posted to venue history only — no transport. recipients stays 0 so the UI
+    // cannot imply staff were messaged.
+    status: "posted",
     sentAt: new Date().toISOString(),
-    recipients: target === "all-staff" ? 12 : 4,
+    recipients: 0,
   };
   history.unshift(entry);
   await setSettingsSection(rid, "communications", history.slice(0, 50));
@@ -164,6 +167,16 @@ router.post("/restaurants/:restaurantId/platform/aggregators/:aggregatorId/inges
     orderSource: source,
     metadata: { aggregator: source, external: true },
   }).returning();
+  // Aggregator channels pre-collect — book Finance once (helper de-duplicates).
+  if (order) {
+    await recordOrderPaymentInLedger({
+      restaurantId: rid,
+      order,
+      method: "aggregator",
+      reference: `${source}-order-${order.id}`,
+      performedBy: `${source} ingest`,
+    });
+  }
   res.status(201).json({ ingested: true, source, order });
 });
 

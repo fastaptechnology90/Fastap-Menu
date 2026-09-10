@@ -55,22 +55,10 @@ export default function Security() {
     onError: () => toast({ title: "Failed to remove IP", variant: "destructive" }),
   });
 
-  const securitySettings = security?.securitySettings ?? {};
   const sessions = security?.sessions || [];
   const devices = security?.devices || [];
   const ipWhitelist = security?.ipWhitelist || [];
   const loginAttempts = security?.loginAttempts || [];
-
-  const updateSecuritySetting = useMutation({
-    mutationFn: (patch: Record<string, boolean>) => api.security.updateSettings(patch),
-    onSuccess: (_d, patch) => {
-      qc.invalidateQueries({ queryKey: ["security"] });
-      const [key, value] = Object.entries(patch)[0] ?? [];
-      const label = SECURITY_SETTINGS.find(s => s.key === key)?.label ?? "Setting";
-      toast({ title: `${label} ${value ? "enabled" : "disabled"}` });
-    },
-    onError: () => toast({ title: "Failed to update setting", variant: "destructive" }),
-  });
 
   return (
     <div className="space-y-6">
@@ -104,7 +92,7 @@ export default function Security() {
           </CardHeader>
           <CardContent className="space-y-4">
             {SECURITY_SETTINGS.map(setting => (
-              <div key={setting.key} className="flex items-start justify-between gap-2">
+              <div key={setting.key} className="flex items-start justify-between gap-2 opacity-80">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-medium">{setting.label}</p>
@@ -112,10 +100,12 @@ export default function Security() {
                   </div>
                   <p className="text-xs text-muted-foreground">{setting.desc}</p>
                 </div>
+                {/* Switches used to flip and toast "enabled" even though login never read them.
+                    Disabled until the auth path actually enforces each control. */}
                 <Switch
-                  checked={securitySettings[setting.key] ?? ["twoFactor", "deviceTracking", "sessionTimeout"].includes(setting.key)}
-                  disabled={updateSecuritySetting.isPending}
-                  onCheckedChange={v => updateSecuritySetting.mutate({ [setting.key]: v })}
+                  checked={false}
+                  disabled
+                  title="Not enforced at login yet"
                 />
               </div>
             ))}

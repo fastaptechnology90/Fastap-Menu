@@ -106,6 +106,7 @@ export default function UserProfile() {
   const [recharging, setRecharging] = useState(false);
   const [walletError, setWalletError] = useState("");
   const [ladder, setLadder] = useState<LoyaltyLadder | null>(null);
+  const [ladderError, setLadderError] = useState("");
 
   // One line used to carry both confirmations and failures in success green, so
   // "Permission denied" read as good news.
@@ -117,7 +118,14 @@ export default function UserProfile() {
   // The tier ladder is the server's, not a constant in this file.
   useEffect(() => {
     if (!user) return;
-    publicApi.loyalty().then(setLadder).catch(() => setLadder(null));
+    publicApi.loyalty().then(data => {
+      setLadder(data);
+      setLadderError("");
+    }).catch(e => {
+      // Failure used to look like "no ladder / top tier" — progress bar stuck at 100%.
+      setLadder(null);
+      setLadderError(e instanceof Error ? e.message : "We could not load your loyalty progress.");
+    });
   }, [user]);
 
   useEffect(() => {
@@ -189,22 +197,28 @@ export default function UserProfile() {
           <span className="guest-pill shrink-0"><Crown className="h-3.5 w-3.5" /> {tierLabel}</span>
         </div>
         <div>
-          <div className="flex justify-between text-xs text-muted-foreground mb-1">
-            <span className="tabular-nums">{profile.points.toLocaleString("en-IN")} points</span>
-            {ladderProgress?.nextTier && (
-              <span className="tabular-nums">{ladderProgress.remaining.toLocaleString("en-IN")} to {ladderProgress.nextTier}</span>
-            )}
-          </div>
-          <div
-            className="h-2 rounded-full bg-muted overflow-hidden"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={ladderProgress?.percent ?? 100}
-            aria-label={ladderProgress?.nextTier ? `Progress to ${ladderProgress.nextTier}` : "Top tier reached"}
-          >
-            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${ladderProgress?.percent ?? 100}%` }} />
-          </div>
+          {ladderError ? (
+            <p role="alert" className="text-xs text-danger">{ladderError}</p>
+          ) : (
+            <>
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span className="tabular-nums">{profile.points.toLocaleString("en-IN")} points</span>
+                {ladderProgress?.nextTier && (
+                  <span className="tabular-nums">{ladderProgress.remaining.toLocaleString("en-IN")} to {ladderProgress.nextTier}</span>
+                )}
+              </div>
+              <div
+                className="h-2 rounded-full bg-muted overflow-hidden"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={ladderProgress?.percent ?? (ladder ? 100 : 0)}
+                aria-label={ladderProgress?.nextTier ? `Progress to ${ladderProgress.nextTier}` : ladder ? "Top tier reached" : "Loyalty progress unavailable"}
+              >
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${ladderProgress?.percent ?? (ladder ? 100 : 0)}%` }} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -240,16 +254,22 @@ export default function UserProfile() {
                 personal chef, concierge service and complimentary stays. */}
             <div className="guest-card p-4">
               <p className="text-sm font-semibold mb-3">Your {tierLabel} tier</p>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Zap className="h-3.5 w-3.5 text-primary shrink-0" />
-                {ladder?.cashbackPercent != null
-                  ? `${ladder.cashbackPercent}% cashback on every order, into your cashback wallet`
-                  : "Cashback on every order, into your cashback wallet"}
-              </div>
-              {ladderProgress?.nextTier && (
-                <p className="text-xs text-muted-foreground mt-3">
-                  {ladderProgress.remaining.toLocaleString("en-IN")} more points to reach <strong className="text-foreground">{ladderProgress.nextTier}</strong>
-                </p>
+              {ladderError ? (
+                <p role="alert" className="text-sm text-danger">{ladderError}</p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Zap className="h-3.5 w-3.5 text-primary shrink-0" />
+                    {ladder?.cashbackPercent != null
+                      ? `${ladder.cashbackPercent}% cashback on every order, into your cashback wallet`
+                      : "Cashback on every order, into your cashback wallet"}
+                  </div>
+                  {ladderProgress?.nextTier && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      {ladderProgress.remaining.toLocaleString("en-IN")} more points to reach <strong className="text-foreground">{ladderProgress.nextTier}</strong>
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -268,6 +288,7 @@ export default function UserProfile() {
                 { icon: Hotel, label: "Room Services", sub: "Room service, housekeeping & wake-up calls", action: () => goGuest("/user/hotel") },
                 { icon: Headphones, label: "Live Support", sub: "Chat, WhatsApp, voice, tickets & emergency", action: () => goGuest("/user/support") },
                 { icon: Wifi, label: "Offline & Low Internet", sub: "Cached menu, order sync & data saver", action: () => goGuest("/user/offline") },
+                { icon: Gift, label: "Offers & promos", sub: "Venue offers (prize games not redeemable)", action: () => goGuest("/user/experience") },
               ].map(item => (
                 <button key={item.label} onClick={item.action} className="w-full flex items-center gap-3 p-4 hover:bg-muted transition-all">
                   <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">

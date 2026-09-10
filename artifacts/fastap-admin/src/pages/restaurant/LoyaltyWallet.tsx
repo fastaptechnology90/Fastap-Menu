@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Gift, Wallet, Star, Crown, Plus, Tag, CreditCard, Repeat, Users, TrendingUp, X, Medal, Trophy, Gem } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Gift, Wallet, Star, Crown, Plus, Tag, TrendingUp, X, Medal, Trophy, Gem, Pencil, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { loyalty as loyaltyApi, customers as customersApi, promoCodesApi } from "@/lib/api";
@@ -9,7 +9,21 @@ import { useToast } from "@/hooks/use-toast";
 type Tab = "loyalty" | "wallet" | "coupons" | "gift-cards";
 
 type MemberRow = { id: string; name: string; mobile: string; tier: string; points: number; walletBalance: number; cashback: number; visits: number; totalSpend: number };
-type CouponRow = { code: string; discount: string; type: string; minOrder: number; maxDiscount: number; used: number; total: number; expiry: string; status: string };
+type CouponRow = {
+  id: number;
+  code: string;
+  discount: string;
+  type: string;
+  discountValue: number;
+  minOrder: number;
+  maxDiscount: number;
+  used: number;
+  total: number;
+  expiry: string;
+  expiresAtRaw: string;
+  status: string;
+  isActive: boolean;
+};
 type GiftCardRow = { code: string; amount: number; remaining: number; purchasedBy: string; status: string; expiry: string };
 type WalletTxnRow = { type: string; desc: string; amount: number; date: string };
 
@@ -20,6 +34,23 @@ const TIER_CFG: Record<string, { label: string; icon: LucideIcon; color: string;
   "vip-elite": { label: "VIP Elite", icon: Crown, color: "text-warning", bg: "bg-warning-subtle", pointsReq: "6000+ pts" },
 };
 
+function mapCoupon(p: any): CouponRow {
+  return {
+    id: Number(p.id),
+    code: p.code,
+    discount: p.discountType === "percent" ? `${p.discountValue}% off` : p.discountType === "fixed" ? `₹${p.discountValue} off` : String(p.discountValue),
+    type: p.discountType || "percent",
+    discountValue: parseFloat(String(p.discountValue ?? 0)),
+    minOrder: parseFloat(String(p.minOrderAmount ?? 0)),
+    maxDiscount: parseFloat(String(p.maxDiscount ?? p.discountValue ?? 0)),
+    used: p.usageCount ?? 0,
+    total: p.usageLimit ?? 100,
+    expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "No expiry",
+    expiresAtRaw: p.expiresAt ? new Date(p.expiresAt).toISOString().slice(0, 10) : "",
+    status: p.status || (p.isActive ? "active" : "inactive"),
+    isActive: p.isActive !== false && p.status !== "inactive" && p.status !== "expired",
+  };
+}
 
 export default function LoyaltyWallet() {
   const { restaurantId } = useRestaurant();
@@ -27,6 +58,9 @@ export default function LoyaltyWallet() {
   const [tab, setTab] = useState<Tab>("loyalty");
   const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editCoupon, setEditCoupon] = useState<CouponRow | null>(null);
+  const [editForm, setEditForm] = useState({ code: "", discountValue: "", minOrder: "", expiry: "" });
+  const [savingCoupon, setSavingCoupon] = useState(false);
   const [search, setSearch] = useState("");
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
@@ -37,6 +71,12 @@ export default function LoyaltyWallet() {
   const [pointsFor, setPointsFor] = useState<MemberRow | null>(null);
   const [pointsToAdd, setPointsToAdd] = useState("");
   const [savingPoints, setSavingPoints] = useState(false);
+
+  const reloadCoupons = useCallback(async () => {
+    if (!restaurantId) return;
+    const rows = await promoCodesApi.list(restaurantId);
+    setCoupons(Array.isArray(rows) ? rows.map(mapCoupon) : []);
+  }, [restaurantId]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -59,19 +99,7 @@ export default function LoyaltyWallet() {
           totalSpend: parseFloat(String(m.totalSpend ?? 0)),
         })));
       }
-      if (Array.isArray(promoData) && promoData.length > 0) {
-        setCoupons(promoData.map((p: any) => ({
-          code: p.code,
-          discount: p.discountType === "percent" ? `${p.discountValue}% off` : p.discountType === "fixed" ? `₹${p.discountValue} off` : String(p.discountValue),
-          type: p.discountType || "percent",
-          minOrder: parseFloat(String(p.minOrderAmount ?? 0)),
-          maxDiscount: parseFloat(String(p.maxDiscount ?? p.discountValue ?? 0)),
-          used: p.usageCount ?? 0,
-          total: p.usageLimit ?? 100,
-          expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "No expiry",
-          status: p.status || (p.isActive ? "active" : "inactive"),
-        })));
-      }
+      if (Array.isArray(promoData)) setCoupons(promoData.map(mapCoupon));
       if (Array.isArray(txnData) && txnData.length > 0) {
         setWalletTxns(txnData.map((t: any) => ({
           type: t.type === "redeem" || parseFloat(String(t.points ?? 0)) < 0 ? "debit" : "credit",
@@ -93,6 +121,7 @@ export default function LoyaltyWallet() {
   async function handleCreateCoupon() {
     if (!restaurantId || !newCoupon.code) return;
     const val = parseFloat(newCoupon.discountValue) || 0;
+    setSavingCoupon(true);
     try {
       await promoCodesApi.create(restaurantId, {
         code: newCoupon.code.toUpperCase(),
@@ -101,26 +130,70 @@ export default function LoyaltyWallet() {
         minOrderAmount: parseFloat(newCoupon.minOrder) || 0,
         expiresAt: newCoupon.expiry || undefined,
       });
-      const rows = await promoCodesApi.list(restaurantId);
-      if (Array.isArray(rows)) {
-        setCoupons(rows.map((p: any) => ({
-          code: p.code,
-          discount: p.discountType === "percent" ? `${p.discountValue}% off` : `₹${p.discountValue} off`,
-          type: p.discountType || "percent",
-          minOrder: parseFloat(String(p.minOrderAmount ?? 0)),
-          maxDiscount: parseFloat(String(p.maxDiscount ?? p.discountValue ?? 0)),
-          used: p.usageCount ?? 0,
-          total: p.usageLimit ?? 100,
-          expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "No expiry",
-          status: p.status || (p.isActive ? "active" : "inactive"),
-        })));
-      }
+      await reloadCoupons();
       setNewCoupon({ code: "", discountValue: "", minOrder: "", expiry: "" });
       setShowAdd(false);
       toast({ title: "Coupon created", description: `“${newCoupon.code.toUpperCase()}” is now available.` });
     } catch (e) {
-      console.error(e);
       toast({ title: "Failed to create coupon", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingCoupon(false);
+    }
+  }
+
+  function openEditCoupon(c: CouponRow) {
+    setEditCoupon(c);
+    setEditForm({
+      code: c.code,
+      discountValue: String(c.discountValue || ""),
+      minOrder: String(c.minOrder || ""),
+      expiry: c.expiresAtRaw,
+    });
+  }
+
+  async function handleSaveEditCoupon() {
+    if (!restaurantId || !editCoupon) return;
+    const val = parseFloat(editForm.discountValue) || 0;
+    setSavingCoupon(true);
+    try {
+      await promoCodesApi.update(restaurantId, editCoupon.id, {
+        code: editForm.code.toUpperCase(),
+        discountType: editForm.discountValue.includes("%") || editCoupon.type === "percent" ? "percent" : "fixed",
+        discountValue: val,
+        minOrderAmount: parseFloat(editForm.minOrder) || 0,
+        expiresAt: editForm.expiry || null,
+      });
+      await reloadCoupons();
+      setEditCoupon(null);
+      toast({ title: "Coupon updated" });
+    } catch (e) {
+      toast({ title: "Could not update coupon", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingCoupon(false);
+    }
+  }
+
+  async function handleToggleCoupon(c: CouponRow) {
+    if (!restaurantId) return;
+    const next = !(c.isActive && c.status !== "expired");
+    try {
+      await promoCodesApi.update(restaurantId, c.id, { isActive: next });
+      await reloadCoupons();
+      toast({ title: next ? "Coupon reactivated" : "Coupon deactivated", description: `“${c.code}” ${next ? "can be used again" : "will no longer apply at checkout"}.` });
+    } catch (e) {
+      toast({ title: "Could not change coupon", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
+  }
+
+  async function handleDeleteCoupon(c: CouponRow) {
+    if (!restaurantId) return;
+    if (!window.confirm(`Delete coupon “${c.code}”? Guests will not be able to use it.`)) return;
+    try {
+      await promoCodesApi.delete(restaurantId, c.id);
+      await reloadCoupons();
+      toast({ title: "Coupon deleted" });
+    } catch (e) {
+      toast({ title: "Could not delete coupon", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
     }
   }
 
@@ -308,22 +381,26 @@ export default function LoyaltyWallet() {
       {tab === "coupons" && (
         <div className="space-y-3">
           {coupons.length === 0 ? <EmptyState title="No coupons" description="Create a promo code to get started." /> : coupons.map(c => (
-            <div key={c.code} className={`bg-card border rounded-lg p-4 ${c.status === "expired" ? "opacity-50 border-border" : "border-border"}`}>
+            <div key={c.id} className={`bg-card border rounded-lg p-4 ${c.status === "expired" || c.status === "inactive" ? "opacity-60 border-border" : "border-border"}`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-success-subtle flex items-center justify-center"><Tag className="h-5 w-5 text-success" /></div>
-                  <div>
-                    <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-lg bg-success-subtle flex items-center justify-center shrink-0"><Tag className="h-5 w-5 text-success" /></div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold font-mono">{c.code}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${c.status === "active" ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger"}`}>{c.status}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${c.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground"}`}>{c.status}</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{c.discount} · Min order ₹{c.minOrder} · Expires {c.expiry}</p>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="flex flex-col items-end gap-2 shrink-0">
                   <p className="text-sm font-semibold text-success">{c.used}/{c.total} used</p>
-                  <div className="mt-1 h-1.5 w-20 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-success rounded-full" style={{ width: `${(c.used / c.total) * 100}%` }} />
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => openEditCoupon(c)} title="Edit" className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={() => handleToggleCoupon(c)} className="px-2.5 h-8 rounded-lg bg-muted text-xs font-semibold hover-elevate">
+                      {c.isActive && c.status !== "expired" ? "Deactivate" : "Activate"}
+                    </button>
+                    <button type="button" onClick={() => handleDeleteCoupon(c)} title="Delete" className="h-8 w-8 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </div>
               </div>
@@ -368,7 +445,29 @@ export default function LoyaltyWallet() {
               ))}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold">Cancel</button>
-                <button onClick={handleCreateCoupon} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm">Create Coupon</button>
+                <button onClick={handleCreateCoupon} disabled={savingCoupon || !newCoupon.code} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40">{savingCoupon ? "Saving…" : "Create Coupon"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editCoupon && (
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5"><h2 className="text-base font-semibold">Edit Coupon</h2><button onClick={() => setEditCoupon(null)} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
+            <div className="space-y-4">
+              {[
+                { label: "Coupon Code", key: "code" as const, placeholder: "e.g. FLAT20" },
+                { label: "Discount Value", key: "discountValue" as const, placeholder: "e.g. 20 or 100" },
+                { label: "Min Order Amount", key: "minOrder" as const, placeholder: "e.g. 500" },
+                { label: "Expiry Date", key: "expiry" as const, placeholder: "YYYY-MM-DD" },
+              ].map(f => (
+                <div key={f.label}><label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">{f.label}</label><input value={editForm[f.key]} onChange={e => setEditForm(c => ({ ...c, [f.key]: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50" placeholder={f.placeholder} /></div>
+              ))}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditCoupon(null)} className="flex-1 py-2.5 rounded-lg bg-muted text-muted-foreground text-sm font-semibold">Cancel</button>
+                <button onClick={handleSaveEditCoupon} disabled={savingCoupon || !editForm.code} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40">{savingCoupon ? "Saving…" : "Save"}</button>
               </div>
             </div>
           </div>

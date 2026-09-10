@@ -1,13 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { DataTable } from "@/components/shared/DataTable";
-import { Activity, Server, Database, Cpu, HardDrive, Network, RefreshCw, Loader2, AlertTriangle, CheckCircle, Clock, Download, Play, RotateCcw, Archive } from "lucide-react";
+import { Activity, Server, Cpu, HardDrive, Network, RefreshCw, Loader2, AlertTriangle, CheckCircle, Clock, Download, Play, RotateCcw, Archive } from "lucide-react";
 import { api, type InfraMetrics } from "@/lib/apiClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/shared/Page";
@@ -19,6 +18,16 @@ function formatTime(iso: string) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs} hr ago`;
   return `${Math.floor(hrs / 24)} days ago`;
+}
+
+function formatUptimeSeconds(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 
 export default function Infrastructure() {
@@ -78,16 +87,6 @@ export default function Infrastructure() {
   const backupStats = overview?.backupStats ?? { total: 0, lastBackup: null, totalSizeMb: 0 };
   const maintenanceMode = settings?.maintenanceMode ?? overview?.maintenanceMode ?? false;
 
-  const MetricCard = ({ icon, title, value, max, unit }: { icon: React.ReactNode; title: string; value?: number; max?: number; unit?: string }) => (
-    <Card>
-      <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">{icon} {title}</CardTitle></CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold mb-2">{value ?? "—"}{unit}</div>
-        {max !== undefined && value !== undefined && <Progress value={Math.min(value, 100)} className={`h-2 ${value > 80 ? "[&>div]:bg-danger" : value > 60 ? "[&>div]:bg-warning" : ""}`} />}
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -112,31 +111,56 @@ export default function Infrastructure() {
 
       {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div> : metrics && (
         <>
-          {/* The API sets `estimated` because these numbers are derived from row counts and
-              queue depth, not read off the host. Showing them as live telemetry would invite
-              capacity decisions based on figures nothing measured. */}
-          {(metrics as any).estimated && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle p-3">
-              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-              <p className="text-xs text-warning dark:text-warning">
-                <span className="font-semibold">Estimated, not measured.</span> These figures are
-                derived from database row counts and queue depth — the platform has no host-metrics
-                agent. Disk is a fixed placeholder. Do not use them for capacity planning.
-              </p>
-            </div>
-          )}
-          <div className="grid gap-4 md:grid-cols-4">
-            <KpiCard title="Uptime" value={metrics.uptime} icon={<Activity className="h-4 w-4 text-success" />} />
-            <KpiCard title="API Req/min (est.)" value={metrics.apiRpm.toLocaleString()} icon={<Network className="h-4 w-4 text-primary" />} />
-            <KpiCard title="Cache Hit Rate (est.)" value={`${metrics.cacheHitRate}%`} icon={<Server className="h-4 w-4 text-info" />} />
-            <KpiCard title="Queue Depth" value={metrics.queueDepth} icon={<Activity className="h-4 w-4 text-warning" />} />
+          <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-subtle p-3">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+            <p className="text-xs text-warning dark:text-warning">
+              <span className="font-semibold">API process only — not host capacity.</span>{" "}
+              CPU and memory below are this Node process. There is no host-metrics agent, so
+              disk, cache hit rate and DB pool size are not shown as live gauges.
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <MetricCard icon={<Cpu className="h-4 w-4" />} title="CPU Usage (est.)" value={metrics.cpu} max={100} unit="%" />
-            <MetricCard icon={<Server className="h-4 w-4" />} title="Memory (est.)" value={metrics.memory} max={100} unit="%" />
-            <MetricCard icon={<HardDrive className="h-4 w-4" />} title="Disk (placeholder)" value={metrics.disk} max={100} unit="%" />
-            <MetricCard icon={<Database className="h-4 w-4" />} title="DB Connections (est.)" value={metrics.dbConnections} unit="" />
+            <KpiCard
+              title="Process uptime"
+              value={(metrics as any).uptimeSeconds != null
+                ? formatUptimeSeconds(Number((metrics as any).uptimeSeconds))
+                : (metrics.uptime || "—")}
+              icon={<Activity className="h-4 w-4 text-success" />}
+            />
+            <KpiCard title="Req/min (this process)" value={Number(metrics.apiRpm || 0).toLocaleString()} icon={<Network className="h-4 w-4 text-primary" />} />
+            <KpiCard title="Queue depth" value={metrics.queueDepth} icon={<Activity className="h-4 w-4 text-warning" />} />
+            <KpiCard title="Errors today" value={(metrics as any).errorsToday ?? "—"} icon={<AlertTriangle className="h-4 w-4 text-danger" />} />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Cpu className="h-4 w-4" /> API process CPU
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold mb-1">{metrics.cpu != null ? `${Number(metrics.cpu).toFixed(1)}%` : "—"}</div>
+                <p className="text-xs text-muted-foreground">Sampled from this server process — not rack or VM capacity.</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Server className="h-4 w-4" /> API process memory
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold mb-1">{metrics.memory != null ? `${Number(metrics.memory).toFixed(1)}%` : "—"}</div>
+                <p className="text-xs text-muted-foreground">
+                  {(metrics as any).memoryRssBytes
+                    ? `${(Number((metrics as any).memoryRssBytes) / (1024 * 1024)).toFixed(0)} MB RSS · `
+                    : ""}
+                  Share of process heap/RSS relative to Node’s view — not host RAM.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </>
       )}

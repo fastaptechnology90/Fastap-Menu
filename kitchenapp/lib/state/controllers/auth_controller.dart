@@ -86,14 +86,22 @@ class AuthController extends ChangeNotifier {
       return false;
     }
 
+    // Housekeeping's core boards (Room service / Cleaning) must open even when
+    // plan entitlements briefly lag after login. The API still gates with 403
+    // if the module is truly disabled — the UI then shows an honest error.
+    final housekeepingCore = session.user.role == StaffRole.housekeeping &&
+        (navIndex == 27 || navIndex == 28);
+
     final systemNumber =
         EnterpriseSystemNavRegistry.systemNumberForNavIndex(navIndex);
-    if (systemNumber != null &&
+    if (!housekeepingCore &&
+        systemNumber != null &&
         _featureEntitlements != null &&
         !_featureEntitlements!.isSystemEnabled(systemNumber)) {
       return false;
     }
-    if (navIndex == 49 &&
+    if (!housekeepingCore &&
+        navIndex == 49 &&
         _featureEntitlements != null &&
         !_featureEntitlements!.isSystemEnabled(49)) {
       return false;
@@ -108,6 +116,11 @@ class AuthController extends ChangeNotifier {
 
   bool isNavBlockedByEntitlements(int navIndex) {
     if (_featureEntitlements == null) {
+      return false;
+    }
+    final session = _session;
+    if (session?.user.role == StaffRole.housekeeping &&
+        (navIndex == 27 || navIndex == 28)) {
       return false;
     }
     final systemNumber =

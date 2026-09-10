@@ -5,6 +5,7 @@ import 'package:kitchenapp/core/constants/app_colors.dart';
 import 'package:kitchenapp/core/constants/app_spacing.dart';
 import 'package:kitchenapp/navigation/module_screen_builder.dart';
 import 'package:kitchenapp/presentation/screens/main/widgets/home_summary.dart';
+import 'package:kitchenapp/presentation/screens/waiter/take_order_screen.dart';
 import 'package:kitchenapp/data/staff_role_access_policy.dart';
 import 'package:kitchenapp/models/auth/staff_role.dart';
 import 'package:kitchenapp/state/auth_controller.dart';
@@ -21,7 +22,16 @@ class HomeTab extends StatelessWidget {
   final KitchenCommandController controller;
   final AuthController auth;
 
+  /// Sentinel for the waiter take-order flow (not a ModuleScreenBuilder nav).
+  static const takeOrderNavIndex = -10;
+
   static final _quickActionCatalog = <int, HomeQuickAction>{
+    takeOrderNavIndex: HomeQuickAction(
+      'Take order',
+      Icons.add_shopping_cart_rounded,
+      takeOrderNavIndex,
+      AppColors.primary,
+    ),
     0: HomeQuickAction(
       'Dashboard',
       Icons.dashboard_rounded,
@@ -125,9 +135,28 @@ class HomeTab extends StatelessWidget {
           role: role,
           permissions: permissions,
         )
+            .where(auth.canAccessNav)
             .map((navIndex) => _quickActionCatalog[navIndex])
             .whereType<HomeQuickAction>()
             .toList();
+        // Waiter take-order is a dedicated screen, not an enterprise module nav.
+        if (role == StaffRole.waiter) {
+          final take = _quickActionCatalog[takeOrderNavIndex];
+          if (take != null &&
+              !quickActions.any((a) => a.navIndex == takeOrderNavIndex)) {
+            quickActions.insert(0, take);
+          }
+        }
+        // Housekeeping's core job tiles must remain visible even when a plan
+        // entitlement briefly lags behind login — otherwise Room service /
+        // Cleaning vanish and the only path left is a dead Ops catalog entry.
+        if (role == StaffRole.housekeeping) {
+          for (final navIndex in const [27, 28]) {
+            if (quickActions.any((a) => a.navIndex == navIndex)) continue;
+            final action = _quickActionCatalog[navIndex];
+            if (action != null) quickActions.insert(0, action);
+          }
+        }
         final showDashboard = auth.canAccessNav(0);
         final showOrders = auth.canAccessNav(1);
         // Waiter/housekeeping care about the live order list first (what to
@@ -320,12 +349,25 @@ class HomeTab extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                   child: HomeQuickActions(
                     actions: quickActions,
-                    onAction: (action) => ModuleScreenBuilder.open(
-                      context,
-                      navIndex: action.navIndex,
-                      controller: controller,
-                      auth: auth,
-                    ),
+                    onAction: (action) {
+                      if (action.navIndex == takeOrderNavIndex) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => TakeOrderScreen(
+                              auth: auth,
+                              controller: controller,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      ModuleScreenBuilder.open(
+                        context,
+                        navIndex: action.navIndex,
+                        controller: controller,
+                        auth: auth,
+                      );
+                    },
                   ),
                 ),
               ),

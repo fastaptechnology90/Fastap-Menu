@@ -32,11 +32,15 @@ class ApiConfig {
   static const _baseUrlDefine = String.fromEnvironment('API_BASE_URL', defaultValue: '');
   static const _envDefine = String.fromEnvironment('APP_ENV', defaultValue: '');
 
-  /// Production Fastap API. The previous VPS host (digitalrestuarants.thefingo.com)
-  /// was decommissioned; a release build that fell back to it could not reach any
-  /// server at all.
-  static const defaultExternalBaseUrl =
+  /// Production API on Railway. Prefer passing this via `--dart-define=API_BASE_URL`
+  /// from `pnpm build:apk:*` / `build:ios:*` so release builds are explicit.
+  static const productionExternalBaseUrl =
       'https://fastap-menu-production.up.railway.app';
+
+  /// Fallback when `--dart-define=API_BASE_URL` is omitted in debug/profile.
+  /// Never point at the decommissioned VPS (`digitalrestuarants.thefingo.com`).
+  /// Release without a define uses [productionExternalBaseUrl] instead.
+  static const defaultExternalBaseUrl = 'http://127.0.0.1:8080';
 
   static ApiRuntimeMode get mode {
     final define = _modeDefine.trim().toLowerCase();
@@ -48,7 +52,7 @@ class ApiConfig {
     if (define == 'external') return ApiRuntimeMode.external;
     // Widget/unit tests: avoid live API probes unless external is forced.
     if (isFlutterTest) return ApiRuntimeMode.mock;
-    // Default to production API unless mock is explicitly requested.
+    // Default to external (HTTP) unless mock is explicitly requested.
     return ApiRuntimeMode.external;
   }
 
@@ -75,6 +79,10 @@ class ApiConfig {
           ? trimmed.substring(0, trimmed.length - 1)
           : trimmed;
     }
+    // Release without an explicit define: prefer the production hostname used by
+    // build scripts, not localhost (useless on a physical device). Dev/debug
+    // without a define targets the local API.
+    if (kReleaseMode) return productionExternalBaseUrl;
     return defaultExternalBaseUrl;
   }
 

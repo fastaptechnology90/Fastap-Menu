@@ -18,6 +18,13 @@ import {
 import { isPaidOrder, orderGrossTotal, parseMoney } from "../lib/payment-calculations.js";
 import { getSpaRevenue, getSpaRevenueBuckets, getBanquetRevenue, getBanquetRevenueBuckets, getRoomRevenue, getRoomRevenueBuckets } from "../lib/ancillary-revenue.js";
 import { getCommissionRate } from "../lib/platform-admin.js";
+import {
+  deriveOpenCloseFromSchedule,
+  extractScheduleHours,
+  normalizeClock,
+  resolveVenueTimezone,
+  type DayHoursRow,
+} from "../lib/venue-hours.js";
 
 const router: IRouter = Router();
 
@@ -245,22 +252,97 @@ router.get("/restaurants/:restaurantId/settings/white-label", requireAuth, async
   });
 });
 
+/**
+ * Operating hours live in appSettings.hours (what the Settings UI edits) AND must stay
+ * mirrored onto restaurants.open_time / close_time / timezone — those columns are what
+ * guest scan/order gates and day-end already read. Saving hours without syncing left
+ * guests stuck on the seed default 11:00–23:00 forever.
+ */
+function defaultHoursFromColumns(openTime: string | null | undefined, closeTime: string | null | undefined): DayHoursRow[] {
+  const from = normalizeClock(openTime) ?? "11:00";
+  const to = normalizeClock(closeTime) ?? "23:00";
+  return ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => ({
+    day,
+    open: true,
+    from: day === "Sunday" && from === "11:00" ? "12:00" : from,
+    to: day === "Sunday" && to === "23:00" ? "21:00" : to,
+  }));
+}
+
+async function syncTradingHoursColumns(
+  restaurantId: number,
+  mergedApp: Record<string, unknown>,
+  restaurantRow: { timezone?: string | null; settings?: unknown; openTime?: string | null; closeTime?: string | null },
+): Promise<void> {
+  const patch: { openTime?: string; closeTime?: string; timezone?: string; settings?: Record<string, unknown> } = {};
+  const tzBody = typeof mergedApp.timezone === "string" ? mergedApp.timezone.trim() : "";
+  if (tzBody) patch.timezone = tzBody;
+
+  const schedule = extractScheduleHours({ appSettings: mergedApp });
+  const tz = tzBody || resolveVenueTimezone({
+    timezone: restaurantRow.timezone,
+    settings: restaurantRow.settings,
+  });
+  if (schedule) {
+    const derived = deriveOpenCloseFromSchedule(schedule, tz);
+    if (derived.openTime) patch.openTime = derived.openTime;
+    if (derived.closeTime) patch.closeTime = derived.closeTime;
+  }
+
+  // Always re-stamp settings.appSettings + timezone so guest readers and columns stay one truth.
+  // (Do not require tzBody — hours-only saves must still sync.)
+  const root = (restaurantRow.settings && typeof restaurantRow.settings === "object" && !Array.isArray(restaurantRow.settings)
+    ? { ...(restaurantRow.settings as Record<string, unknown>) }
+    : {}) as Record<string, unknown>;
+  if (tzBody) root.timezone = tzBody;
+  else if (typeof root.timezone !== "string" || !String(root.timezone).trim()) root.timezone = tz;
+  root.appSettings = mergedApp;
+  patch.settings = root;
+
+  if (Object.keys(patch).length === 0) return;
+  await db.update(restaurantsTable).set(patch).where(eq(restaurantsTable.id, restaurantId));
+}
+
 router.get("/restaurants/:restaurantId/settings/app", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
-  const appSettings = await getSettingsSection(id, "appSettings", {});
-  res.json(appSettings);
+  const appSettings = await getSettingsSection(id, "appSettings", {}) as Record<string, unknown>;
+  const hours = Array.isArray(appSettings.hours) && appSettings.hours.length
+    ? appSettings.hours
+    : defaultHoursFromColumns(restaurant.openTime, restaurant.closeTime);
+  const timezone =
+    (typeof appSettings.timezone === "string" && appSettings.timezone.trim())
+    || restaurant.timezone
+    || "Asia/Kolkata";
+  res.json({ ...appSettings, hours, timezone });
 });
 
 router.put("/restaurants/:restaurantId/settings/app", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.restaurantId), 10);
   const restaurant = await getAccessibleRestaurant(req, id);
   if (!restaurant) { res.status(404).json({ error: "Restaurant not found" }); return; }
-  const current = await getSettingsSection(id, "appSettings", {});
-  const merged = { ...(current as object), ...req.body };
+  const current = await getSettingsSection(id, "appSettings", {}) as Record<string, unknown>;
+  const body = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+  const merged = { ...current, ...body } as Record<string, unknown>;
+  if (typeof body.timezone === "string" && body.timezone.trim()) {
+    merged.timezone = body.timezone.trim();
+  }
   await setSettingsSection(id, "appSettings", merged);
-  res.json(merged);
+  // Re-read settings after section write (setSettingsSection merges into jsonb).
+  const [fresh] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id));
+  await syncTradingHoursColumns(id, merged, fresh ?? restaurant);
+  const [after] = await db.select({
+    openTime: restaurantsTable.openTime,
+    closeTime: restaurantsTable.closeTime,
+    timezone: restaurantsTable.timezone,
+  }).from(restaurantsTable).where(eq(restaurantsTable.id, id));
+  res.json({
+    ...merged,
+    timezone: after?.timezone ?? merged.timezone,
+    openTime: after?.openTime ?? null,
+    closeTime: after?.closeTime ?? null,
+  });
 });
 
 /**
@@ -419,7 +501,8 @@ router.get("/restaurants/:restaurantId/dashboard", requireAuth, async (req, res)
   let refundAmount = 0;
   for (const o of allOrders) {
     if (o.paymentStatus === "refunded") refundAmount += parseFloat(String(o.total || 0));
-    else if (o.paymentStatus === "paid" || o.status === "completed") {
+    // Kitchen "completed" is not revenue — only paymentStatus paid (isPaidOrder).
+    else if (isPaidOrder(o)) {
       const method = (o.paymentMethod || "cash").toLowerCase();
       if (ONLINE_METHODS.has(method)) totalOnlineSales += parseFloat(String(o.total || 0));
     }

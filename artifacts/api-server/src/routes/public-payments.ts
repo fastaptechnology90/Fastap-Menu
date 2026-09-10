@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import type { Request } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { db, ordersTable, restaurantsTable } from "@workspace/db";
+import { db, ordersTable, restaurantsTable, tablesMapTable } from "@workspace/db";
 import {
   getPaymentCatalog, computeBillQuote, buildGstInvoice, buildInvoiceHtml,
   validateSplitPayments, resolvePaymentStatus,
@@ -14,6 +14,8 @@ import { allocateInvoiceNumber } from "../lib/invoice-series.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
 import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
 import { getPaymentsPublicConfig, isOnlinePaymentMethod, isCashPaymentMethod, processGatewayPayment } from "../lib/payment-gateway.js";
+import { broadcastEvent, broadcastOrderEvent } from "../lib/sse.js";
+import { recordOrderPaymentInLedger } from "../lib/order-payment-ledger.js";
 
 const router: IRouter = Router();
 
@@ -132,6 +134,7 @@ router.post("/public/payments/intent/:orderId", async (req, res): Promise<void> 
     orderId,
     amount,
     paymentMethod,
+    phase: "intent",
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     customerEmail: order.customerEmail,
@@ -205,6 +208,7 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
       orderId,
       amount: chargeAmount,
       paymentMethod: method,
+      phase: "capture",
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
@@ -226,6 +230,26 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
         },
       }).where(eq(ordersTable.id, orderId));
       res.status(402).json({ error: gatewayResult.error ?? "Payment failed", paymentStatus: "failed" });
+      return;
+    }
+
+    // Belt-and-braces: a "demo" mode success must never settle a bill. processGatewayPayment
+    // already returns success:false without credentials, but refuse here too if that ever
+    // regresses — inventing paid from demoMode was the most damaging money bug.
+    if (gatewayResult.mode === "demo") {
+      await db.update(ordersTable).set({
+        paymentMethod: method,
+        paymentStatus: "failed",
+        metadata: {
+          ...meta,
+          billing,
+          gatewayResponse: { error: "Demo gateway cannot collect money", gatewayId: gatewayResult.gatewayId, mode: "demo" },
+        },
+      }).where(eq(ordersTable.id, orderId));
+      res.status(402).json({
+        error: "Online payment is not set up yet. Please pay at the counter.",
+        paymentStatus: "failed",
+      });
       return;
     }
 
@@ -253,6 +277,7 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
 
   const receiptToken = receiptTokenFor(order) ?? newReceiptToken();
 
+  const wasPaid = order.paymentStatus === "paid";
   const [updated] = await db.update(ordersTable).set({
     paymentMethod: method,
     paymentStatus,
@@ -265,6 +290,55 @@ router.post("/public/payments/process/:orderId", async (req, res): Promise<void>
       : {}),
     metadata: { ...meta, ...gatewayMeta, billing, receiptToken },
   }).where(eq(ordersTable.id, orderId)).returning();
+
+  const nowPaid = paymentStatus === "paid";
+  const restaurantId = order.restaurantId;
+
+  // Cash at this endpoint stays `pending` (counter collect). Only a real paid
+  // settlement notifies the floor, books Finance, and may free the cover — same
+  // rules as staff settle. Ledger de-duplicates on orderId so a later POS touch
+  // cannot double-book.
+  if (!wasPaid && nowPaid && updated) {
+    await recordOrderPaymentInLedger({
+      restaurantId,
+      order: updated,
+      method,
+      reference: (typeof gatewayMeta.utr === "string" ? gatewayMeta.utr : null)
+        ?? (typeof gatewayMeta.gatewayTxnId === "string" ? gatewayMeta.gatewayTxnId : null),
+      performedBy: "Guest checkout",
+    });
+
+    broadcastEvent("order_paid", {
+      id: orderId,
+      restaurantId,
+      tableName: order.tableName,
+      paymentStatus: "paid",
+    });
+    broadcastOrderEvent(orderId, "order_paid", { id: orderId, paymentStatus: "paid" });
+    broadcastOrderEvent(orderId, "order_status", {
+      id: orderId,
+      status: updated?.status ?? order.status,
+      paymentStatus: "paid",
+      tableName: order.tableName,
+    });
+
+    const effectiveStatus = String(updated?.status ?? order.status ?? "");
+    const mealDone = ["served", "delivered", "billing", "billed", "completed"].includes(effectiveStatus);
+    if (order.tableId && mealDone) {
+      await db.update(tablesMapTable).set({
+        status: "free",
+        currentOrderId: null,
+        currentCustomerName: null,
+        currentGuestCount: 0,
+        occupiedSince: null,
+      }).where(and(eq(tablesMapTable.id, order.tableId), eq(tablesMapTable.restaurantId, restaurantId)));
+      broadcastEvent("table_cleared", {
+        restaurantId,
+        tableName: order.tableName,
+        orderId,
+      });
+    }
+  }
 
   res.json({
     success: true,

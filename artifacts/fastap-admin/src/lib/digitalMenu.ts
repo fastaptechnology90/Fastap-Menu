@@ -58,7 +58,9 @@ export function getDemoMenu(table?: string) {
         preview360Url: i.preview360Url ?? media.preview360Url,
         variants: i.variants ?? [],
         addons: i.addons ?? [],
-        customizationOptions: { ...DEFAULT_CUSTOMIZATION, ...(i.customizationOptions ?? {}) },
+        // Do not merge DEFAULT_CUSTOMIZATION — those invent Extra Cheese / combo +₹99
+        // that the bill never charges. Demo dishes only show their own addons/variants.
+        customizationOptions: i.customizationOptions ?? {},
       };
     }),
   }));

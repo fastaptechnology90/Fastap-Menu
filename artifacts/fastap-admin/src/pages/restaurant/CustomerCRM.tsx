@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { customers as customersApi, feedbackApi } from "@/lib/api";
-import { Search, Plus, Star, Phone, Mail, MessageSquare, Gift, Crown, TrendingUp, Users, X, Filter, RefreshCw, Medal, Trophy, Gem, Sparkles } from "lucide-react";
+import { Search, Plus, Star, Phone, Mail, Gift, Crown, TrendingUp, Users, X, Medal, Trophy, Gem, Sparkles, Edit2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const TIER_CFG: Record<string, { label: string; icon: LucideIcon; color: string; bg: string }> = {
   silver:     { label: "Silver",   icon: Medal, color: "text-muted-foreground",  bg: "bg-muted" },
@@ -15,8 +16,22 @@ const TIER_CFG: Record<string, { label: string; icon: LucideIcon; color: string;
 
 type Tab = "customers" | "segments" | "feedback";
 
+function mapCustomer(c: any) {
+  return {
+    ...c,
+    id: String(c.id),
+    tier: c.segment || "new",
+    visits: c.totalOrders || 0,
+    totalSpend: parseFloat(String(c.totalSpend)) || 0,
+    points: c.loyaltyPoints || 0,
+    mobile: c.phone || "",
+    lastVisit: c.lastVisit ? new Date(c.lastVisit).toLocaleDateString("en-IN") : "—",
+  };
+}
+
 export default function CustomerCRM() {
   const { restaurantId } = useRestaurant();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("customers");
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
@@ -26,6 +41,15 @@ export default function CustomerCRM() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", email: "" });
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function reload() {
+    if (!restaurantId) return;
+    const data = await customersApi.list(restaurantId).catch(() => []);
+    setCustomers(Array.isArray(data) ? data.map(mapCustomer) : []);
+  }
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -34,7 +58,7 @@ export default function CustomerCRM() {
       customersApi.list(restaurantId).catch(() => []),
       feedbackApi.list(restaurantId).catch(() => []),
     ]).then(([cust, fb]) => {
-      setCustomers(Array.isArray(cust) ? cust.map(c => ({ ...c, id: String(c.id), tier: c.segment || "new", visits: c.totalOrders || 0, totalSpend: parseFloat(String(c.totalSpend)) || 0, points: c.loyaltyPoints || 0, mobile: c.phone || "", lastVisit: c.lastVisit ? new Date(c.lastVisit).toLocaleDateString("en-IN") : "—" })) : []);
+      setCustomers(Array.isArray(cust) ? cust.map(mapCustomer) : []);
       setFeedback(Array.isArray(fb) ? fb : []);
     }).finally(() => setLoading(false));
   }, [restaurantId]);
@@ -51,11 +75,44 @@ export default function CustomerCRM() {
 
   async function handleAdd() {
     if (!newCustomer.name || !restaurantId) return;
-    await customersApi.create(restaurantId, { name: newCustomer.name, phone: newCustomer.phone, email: newCustomer.email });
-    const data = await customersApi.list(restaurantId);
-    setCustomers(Array.isArray(data) ? data.map(c => ({ ...c, id: String(c.id), tier: c.segment || "new", visits: c.totalOrders || 0, totalSpend: parseFloat(String(c.totalSpend)) || 0, points: c.loyaltyPoints || 0, mobile: c.phone || "", lastVisit: c.lastVisit ? new Date(c.lastVisit).toLocaleDateString("en-IN") : "—" })) : []);
-    setNewCustomer({ name: "", phone: "", email: "" });
-    setShowAdd(false);
+    setSaving(true);
+    try {
+      await customersApi.create(restaurantId, { name: newCustomer.name, phone: newCustomer.phone, email: newCustomer.email });
+      await reload();
+      setNewCustomer({ name: "", phone: "", email: "" });
+      setShowAdd(false);
+      toast({ title: "Customer added" });
+    } catch (e) {
+      toast({ title: "Could not add customer", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openEdit() {
+    if (!selected) return;
+    setEditForm({ name: selected.name || "", phone: selected.mobile || selected.phone || "", email: selected.email || "" });
+    setEditMode(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!restaurantId || !selected || !editForm.name.trim()) return;
+    setSaving(true);
+    try {
+      await customersApi.update(restaurantId, Number(selected.id), {
+        name: editForm.name.trim(),
+        phone: editForm.phone.trim(),
+        email: editForm.email.trim(),
+      });
+      await reload();
+      setSelected(null);
+      setEditMode(false);
+      toast({ title: "Customer updated" });
+    } catch (e) {
+      toast({ title: "Could not update customer", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -177,7 +234,6 @@ export default function CustomerCRM() {
         </div>
       )}
 
-      {/* Add Modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={e => e.target === e.currentTarget && setShowAdd(false)}>
           <div className="w-full max-w-sm bg-card rounded-lg p-6 border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
@@ -188,12 +244,12 @@ export default function CustomerCRM() {
             {["name", "phone", "email"].map(field => (
               <input key={field} placeholder={field.charAt(0).toUpperCase() + field.slice(1)} value={(newCustomer as any)[field]} onChange={e => setNewCustomer(p => ({ ...p, [field]: e.target.value }))} className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground" />
             ))}
-            <button onClick={handleAdd} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm">Add Customer</button>
+            <button onClick={handleAdd} disabled={saving || !newCustomer.name} className="w-full py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-40">{saving ? "Saving…" : "Add Customer"}</button>
           </div>
         </div>
       )}
 
-      {selected && (
+      {selected && !editMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={e => e.target === e.currentTarget && setSelected(null)}>
           <div className="w-full max-w-sm bg-card rounded-lg p-6 border border-border max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
@@ -213,6 +269,34 @@ export default function CustomerCRM() {
               <div className="p-3 rounded-lg bg-muted"><p className="text-xs text-muted-foreground">Last Visit</p><p className="text-sm font-semibold">{selected.lastVisit}</p></div>
             </div>
             {selected.email && <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground"><Mail className="h-3 w-3" />{selected.email}</div>}
+            {(selected.mobile || selected.phone) && <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground"><Phone className="h-3 w-3" />{selected.mobile || selected.phone}</div>}
+            <button onClick={openEdit} className="w-full mt-4 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm flex items-center justify-center gap-2">
+              <Edit2 className="h-4 w-4" /> Edit Customer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selected && editMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={e => e.target === e.currentTarget && setEditMode(false)}>
+          <div className="w-full max-w-sm bg-card rounded-lg p-6 border border-border space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2"><Edit2 className="h-4 w-4" /> Edit Customer</h3>
+              <button onClick={() => setEditMode(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
+            </div>
+            {(["name", "phone", "email"] as const).map(field => (
+              <input
+                key={field}
+                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                value={editForm[field]}
+                onChange={e => setEditForm(p => ({ ...p, [field]: e.target.value }))}
+                className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-primary/40 placeholder:text-muted-foreground"
+              />
+            ))}
+            <div className="flex gap-2">
+              <button onClick={() => setEditMode(false)} className="flex-1 py-3 rounded-lg border border-border text-sm font-semibold">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={saving || !editForm.name.trim()} className="flex-1 py-3 rounded-lg bg-primary hover:bg-primary/90 font-semibold text-sm disabled:opacity-40">{saving ? "Saving…" : "Save"}</button>
+            </div>
           </div>
         </div>
       )}

@@ -56,10 +56,13 @@ export function lifecycleIndex(stage: LifecycleStage): number {
 export function mapDbStatusToLifecycle(dbStatus: string, meta: OrderTrackingMetadata = {}): LifecycleStage {
   const t = meta.tracking;
   if (dbStatus === "cancelled") return "cancelled";
-  if (t?.isDelayed && !["delivered", "completed", "cancelled"].includes(dbStatus)) return "delayed";
+  if (t?.isDelayed && !["delivered", "completed", "cancelled", "served", "billed", "billing", "ready"].includes(dbStatus)) {
+    return "delayed";
+  }
 
   switch (dbStatus) {
     case "pending":
+    case "new":
       return "received";
     case "confirmed":
     case "accepted":
@@ -68,11 +71,17 @@ export function mapDbStatusToLifecycle(dbStatus: string, meta: OrderTrackingMeta
       if (t?.cookingStartedAt) return "cooking";
       if (t?.chefAssignedAt || t?.chefName) return "chef_assigned";
       return "kitchen_preparing";
+    // Kitchen "ready" means food is plated — guest should see progress past "still cooking".
     case "ready":
-      return "cooking";
+      return "on_the_way";
     case "serving":
       return "on_the_way";
+    // Web KDS "Served" writes this literal. Mapping it back to "received" made the
+    // guest timeline jump backwards after the meal was already on the table.
+    case "served":
     case "delivered":
+    case "billing":
+    case "billed":
     case "completed":
       return "delivered";
     case "delayed":
@@ -102,7 +111,7 @@ export function buildTrackingSnapshot(
   let waiterStatus: WaiterStatus = t.waiterStatus ?? "pending";
   if (!t.waiterStatus || t.waiterStatus === "pending") {
     if (order.status === "serving") waiterStatus = "on_the_way";
-    else if (order.status === "delivered" || order.status === "completed") waiterStatus = "delivered";
+    else if (order.status === "delivered" || order.status === "completed" || order.status === "served" || order.status === "billed" || order.status === "billing") waiterStatus = "delivered";
     else if (order.waiterName) waiterStatus = "assigned";
   }
 
@@ -110,7 +119,8 @@ export function buildTrackingSnapshot(
     ? t.kitchenUpdates
     : defaultKitchenUpdates(order.status, t.chefName);
 
-  const isDelayed = Boolean(t.isDelayed) || (elapsed > estMinutes * 60 && !["delivered", "completed", "cancelled"].includes(order.status));
+  const terminal = ["delivered", "completed", "cancelled", "served", "billing", "billed", "ready"].includes(order.status);
+  const isDelayed = !terminal && (Boolean(t.isDelayed) || (elapsed > estMinutes * 60));
 
   return {
     lifecycleStage: isDelayed && lifecycleStage !== "delivered" && lifecycleStage !== "cancelled" ? "delayed" : lifecycleStage,
@@ -131,19 +141,19 @@ export function buildTrackingSnapshot(
 function defaultKitchenUpdates(status: string, chefName?: string): KitchenUpdate[] {
   const now = new Date().toISOString();
   const updates: KitchenUpdate[] = [{ at: now, message: "Order received by kitchen display system", type: "info" }];
-  if (["confirmed", "accepted", "preparing", "ready", "serving", "delivered", "completed"].includes(status)) {
+  if (["confirmed", "accepted", "preparing", "ready", "serving", "served", "delivered", "billing", "billed", "completed"].includes(status)) {
     updates.unshift({ at: now, message: "Order accepted by kitchen manager", type: "info" });
   }
-  if (["preparing", "ready", "serving", "delivered", "completed"].includes(status)) {
+  if (["preparing", "ready", "serving", "served", "delivered", "billing", "billed", "completed"].includes(status)) {
     updates.unshift({ at: now, message: "Kitchen started preparation", type: "info" });
   }
-  if (chefName && ["preparing", "ready", "serving", "delivered", "completed"].includes(status)) {
+  if (chefName && ["preparing", "ready", "serving", "served", "delivered", "billing", "billed", "completed"].includes(status)) {
     updates.unshift({ at: now, message: `Chef ${chefName} assigned to your order`, type: "chef" });
   }
-  if (["ready", "serving", "delivered", "completed"].includes(status)) {
+  if (["ready", "serving", "served", "delivered", "billing", "billed", "completed"].includes(status)) {
     updates.unshift({ at: now, message: "Cooking complete — plating in progress", type: "ready" });
   }
-  if (["serving", "delivered", "completed"].includes(status)) {
+  if (["serving", "served", "delivered", "billing", "billed", "completed"].includes(status)) {
     updates.unshift({ at: now, message: "Waiter picked up order — on the way to your table", type: "info" });
   }
   return updates;

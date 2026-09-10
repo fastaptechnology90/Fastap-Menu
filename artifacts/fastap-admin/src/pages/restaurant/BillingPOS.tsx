@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { orders as ordersApi, orderAdjustments, restaurantApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -27,12 +27,13 @@ import {
    answering is "how much, and is it taken yet".
    ──────────────────────────────────────────────────────────────────────────── */
 
+// Till methods: record how the guest settled — they do not charge a payment gateway.
 const PAYMENT_METHODS = [
-  { id: "upi",    label: "UPI",    icon: Smartphone },
-  { id: "card",   label: "Card",   icon: CreditCard },
-  { id: "cash",   label: "Cash",   icon: Banknote },
-  { id: "wallet", label: "Wallet", icon: Wallet },
-  { id: "nfc",    label: "NFC",    icon: Nfc },
+  { id: "upi",    label: "UPI",      icon: Smartphone },
+  { id: "card",   label: "Card",     icon: CreditCard },
+  { id: "cash",   label: "Cash",     icon: Banknote },
+  { id: "wallet", label: "Wallet",   icon: Wallet },
+  { id: "nfc",    label: "Tap / NFC", icon: Nfc },
 ];
 
 const REF_METHODS = ["upi", "card", "nfc"];
@@ -162,6 +163,28 @@ export default function BillingPOS() {
   }, [restaurantId, settledCount]);
 
   const billableOrders = liveOrders.filter(o => ["preparing", "ready", "served", "accepted"].includes(o.status));
+
+  /**
+   * `?order=123` opens that tab's bill on arrival.
+   *
+   * The floor map sends a cashier here with a table's running tab; landing on an
+   * unfiltered list of every open tab and asking them to find it again is the
+   * step this removes. It fires once — clearing the flag before the guard means a
+   * tab that has already been settled does not retry on every poll — and it never
+   * overrides a bill the cashier has already opened by hand.
+   */
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || selectedOrder || billableOrders.length === 0) return;
+    const want = new URLSearchParams(window.location.search).get("order");
+    if (!want) { deepLinked.current = true; return; }
+    const match = billableOrders.find(o => String(o.id) === want);
+    deepLinked.current = true;
+    if (match) loadOrder(match);
+    else toast({ title: `Order #${want} is not waiting to be billed`, description: "It may already be settled, or cancelled." });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billableOrders.length]);
+
   const visibleOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return billableOrders;
@@ -303,10 +326,20 @@ export default function BillingPOS() {
 
   async function handlePay() {
     if (!selectedOrder || paying) return;
+    const isUpiLike = paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "nfc";
+    if (isUpiLike && !reference.trim()) {
+      toast({
+        title: "Reference required",
+        description: paymentMethod === "upi"
+          ? "Enter the UPI ID or UTR before marking this bill paid."
+          : "Enter the card RRN / NFC reference before marking this bill paid.",
+        variant: "destructive",
+      });
+      return;
+    }
     setPaying(true);
     try {
       const orderId = parseInt(selectedOrder.id, 10);
-      const isUpiLike = paymentMethod === "upi" || paymentMethod === "card" || paymentMethod === "nfc";
       if (!Number.isNaN(orderId) && restaurantId) {
         await ordersApi.update(restaurantId, orderId, {
           status: "completed",
@@ -316,7 +349,7 @@ export default function BillingPOS() {
           finalTotal: grandTotal,   // record exactly what was collected (incl. discount/tip)
           collectedBy: currentStaff?.name || "Cashier",
           collectedFrom: "Cashier POS",
-          ...(isUpiLike && reference ? (paymentMethod === "upi" ? { upiId: reference } : { utr: reference }) : {}),
+          ...(isUpiLike && reference ? (paymentMethod === "upi" ? { upiId: reference.trim() } : { utr: reference.trim() }) : {}),
         });
       }
       updateOrderStatus(selectedOrder.id, "billed");
@@ -354,10 +387,10 @@ export default function BillingPOS() {
   const chipOff = "border-border bg-card text-muted-foreground";
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 min-w-0 overflow-x-hidden">
       {/* ── Left: what there is to bill ─────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b border-border bg-card px-4 py-3">
+        <header className="shrink-0 border-b border-border bg-card px-3 py-3 sm:px-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight">Billing &amp; POS</h1>
@@ -431,7 +464,7 @@ export default function BillingPOS() {
                   <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                     {search
                       ? "Clear the search to see every open tab."
-                      : "A tab appears here as soon as the kitchen accepts its first order."}
+                      : "Open tabs appear after a guest or waiter places an order and the kitchen accepts it. Take orders from Tables, Kitchen, or the waiter Take order screen."}
                   </p>
                   {search && (
                     <button
@@ -718,6 +751,9 @@ export default function BillingPOS() {
 
               <section>
                 <h3 className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">How it was paid</h3>
+                <p className="mb-2 text-2xs text-muted-foreground">
+                  Marks the bill paid on the till. Does not charge a gateway — enter the UPI/card/tap reference the guest already settled with.
+                </p>
                 <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
                   {PAYMENT_METHODS.map(m => {
                     const on = paymentMethod === m.id;
@@ -740,7 +776,7 @@ export default function BillingPOS() {
                     value={reference}
                     onChange={e => setReference(e.target.value)}
                     aria-label="Payment reference"
-                    placeholder={paymentMethod === "upi" ? "UPI ID / UTR (optional)" : paymentMethod === "card" ? "Card txn / RRN (optional)" : "NFC reference (optional)"}
+                    placeholder={paymentMethod === "upi" ? "UPI ID / UTR (required)" : paymentMethod === "card" ? "Card txn / RRN (required)" : "Tap / NFC reference (required)"}
                     className="mt-2 min-h-10 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                 )}
@@ -785,7 +821,7 @@ export default function BillingPOS() {
                   type="button"
                   onClick={handlePay}
                   disabled={paying}
-                  className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-primary-border bg-primary text-base font-semibold text-primary-foreground transition-colors hover-elevate active-elevate-2 disabled:opacity-60"
+                  className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-primary-border bg-primary px-3 text-center text-base font-semibold leading-snug text-primary-foreground transition-colors hover-elevate active-elevate-2 disabled:opacity-60"
                 >
                   {paying ? "Recording payment…" : <>
                     <CheckCircle className="h-5 w-5" aria-hidden />

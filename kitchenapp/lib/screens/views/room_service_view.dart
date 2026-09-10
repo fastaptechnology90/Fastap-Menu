@@ -24,7 +24,8 @@ class RoomServiceView extends StatelessWidget {
     if (snapshot == null) {
       return _EmptyState(
         message: controller.roomServiceErrorMessage ??
-            'Room service system unavailable',
+            'Room service is not available right now. '
+            'Check your connection or ask your manager if this module is enabled.',
         onRetry: () => controller.refreshRoomService(),
       );
     }

@@ -226,7 +226,23 @@ const DEFAULT_RESTAURANT: RestaurantInfo = {
   currency: PLATFORM_CURRENCY_SYMBOL,
 };
 
+function mapLineItemStatus(
+  raw: unknown,
+  orderStatus: LiveOrder["status"],
+): "pending" | "preparing" | "ready" {
+  const s = String(raw ?? "").toLowerCase();
+  if (s === "ready" || s === "served" || s === "completed") return "ready";
+  if (s === "preparing" || s === "cooking") return "preparing";
+  if (s === "pending" || s === "new" || s === "queued") return "pending";
+  // No per-line status stored — mirror the ticket so the board doesn't show every
+  // item as "pending" while the order itself is already cooking or ready.
+  if (orderStatus === "ready" || orderStatus === "served" || orderStatus === "billed") return "ready";
+  if (orderStatus === "preparing" || orderStatus === "accepted") return "preparing";
+  return "pending";
+}
+
 function mapApiOrder(o: any): LiveOrder {
+  const orderStatus = normalizeOrderStatus(o.status);
   const items = Array.isArray(o.items) ? o.items.map((i: any) => ({
     name: typeof i === "object" ? (i.name || i.menuItemName || "Item") : String(i),
     qty: typeof i === "object" ? (i.quantity || i.qty || 1) : 1,
@@ -234,7 +250,7 @@ function mapApiOrder(o: any): LiveOrder {
     // line subtotal (pre-tax) as stored on the order — the POS uses this to bill the
     // exact order amount instead of re-deriving from a possibly-stale unit price.
     subtotal: typeof i === "object" ? (parseFloat(i.subtotal) || 0) : 0,
-    status: "pending" as const,
+    status: mapLineItemStatus(typeof i === "object" ? i.status : undefined, orderStatus),
     // Carry the extras through so the owner can see them in Order Details.
     variant: typeof i === "object" ? (i.variant || undefined) : undefined,
     addons: typeof i === "object" && Array.isArray(i.addons) ? i.addons.map((a: any) => ({ name: String(a?.name ?? a), price: parseFloat(a?.price) || 0 })) : undefined,
@@ -247,6 +263,8 @@ function mapApiOrder(o: any): LiveOrder {
   })) : [];
   const tableName = o.tableName ?? o.table_name;
   const tableId = o.tableId ?? o.table_id;
+  const placedRaw = o.createdAt ?? o.created_at;
+  const placedAt = placedRaw ? new Date(placedRaw) : new Date();
   return {
     id: String(o.id),
     tabId: typeof o.metadata?.tabId === "number" ? o.metadata.tabId : undefined,
@@ -257,9 +275,9 @@ function mapApiOrder(o: any): LiveOrder {
         : "Walk-in",
     waiter: o.waiterName || o.waiter_name || o.customerName || "Staff",
     items,
-    status: normalizeOrderStatus(o.status),
+    status: orderStatus,
     type: (o.type === "dine_in" ? "dine-in" : o.type === "takeaway" ? "takeaway" : o.type === "delivery" ? "delivery" : o.type === "room_service" ? "room-service" : "dine-in") as LiveOrder["type"],
-    placedAt: new Date(o.createdAt),
+    placedAt: Number.isNaN(placedAt.getTime()) ? new Date() : placedAt,
     total: parseFloat(String(o.total)),
     guests: o.guestCount ?? o.guest_count ?? 1,
     specialReq: o.notes || undefined,
@@ -352,9 +370,14 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
   const refreshOrdersRef = useRef(refreshOrders);
   refreshOrdersRef.current = refreshOrders;
 
+  const refreshTablesRef = useRef(refreshTables);
+  // refreshTables is declared below; keep the ref wired after both exist.
   const onSSE = useCallback((event: string) => {
     if (ORDER_CHANGING_EVENTS.has(event)) {
       refreshOrdersRef.current();
+      // Floor map / table chips live on a separate fetch — without this, paid +
+      // cleared covers stayed occupied until a full reload.
+      refreshTablesRef.current();
     }
   }, []);
 
@@ -367,6 +390,7 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
       setTables(Array.isArray(data) ? data.map(mapApiTable) : []);
     } catch {}
   }
+  refreshTablesRef.current = refreshTables;
 
   async function refreshStaff() {
     if (!restaurantId) return;

@@ -7,6 +7,7 @@ import {
   ShoppingBag, Receipt, LayoutDashboard,
   CheckCircle2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { GuestLogo } from "@/components/user/GuestUI";
 import { PhoneMockup } from "@/components/user/PhoneMockup";
@@ -26,33 +27,60 @@ const smartEntryDemos = [
   { label: "PWA App", path: GUEST_ENTRY_PATH },
 ];
 
-const userWebFeatures = [
-  { icon: QrCode, label: "Digital Menu", desc: "Browse, customize & order", path: GUEST_ENTRY_PATH },
-  { icon: ShoppingBag, label: "Cart & Checkout", desc: "Order, split pay & schedule", path: GUEST_ENTRY_PATH },
-  { icon: Receipt, label: "Smart Dining", desc: "Call waiter, live bill & split", path: GUEST_ENTRY_PATH },
-  { icon: MapPin, label: "Smart Seating", desc: "Live tables & suggestions", path: GUEST_ENTRY_PATH },
-  { icon: Calendar, label: "Reservations", desc: "Table, spa & event booking", path: GUEST_ENTRY_PATH },
-  { icon: Sparkles, label: "Events & Banquet", desc: "Weddings & conferences", path: GUEST_ENTRY_PATH },
-  { icon: Clock, label: "Waitlist", desc: "Join queue & get notified", path: GUEST_ENTRY_PATH },
-  { icon: Smartphone, label: "Live Tracking", desc: "Real-time order status", path: GUEST_ENTRY_PATH },
-  { icon: Hotel, label: "Room Service", desc: "Hotel guest requests", path: GUEST_ENTRY_PATH },
-  { icon: Sparkles, label: "Spa & Wellness", desc: "Book treatments", path: GUEST_ENTRY_PATH },
-  { icon: Wine, label: "Bar & Nightlife", desc: "Happy hour & cocktails", path: GUEST_ENTRY_PATH },
-  { icon: Wallet, label: "Wallet & Loyalty", desc: "Recharge & transfer", path: GUEST_ENTRY_PATH },
-  { icon: Sparkles, label: "Personalisation", desc: "Dietary filters & suggestions", path: GUEST_ENTRY_PATH },
-  { icon: CreditCard, label: "Payment & Billing", desc: "UPI, split pay, GST", path: GUEST_ENTRY_PATH },
-  { icon: Headphones, label: "Support", desc: "Raise and track a request", path: GUEST_ENTRY_PATH },
-  { icon: Languages, label: "Language & A11y", desc: "Hindi, English & regional", path: GUEST_ENTRY_PATH },
-  { icon: Wifi, label: "Offline Mode", desc: "Cached menu & sync", path: GUEST_ENTRY_PATH },
-  { icon: Smartphone, label: "PWA Experience", desc: "Install & push alerts", path: GUEST_ENTRY_PATH },
-  { icon: Monitor, label: "Smart Kiosk", desc: "Self order & NFC pay", path: GUEST_ENTRY_PATH },
-  { icon: Film, label: "Digital Experience", desc: "Offers, themes & video", path: GUEST_ENTRY_PATH },
+type GuestGroup = {
+  heading: string;
+  note: string;
+  items: { icon: LucideIcon; label: string; desc: string; path: string }[];
+};
+
+// Grouped rather than left as one undifferentiated wall of twenty tiles. Somebody
+// reading this is looking for one of three things — a table, a room, or the bill —
+// and the headings say which pile each feature is in.
+const guestGroups: GuestGroup[] = [
+  {
+    heading: "At the table",
+    note: "Scan the code on the table and the rest follows",
+    items: [
+      { icon: QrCode, label: "Digital menu", desc: "Browse, customise and order", path: GUEST_ENTRY_PATH },
+      { icon: ShoppingBag, label: "Cart & checkout", desc: "Order, split the bill, schedule ahead", path: GUEST_ENTRY_PATH },
+      { icon: Receipt, label: "Live bill", desc: "Call a waiter, watch the total build", path: GUEST_ENTRY_PATH },
+      { icon: Smartphone, label: "Order tracking", desc: "Accepted, cooking, on its way", path: GUEST_ENTRY_PATH },
+      { icon: CreditCard, label: "Payment", desc: "UPI, cards, split pay, GST invoice", path: GUEST_ENTRY_PATH },
+      { icon: Monitor, label: "Self-order kiosk", desc: "Order and tap to pay at the counter", path: GUEST_ENTRY_PATH },
+    ],
+  },
+  {
+    heading: "Before they arrive",
+    note: "Seating, bookings and the queue",
+    items: [
+      { icon: Calendar, label: "Reservations", desc: "Tables, spa slots and event dates", path: GUEST_ENTRY_PATH },
+      { icon: MapPin, label: "Smart seating", desc: "Live floor and table suggestions", path: GUEST_ENTRY_PATH },
+      { icon: Clock, label: "Waitlist", desc: "Join the queue, get a message back", path: GUEST_ENTRY_PATH },
+      { icon: Sparkles, label: "Events & banquets", desc: "Weddings, conferences, private halls", path: GUEST_ENTRY_PATH },
+      { icon: Hotel, label: "Room service", desc: "In-room ordering for hotel guests", path: GUEST_ENTRY_PATH },
+      { icon: Waves, label: "Spa & wellness", desc: "Book treatments and therapists", path: GUEST_ENTRY_PATH },
+    ],
+  },
+  {
+    heading: "Everything else",
+    note: "The parts guests notice only when they are missing",
+    items: [
+      { icon: Wallet, label: "Wallet & loyalty", desc: "Recharge, transfer, earn points", path: GUEST_ENTRY_PATH },
+      { icon: Wine, label: "Bar & nightlife", desc: "Happy hour, cocktails, table service", path: GUEST_ENTRY_PATH },
+      { icon: Sparkles, label: "Dietary filters", desc: "Jain, vegan, allergen and spice level", path: GUEST_ENTRY_PATH },
+      { icon: Languages, label: "Languages", desc: "Hindi, English and regional", path: GUEST_ENTRY_PATH },
+      { icon: Wifi, label: "Works offline", desc: "Cached menu, syncs when signal returns", path: GUEST_ENTRY_PATH },
+      { icon: Headphones, label: "Support", desc: "Raise a request and track it", path: GUEST_ENTRY_PATH },
+      { icon: Smartphone, label: "Install as an app", desc: "Add to home screen, push alerts", path: GUEST_ENTRY_PATH },
+      { icon: Film, label: "Offers & experiences", desc: "Campaigns and seasonal offers", path: "/user/experience" },
+    ],
+  },
 ];
 
 const navLinks = [
-  { label: "Guest Experience", path: "#guest-web" },
-  { label: "Features", path: "#features" },
-  { label: "Get Started", path: "#get-started" },
+  { label: "For guests", path: "#guest-web" },
+  { label: "For your team", path: "#features" },
+  { label: "Get started", path: "#get-started" },
 ];
 
 // The three surfaces the product actually ships. This replaced a strip of vanity
@@ -66,25 +94,35 @@ const panels = [
 
 const venueTypes = [
   { icon: Utensils, label: "Restaurants" },
-  { icon: Building2, label: "Hotels & Resorts" },
-  { icon: Coffee, label: "Bars & Lounges" },
-  { icon: MapPin, label: "Food Courts" },
-  { icon: Waves, label: "Beach Clubs" },
-  { icon: ChefHat, label: "Cloud Kitchens" },
+  { icon: Building2, label: "Hotels & resorts" },
+  { icon: Coffee, label: "Bars & lounges" },
+  { icon: MapPin, label: "Food courts" },
+  { icon: Waves, label: "Beach clubs" },
+  { icon: ChefHat, label: "Cloud kitchens" },
 ];
 
 const features = [
-  { icon: QrCode, title: "QR & Digital Menus", desc: "Contactless menus that update in real time. No app required — just scan and explore." },
-  { icon: CreditCard, title: "Integrated Payments", desc: "Take UPI, card and cash at the table, with settlement and refund tracking behind it." },
-  { icon: BarChart3, title: "Analytics & Insights", desc: "Live dashboards showing what is selling, who is ordering, and when." },
-  { icon: Users, title: "CRM & Loyalty", desc: "Reward regulars, run campaigns, and turn first-time guests into repeat ones." },
-  { icon: Utensils, title: "Kitchen Display", desc: "Route orders straight to the kitchen. Cut prep time and reduce errors." },
+  { icon: QrCode, title: "QR & digital menus", desc: "Change a price at four in the afternoon and the next guest to scan sees it. Nothing to download, nothing to reprint." },
+  { icon: CreditCard, title: "Payments that reconcile", desc: "UPI, card and cash taken at the table, with settlement and refunds tracked against the same order." },
+  { icon: BarChart3, title: "Numbers you can act on", desc: "What sold, what sat, which hours carried the day — and the same totals in the report as on the bill." },
+  { icon: Users, title: "CRM & loyalty", desc: "Remember the regulars, run a campaign at them, and see whether it actually brought anybody back." },
+  { icon: Utensils, title: "Kitchen display", desc: "Orders go straight to the pass. No shouting, no paper ticket going missing under a hot plate." },
   // Was "SOC 2 compliant …". Nothing has been certified; naming a certification the
   // platform does not hold is a claim an enterprise buyer will check.
-  { icon: Shield, title: "Access & Audit", desc: "Role-based access, full audit trails, fraud checks and vendor KYC." },
+  { icon: Shield, title: "Access & audit", desc: "Every role sees only its own screens, and every change leaves a trail with a name against it." },
 ];
 
-const TRUST_POINTS = ["No app download", "Works offline", "GST compliant", "Role-based staff access"];
+const TRUST_POINTS = ["No app to download", "Works offline", "GST compliant", "Role-based staff access"];
+
+// The flow, in the order it happens. The first question a venue owner asks is
+// "what does this actually do on a Friday night", and a grid of features has
+// never once answered it.
+const flow = [
+  { step: "01", title: "Guest scans", body: "The code on the table opens the menu in the browser. No app, no wifi password, no waiting to catch someone's eye." },
+  { step: "02", title: "Kitchen sees it", body: "The order lands on the kitchen display the moment it is placed, with the table number and the notes attached to it." },
+  { step: "03", title: "Waiter runs it", body: "Prep, ready and served are one tap each. The guest watches the same status move along on their own phone." },
+  { step: "04", title: "Bill settles", body: "Split it, add GST, take UPI or cash. The payment is written against the order, so the day closes clean." },
+];
 
 export default function Landing() {
   const [, navigate] = useLocation();
@@ -104,32 +142,28 @@ export default function Landing() {
   }
 
   return (
-    <div className="guest-page min-h-screen font-sans">
+    <div className="landing-page font-sans">
       {/* Nav */}
-      <header className="sticky top-0 z-50 guest-glass">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur-md">
+        <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <GuestLogo size="sm" />
-              <span className="font-display text-lg font-semibold tracking-tight">FastMenu</span>
+              <span className="landing-serif text-lg">FastMenu</span>
             </div>
 
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-7">
               {navLinks.map(link => (
-                <button key={link.label} onClick={() => scrollTo(link.path)} className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-md hover-elevate">
+                <button key={link.label} onClick={() => scrollTo(link.path)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   {link.label}
                 </button>
               ))}
-              <button onClick={goUserMenu} className="px-3 py-2 text-sm text-primary font-medium transition-colors rounded-md hover-elevate">
-                Try Guest Menu
-              </button>
             </nav>
 
-            <div className="hidden lg:flex items-center gap-2">
-              <button onClick={goRestaurant} className="guest-btn-secondary px-4 py-2 text-sm">Restaurant</button>
-              <button onClick={goAdmin} className="guest-btn-secondary px-4 py-2 text-sm">Admin</button>
+            <div className="hidden lg:flex items-center gap-5">
+              <button onClick={goRestaurant} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Staff sign in</button>
               <button onClick={goUserMenu} className="guest-btn-primary px-5 py-2.5 text-sm">
-                Open Guest Web <ArrowRight className="h-3.5 w-3.5" />
+                See the guest menu <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
 
@@ -146,59 +180,50 @@ export default function Landing() {
           {mobileMenuOpen && (
             <div className="lg:hidden border-t py-4 space-y-1">
               {navLinks.map(link => (
-                <button key={link.label} onClick={() => scrollTo(link.path)} className="flex w-full px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground rounded-md hover-elevate">
+                <button key={link.label} onClick={() => scrollTo(link.path)} className="flex w-full px-1 py-2.5 text-sm text-muted-foreground hover:text-foreground">
                   {link.label}
                 </button>
               ))}
               <div className="pt-3 flex flex-col gap-2">
-                <button onClick={goUserMenu} className="guest-btn-primary w-full py-2.5 text-sm">Open Guest Web</button>
-                <button onClick={goRestaurant} className="guest-btn-secondary w-full py-2 text-sm">Restaurant Login</button>
-                <button onClick={goAdmin} className="guest-btn-secondary w-full py-2 text-sm">Admin Login</button>
+                <button onClick={goUserMenu} className="guest-btn-primary w-full py-2.5 text-sm">See the guest menu</button>
+                <button onClick={goRestaurant} className="guest-btn-secondary w-full py-2 text-sm">Restaurant sign in</button>
+                <button onClick={goAdmin} className="guest-btn-secondary w-full py-2 text-sm">Admin sign in</button>
               </div>
             </div>
           )}
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative pt-16 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-            <div className="text-center lg:text-left">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium text-muted-foreground">
-                <Smartphone className="h-3.5 w-3.5" />
-                Guest web — scan, order, track & pay
-              </div>
+      {/* Hero — asymmetric on purpose. A centred headline over a centred sub over a
+          centred pair of buttons is the shape of every template on the internet. */}
+      <section className="px-5 sm:px-6 lg:px-8 pt-14 pb-16 sm:pt-20">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+            <div className="lg:col-span-7">
+              <p className="landing-eyebrow mb-6">Smart hospitality</p>
 
-              <h1 className="font-display mb-6 text-3xl font-semibold tracking-tight leading-tight sm:text-4xl lg:text-5xl">
-                Smart hospitality for your guests
+              <h1 className="landing-serif text-[2.1rem] leading-[1.12] sm:text-5xl lg:text-[3.4rem] mb-6">
+                Your dining room,{" "}
+                <span className="text-primary italic">running on its own.</span>
               </h1>
 
-              <p className="mb-8 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0">
-                QR menus, live tracking, reservations, room service, wallet and loyalty —
-                a complete guest experience in the browser. No app download required.
+              <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mb-8">
+                A guest scans the code on the table and orders. The kitchen sees it,
+                the waiter runs it, the bill settles itself. You get the evening back.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 mb-4">
-                <button onClick={goUserMenu} className="guest-btn-primary px-8 py-3.5 text-base w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-3 mb-8">
+                <button onClick={goUserMenu} className="guest-btn-primary px-7 py-3.5 text-base">
                   <QrCode className="h-5 w-5" />
-                  Try Demo Menu
-                  <ArrowRight className="h-4 w-4" />
+                  Try the demo menu
                 </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 mb-8">
-                <button onClick={goRestaurant} className="guest-btn-secondary px-8 py-3.5 text-base w-full sm:w-auto">
-                  <ChefHat className="h-5 w-5" />
-                  Restaurant Staff Login
-                </button>
-                <button onClick={goRestaurantRegister} className="guest-btn-secondary px-8 py-3.5 text-base w-full sm:w-auto">
+                <button onClick={goRestaurantRegister} className="guest-btn-secondary px-7 py-3.5 text-base">
                   <Building2 className="h-4 w-4" />
-                  Register Restaurant
+                  Register your venue
                 </button>
               </div>
 
-              <div className="flex flex-wrap justify-center lg:justify-start gap-4 mb-10">
+              <div className="flex flex-wrap gap-x-6 gap-y-2.5">
                 {TRUST_POINTS.map(point => (
                   <div key={point} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <CheckCircle2 className="h-3.5 w-3.5 text-success" />
@@ -206,67 +231,110 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                {panels.map(({ icon: Icon, label, desc }) => (
-                  <div key={label} className="guest-card p-4 text-left">
-                    <Icon className="h-4 w-4 text-primary" />
-                    <div className="font-display text-sm font-semibold mt-2">{label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            <div className="flex justify-center lg:justify-end">
+            <div className="lg:col-span-5 flex justify-center lg:justify-end">
               <PhoneMockup />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Guest Web */}
-      <section id="guest-web" className="py-24 px-4 sm:px-6 lg:px-8 border-y">
+      {/* Venue types — a plain line of text, not a fake logo wall. */}
+      <div className="landing-band py-7 px-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-14">
-            <p className="guest-section-label mb-4">Guest web panel</p>
-            <h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl mb-4">
-              Everything your guests need
+          {/* Was "Trusted by venues worldwide" over a list of venue *categories* — no
+              venue named here is a customer. It says what the product is built for. */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+            <p className="landing-serif text-sm italic text-muted-foreground shrink-0">Built for</p>
+            <div className="flex flex-wrap items-center gap-x-7 gap-y-2.5">
+              {venueTypes.map(({ icon: Icon, label }) => (
+                <div key={label} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Icon className="h-4 w-4 text-primary/70" />
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How it works */}
+      <section className="py-20 px-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="max-w-xl mb-12">
+            <p className="landing-eyebrow mb-5">One evening, start to finish</p>
+            <h2 className="landing-serif text-3xl sm:text-4xl leading-tight">
+              Four steps, and nobody has to shout across the pass
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-              Menu ordering, reservations, hotel services, wallet and support — connected in one browser session.
-            </p>
-            <button onClick={goUserMenu} className="guest-btn-primary px-6 py-3 text-sm">
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
+            {flow.map(s => (
+              <div key={s.step}>
+                <div className="landing-serif text-3xl text-primary/40 mb-3">{s.step}</div>
+                <div className="landing-rule mb-4" />
+                <h3 className="landing-serif text-lg mb-2">{s.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Guest web */}
+      <section id="guest-web" className="landing-band py-20 px-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div className="max-w-xl">
+              <p className="landing-eyebrow mb-5">For guests</p>
+              <h2 className="landing-serif text-3xl sm:text-4xl leading-tight mb-4">
+                Everything a guest can do from their own phone
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                One browser session covers the table, the room, the spa and the bill.
+                Open any of these to see the real screen.
+              </p>
+            </div>
+            <button onClick={goUserMenu} className="guest-btn-primary px-6 py-3 text-sm shrink-0">
               <QrCode className="h-4 w-4" />
-              Try Demo Menu
+              Open the demo
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {userWebFeatures.map(f => (
-              <button
-                key={f.label}
-                onClick={() => navigate(f.path)}
-                className="guest-card guest-card-interactive p-5 text-left group"
-              >
-                {/* One accent for the whole grid. This was a twelve-hue lookup table
-                    that gave each tile an unrelated colour with no meaning behind it. */}
-                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md border bg-primary/10 text-primary">
-                  <f.icon className="h-5 w-5" />
+          <div className="grid md:grid-cols-3 gap-x-10 gap-y-10">
+            {guestGroups.map(group => (
+              <div key={group.heading}>
+                <h3 className="landing-serif text-xl mb-1">{group.heading}</h3>
+                <p className="text-xs text-muted-foreground mb-4">{group.note}</p>
+                <div className="border-t">
+                  {group.items.map(item => (
+                    <button
+                      key={item.label}
+                      onClick={() => navigate(item.path)}
+                      className="landing-row group"
+                    >
+                      <span className="landing-row__icon">
+                        <item.icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">{item.label}</span>
+                        <span className="block text-xs text-muted-foreground leading-relaxed mt-0.5">{item.desc}</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 mt-1 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
                 </div>
-                <h3 className="font-display font-semibold mb-1">{f.label}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-                <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                  Open <ChevronRight className="h-3 w-3" />
-                </div>
-              </button>
+              </div>
             ))}
           </div>
 
-          <div className="mt-8 guest-card p-6">
-            <h3 className="font-display font-semibold mb-1">Smart entry & access</h3>
-            <p className="text-xs text-muted-foreground mb-4">QR, NFC, room, poolside, spa, event, parking and PWA</p>
+          <div className="mt-12 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 rounded-lg border bg-card p-6">
+            <div className="shrink-0">
+              <h3 className="landing-serif text-lg">However they arrive</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Table, room, poolside, spa, event, parking</p>
+            </div>
             <div className="flex flex-wrap gap-2">
               {smartEntryDemos.map(d => (
                 <button key={d.label} onClick={() => navigate(d.path)} className="guest-pill">
@@ -278,101 +346,97 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Venue types */}
-      <div className="py-6 border-b">
-        {/* Was "Trusted by venues worldwide" over a list of venue *categories* — no
-            venue named here is a customer. It says what the product is built for. */}
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-2xs text-muted-foreground mb-4 uppercase tracking-[0.25em]">Built for</p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3">
-            {venueTypes.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Operator features */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8">
+      <section id="features" className="py-20 px-5 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-14">
-            <p className="guest-section-label mb-4">For operators</p>
-            <h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl mb-4">
-              The tools behind the counter
+          <div className="max-w-xl mb-12">
+            <p className="landing-eyebrow mb-5">For your team</p>
+            <h2 className="landing-serif text-3xl sm:text-4xl leading-tight mb-4">
+              The half of it the guest never sees
             </h2>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Kitchen displays, analytics, CRM and platform controls for your team.
+            <p className="text-muted-foreground leading-relaxed">
+              Kitchen displays, stock, staff rosters, reports and platform controls —
+              the same data the guest's phone is reading, from the other side of it.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-9">
             {features.map(f => (
-              <div key={f.title} className="guest-card p-6">
-                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-md border bg-primary/10 text-primary">
+              <div key={f.title}>
+                <div className="landing-row__icon mb-4 h-10 w-10">
                   <f.icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display font-semibold mb-2">{f.title}</h3>
+                <h3 className="landing-serif text-lg mb-2">{f.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-10 guest-card p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div>
-              <h3 className="font-display text-lg font-semibold mb-2">Restaurant manager portal</h3>
-              <p className="text-sm text-muted-foreground max-w-xl">
-                Role-based staff login — owner, manager, cashier, waiter, kitchen, bar, reception,
-                housekeeping, spa, finance, HR and franchise. New venues register with KYC.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-              <button onClick={goRestaurant} className="guest-btn-primary px-6 py-3 text-sm">
-                Staff Login
-              </button>
-              <button onClick={goRestaurantRegister} className="guest-btn-secondary px-6 py-3 text-sm">
-                Register with KYC
-              </button>
-            </div>
+          <div className="mt-14 grid sm:grid-cols-3 gap-5">
+            {panels.map(({ icon: Icon, label, desc }) => (
+              <div key={label} className="rounded-lg border bg-card p-5">
+                <Icon className="h-4 w-4 text-primary" />
+                <div className="landing-serif text-base mt-3">{label}</div>
+                <div className="text-xs text-muted-foreground mt-1">{desc}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* CTA — was a "Loved by restaurant owners" wall of three invented people, one of
           whom credited the product with a 34% revenue rise. None of it was a customer. */}
-      <section id="get-started" className="py-20 px-4 sm:px-6 lg:px-8 border-t">
-        <div className="mx-auto max-w-3xl">
-          <div className="guest-card p-8 sm:p-12 text-center">
-            <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mb-4">
-              Try the guest experience now
-            </h2>
-            <p className="text-muted-foreground mb-8 leading-relaxed">
-              Open the demo menu — order, track, reserve and explore every guest feature live.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button onClick={goUserMenu} className="guest-btn-primary px-8 py-3.5 text-sm w-full sm:w-auto">
-                Open Guest Web Demo <ArrowRight className="h-4 w-4" />
-              </button>
-              <button onClick={goAdmin} className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
-                Operator / Admin sign in
-              </button>
+      <section id="get-started" className="landing-band py-20 px-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <div>
+              <h2 className="landing-serif text-3xl sm:text-4xl leading-tight mb-4">
+                Have a look before you decide anything
+              </h2>
+              <p className="text-muted-foreground leading-relaxed mb-7">
+                The demo menu is the real guest web, running on a real restaurant's data.
+                Browse it, open a dish, walk through the checkout — none of it is a screenshot.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={goUserMenu} className="guest-btn-primary px-7 py-3.5 text-sm">
+                  Open the demo menu <ArrowRight className="h-4 w-4" />
+                </button>
+                <button onClick={goRestaurantRegister} className="guest-btn-secondary px-7 py-3.5 text-sm">
+                  Register your venue
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-card p-7">
+              <h3 className="landing-serif text-lg mb-1">Already set up?</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Staff sign in with the role their manager gave them — owner, manager,
+                cashier, waiter, kitchen, bar, reception, housekeeping, spa, finance, HR.
+              </p>
+              <div className="flex flex-col gap-3 items-start">
+                <button onClick={goRestaurant} className="guest-btn-secondary w-full py-3 text-sm">
+                  <ChefHat className="h-4 w-4" />
+                  Restaurant staff sign in
+                </button>
+                <button onClick={goAdmin} className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
+                  Platform admin sign in
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-10 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <footer className="border-t py-10 px-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2.5">
               <GuestLogo size="sm" />
-              <span className="font-display font-semibold">FastMenu</span>
+              <span className="landing-serif">FastMenu</span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 text-xs text-muted-foreground">
-              <button onClick={goUserMenu} className="hover:text-foreground transition-colors font-medium">Guest Menu</button>
+              <button onClick={goUserMenu} className="hover:text-foreground transition-colors font-medium">Guest menu</button>
               <button onClick={goRestaurant} className="hover:text-foreground transition-colors">Restaurant</button>
               <button onClick={goAdmin} className="hover:text-foreground transition-colors">Admin</button>
             </div>

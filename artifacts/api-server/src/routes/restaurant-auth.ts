@@ -30,6 +30,8 @@ import {
 import { isEmailConfigured, sendEmail, publicBaseUrl } from "../lib/email.js";
 import { makeResetToken, verifyResetToken } from "../lib/password-reset.js";
 import { logger } from "../lib/logger.js";
+import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
+import { sendOtpSms, smsCredentialsPresent } from "../lib/sms-delivery.js";
 
 const router: IRouter = Router();
 
@@ -325,6 +327,17 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
   // Math.random() is predictable enough to guess a six-digit login code from a couple of
   // samples; this draws from the OS entropy source instead.
   const otp = generateOtp();
+
+  const platform = await getPlatformSettingsRaw().catch(() => null);
+  const integrations = platform?.integrations;
+  if (!smsCredentialsPresent(integrations)) {
+    res.status(503).json({
+      error: "Phone OTP is not available — SMS is not configured. Sign in with email and password.",
+      code: "SMS_NOT_CONNECTED",
+    });
+    return;
+  }
+
   otpStore.set(normalized, {
     otp,
     expiresAt: Date.now() + 10 * 60 * 1000,
@@ -332,7 +345,16 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
     restaurantId: restaurant.id,
   });
 
-  // Integrate SMS provider here; OTP is never returned to the client.
+  const sent = await sendOtpSms(normalized, otp, integrations);
+  if (!sent.ok) {
+    otpStore.delete(normalized);
+    res.status(503).json({
+      error: "We could not send the OTP. Use email and password, or try again later.",
+      code: "SMS_SEND_FAILED",
+    });
+    return;
+  }
+
   res.json({ success: true, message: "OTP sent to your registered mobile number" });
 });
 

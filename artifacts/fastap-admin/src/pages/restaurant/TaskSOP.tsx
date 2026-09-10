@@ -43,6 +43,7 @@ export default function TaskSOP() {
   const [viewSop, setViewSop] = useState<any | null>(null);
   const [trainingVideos, setTrainingVideos] = useState<TrainingVideo[]>([]);
   const [loadingVideo, setLoadingVideo] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // "Read by staff" used to be invented from the number of steps in the document — a
   // number no one had recorded, shown as if it were a real acknowledgement count. There
@@ -74,24 +75,26 @@ export default function TaskSOP() {
     if (Array.isArray(rows)) applySops(rows);
   }, [restaurantId, applySops]);
 
-  const persistProgress = useCallback(async (type: "opening" | "closing", ids: string[]) => {
+  const persistProgress = useCallback(async (type: "opening" | "closing", ids: string[], previous: Set<string>) => {
     if (!restaurantId) return;
     try {
       await tasksApi.saveChecklistProgress(restaurantId, type, ids);
     } catch (e) {
       // A tick that never reached the server would otherwise look done to the
-      // next shift, who would skip the task.
+      // next shift, who would skip the task. Roll the UI back to the last known set.
+      setChecked(new Set(previous));
       toast({ title: "Checklist not saved", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
     }
   }, [restaurantId]);
 
   useEffect(() => {
     if (!restaurantId) return;
+    setLoadError(null);
     Promise.all([
-      tasksApi.tasks(restaurantId).catch(() => []),
-      tasksApi.sopList(restaurantId).catch(() => []),
-      tasksApi.trainingVideos(restaurantId).catch(() => []),
-      tasksApi.checklists(restaurantId).catch(() => null),
+      tasksApi.tasks(restaurantId),
+      tasksApi.sopList(restaurantId),
+      tasksApi.trainingVideos(restaurantId),
+      tasksApi.checklists(restaurantId),
     ]).then(([taskRows, sopRows, videos, checklistData]) => {
       if (Array.isArray(taskRows)) setTasks(taskRows.map(mapTaskRow));
       if (Array.isArray(sopRows)) applySops(sopRows);
@@ -104,8 +107,13 @@ export default function TaskSOP() {
         const prog = checklistData.progress?.[checklistType] ?? [];
         setChecked(new Set(prog));
       }
+    }).catch(e => {
+      // Swallowing each call as [] made a 500 look like an empty shift board.
+      const msg = e instanceof Error ? e.message : "Could not load tasks and SOPs.";
+      setLoadError(msg);
+      toast({ title: "Could not load Tasks & SOPs", description: msg, variant: "destructive" });
     });
-  }, [restaurantId, staffList.length]);
+  }, [restaurantId, staffList.length, applySops]);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -243,14 +251,16 @@ export default function TaskSOP() {
     setChecked(prev => {
       const n = new Set(prev);
       n.has(id) ? n.delete(id) : n.add(id);
-      persistProgress(checklistType, [...n]);
+      void persistProgress(checklistType, [...n], prev);
       return n;
     });
   }
 
   function resetChecklist() {
-    setChecked(new Set());
-    persistProgress(checklistType, []);
+    setChecked(prev => {
+      void persistProgress(checklistType, [], prev);
+      return new Set();
+    });
   }
 
   async function downloadSop(docId: string) {
@@ -312,6 +322,10 @@ export default function TaskSOP() {
           </button>
         )}
       </div>
+
+      {loadError && (
+        <p role="alert" className="text-sm text-danger bg-danger-subtle border border-danger-border rounded-lg px-3 py-2">{loadError}</p>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[

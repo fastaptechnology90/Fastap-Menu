@@ -4,11 +4,11 @@ export type PaymentModeId = "upi" | "card" | "cash" | "nfc" | "qr" | "wallet" | 
 export const PAYMENT_MODES = [
   { id: "upi" as const, label: "UPI", icon: "📱", desc: "PhonePe, GPay, Paytm, BHIM", instant: true },
   { id: "card" as const, label: "Card", icon: "💳", desc: "Debit / Credit / RuPay", instant: true },
-  { id: "cash" as const, label: "Cash", icon: "💵", desc: "Pay at counter or table", instant: false },
-  { id: "nfc" as const, label: "NFC Tap", icon: "📡", desc: "Contactless tap to pay", instant: true },
-  { id: "qr" as const, label: "QR Payment", icon: "🔲", desc: "Scan & pay restaurant QR", instant: true },
-  { id: "wallet" as const, label: "Wallet", icon: "👛", desc: "FastMenu customer wallet", instant: true },
-  { id: "netbanking" as const, label: "Net Banking", icon: "🏦", desc: "All major banks supported", instant: true },
+  { id: "cash" as const, label: "Cash", icon: "💵", desc: "Pay at counter or table — no online charge", instant: false },
+  { id: "nfc" as const, label: "NFC Tap", icon: "📡", desc: "Contactless — needs a live gateway", instant: true },
+  { id: "qr" as const, label: "QR Payment", icon: "🔲", desc: "Scan & pay — not wired yet", instant: true },
+  { id: "wallet" as const, label: "Wallet", icon: "👛", desc: "Venue wallet — needs wallet enabled", instant: true },
+  { id: "netbanking" as const, label: "Net Banking", icon: "🏦", desc: "Needs a live payment gateway", instant: true },
 ];
 
 /**

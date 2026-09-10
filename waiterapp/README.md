@@ -32,12 +32,13 @@ lib/
 ## Run / build
 
 ```bash
+# Prefer: pnpm dev:waiterapp / pnpm build:apk:waiter
 flutter run --dart-define=API_MODE=external \
-  --dart-define=API_BASE_URL=https://digitalrestuarants.thefingo.com
+  --dart-define=API_BASE_URL=http://127.0.0.1:8080
 
 flutter build apk --release \
   --dart-define=API_MODE=external \
-  --dart-define=API_BASE_URL=https://digitalrestuarants.thefingo.com \
+  --dart-define=API_BASE_URL=https://fastap-menu-production.up.railway.app \
   --dart-define=APP_ENV=production
 ```
 

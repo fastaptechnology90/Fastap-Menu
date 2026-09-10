@@ -9,7 +9,7 @@ import {
   type KioskCartItem,
 } from "../lib/smartKioskLogic.js";
 import { priceMenuItem, clampTip } from "../lib/order-pricing.js";
-import { venueHours, closedResponse } from "../lib/venue-hours.js";
+import { closedResponse, ordersAllowed, publicHoursPayload } from "../lib/venue-hours.js";
 
 const router: IRouter = Router();
 
@@ -94,7 +94,7 @@ router.get("/public/kiosk/menu/:slug", async (req, res): Promise<void> => {
   }));
   res.json({
     restaurant: { id: restaurant.id, name: restaurant.name },
-    hours: venueHours(restaurant),
+    hours: publicHoursPayload(restaurant),
     menu,
     config: getSettings(restaurant.id),
   });
@@ -134,11 +134,12 @@ router.post("/public/kiosk/checkout", async (req, res): Promise<void> => {
   }
 
   // A kiosk left switched on overnight took orders all night. `open_time` and
-  // `close_time` are on the restaurant row and nothing read them.
+  // `close_time` are on the restaurant row — same gate as public orders (with
+  // local/dev and restaurant-setting bypass via ordersAllowed).
   const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
-  const hours = venueHours(venue);
-  if (!hours.isOpen) {
-    res.status(409).json(closedResponse(hours));
+  const gate = ordersAllowed(venue);
+  if (!gate.allowed) {
+    res.status(409).json(closedResponse(gate.hours));
     return;
   }
 

@@ -101,8 +101,6 @@ export function DishSheet({
   const [selectedAddons, setSelectedAddons] = useState<{ name: string; price: number }[]>([]);
   const [instructions, setInstructions] = useState("");
   const [portion, setPortion] = useState("");
-  const [extraCheese, setExtraCheese] = useState(false);
-  const [extraSpicy, setExtraSpicy] = useState(false);
   const [mediaTab, setMediaTab] = useState<"photo" | "video" | "360">("photo");
 
   // A fresh dish is a fresh set of choices; carrying the previous dish's add-ons over was
@@ -113,39 +111,33 @@ export function DishSheet({
     setSelectedAddons([]);
     setInstructions("");
     setPortion("");
-    setExtraCheese(false);
-    setExtraSpicy(false);
     setMediaTab("photo");
   }, [item?.id]);
 
   if (!item) return null;
 
   const opts = item.customizationOptions;
-  // The dish's own portions, at the dish's own prices. This used to fall back to inventing
-  // a flat ₹25 surcharge for anything named "large", which matched nothing the kitchen or
-  // the server knew about.
+  // Portions and priced add-ons only from the menu API for this dish — never invent cheese,
+  // toppings, or combo upsells that the server will not bill.
   const portionSizes = item.variants;
-  const removeOptions = opts.removeIngredients ?? ["No onion", "No garlic", "No dairy", "No nuts"];
-  const toppings = opts.toppings ?? [];
-  const comboUpgrades = opts.comboUpgrades ?? [];
+  const removeOptions = Array.isArray(opts.removeIngredients) ? opts.removeIngredients : [];
+  const menuAddons = item.addons;
 
   const portionPrice = portionSizes.find(p => p.name === portion)?.price;
-  const extrasPrice =
-    (extraCheese ? (opts.extraCheese?.price ?? 0) : 0) + (extraSpicy ? (opts.extraSpicy?.price ?? 0) : 0);
-  const unitPrice = (portionPrice ?? item.price) + extrasPrice + selectedAddons.reduce((s, a) => s + a.price, 0);
+  const unitPrice = (portionPrice ?? item.price) + selectedAddons.reduce((s, a) => s + a.price, 0);
   const total = unitPrice * qty;
 
-  const allCustomizations = [
-    ...selectedCustom,
-    ...(extraCheese ? [opts.extraCheese?.label ?? "Extra Cheese"] : []),
-    ...(extraSpicy ? [opts.extraSpicy?.label ?? "Extra Spicy"] : []),
-  ];
+  const allCustomizations = [...selectedCustom];
 
   function toggleCustom(c: string) {
     setSelectedCustom(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c]);
   }
   function toggleAddon(a: { name: string; price: number }) {
-    setSelectedAddons(p => p.find(x => x.name === a.name) ? p.filter(x => x.name !== a.name) : [...p, a]);
+    const billed = menuAddons.find(x => x.name === a.name);
+    if (!billed) return;
+    setSelectedAddons(p =>
+      p.find(x => x.name === billed.name) ? p.filter(x => x.name !== billed.name) : [...p, billed],
+    );
   }
 
   const mediaTabs = [
@@ -320,58 +312,9 @@ export function DishSheet({
           </Group>
         )}
 
-        {(opts.extraCheese || opts.extraSpicy) && (
-          <Group title="Make it yours">
-            {opts.extraCheese && (
-              <OptionRow
-                label={opts.extraCheese.label}
-                price={opts.extraCheese.price}
-                selected={extraCheese}
-                onClick={() => setExtraCheese(v => !v)}
-              />
-            )}
-            {opts.extraSpicy && (
-              <OptionRow
-                label={opts.extraSpicy.label}
-                price={opts.extraSpicy.price}
-                selected={extraSpicy}
-                onClick={() => setExtraSpicy(v => !v)}
-              />
-            )}
-          </Group>
-        )}
-
-        {toppings.length > 0 && (
-          <Group title="Toppings">
-            {toppings.map(t => (
-              <OptionRow
-                key={t.name}
-                label={t.name}
-                price={t.price}
-                selected={Boolean(selectedAddons.find(x => x.name === t.name))}
-                onClick={() => toggleAddon(t)}
-              />
-            ))}
-          </Group>
-        )}
-
-        {comboUpgrades.length > 0 && (
-          <Group title="Make it a combo">
-            {comboUpgrades.map(c => (
-              <OptionRow
-                key={c.name}
-                label={c.name}
-                price={c.price}
-                selected={Boolean(selectedAddons.find(x => x.name === c.name))}
-                onClick={() => toggleAddon(c)}
-              />
-            ))}
-          </Group>
-        )}
-
-        {item.addons.length > 0 && (
+        {menuAddons.length > 0 && (
           <Group title="Add-ons">
-            {item.addons.map(a => (
+            {menuAddons.map(a => (
               <OptionRow
                 key={a.name}
                 label={a.name}

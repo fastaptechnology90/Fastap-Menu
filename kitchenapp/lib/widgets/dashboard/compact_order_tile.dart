@@ -15,7 +15,8 @@ class CompactOrderTile extends StatelessWidget {
   final KitchenOrder order;
   // Runs a kitchen action (accept / prepare / ready / cancel …) for this order.
   // When provided, the detail sheet shows the matching action buttons.
-  final Future<void> Function(String orderId, String action)? onAction;
+  // [reference] is the UPI ID / UTR / card RRN required for online collect actions.
+  final Future<void> Function(String orderId, String action, {String? reference})? onAction;
   // Waiter app: show delivery actions (Start Delivery / Delivered) in place of
   // the kitchen actions.
   final bool deliveryMode;
@@ -492,7 +493,7 @@ class CompactOrderTile extends StatelessWidget {
                     onPressed: () async {
                       Navigator.of(context).pop();
                       try {
-                        await onAction!(order.id ?? '', a.$2);
+                        await onAction!(order.id ?? '', a.$2, reference: null);
                         messenger
                           ..hideCurrentSnackBar()
                           ..showSnackBar(SnackBar(
@@ -535,13 +536,62 @@ class CompactOrderTile extends StatelessWidget {
     String action,
     double width,
   ) {
+    final needsReference = action != 'collect_cash' && action.startsWith('collect_');
     return SizedBox(
       width: width,
       child: FilledButton(
         onPressed: () async {
+          String? reference;
+          if (needsReference) {
+            final controller = TextEditingController();
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text('$label reference'),
+                content: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    hintText: action == 'collect_upi'
+                        ? 'UPI ID or UTR'
+                        : action == 'collect_card'
+                            ? 'Card txn / RRN'
+                            : 'Payment reference',
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Mark paid'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) return;
+            reference = controller.text.trim();
+            if (reference.isEmpty) {
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text(
+                    action == 'collect_upi'
+                        ? 'Enter the UPI ID or UTR before marking paid.'
+                        : 'Enter the payment reference before marking paid.',
+                  ),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                ));
+              return;
+            }
+          }
           Navigator.of(context).pop();
           try {
-            await onAction!(order.id ?? '', action);
+            await onAction!(order.id ?? '', action, reference: reference);
             messenger
               ..hideCurrentSnackBar()
               ..showSnackBar(SnackBar(
@@ -553,7 +603,11 @@ class CompactOrderTile extends StatelessWidget {
             messenger
               ..hideCurrentSnackBar()
               ..showSnackBar(SnackBar(
-                content: Text('Could not mark paid. Check connection and try again.'),
+                content: Text(
+                  needsReference
+                      ? 'Could not mark paid. Check the reference and try again.'
+                      : 'Could not mark paid. Check connection and try again.',
+                ),
                 backgroundColor: AppColors.danger,
                 behavior: SnackBarBehavior.floating,
               ));
@@ -583,7 +637,7 @@ class CompactOrderTile extends StatelessWidget {
         onPressed: () async {
           Navigator.of(context).pop();
           try {
-            await onAction!(order.id ?? '', action);
+            await onAction!(order.id ?? '', action, reference: null);
             messenger
               ..hideCurrentSnackBar()
               ..showSnackBar(SnackBar(

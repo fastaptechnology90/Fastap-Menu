@@ -158,6 +158,20 @@ export default function FoodCosting() {
     }
   }
 
+  async function handleDeleteRecipe(recipe: Recipe) {
+    if (!restaurantId) return;
+    const ok = window.confirm(`Delete recipe “${recipe.name}”? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await foodCostingApi.delete(restaurantId, parseInt(recipe.id, 10));
+      if (selected?.id === recipe.id) setSelected(null);
+      await loadRecipes();
+      toast({ title: "Recipe deleted" });
+    } catch (e) {
+      toast({ title: "Could not delete recipe", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    }
+  }
+
   useEffect(() => { loadRecipes(); }, [loadRecipes]);
 
   const categories = ["all", ...Array.from(new Set(recipes.map(r => r.category)))];
@@ -267,7 +281,10 @@ export default function FoodCosting() {
                   <h2 className="text-base font-semibold">{selected.name}</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">{selected.category} · {selected.servings} serving(s)</p>
                 </div>
-                <button onClick={() => openEdit(selected)} title="Edit recipe & ingredients" className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><Edit2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => openEdit(selected)} title="Edit recipe & ingredients" className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center hover-elevate"><Edit2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                  <button onClick={() => handleDeleteRecipe(selected)} title="Delete recipe" className="h-8 w-8 rounded-lg bg-danger-subtle text-danger flex items-center justify-center hover-elevate"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
               </div>
 
               {/* Cost Summary */}

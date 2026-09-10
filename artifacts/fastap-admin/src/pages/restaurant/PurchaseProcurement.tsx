@@ -56,6 +56,7 @@ export default function PurchaseProcurement() {
   const [showAdd, setShowAdd] = useState(false);
   const [poForm, setPoForm] = useState({ supplierName: "", itemName: "", qty: 1, unitPrice: 0 });
   const [creatingPo, setCreatingPo] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function createPO() {
     if (!restaurantId || !poForm.supplierName || !poForm.itemName) return;
@@ -99,9 +100,10 @@ export default function PurchaseProcurement() {
 
   useEffect(() => {
     if (!restaurantId) return;
+    setLoadError(null);
     Promise.all([
-      procurementApi.purchaseOrders(restaurantId).catch(() => []),
-      procurementApi.suppliers(restaurantId).catch(() => []),
+      procurementApi.purchaseOrders(restaurantId),
+      procurementApi.suppliers(restaurantId),
     ]).then(([poData, supData]) => {
       if (Array.isArray(poData)) {
         setOrders(poData.map((o:any)=>({
@@ -127,7 +129,8 @@ export default function PurchaseProcurement() {
           createdAt: o.createdAt?.split("T")[0] || "",
           expectedBy: o.expectedDelivery?.split("T")[0] || "",
           deliveredAt: o.deliveredAt?.split("T")[0] || null,
-          paymentStatus: o.status === "received" ? "paid" : "pending",
+          // There is no supplier-payment column — "received" is not "paid".
+          paymentStatus: o.paymentStatus === "paid" ? "paid" : "pending",
           invoiceNo: o.invoiceUrl || "—",
         })));
       }
@@ -151,6 +154,11 @@ export default function PurchaseProcurement() {
           status: s.isActive !== false ? "active" : "inactive",
         })));
       }
+    }).catch(e => {
+      // Failure used to render as an empty PO/supplier list with no explanation.
+      const msg = e?.message || "Could not load purchase orders or suppliers.";
+      setLoadError(msg);
+      toast({ title: "Could not load procurement data", description: msg, variant: "destructive" });
     });
   }, [restaurantId]);
 
@@ -223,6 +231,10 @@ export default function PurchaseProcurement() {
           </button>
         )}
       </div>
+
+      {loadError && (
+        <p role="alert" className="text-sm text-danger bg-danger-subtle border border-danger-border rounded-lg px-3 py-2">{loadError}</p>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

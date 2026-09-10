@@ -77,7 +77,9 @@ const KITCHEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 function isKitchenActive(order: LiveOrder) {
   if (["served", "billed", "cancelled"].includes(order.status)) return false;
   const placed = new Date(order.placedAt).getTime();
-  if (Number.isNaN(placed)) return false;
+  // A missing/bad timestamp must not hide a live ticket — that looked like a
+  // broken KDS (order in the DB, blank board) and forced pointless reloads.
+  if (Number.isNaN(placed)) return true;
   return Date.now() - placed <= KITCHEN_MAX_AGE_MS;
 }
 
@@ -476,7 +478,7 @@ export default function KitchenDisplay() {
   const iconBtn = "flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition-colors hover-elevate active-elevate-2";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden bg-background">
       {/* New-order flash — a pulsing frame so the kitchen notices even at a glance
           (and even when sound is muted). Non-blocking overlay. */}
       {flash && (
@@ -489,12 +491,12 @@ export default function KitchenDisplay() {
           chef's thumb always lands in the same place. */}
       <header className="shrink-0 border-b border-border bg-card">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+          <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
               <ChefHat className="h-5 w-5" aria-hidden />
             </span>
-            <div className="leading-tight">
-              <h1 className="text-sm font-semibold">Kitchen Display</h1>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-sm font-semibold">Kitchen Display</h1>
               <p className="flex items-center gap-1 text-2xs text-success">
                 <span className="h-1.5 w-1.5 rounded-pill bg-success motion-safe:animate-pulse" aria-hidden />
                 Live · {STATION_LABEL[station] ?? station}
@@ -513,13 +515,13 @@ export default function KitchenDisplay() {
             ))}
           </dl>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <div className="ml-auto flex min-w-0 max-w-full shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5">
             <button
               type="button"
               onClick={() => { const v = !priorityMode; setPriorityMode(v); savePref({ priorityMode: v }); }}
               aria-pressed={priorityMode}
               title="Rush mode — oldest ticket first"
-              className={`flex min-h-11 items-center gap-1.5 rounded-md border px-3 text-sm font-semibold transition-colors hover-elevate active-elevate-2 ${
+              className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-semibold transition-colors hover-elevate active-elevate-2 ${
                 priorityMode ? "border-danger-border bg-danger-subtle text-danger" : "border-border bg-card text-muted-foreground"
               }`}
             >
@@ -625,7 +627,7 @@ export default function KitchenDisplay() {
             {station === "all" ? "Nothing on the pass" : `Nothing for ${STATION_LABEL[station] ?? station}`}
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            New dine-in, room and online orders appear here the moment they are placed. Served, billed
+            New dine-in, room and online orders appear here the moment they are placed — from the guest QR menu or the waiter Take order screen. Served, billed
             and cancelled tickets are cleared off the board.
           </p>
           {station !== "all" && (

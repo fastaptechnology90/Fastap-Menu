@@ -77,11 +77,10 @@ export const restaurantNavGroups: RestaurantNavGroup[] = [
     group: "Technology",
     items: [
       { path: "/restaurant/qr-management", label: "QR / NFC", icon: "qr_code_2" },
-      { path: "/restaurant/digital-signage", label: "Digital Signage", icon: "tv" },
-      { path: "/restaurant/kiosk", label: "Self-Order Kiosk", icon: "tablet_mac" },
-      { path: "/restaurant/offline", label: "Offline & Failover", icon: "cloud_off" },
-      { path: "/restaurant/aggregators", label: "Aggregators", icon: "sync" },
-      { path: "/restaurant/api-platform", label: "API Platform", icon: "api" },
+      // Digital Signage & Self-Order Kiosk: hidden — "Active"/"Connected Screens" read as
+      // live hardware while there is no device fleet on the go-live path. Deep links still work.
+      // Offline, Aggregators, API Platform: hidden — toggles/keys looked live but did not
+      // run real offline POS, partner sync, or authenticated public APIs.
       { path: "/restaurant/documents", label: "Docs & Hardware", icon: "description" },
     ],
   },
@@ -89,14 +88,14 @@ export const restaurantNavGroups: RestaurantNavGroup[] = [
     group: "Enterprise",
     items: [
       { path: "/restaurant/branches", label: "Branches & Franchise", icon: "corporate_fare" },
-      { path: "/restaurant/ai-features", label: "AI Features", icon: "auto_awesome" },
+      // AI Features & Accessibility: hidden — heuristic/template copy and venue defaults
+      // that never reached the guest menu. Deep links still show FeatureUnavailable.
       { path: "/restaurant/white-label", label: "White Label", icon: "palette" },
       { path: "/restaurant/feature-control", label: "Feature Control", icon: "tune" },
       { path: "/restaurant/rbac", label: "RBAC Permissions", icon: "lock" },
       { path: "/restaurant/audit", label: "Security & Audit", icon: "shield" },
       { path: "/restaurant/notifications", label: "Notifications", icon: "notifications" },
       { path: "/restaurant/communications", label: "Communications", icon: "forum" },
-      { path: "/restaurant/accessibility", label: "Accessibility", icon: "accessibility" },
       { path: "/restaurant/settings", label: "Settings", icon: "settings" },
     ],
   },

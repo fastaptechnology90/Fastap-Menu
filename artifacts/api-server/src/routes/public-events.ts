@@ -95,10 +95,45 @@ router.post("/public/events/quotation", async (req, res): Promise<void> => {
   res.json({ quotation, validUntil: new Date(Date.now() + 7 * 86400000).toISOString() });
 });
 
+/**
+ * Load a banquet enquiry only when the caller proves they own it.
+ *
+ * Detail / invite routes used to take the integer id alone, so counting upward leaked
+ * every contact name and phone on the platform and let strangers add guest lists.
+ * Ownership is the contact phone from the enquiry, or the `enquiryToken` stamped into
+ * metadata when the enquiry was created.
+ */
+function digits(raw: unknown): string {
+  return String(raw ?? "").replace(/\D/g, "");
+}
+
+function eventEnquiryToken(event: { metadata: unknown }): string {
+  const meta = (typeof event.metadata === "object" && event.metadata ? event.metadata : {}) as Record<string, unknown>;
+  return String(meta.enquiryToken ?? "").trim();
+}
+
+function ownsBanquetEvent(
+  event: { contactPhone: string | null; metadata: unknown },
+  opts: { phone?: unknown; token?: unknown },
+): boolean {
+  const token = String(opts.token ?? "").trim();
+  if (token && eventEnquiryToken(event) && token === eventEnquiryToken(event)) return true;
+  const claimed = digits(opts.phone);
+  const booked = digits(event.contactPhone);
+  return Boolean(claimed && booked && claimed === booked);
+}
+
 router.get("/public/events/detail/:eventId", async (req, res): Promise<void> => {
   const eventId = parseInt(String(req.params.eventId), 10);
+  if (!Number.isInteger(eventId) || eventId <= 0) { res.status(404).json({ error: "Event not found" }); return; }
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+  const phone = req.query.phone ?? req.headers["x-guest-phone"];
+  const token = req.query.token ?? req.query.enquiryToken;
+  if (!ownsBanquetEvent(event, { phone, token })) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
   res.json(event);
 });
 
@@ -164,9 +199,17 @@ router.post("/public/events/enquiry", async (req, res): Promise<void> => {
 
 router.post("/public/events/:eventId/invitations", async (req, res): Promise<void> => {
   const eventId = parseInt(String(req.params.eventId), 10);
-  const { invitations } = req.body as { invitations: { name: string; phone?: string; email?: string }[] };
+  const { invitations, phone, token, enquiryToken } = req.body as {
+    invitations: { name: string; phone?: string; email?: string }[];
+    phone?: string;
+    token?: string;
+    enquiryToken?: string;
+  };
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
-  if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+  if (!event || !ownsBanquetEvent(event, { phone, token: token ?? enquiryToken })) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
 
   const meta = (typeof event.metadata === "object" && event.metadata ? event.metadata : {}) as Record<string, unknown>;
   const existing = Array.isArray(meta.guestInvitations) ? meta.guestInvitations as Record<string, unknown>[] : [];
@@ -189,9 +232,17 @@ router.post("/public/events/:eventId/invitations", async (req, res): Promise<voi
 
 router.patch("/public/events/:eventId/invitations/:inviteId", async (req, res): Promise<void> => {
   const eventId = parseInt(String(req.params.eventId), 10);
-  const { status } = req.body;
+  const { status, phone, token, enquiryToken } = req.body as {
+    status?: string;
+    phone?: string;
+    token?: string;
+    enquiryToken?: string;
+  };
   const [event] = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.id, eventId));
-  if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+  if (!event || !ownsBanquetEvent(event, { phone, token: token ?? enquiryToken })) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
 
   const meta = (typeof event.metadata === "object" && event.metadata ? event.metadata : {}) as Record<string, unknown>;
   const invites = (Array.isArray(meta.guestInvitations) ? meta.guestInvitations : []) as Record<string, unknown>[];
@@ -206,7 +257,16 @@ router.patch("/public/events/:eventId/invitations/:inviteId", async (req, res): 
 router.get("/public/events/:restaurantId", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
   if (Number.isNaN(restaurantId)) { res.status(400).json({ error: "Invalid restaurant id" }); return; }
-  const events = await db.select().from(banquetEventsTable).where(eq(banquetEventsTable.restaurantId, restaurantId));
+  // This used to return every banquet enquiry for the venue — names, phones, deposits —
+  // to anyone who knew the restaurant id. Guests look up their own via phone (/my).
+  const phone = String(req.query.phone ?? "").trim();
+  if (!phone) {
+    res.status(400).json({ error: "phone is required to list your event enquiries" });
+    return;
+  }
+  const events = await db.select().from(banquetEventsTable).where(
+    and(eq(banquetEventsTable.restaurantId, restaurantId), eq(banquetEventsTable.contactPhone, phone)),
+  ).orderBy(desc(banquetEventsTable.createdAt));
   res.json(events);
 });
 

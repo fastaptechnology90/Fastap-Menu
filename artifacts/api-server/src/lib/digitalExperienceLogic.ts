@@ -102,23 +102,46 @@ export function mapSignageToBanners(signageSlides?: {
     }));
 }
 
+/** Spin / scratch / tap prizes are preview theatre — nothing applies a code at checkout. */
+export const PRIZES_COLLECTABLE = false;
+export const PRIZES_UNAVAILABLE_REASON =
+  "Prize games are preview-only. Winnings cannot be applied at checkout yet.";
+
 export function getPromotionsConfig() {
   return {
-    spinWheel: { segments: SPIN_SEGMENTS, maxSpinsPerDay: 3 },
+    prizesCollectable: PRIZES_COLLECTABLE,
+    prizesUnavailableReason: PRIZES_UNAVAILABLE_REASON,
+    spinWheel: {
+      segments: SPIN_SEGMENTS,
+      maxSpinsPerDay: 3,
+      enabled: PRIZES_COLLECTABLE,
+      label: PRIZES_COLLECTABLE ? undefined : "Preview only — not redeemable",
+    },
     scratchCards: [
-      { id: "sc-1", title: "Scratch & Win", hidden: "₹100 OFF" },
-      { id: "sc-2", title: "Mystery Reward", hidden: "Free Mocktail" },
-      { id: "sc-3", title: "Lucky Dip", hidden: "20% Discount" },
+      { id: "sc-1", title: "Scratch & Win", hidden: "₹100 OFF", collectable: PRIZES_COLLECTABLE },
+      { id: "sc-2", title: "Mystery Reward", hidden: "Free Mocktail", collectable: PRIZES_COLLECTABLE },
+      { id: "sc-3", title: "Lucky Dip", hidden: "20% Discount", collectable: PRIZES_COLLECTABLE },
     ],
     tapPromos: [
-      { id: "tp-1", emoji: "🍕", title: "Pizza Night", reward: "Buy 1 Get 1" },
-      { id: "tp-2", emoji: "🍹", title: "Cocktail Hour", reward: "2nd drink 50% off" },
-      { id: "tp-3", emoji: "🎂", title: "Birthday Treat", reward: "Free dessert" },
+      { id: "tp-1", emoji: "🍕", title: "Pizza Night", reward: "Buy 1 Get 1", collectable: PRIZES_COLLECTABLE },
+      { id: "tp-2", emoji: "🍹", title: "Cocktail Hour", reward: "2nd drink 50% off", collectable: PRIZES_COLLECTABLE },
+      { id: "tp-3", emoji: "🎂", title: "Birthday Treat", reward: "Free dessert", collectable: PRIZES_COLLECTABLE },
     ],
   };
 }
 
 export function spinWheel(guestKey = "guest") {
+  if (!PRIZES_COLLECTABLE) {
+    return {
+      segmentIndex: 0,
+      prize: null,
+      value: null,
+      code: null,
+      collectable: false,
+      disabled: true,
+      message: PRIZES_UNAVAILABLE_REASON,
+    };
+  }
   const idx = Math.floor(Math.random() * SPIN_SEGMENTS.length);
   const prize = SPIN_SEGMENTS[idx];
   spinHistory.push({ guestKey, prize: prize.label, at: new Date().toISOString() });
@@ -127,16 +150,25 @@ export function spinWheel(guestKey = "guest") {
     prize: prize.label,
     value: prize.value,
     code: prize.value === "retry" ? null : `SPIN-${prize.value.toUpperCase()}`,
+    collectable: true,
     message: prize.value === "retry" ? "Better luck next time!" : `You won: ${prize.label}!`,
   };
 }
 
 export function claimOffer(offerId: string, guestKey = "guest") {
+  if (!PRIZES_COLLECTABLE) {
+    return {
+      success: false,
+      alreadyClaimed: false,
+      collectable: false,
+      message: PRIZES_UNAVAILABLE_REASON,
+    };
+  }
   if (claimedOffers.has(`${guestKey}:${offerId}`)) {
-    return { success: true, alreadyClaimed: true, message: "Offer already in your wallet" };
+    return { success: true, alreadyClaimed: true, collectable: true, message: "Offer already in your wallet" };
   }
   claimedOffers.add(`${guestKey}:${offerId}`);
-  return { success: true, alreadyClaimed: false, message: "Offer claimed — apply at checkout" };
+  return { success: true, alreadyClaimed: false, collectable: true, message: "Offer claimed — apply at checkout" };
 }
 
 export function getFestivalThemes() {

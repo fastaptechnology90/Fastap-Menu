@@ -1,6 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { generateOtp } from "../lib/mobile-kitchen/staff-tokens.js";
-import { eq, and, desc, or, sql, gte } from "drizzle-orm";
+import { eq, and, desc, or, sql, gte, ne, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { logger } from "../lib/logger.js";
@@ -40,7 +39,7 @@ import {
   type EntryQuery,
 } from "../lib/smart-entry.js";
 import { buildTrackingSnapshot, type OrderTrackingMetadata } from "../lib/orderTracking.js";
-import { addOrderSSEClient, broadcastOrderEvent } from "../lib/sse.js";
+import { addOrderSSEClient, broadcastEvent, broadcastOrderEvent } from "../lib/sse.js";
 import {
   autoAssignHousekeepingTask,
   autoAssignMaintenanceRequest,
@@ -58,8 +57,11 @@ import { otpSendRateLimit, otpVerifyRateLimit } from "../middlewares/rate-limit.
 import { getPublicIntegrationsConfig } from "../lib/platform-integrations.js";
 import { canAccessGuestVenue, getPublicationStatus, guestVenueAccessError } from "../lib/restaurant-publication.js";
 import { priceMenuItem, taxRateFor } from "../lib/order-pricing.js";
-import { venueHours, closedResponse } from "../lib/venue-hours.js";
+import { venueHours, closedResponse, ordersAllowed, publicHoursPayload } from "../lib/venue-hours.js";
 import { loadOwnedOrder } from "../lib/guest-order-access.js";
+import { callerIsInRoom } from "../lib/guest-room-access.js";
+import { generateOtp } from "../lib/mobile-kitchen/staff-tokens.js";
+import { sendOtpSms, smsCredentialsPresent } from "../lib/sms-delivery.js";
 
 const router: IRouter = Router();
 
@@ -162,6 +164,33 @@ router.get("/public/venues", async (_req, res): Promise<void> => {
       publicationStatus: getPublicationStatus(r),
     }));
   res.json({ venues });
+});
+
+/**
+ * Just the open/closed state, nothing else.
+ *
+ * `GET /public/venue/:slug` already returns `hours`, but it is a heavy call — it reads
+ * branches, areas and tables and opens a guest session row — so the guest web fetches it
+ * once, when the screen mounts. That made the venue's own opening hours a snapshot taken
+ * at load: an owner could change the times in Settings → Operating Hours and the phone
+ * sitting on the table would keep saying "Open until 23:00" until somebody reloaded it,
+ * and a menu left open past closing time never noticed it had closed.
+ *
+ * This is the endpoint the guest screens poll instead. Same payload as the `hours` key on
+ * the full venue response, so nothing has to learn a second shape.
+ */
+router.get("/public/venue/:slug/hours", async (req, res): Promise<void> => {
+  const slug = resolveVenueSlug(req.params.slug);
+  const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.slug, slug));
+  if (!restaurant) {
+    res.status(404).json({ error: "Venue not found" });
+    return;
+  }
+  if (!canAccessGuestVenue(restaurant)) {
+    res.status(403).json({ error: guestVenueAccessError(getPublicationStatus(restaurant)) });
+    return;
+  }
+  res.json({ hours: publicHoursPayload(restaurant) });
 });
 
 router.get("/public/venue/:slug", async (req, res): Promise<void> => {
@@ -278,7 +307,7 @@ router.get("/public/venue/:slug", async (req, res): Promise<void> => {
 
   res.json({
     restaurant,
-    hours: venueHours(restaurant),
+    hours: publicHoursPayload(restaurant),
     branch: detectedBranch,
     branches,
     areas: areas.map(a => ({
@@ -340,6 +369,9 @@ router.post("/public/session/init", async (req, res): Promise<void> => {
   const token = generateSessionToken();
   const shareCode = generateShareCode();
   const deviceId = getDeviceId();
+  // Room number must not be claimed from a free-form POST — that let anyone bind
+  // session.roomNumber to 101 and then pass callerIsInRoom for that room's controls.
+  // Room binding only happens when the guest opens a venue/scan URL with ?room=.
   const [session] = await db.insert(guestSessionsTable).values({
     token,
     shareCode,
@@ -347,7 +379,7 @@ router.post("/public/session/init", async (req, res): Promise<void> => {
     sessionType: sessionType ?? "personal",
     tableId: tableId ?? null,
     tableName: tableName ?? null,
-    roomNumber: roomNumber ?? null,
+    roomNumber: null,
     entryMethod: entryMethod ?? "browser",
     serviceMode: serviceMode ?? "browse",
     language: language ?? "en",
@@ -358,7 +390,7 @@ router.post("/public/session/init", async (req, res): Promise<void> => {
   }).returning();
   req.session.guestSessionToken = session.token;
   req.session.guestSessionId = session.id;
-  res.status(201).json({ session });
+  res.status(201).json({ session, notice: roomNumber ? "Room is set only by scanning the in-room QR." : undefined });
 });
 
 router.get("/public/session/restore", async (req, res): Promise<void> => {
@@ -522,24 +554,31 @@ function isDemoPhone(phone: string): boolean {
 }
 
 /**
- * Whether real one-time codes are in force.
+ * Whether real one-time codes are in force (must be delivered by SMS, not echoed).
  *
- * NODE_ENV alone is a footgun — a deployment that forgets to set it would keep the fixed
- * demo code — so a configured SMS provider counts as production too: the moment a venue
- * can actually send a code, the fixed one stops working and nothing is echoed back.
+ * Credentials (Twilio / MSG91 env or platform settings) mean we can try a real send.
+ * NODE_ENV=production without credentials still fails closed — never forever-123456.
  */
-async function realOtpsInForce(): Promise<boolean> {
-  return IS_PRODUCTION() || (await smsIsDeliverable());
-}
-
-/** Whether a code asked for now could actually be delivered to a phone. */
-async function smsIsDeliverable(): Promise<boolean> {
+async function smsProviderReady(): Promise<boolean> {
   try {
     const platform = await getPlatformSettingsRaw();
-    return getPublicIntegrationsConfig(platform.integrations).messaging.sms === true;
+    return smsCredentialsPresent(platform.integrations);
   } catch {
-    return false;
+    return smsCredentialsPresent();
   }
+}
+
+/**
+ * In-memory / fixed demo OTPs are local-dev only.
+ *
+ * Fail closed unless NODE_ENV is explicitly development/test, or ALLOW_DEMO_OTP=1 is set.
+ * An unset or weird NODE_ENV (common on half-configured hosts) must not unlock 123456.
+ */
+function demoOtpsAllowed(): boolean {
+  if (IS_PRODUCTION()) return false;
+  if (process.env.ALLOW_DEMO_OTP === "1") return true;
+  const env = String(process.env.NODE_ENV ?? "").toLowerCase();
+  return env === "development" || env === "test";
 }
 
 router.post("/public/auth/otp/send", otpSendRateLimit, async (req, res): Promise<void> => {
@@ -549,28 +588,51 @@ router.post("/public/auth/otp/send", otpSendRateLimit, async (req, res): Promise
     return;
   }
 
-  const real = await realOtpsInForce();
-  const demo = !real && isDemoPhone(phone);
+  const platform = await getPlatformSettingsRaw().catch(() => null);
+  const integrations = platform?.integrations;
+  const canSms = smsCredentialsPresent(integrations);
+  const allowDemo = !canSms && demoOtpsAllowed();
+  const demo = allowDemo && isDemoPhone(phone);
 
-  // There has to be a way to send the code. Saying "OTP sent" with no SMS provider
-  // configured leaves the guest waiting for a message no part of this system can send.
-  if (real && IS_PRODUCTION() && !(await smsIsDeliverable())) {
-    res.status(503).json({
-      error: "Sign-in by phone is not available yet. Please ask a member of staff.",
-      code: "SMS_NOT_CONFIGURED",
+  if (canSms) {
+    const otp = generateOtp();
+    otpStore.set(phone, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    const sent = await sendOtpSms(phone, otp, integrations);
+    if (!sent.ok) {
+      otpStore.delete(phone);
+      res.status(503).json({
+        error: "We could not send a verification text right now. Please try email sign-in, continue as guest, or ask staff.",
+        code: "SMS_SEND_FAILED",
+        detail: sent.error,
+      });
+      return;
+    }
+    res.json({
+      success: true,
+      message: "OTP sent to your mobile number.",
+      provider: sent.provider,
     });
     return;
   }
 
-  const otp = real ? generateOtp() : DEMO_GUEST_OTP;
+  // No SMS credentials: production / non-dev must fail closed. Local/dev returns the
+  // code in the response so smoke tests work without a vendor account.
+  if (!allowDemo) {
+    res.status(503).json({
+      error: "Phone sign-in is not available yet — SMS is not configured. Continue as guest from a table QR, or use email.",
+      code: "SMS_NOT_CONNECTED",
+    });
+    return;
+  }
+
+  const otp = demo ? DEMO_GUEST_OTP : generateOtp();
   otpStore.set(phone, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
   res.json({
     success: true,
-    message: "OTP sent",
-    // Never once real codes are in force, for any number. This field is a development
-    // convenience and was the whole exploit: the server handed back the code it had
-    // just issued, and the demo-phone flag bypassed the production check on it.
-    devOtp: real ? undefined : otp,
+    message: demo
+      ? "Demo login — use the code shown below (no SMS was sent)."
+      : "Development mode — use the code shown below (no SMS was sent).",
+    devOtp: otp,
     demoAccount: demo || undefined,
   });
 });
@@ -581,9 +643,11 @@ router.post("/public/auth/otp/verify", otpVerifyRateLimit, async (req, res): Pro
     const { otp, name, restaurantId } = req.body;
     const rid = restaurantId ? parseInt(String(restaurantId), 10) : undefined;
     if (!phone || !otp) { res.status(400).json({ error: "phone and otp required" }); return; }
-    // Same fix as on the send side: the `endsWith` match let any number ending in the demo
-    // digits sign in with the fixed code, in production.
-    const isDemoLogin = !(await realOtpsInForce()) && isDemoPhone(phone) && String(otp) === DEMO_GUEST_OTP;
+    // Fixed demo OTP only when demo path is allowed and SMS is not live.
+    const isDemoLogin = demoOtpsAllowed()
+      && !(await smsProviderReady())
+      && isDemoPhone(phone)
+      && String(otp) === DEMO_GUEST_OTP;
     const stored = otpStore.get(phone);
     if (!isDemoLogin && (!stored || stored.otp !== String(otp) || stored.expiresAt < Date.now())) {
       res.status(401).json({ error: "Invalid or expired OTP" });
@@ -678,6 +742,8 @@ router.get("/public/auth/oauth-config", async (_req, res) => {
     google: publicCfg.oauth.google || Boolean(process.env.GOOGLE_CLIENT_ID),
     apple: publicCfg.oauth.apple || Boolean(process.env.APPLE_CLIENT_ID),
     googleClientId: publicCfg.oauth.googleClientId || process.env.GOOGLE_CLIENT_ID || "",
+    /** Guest phone OTP only when Twilio/MSG91 credentials can actually deliver. */
+    smsOtp: publicCfg.messaging.sms,
     manualSocialFlow: true,
   });
 });
@@ -700,6 +766,17 @@ router.post("/public/auth/logout", async (req, res): Promise<void> => {
 
 router.post("/public/auth/social", async (req, res): Promise<void> => {
   try {
+    // Email-only "social" used to mint a real guest session from any address typed in the
+    // browser — no Google/Apple token check. Production must fail closed until real OAuth
+    // is wired; local/dev may still use the convenience path.
+    if (IS_PRODUCTION() && process.env.ALLOW_DEV_SOCIAL !== "1") {
+      res.status(503).json({
+        error: "Social sign-in is not available yet. Use email or ask staff for help.",
+        code: "OAUTH_NOT_CONNECTED",
+      });
+      return;
+    }
+
     const provider = String(req.body.provider ?? "");
     const name = String(req.body.name ?? `${provider} User`);
     const email = socialEmailForProvider(provider, req.body.email, req.body.providerId);
@@ -990,6 +1067,15 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   const { restaurantId, roomNumber, guestName, guestPhone, type, items, notes, total, paymentMethod } = req.body;
   if (!restaurantId || !roomNumber) { res.status(400).json({ error: "restaurantId and roomNumber required" }); return; }
 
+  const rid = parseInt(String(restaurantId), 10);
+  const room = String(roomNumber);
+  // Same as hotel controls: a room number is a location, not a credential. Without the
+  // in-room QR session anyone could charge laundry or food to room 501.
+  if (!(await callerIsInRoom(req, rid, room))) {
+    res.status(403).json({ error: "Scan the QR code in your room to place a room request." });
+    return;
+  }
+
   const requestType = type || "food";
 
   // `open_time`/`close_time` sat unread in the restaurants table, so nothing anywhere
@@ -1000,14 +1086,18 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   let afterHours: ReturnType<typeof venueHours> | null = null;
   if (requestType === "food" || requestType === "bar") {
     const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId));
-    const hours = venueHours(venue);
-    if (!hours.isOpen) {
+    const gate = ordersAllowed(venue);
+    if (!gate.allowed) {
       if (venue?.businessType === "hotel") {
-        afterHours = hours;
+        afterHours = gate.hours;
       } else {
-        res.status(409).json(closedResponse(hours));
+        res.status(409).json(closedResponse(gate.hours));
         return;
       }
+    } else if (!gate.hours.isOpen && venue?.businessType === "hotel") {
+      // Hotel room service still flags after-hours for staff even when a demo bypass
+      // would allow the write — the kitchen may be shut while the desk takes the ticket.
+      afterHours = gate.hours;
     }
   }
 
@@ -1054,9 +1144,11 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
   const roomTax = Math.round(lineSubtotal * taxRate * 100) / 100;
   const roomTotal = Math.round((lineSubtotal + roomTax) * 100) / 100;
 
+  // Use the session-bound restaurant/room ids from here on, not the raw body values —
+  // the ownership check already proved they match.
   const [request] = await db.insert(roomServiceRequestsTable).values({
-    restaurantId,
-    roomNumber,
+    restaurantId: rid,
+    roomNumber: room,
     guestName,
     guestPhone,
     type: requestType,
@@ -1102,6 +1194,23 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
         paymentStatus: "pending",
         orderSource: "room_service",
         metadata: { roomNumber, roomServiceRequestId: request.id, folioMirror: true, source: requestType },
+      }).returning().then(([order]) => {
+        if (!order) return;
+        // Without this the kitchen board and Orders list only catch up on the 15s poll —
+        // a room meal sat invisible until someone refreshed.
+        broadcastEvent("new_order", {
+          id: order.id,
+          restaurantId,
+          tableName: order.tableName,
+          total: order.total,
+          status: "pending",
+          type: "room_service",
+        });
+        broadcastOrderEvent(order.id, "order_status", {
+          id: order.id,
+          status: "pending",
+          tableName: order.tableName,
+        });
       });
     } catch (err) {
       logger.error({ err, requestId: request.id }, "could not mirror guest room-service order to the kitchen");
@@ -1121,41 +1230,61 @@ router.post("/public/room-service", async (req, res): Promise<void> => {
 router.post("/public/housekeeping", async (req, res): Promise<void> => {
   const { restaurantId, roomNumber, type, title, description, priority } = req.body;
   if (!restaurantId || !roomNumber) { res.status(400).json({ error: "restaurantId and roomNumber required" }); return; }
+  const rid = parseInt(String(restaurantId), 10);
+  const room = String(roomNumber);
+  // Counting upward through room numbers used to create cleaning tickets for every
+  // occupied room. Only the browser that scanned that room's QR may ask.
+  if (!(await callerIsInRoom(req, rid, room))) {
+    res.status(403).json({ error: "Scan the QR code in your room to request housekeeping." });
+    return;
+  }
   const [task] = await db.insert(housekeepingTasksTable).values({
-    restaurantId,
+    restaurantId: rid,
     type: type || "cleaning",
     title: title || "Guest request",
     description,
-    location: `Room ${roomNumber}`,
-    roomNumber,
+    location: `Room ${room}`,
+    roomNumber: room,
     priority: priority || "normal",
     status: "pending",
   }).returning();
-  const assigned = await autoAssignHousekeepingTask(restaurantId, task.id);
+  const assigned = await autoAssignHousekeepingTask(rid, task.id);
   res.status(201).json(assigned ?? task);
 });
 
 router.post("/public/maintenance", async (req, res): Promise<void> => {
   const { restaurantId, roomNumber, title, description, category, priority } = req.body;
   if (!restaurantId || !roomNumber) { res.status(400).json({ error: "restaurantId and roomNumber required" }); return; }
+  const rid = parseInt(String(restaurantId), 10);
+  const room = String(roomNumber);
+  if (!(await callerIsInRoom(req, rid, room))) {
+    res.status(403).json({ error: "Scan the QR code in your room to report a maintenance issue." });
+    return;
+  }
   const [request] = await db.insert(maintenanceRequestsTable).values({
-    restaurantId,
+    restaurantId: rid,
     title: title || "Maintenance request",
     description,
-    location: `Room ${roomNumber}`,
+    location: `Room ${room}`,
     category: category || "general",
     priority: priority || "normal",
-    reportedBy: `Room ${roomNumber}`,
+    reportedBy: `Room ${room}`,
     status: "open",
   }).returning();
-  const assigned = await autoAssignMaintenanceRequest(restaurantId, request.id);
+  const assigned = await autoAssignMaintenanceRequest(rid, request.id);
   res.status(201).json(assigned ?? request);
 });
 
 router.get("/public/room/:restaurantId/:roomNumber", async (req, res): Promise<void> => {
   const restaurantId = parseInt(String(req.params.restaurantId), 10);
+  const roomNumber = String(req.params.roomNumber);
+  // Same gate as /public/hotel/room — bare room numbers must not enumerate status.
+  if (!(await callerIsInRoom(req, restaurantId, roomNumber))) {
+    res.status(403).json({ error: "Scan the QR code in your room to see this room." });
+    return;
+  }
   const [room] = await db.select().from(hotelRoomsTable).where(
-    and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, req.params.roomNumber)),
+    and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, roomNumber)),
   );
   if (!room) { res.status(404).json({ error: "Room not found" }); return; }
   // This returned the entire row to anyone who asked: the occupant's name, their phone
@@ -1189,7 +1318,9 @@ router.post("/public/support/tickets", async (req, res): Promise<void> => {
 // ─── Order live tracking ─────────────────────────────────────────────
 router.get("/public/orders/:orderId/status", async (req, res): Promise<void> => {
   const orderId = parseInt(String(req.params.orderId), 10);
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // Same as GET /public/orders/:id — sequential ids must not expose waiter phones,
+  // table names or payment state for every ticket in the venue.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const [[restaurant], waiterStaff] = await Promise.all([
@@ -1285,9 +1416,45 @@ router.post("/public/orders/:orderId/cancel", async (req, res): Promise<void> =>
     },
   }).where(eq(ordersTable.id, orderId)).returning();
 
-  // The kitchen display and the waiter board both listen on this stream; without the
-  // broadcast a cancelled ticket stays on the pass until someone reloads.
-  broadcastOrderEvent(orderId, "status", { id: orderId, status: "cancelled", cancelledReason: reason });
+  // Staff panels listen on the restaurant SSE feed (`order_status`); guests listen on
+  // the per-order stream. The old event name was `"status"`, which neither client
+  // subscribed to — so a guest cancel left the KDS ticket sitting until reload.
+  const restaurantId = order.restaurantId;
+  broadcastEvent("order_status", {
+    id: orderId,
+    restaurantId,
+    tableName: order.tableName,
+    status: "cancelled",
+    cancelledReason: reason,
+  });
+  broadcastOrderEvent(orderId, "order_status", {
+    id: orderId,
+    status: "cancelled",
+    tableName: order.tableName,
+    cancelledReason: reason,
+  });
+
+  // If this was the open cover on a table and nothing else is still active, free it so
+  // the floor map matches the cancelled ticket.
+  if (order.tableId) {
+    const OPEN = ["pending", "new", "confirmed", "accepted", "preparing", "ready", "serving", "served", "billing"];
+    const siblings = await db.select({ id: ordersTable.id }).from(ordersTable).where(and(
+      eq(ordersTable.restaurantId, restaurantId),
+      eq(ordersTable.tableId, order.tableId),
+      ne(ordersTable.id, orderId),
+      inArray(ordersTable.status, OPEN),
+    )).limit(1);
+    if (siblings.length === 0) {
+      await db.update(tablesMapTable).set({
+        status: "free",
+        currentOrderId: null,
+        currentCustomerName: null,
+        currentGuestCount: 0,
+        occupiedSince: null,
+      }).where(and(eq(tablesMapTable.id, order.tableId), eq(tablesMapTable.restaurantId, restaurantId)));
+      broadcastEvent("table_cleared", { restaurantId, tableName: order.tableName, orderId });
+    }
+  }
 
   res.json({ cancelled: true, order: updated, windowSeconds: GUEST_CANCEL_WINDOW_SECONDS });
 });
@@ -1335,7 +1502,8 @@ router.post("/public/orders/:orderId/message", async (req, res): Promise<void> =
   const text = String(req.body?.message ?? "").trim();
   if (!text) { res.status(400).json({ error: "message required" }); return; }
 
-  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  // Same ownership gate as cancel/pay — messaging a stranger's ticket by id is not ok.
+  const order = await loadOwnedOrder(req, orderId);
   if (!order) { res.status(404).json({ error: "Order not found" }); return; }
 
   const message = text.slice(0, 500);
@@ -1363,9 +1531,20 @@ router.post("/public/orders/:orderId/message", async (req, res): Promise<void> =
   res.status(201).json({ success: true, callId: call.id });
 });
 
-router.get("/public/orders/:orderId/live", (req, res): void => {
+router.get("/public/orders/:orderId/live", async (req, res): Promise<void> => {
   const orderId = parseInt(String(req.params.orderId), 10);
-  if (Number.isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    res.status(400).json({ error: "Invalid order id" });
+    return;
+  }
+  // EventSource used to open for any sequential id, so a stranger could subscribe to
+  // kitchen/payment events for every ticket. Same ownership as status/cancel/pay —
+  // the guest session cookie travels with same-origin EventSource.
+  const order = await loadOwnedOrder(req, orderId);
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
   const cleanup = addOrderSSEClient(res, orderId);
   req.on("close", cleanup);
 });

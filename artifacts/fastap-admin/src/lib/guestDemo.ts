@@ -43,9 +43,12 @@ export function withGuestQuery(
   const current = new URLSearchParams(
     typeof window !== "undefined" ? window.location.search : "",
   );
-  const base = path.split("?")[0];
+  // Keep path-owned query (e.g. `/user/reserve?tab=my`). Dropping it sent every
+  // Bookings tab tap to New Booking instead of My Bookings.
+  const qIdx = path.indexOf("?");
+  const base = qIdx >= 0 ? path.slice(0, qIdx) : path;
+  const qs = new URLSearchParams(qIdx >= 0 ? path.slice(qIdx + 1) : "");
   const slug = resolveGuestSlug(venue?.restaurantSlug || undefined);
-  const qs = new URLSearchParams();
   if (slug) qs.set("slug", slug);
   const table = current.get("table") || activeTable;
   if (table) qs.set("table", table);

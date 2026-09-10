@@ -99,6 +99,7 @@ import '../api/sandbox_training_endpoints.dart';
 import '../api/hidden_enterprise_endpoints.dart';
 import '../api/future_ai_expansion_endpoints.dart';
 import '../api/waiter_auto_assignment_endpoints.dart';
+import '../api/waiter_take_order_endpoints.dart';
 import '../../data/mock/mock_waiter_auto_assignment_engine.dart';
 import '../api/dashboard_endpoints.dart';
 import '../api/kitchen_api_client.dart';
@@ -661,6 +662,68 @@ class MockKitchenApiClient implements KitchenApiClient {
           'data': MockWaiterAutoAssignmentEngine.buildSnapshot(section: section),
         };
 
+      case WaiterTakeOrderEndpoints.tables:
+        _requireSession();
+        return {
+          'success': true,
+          'data': {
+            'tables': [
+              {
+                'id': 1,
+                'name': 'T1',
+                'zone': 'Main',
+                'capacity': 4,
+                'status': 'free',
+                'isRoom': false,
+              },
+              {
+                'id': 2,
+                'name': 'T2',
+                'zone': 'Main',
+                'capacity': 2,
+                'status': 'occupied',
+                'isRoom': false,
+              },
+            ],
+          },
+        };
+
+      case WaiterTakeOrderEndpoints.menu:
+        _requireSession();
+        return {
+          'success': true,
+          'data': {
+            'items': [
+              {
+                'id': 101,
+                'name': 'Butter Chicken',
+                'description': 'Demo dish',
+                'displayPrice': 320,
+                'categoryId': 1,
+                'taxCategory': 'food',
+                'variants': [
+                  {'name': 'Half', 'displayPrice': 180},
+                  {'name': 'Full', 'displayPrice': 320},
+                ],
+                'addons': [
+                  {'name': 'Extra gravy', 'displayPrice': 40},
+                  {'name': 'Butter naan side', 'displayPrice': 30},
+                ],
+              },
+              {
+                'id': 102,
+                'name': 'Garlic Naan',
+                'description': 'Demo dish',
+                'displayPrice': 60,
+                'categoryId': 1,
+                'taxCategory': 'food',
+                'variants': <Map<String, dynamic>>[],
+                'addons': <Map<String, dynamic>>[],
+              },
+            ],
+          },
+        };
+
       default:
         throw ApiException(message: 'Mock route not found: $path', statusCode: 404);
     }
@@ -673,6 +736,36 @@ class MockKitchenApiClient implements KitchenApiClient {
   }) async {
     await _delay();
     final payload = body ?? {};
+
+    if (path == WaiterTakeOrderEndpoints.placeOrder) {
+      _requireSession();
+      final items = payload['items'];
+      if (items is! List || items.isEmpty) {
+        throw const ApiException(
+          message: 'Add at least one menu item',
+          statusCode: 400,
+        );
+      }
+      final tableId = payload['tableId'];
+      if (tableId == null) {
+        throw const ApiException(message: 'Pick a table', statusCode: 400);
+      }
+      return {
+        'success': true,
+        'data': {
+          'id': 'ORD-MOCK-1',
+          'orderId': 9001,
+          'tableName': 'T1',
+          'status': 'pending',
+          'subtotal': 380,
+          'tax': 19,
+          'total': 399,
+          'itemCount': items.length,
+          'waiterName': 'Mock Waiter',
+          'message': 'Order placed for T1',
+        },
+      };
+    }
 
     if (path.startsWith('/sections/orders/') && path.endsWith('/reroute')) {
       _requireSession();
@@ -2063,6 +2156,9 @@ class MockKitchenApiClient implements KitchenApiClient {
       final segments = path.split('/');
       final orderId = segments[2];
       final action = payload['action']?.toString() ?? '';
+      final reference = (payload['reference'] ?? payload['utr'] ?? payload['upiId'])
+          ?.toString()
+          .trim();
       try {
         final updated = MockOrderStore.processAction(
           orderId,
@@ -2070,13 +2166,23 @@ class MockKitchenApiClient implements KitchenApiClient {
           targetSection: payload['targetSection']?.toString(),
           itemName: payload['itemName']?.toString(),
           modification: payload['modification']?.toString(),
+          paymentReference: reference,
         );
         return {
           'success': true,
           'order': MockDashboardCalculator.serializeOrder(updated),
         };
       } on ArgumentError catch (error) {
-        throw ApiException(message: error.message ?? 'Invalid action');
+        final msg = error.message?.toString() ?? 'Invalid action';
+        if (msg == 'PAYMENT_REFERENCE_REQUIRED') {
+          throw const ApiException(
+            message:
+                'Enter the UPI ID / UTR (or card RRN) before marking this bill paid.',
+            statusCode: 400,
+            code: 'PAYMENT_REFERENCE_REQUIRED',
+          );
+        }
+        throw ApiException(message: msg);
       }
     }
 
@@ -2085,14 +2191,30 @@ class MockKitchenApiClient implements KitchenApiClient {
       final segments = path.split('/');
       final orderId = segments[3];
       final action = payload['action']?.toString() ?? '';
+      final reference = (payload['reference'] ?? payload['utr'] ?? payload['upiId'])
+          ?.toString()
+          .trim();
       try {
-        final updated = MockOrderStore.processAction(orderId, action);
+        final updated = MockOrderStore.processAction(
+          orderId,
+          action,
+          paymentReference: reference,
+        );
         return {
           'success': true,
           'order': MockDashboardCalculator.serializeOrder(updated),
         };
       } on ArgumentError catch (error) {
-        throw ApiException(message: error.message ?? 'Unknown KDS action');
+        final msg = error.message?.toString() ?? 'Unknown KDS action';
+        if (msg == 'PAYMENT_REFERENCE_REQUIRED') {
+          throw const ApiException(
+            message:
+                'Enter the UPI ID / UTR (or card RRN) before marking this bill paid.',
+            statusCode: 400,
+            code: 'PAYMENT_REFERENCE_REQUIRED',
+          );
+        }
+        throw ApiException(message: msg);
       }
     }
 

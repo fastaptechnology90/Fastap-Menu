@@ -127,7 +127,10 @@ export function resolvePaymentStatus(
   // No method means nothing has been collected yet — the normal dine-in case,
   // where the guest orders now and the waiter takes the money at the table.
   // Treating that as "paid" marked money collected before anyone had paid.
-  if (!paymentMethod || paymentMethod === "cash") return "pending";
+  // Case-insensitive: "Cash" used to fall through to "paid" and book Finance
+  // while the notes were still in the guest's hand.
+  const method = String(paymentMethod ?? "").trim().toLowerCase();
+  if (!method || method === "cash") return "pending";
   return "paid";
 }
 

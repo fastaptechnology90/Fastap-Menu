@@ -1,10 +1,23 @@
+/**
+ * The cart.
+ *
+ * It was twelve stacked cards — group ordering, scheduling, course management, special
+ * requests, split, partial, advance, favourites — with the basket itself somewhere in the
+ * middle and the total near the bottom of a very long scroll. A diner adding two dosas had
+ * to scroll past nine settings they will never touch to find out what they owed.
+ *
+ * Now: what you ordered, what it costs, and Place order. Everything else that a venue
+ * genuinely offers is still here, one tap away in the "More options" sheet, so nothing
+ * the client paid for has been dropped.
+ *
+ * The money is unchanged. The line price already carries the portion and every add-on;
+ * GST, discount, tip, split, partial and advance all still come from `computeBillQuote`,
+ * and the server prices the order from `menuItemId` regardless of what this screen shows.
+ */
 import { useState, useEffect } from "react";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { useUser } from "@/contexts/UserContext";
-import { GuestHeader } from "@/components/user/GuestUI";
-import { useGuestBack } from "@/hooks/useGuestBack";
 import { withGuestQuery } from "@/lib/guestDemo";
-import { Icon } from "@/components/shared/Icon";
 import { useOffline } from "@/contexts/OfflineContext";
 import { publicApi, type UpsellSuggestion } from "@/lib/api";
 import {
@@ -12,14 +25,19 @@ import {
   serviceModeToOrderType, type CourseTimingId, type OrderTypeId,
 } from "@/lib/orderingCatalog";
 import { PAYMENT_MODES, tipPresetsFor, computeBillQuote } from "@/lib/paymentCatalog";
-import {
-  Plus, Minus, Trash2, Tag,
-  CreditCard, Smartphone, Wallet, Banknote, Nfc, Receipt, Users,
-  Clock, CheckCircle, ShoppingBag, Share2, Sparkles, RotateCcw, Calendar, Heart,
-  QrCode, Building2, Percent,
-  Utensils,
-} from "lucide-react";
 import { GuestIcon } from "@/components/user/GuestIcon";
+import {
+  GuestAppScreen, GuestAppBar, GuestAppBarButton, GuestBody, GuestSection,
+  GuestList, GuestRow, GuestTableChip, GuestSheet, GuestActionBar, GuestPrimaryButton,
+  guestHomePath,
+} from "@/components/user/GuestShell";
+import {
+  Plus, Minus, Trash2, Tag, X,
+  CreditCard, Smartphone, Wallet, Banknote, Nfc, Users,
+  Clock, CheckCircle, ShoppingBag, Share2, Sparkles, RotateCcw, Calendar, Heart,
+  QrCode, Building2, Percent, Utensils, Info, CloudOff, UtensilsCrossed,
+  SlidersHorizontal, Loader2,
+} from "lucide-react";
 
 const MODE_ICONS: Record<string, typeof Smartphone> = {
   upi: Smartphone, card: CreditCard, wallet: Wallet, nfc: Nfc, cash: Banknote, qr: QrCode, netbanking: Building2,
@@ -34,9 +52,43 @@ function paymentMethods(walletTotal?: number) {
   }));
 }
 
+/** A labelled block inside the "More options" sheet. */
+function SheetBlock({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="mt-5 first:mt-1">
+      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
+        {icon}
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** The on/off control the advanced blocks share. */
+function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={on
+        ? "relative h-6 w-11 shrink-0 rounded-pill bg-primary transition-colors"
+        : "relative h-6 w-11 shrink-0 rounded-pill bg-muted transition-colors"}
+    >
+      <span
+        className={on
+          ? "absolute left-[22px] top-0.5 h-5 w-5 rounded-full bg-card transition-all"
+          : "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-card transition-all"}
+      />
+    </button>
+  );
+}
+
 export default function CartPage() {
   const [, navigate] = useAppLocation();
-  const goBack = useGuestBack();
   const {
     cart, updateQuantity, removeFromCart, cartTotal, cartCount, placeOrder,
     user, activeTable, venue, smartEntry, orders,
@@ -45,9 +97,10 @@ export default function CartPage() {
   } = useUser();
   const { pendingOrders, isOnline } = useOffline();
   const [queuedOffline, setQueuedOffline] = useState(false);
-  // The venue's own opening hours, which nothing used to read. A venue that has not
-  // published any is treated as open — the server says the same.
-  const venueClosed = venue.hours.hoursPublished && !venue.hours.isOpen;
+  // Clock-closed is honest; ordering is only blocked when the server says so
+  // (`ordersAllowed !== true`). Local/dev may still take orders after hours.
+  const clockClosed = venue.hours.hoursPublished && !venue.hours.isOpen;
+  const orderingBlocked = clockClosed && venue.hours.ordersAllowed !== true;
 
   /**
    * What is in this basket, and how long it will take.
@@ -64,7 +117,11 @@ export default function CartPage() {
   const [orderType, setOrderType] = useState<OrderTypeId>(() =>
     venue.roomNumber ? "room-service" : activeTable ? "dine-in" : "takeaway",
   );
-  const [paymentMethod, setPaymentMethod] = useState("upi");
+  // Cash first — without gateway keys, UPI/card/etc. on this screen only mark intent;
+  // the kitchen still gets the order, but nothing is charged online.
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [onlineCheckoutReady, setOnlineCheckoutReady] = useState(false);
+  const [payCatalogKnown, setPayCatalogKnown] = useState(false);
   const [guestName, setGuestName] = useState(user?.name ?? "");
   const [guestPhone, setGuestPhone] = useState(user?.mobile ?? "");
   const [coupon, setCoupon] = useState("");
@@ -80,18 +137,40 @@ export default function CartPage() {
   const [specialFlags, setSpecialFlags] = useState<string[]>([]);
   const [allergyInstructions, setAllergyInstructions] = useState("");
   const [courseTiming, setCourseTiming] = useState<CourseTimingId>("starters_first");
-  const [courseMode, setCourseMode] = useState(true);
   const [scheduledAt, setScheduledAt] = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [groupCode, setGroupCode] = useState("");
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [upsells, setUpsells] = useState<UpsellSuggestion[]>([]);
+  const [upsellError, setUpsellError] = useState("");
   const [placing, setPlacing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [couponError, setCouponError] = useState("");
   const [groupError, setGroupError] = useState("");
   const [placeError, setPlaceError] = useState("");
   const [couponRefused, setCouponRefused] = useState("");
+  const [showOptions, setShowOptions] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    publicApi.payments.catalog()
+      .then((c: { onlineCheckoutReady?: boolean; clientConfig?: { demoMode?: boolean } | null }) => {
+        if (cancelled) return;
+        const ready = c?.onlineCheckoutReady === true && c?.clientConfig?.demoMode !== true;
+        setOnlineCheckoutReady(ready);
+        setPayCatalogKnown(true);
+        if (!ready) setPaymentMethod("cash");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fail closed: no catalog means we cannot promise online pay.
+        setOnlineCheckoutReady(false);
+        setPayCatalogKnown(true);
+        setPaymentMethod("cash");
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (activeTable) {
@@ -114,14 +193,25 @@ export default function CartPage() {
     const cartItemIds = cart.map(c => parseInt(c.menuItemId, 10)).filter(n => !Number.isNaN(n));
     if (!venue.restaurantId) {
       setUpsells([]);
+      setUpsellError("");
       return;
     }
     publicApi.ai.upsell({ restaurantId: venue.restaurantId, cartCourses: courses, cartItemIds })
-      .then(r => setUpsells(r.suggestions ?? []))
+      .then(r => {
+        setUpsells(r.suggestions ?? []);
+        setUpsellError("");
+      })
       .catch(() =>
         publicApi.suggestUpsell({ restaurantId: venue.restaurantId!, cartCourses: courses })
-          .then(r => setUpsells(r.suggestions ?? []))
-          .catch(() => setUpsells([])),
+          .then(r => {
+            setUpsells(r.suggestions ?? []);
+            setUpsellError("");
+          })
+          .catch(e => {
+            // Empty suggestions used to look like "no ideas" when the API was down.
+            setUpsells([]);
+            setUpsellError(e instanceof Error ? e.message : "Could not load suggestions.");
+          }),
       );
   }, [cart, venue.restaurantId]);
 
@@ -185,7 +275,7 @@ export default function CartPage() {
     setPlaceError("");
     // Placing an order into a closed kitchen produced a ticket nobody was there to
     // cook and a guest left waiting for food that was never coming.
-    if (venueClosed) {
+    if (orderingBlocked) {
       setPlaceError(venue.hours.message);
       return;
     }
@@ -237,392 +327,305 @@ export default function CartPage() {
   }
 
   const lastOrder = orders[0];
+  const menuPath = withGuestQuery("/user/menu", venue, activeTable);
 
   if (showSuccess) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-foreground flex items-center justify-center flex-col gap-4">
-        <div className="h-20 w-20 rounded-full bg-success-subtle border-2 border-success-border flex items-center justify-center">
-          <CheckCircle className="h-10 w-10 text-success" />
-        </div>
-        <h2 className="text-2xl font-semibold">{queuedOffline ? "Order Saved Offline" : "Order Placed!"}</h2>
-        <p className="text-muted-foreground">{queuedOffline ? "Will sync automatically when you're back online…" : "Taking you to live tracking…"}</p>
-        {couponRefused && (
-          <div className="mx-8 max-w-sm rounded-xl border border-warning-border bg-warning-subtle px-4 py-3 text-center text-sm text-warning">
-            {couponRefused} You were charged the full amount — please speak to a member of staff if this looks wrong.
-          </div>
-        )}
-      </div>
+      <GuestAppScreen>
+        <GuestAppBar title={queuedOffline ? "Saved on this phone" : "Order placed"} showBack={false} />
+        <GuestBody className="flex flex-col items-center gap-4 py-16 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-success-border bg-success-subtle">
+            <CheckCircle className="h-10 w-10 text-success" />
+          </span>
+          <h2 className="font-display text-xl font-semibold">
+            {queuedOffline ? "Order saved offline" : "Sent to the kitchen"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {queuedOffline
+              ? "It will be sent the moment you are back online. The kitchen has not seen it yet."
+              : "Taking you to live tracking…"}
+          </p>
+          {/* The one thing on this screen that must not be missed: the guest was shown a
+              discount and then charged full price, and has to be told why. */}
+          {couponRefused && (
+            <div className="w-full max-w-sm rounded-md border border-warning-border bg-warning-subtle px-4 py-3 text-sm text-warning">
+              {couponRefused} You were charged the full amount — please speak to a member of staff if this looks wrong.
+            </div>
+          )}
+        </GuestBody>
+      </GuestAppScreen>
     );
   }
 
   if (cart.length === 0) {
     return (
-      <div className="guest-page thin-scroll min-h-screen text-foreground flex flex-col items-center justify-center gap-4 px-8 text-center">
-        <div className="h-20 w-20 rounded-2xl bg-muted border border-primary flex items-center justify-center">
-          <Icon name="shopping_cart" size={40} className="text-primary" />
-        </div>
-        <h2 className="font-display text-xl font-semibold">Your cart is empty</h2>
-        <p className="text-muted-foreground text-sm max-w-xs">Add dishes from the menu to start your order</p>
-        {lastOrder && (
-          <button onClick={() => { reorderFromOrder(lastOrder); navigate("/user/cart"); }} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary text-primary text-sm font-semibold">
-            <RotateCcw className="h-4 w-4" /> One-click reorder last meal
-          </button>
-        )}
-        {favorites.length > 0 && (
-          <div className="w-full max-w-sm mt-2 space-y-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Repeat favorites</p>
-            {favorites.slice(0, 3).map(f => (
-              <button key={f.menuItemId} onClick={() => { repeatFavorite(f); navigate("/user/cart"); }} className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-muted border border-border text-sm">
-                <span className="flex items-center gap-2"><Heart className="h-3.5 w-3.5 text-primary" />{f.name}</span>
-                <span className="text-primary">₹{f.price}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <button type="button" onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))} className="guest-btn-primary mt-2 px-6 py-3 text-sm">
-          Browse menu
-        </button>
-      </div>
+      <GuestAppScreen withCartBar>
+        <GuestAppBar title="Your order" backFallback={menuPath} />
+        <GuestBody>
+          <GuestSection>
+            <div className="flex flex-col items-center gap-3 rounded-md border border-border bg-card px-6 py-12 text-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-md bg-muted">
+                <ShoppingBag className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
+              </span>
+              <h2 className="font-display text-base font-semibold">Nothing in the basket yet</h2>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Add dishes from the menu and they will show up here.
+              </p>
+            </div>
+          </GuestSection>
+
+          {(lastOrder || favorites.length > 0) && (
+            <GuestSection title="Start from something you had before">
+              <GuestList>
+                {lastOrder && (
+                  <GuestRow
+                    icon={<RotateCcw className="h-4 w-4" />}
+                    title="Reorder your last meal"
+                    detail={`${lastOrder.items.length} item${lastOrder.items.length === 1 ? "" : "s"} · ₹${lastOrder.total}`}
+                    onClick={() => { reorderFromOrder(lastOrder); navigate(withGuestQuery("/user/cart", venue, activeTable)); }}
+                  />
+                )}
+                {favorites.slice(0, 3).map(f => (
+                  <GuestRow
+                    key={f.menuItemId}
+                    icon={<Heart className="h-4 w-4" />}
+                    title={f.name}
+                    detail={`₹${f.price}`}
+                    onClick={() => { repeatFavorite(f); navigate(withGuestQuery("/user/cart", venue, activeTable)); }}
+                  />
+                ))}
+              </GuestList>
+            </GuestSection>
+          )}
+        </GuestBody>
+        <GuestActionBar>
+          <GuestPrimaryButton onClick={() => navigate(menuPath)}>
+            <UtensilsCrossed className="h-4 w-4" />
+            Browse the menu
+          </GuestPrimaryButton>
+        </GuestActionBar>
+      </GuestAppScreen>
     );
   }
 
   return (
-    <div className="guest-page thin-scroll min-h-screen text-foreground pb-36">
-      <GuestHeader
+    <GuestAppScreen withCartBar>
+      <GuestAppBar
         title="Your order"
-        subtitle={`Table ${activeTable} · ${cartCount} items`}
-        onBack={goBack}
-        actions={lastOrder ? (
-          <button type="button" onClick={() => reorderFromOrder(lastOrder)} className="text-xs px-2.5 py-1.5 rounded-lg bg-muted text-primary border border-primary flex items-center gap-1 font-medium">
-            <RotateCcw className="h-3 w-3" /> Reorder
-          </button>
-        ) : undefined}
+        subtitle={
+          activeTable || venue.roomNumber
+            ? <GuestTableChip table={activeTable} room={venue.roomNumber} />
+            : `${cartCount} item${cartCount === 1 ? "" : "s"}`
+        }
+        backFallback={menuPath}
+        right={
+          <GuestAppBarButton label="More options" onClick={() => setShowOptions(true)}>
+            <SlidersHorizontal className="h-4 w-4" />
+          </GuestAppBarButton>
+        }
       />
 
-      {(pendingOrders.length > 0 || !isOnline) && (
-        <div className="mx-4 mt-3 rounded-xl border border-info-border bg-info-subtle px-3 py-2 text-xs text-info">
-          {!isOnline ? "Offline — order will be queued for sync" : `${pendingOrders.length} order(s) pending sync`}
-          {" · "}
-          <button onClick={() => navigate("/user/offline")} className="underline">Details</button>
-        </div>
-      )}
-
-      <div className="px-4 py-4 space-y-4">
-        {/* How long the round takes. `prepTime` is recorded per dish and reached no
-            screen, so nobody was ever told whether their food was five minutes away or
-            twenty-five. The kitchen works a round in parallel, so it is the slowest
-            dish, not the sum of them. */}
-        {longestPrep > 0 && !venueClosed && (
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            Kitchen time for this round is about {longestPrep} minutes once the order is accepted.
-          </p>
-        )}
-
-        {/* Order type — table scan defaults to dine-in; pickup options only */}
-        <div className="guest-card p-4">
-          <p className="menu-filter-label">Order type</p>
-          {activeTable && orderType === "dine-in" && (
-            <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary bg-muted px-3 py-2.5">
-              <Utensils className="h-5 w-5 text-primary shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-primary">Dine-in at your table</p>
-                <p className="text-2xs text-muted-foreground">Table {activeTable} — staff will serve you here</p>
-              </div>
-            </div>
-          )}
-          <p className="mb-2 text-2xs text-muted-foreground">
-            {activeTable ? "Or choose pickup instead:" : "Choose how you want your order:"}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {CART_PICKUP_ORDER_TYPES.map(t => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setOrderType(t.id)}
-                className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs border transition-all ${orderType === t.id ? "bg-muted border-primary text-primary" : "bg-muted border-border text-muted-foreground hover:border-border"}`}
-              >
-                <GuestIcon id={t.id} className="h-5 w-5 text-primary" />
-                <span className="leading-tight text-center font-medium">{t.label}</span>
-              </button>
-            ))}
-          </div>
-          {activeTable && orderType !== "dine-in" && (
+      <GuestBody>
+        {(pendingOrders.length > 0 || !isOnline) && (
+          <GuestSection>
             <button
               type="button"
-              onClick={() => setOrderType("dine-in")}
-              className="mt-3 w-full py-2 rounded-xl text-xs font-medium text-primary border border-primary bg-muted hover:bg-muted transition-colors"
+              onClick={() => navigate("/user/offline")}
+              className="flex w-full items-start gap-2 rounded-md border border-info-border bg-info-subtle p-3 text-left"
             >
-              ← Back to dine-in at Table {activeTable}
+              <CloudOff className="mt-0.5 h-4 w-4 shrink-0 text-info" />
+              <span className="min-w-0 flex-1 text-xs text-info">
+                {!isOnline
+                  ? "You are offline. This order will be held on the phone and sent when the connection is back — the kitchen will not see it until then."
+                  : `${pendingOrders.length} order${pendingOrders.length === 1 ? "" : "s"} still waiting to be sent.`}
+                <span className="mt-0.5 block font-semibold underline">See the queue</span>
+              </span>
             </button>
-          )}
-        </div>
-
-        {/* Group / Shared cart */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Share2 className="h-4 w-4 text-primary" /> Group & Shared Cart</p>
-          <div className="flex gap-2 mb-2">
-            <button onClick={startGroupOrder} className="flex-1 py-2.5 rounded-xl bg-muted border border-primary text-primary text-xs font-semibold">
-              Start group order
-            </button>
-            <button onClick={saveFavoriteFromCart} className="px-3 py-2.5 rounded-xl border border-primary text-primary text-xs font-semibold flex items-center gap-1">
-              <Heart className="h-3.5 w-3.5" /> Save favorite
-            </button>
-          </div>
-          {shareCode && (
-            <p className="text-xs text-primary mb-2">Share code: <strong>{shareCode}</strong> — friends can join to share this cart</p>
-          )}
-          {groupError && <p className="text-xs text-danger mb-2">{groupError}</p>}
-          <div className="flex gap-2">
-            <input
-              className="flex-1 bg-muted border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary"
-              placeholder="Enter share code to join"
-              value={groupCode}
-              onChange={e => setGroupCode(e.target.value.toUpperCase())}
-            />
-            <button onClick={joinGroup} className="px-4 py-2 rounded-xl bg-muted text-xs font-semibold">Join</button>
-          </div>
-        </div>
-
-        {/* AI Upselling & Combo suggestions */}
-        {upsells.length > 0 && (
-          <div className="rounded-2xl border border-primary p-4">
-            <p className="text-sm font-semibold mb-2 flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> AI Upsell Suggestions</p>
-            <div className="space-y-2">
-              {upsells.map(u => (
-                <button key={`${u.menuItemId}-${u.name}`} onClick={() => navigate(withGuestQuery("/user/menu", venue, activeTable))} className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-foreground/40 border border-border text-left hover:border-primary transition-all">
-                  <div>
-                    <p className="text-sm font-medium">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">{u.reason}</p>
-                  </div>
-                  <span className="text-xs text-primary capitalize">{u.type.replace("_", " ")}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          </GuestSection>
         )}
 
-        {/* Scheduled ordering */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold flex items-center gap-2"><Calendar className="h-4 w-4 text-primary" /> Scheduled Ordering</p>
-            <button onClick={() => setScheduleEnabled(!scheduleEnabled)} className={`w-10 h-5 rounded-full transition-all ${scheduleEnabled ? "bg-primary" : "bg-muted"} relative`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card transition-all ${scheduleEnabled ? "left-5" : "left-0.5"}`} />
-            </button>
-          </div>
-          {scheduleEnabled && (
-            <input
-              type="datetime-local"
-              className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
-              value={scheduledAt}
-              onChange={e => setScheduledAt(e.target.value)}
-            />
-          )}
-        </div>
+        {/* The basket itself, first, full bleed. */}
+        <GuestSection title={`${cartCount} item${cartCount === 1 ? "" : "s"}`}>
+          <div className="-mx-4 divide-y divide-border border-y border-border bg-card">
+            {cart.map(item => (
+              <div key={item.id} className="flex gap-3 px-4 py-3.5">
+                <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-md bg-muted">
+                  <GuestIcon id={`course_${item.course}`} className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-[9px] capitalize text-muted-foreground">{item.course}</span>
+                </span>
 
-        {/* Cart Items with course badges */}
-        <div className="rounded-2xl bg-card border border-border divide-y divide-border">
-          {cart.map(item => (
-            <div key={item.id} className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="h-14 w-14 rounded-xl bg-muted flex flex-col items-center justify-center shrink-0">
-                  <GuestIcon id={`course_${item.course}`} className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-2xs text-muted-foreground capitalize">{item.course}</span>
-                </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">{item.name}</p>
-                      {item.variant && <p className="text-xs text-muted-foreground mt-0.5">{item.variant}</p>}
-                      {item.customizations.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">{item.customizations.join(", ")}</p>}
-                      {item.addons.length > 0 && <p className="text-xs text-primary mt-0.5">+ {item.addons.map(a => a.name).join(", ")}</p>}
-                      {item.specialInstructions && <p className="text-xs text-warning mt-0.5">Note: {item.specialInstructions}</p>}
-                    </div>
-                    <button onClick={() => removeFromCart(item.id)} className="text-danger hover:text-danger p-1">
-                      <Trash2 className="h-3.5 w-3.5" />
+                    <p className="min-w-0 text-sm font-medium leading-snug">{item.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.id)}
+                      aria-label={`Remove ${item.name}`}
+                      className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-danger"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="flex items-center justify-between mt-2">
+
+                  {(item.variant || item.customizations.length > 0 || item.addons.length > 0 || item.specialInstructions) && (
+                    <div className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
+                      {item.variant && <p>{item.variant}</p>}
+                      {item.customizations.length > 0 && <p>{item.customizations.join(", ")}</p>}
+                      {item.addons.length > 0 && <p>+ {item.addons.map(a => a.name).join(", ")}</p>}
+                      {item.specialInstructions && <p className="text-warning">Note: {item.specialInstructions}</p>}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center justify-between gap-3">
                     {/* item.price already includes the portion and every add-on. */}
-                    <span className="text-sm font-semibold text-primary">₹{item.price * item.quantity}</span>
-                    <div className="flex items-center gap-2 bg-muted rounded-lg p-0.5">
-                      <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="h-7 w-7 rounded-md bg-muted flex items-center justify-center"><Minus className="h-3 w-3" /></button>
-                      <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="h-7 w-7 rounded-md bg-primary flex items-center justify-center"><Plus className="h-3 w-3" /></button>
+                    <span className="text-sm font-semibold tabular-nums">₹{item.price * item.quantity}</span>
+                    <div className="flex h-9 items-center gap-1 rounded-md border border-border bg-card px-1">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        aria-label={`One fewer ${item.name}`}
+                        className="flex h-7 w-8 items-center justify-center rounded-sm text-primary"
+                      >
+                        <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      </button>
+                      <span className="w-5 text-center text-sm font-semibold tabular-nums">{item.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        aria-label={`One more ${item.name}`}
+                        className="flex h-7 w-8 items-center justify-center rounded-sm text-primary"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Course Management */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <button onClick={() => setCourseMode(!courseMode)} className="w-full flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Course Management</span>
-            </div>
-            <span className="text-xs text-muted-foreground">{courseMode ? "▼" : "▶"}</span>
-          </button>
-          {courseMode && (
-            <div className="mt-3 space-y-2">
-              {COURSE_TIMING_OPTIONS.map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => setCourseTiming(opt.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl text-xs border transition-all ${courseTiming === opt.id ? "bg-muted border-primary text-primary" : "border-border bg-muted text-muted-foreground hover:border-primary"}`}
-                >
-                  <p className="font-semibold">{opt.label}</p>
-                  <p className="text-muted-foreground mt-0.5">{opt.desc}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Special Order Features */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3">Special Order Requests</p>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {SPECIAL_REQUEST_TAGS.map(tag => (
-              <button
-                key={tag.id}
-                onClick={() => toggleFlag(tag.flag)}
-                className={`px-3 py-1.5 rounded-full text-xs border transition-all ${specialFlags.includes(tag.flag) ? "bg-muted border-primary text-primary" : "border-border bg-muted text-muted-foreground"}`}
-              >
-                {tag.label}
-              </button>
             ))}
-          </div>
-          <textarea
-            className="w-full bg-muted border border-border rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none mb-2"
-            rows={2}
-            placeholder="Allergy instructions — list all allergens and severity..."
-            value={allergyInstructions}
-            onChange={e => setAllergyInstructions(e.target.value)}
-          />
-          <textarea
-            className="w-full bg-muted border border-border rounded-xl p-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
-            rows={2}
-            placeholder="Birthday surprise details, anniversary setup, candlelight preferences..."
-            value={specialRequest}
-            onChange={e => setSpecialRequest(e.target.value)}
-          />
-        </div>
 
-        {/* Coupon */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Tag className="h-4 w-4 text-primary" /> Promo Code</p>
+            <button
+              type="button"
+              onClick={() => navigate(menuPath)}
+              className="flex min-h-12 w-full items-center gap-2 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-accent"
+            >
+              <Plus className="h-4 w-4" />
+              Add more dishes
+            </button>
+          </div>
+
+          {/* How long the round takes. `prepTime` is recorded per dish and reached no
+              screen, so nobody was ever told whether their food was five minutes away or
+              twenty-five. The kitchen works a round in parallel, so it is the slowest
+              dish, not the sum of them. */}
+          {longestPrep > 0 && !orderingBlocked && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              About {longestPrep} minutes in the kitchen once the order is accepted.
+            </p>
+          )}
+        </GuestSection>
+
+        {/* What is actually in the basket, said by the screen rather than asked of the
+            guest. The dishes' own allergens travel on the cart line. */}
+        {cartAllergens.length > 0 && (
+          <GuestSection>
+            <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-subtle p-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-warning">This order contains</p>
+                <p className="mt-0.5 text-xs capitalize text-muted-foreground">{cartAllergens.join(", ")}</p>
+              </div>
+            </div>
+          </GuestSection>
+        )}
+
+        {upsellError && (
+          <p className="text-xs text-danger px-1">{upsellError}</p>
+        )}
+        {upsells.length > 0 && (
+          <GuestSection title="Goes well with this">
+            <GuestList>
+              {upsells.slice(0, 3).map(u => (
+                <GuestRow
+                  key={`${u.menuItemId}-${u.name}`}
+                  icon={<Sparkles className="h-4 w-4" />}
+                  title={u.name}
+                  detail={u.reason}
+                  onClick={() => navigate(menuPath)}
+                />
+              ))}
+            </GuestList>
+          </GuestSection>
+        )}
+
+        <GuestSection title="Promo code">
           {appliedCoupon ? (
-            <div className="flex items-center justify-between bg-success-subtle border border-success-border rounded-xl px-3 py-2.5">
-              <div>
-                <p className="text-sm font-semibold text-success">{appliedCoupon.code} applied!</p>
+            <div className="flex items-center justify-between gap-3 rounded-md border border-success-border bg-success-subtle px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-success">{appliedCoupon.code} applied</p>
                 <p className="text-xs text-muted-foreground">Saving ₹{appliedCoupon.discount}</p>
               </div>
-              <button onClick={() => setAppliedCoupon(null)} className="text-muted-foreground hover:text-muted-foreground"><XIcon /></button>
+              <button
+                type="button"
+                onClick={() => setAppliedCoupon(null)}
+                aria-label="Remove promo code"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           ) : (
             <div className="flex gap-2">
-              <input className="flex-1 bg-muted border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary" placeholder="Enter code" value={coupon} onChange={e => setCoupon(e.target.value.toUpperCase())} />
-              <button onClick={applyCoupon} className="px-4 py-2.5 rounded-xl bg-muted border border-primary text-primary text-sm font-semibold">Apply</button>
+              <div className="relative min-w-0 flex-1">
+                <Tag className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={coupon}
+                  onChange={e => setCoupon(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  aria-label="Promo code"
+                  className="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm uppercase text-foreground placeholder:normal-case placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={applyCoupon}
+                className="h-11 shrink-0 rounded-md border border-primary bg-card px-4 text-sm font-semibold text-primary"
+              >
+                Apply
+              </button>
             </div>
           )}
-          {couponError && <p className="text-xs text-danger mt-1">{couponError}</p>}
-        </div>
+          {couponError && <p className="mt-1.5 text-xs text-danger">{couponError}</p>}
+        </GuestSection>
 
-        {/* Tip */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3">Add a tip</p>
-          <div className="flex gap-2">
-            {/* Flat rupee presets — 0, 20, 50, 100, 150 — whatever the bill came to.
-                On a ₹45 tea and dosa the smallest tip offered was 44%; on a ₹5,000
-                dinner the largest was 3%. A tip is a share of the bill. */}
+        <GuestSection title="Add a tip">
+          {/* A share of the bill, not a flat rupee ladder. On a ₹45 tea the smallest flat
+              tip offered was 44%; on a ₹5,000 dinner the largest was 3%. */}
+          <div className="flex flex-wrap gap-2">
             {tipPresetsFor(Math.max(0, subtotal - discount)).map(({ percent, amount }) => (
-              <button key={percent} onClick={() => setTip(amount)} aria-pressed={tip === amount}
-                className={`flex-1 min-h-11 py-2 rounded-md text-xs font-medium border transition-colors ${tip === amount ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-muted-foreground"}`}>
-                {percent === 0 ? "None" : <>{percent}%<span className="block text-2xs opacity-70 tabular-nums">₹{amount}</span></>}
+              <button
+                key={percent}
+                type="button"
+                onClick={() => setTip(amount)}
+                aria-pressed={tip === amount}
+                className={tip === amount
+                  ? "min-h-11 min-w-[4.5rem] flex-1 rounded-md border border-primary bg-primary text-xs font-semibold text-primary-foreground"
+                  : "min-h-11 min-w-[4.5rem] flex-1 rounded-md border border-border bg-card text-xs font-medium text-muted-foreground"}
+              >
+                {percent === 0 ? "None" : (
+                  <>
+                    {percent}%
+                    <span className="block text-[10px] tabular-nums opacity-80">₹{amount}</span>
+                  </>
+                )}
               </button>
             ))}
           </div>
-        </div>
+        </GuestSection>
 
-        {/* Split ordering */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold">Split Ordering</p>
-            </div>
-            <button onClick={() => setSplitBilling(!splitBilling)} className={`w-10 h-5 rounded-full transition-all ${splitBilling ? "bg-primary" : "bg-muted"} relative`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card transition-all ${splitBilling ? "left-5" : "left-0.5"}`} />
-            </button>
-          </div>
-          {splitBilling && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Minus className="h-3 w-3" /></button>
-                <span className="flex-1 text-center text-sm font-semibold">{splitCount} people</span>
-                <button onClick={() => setSplitCount(Math.min(10, splitCount + 1))} className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center"><Plus className="h-3 w-3" /></button>
-              </div>
-              <div className="bg-muted rounded-xl p-3 text-center">
-                <p className="text-xs text-muted-foreground">Each person pays</p>
-                <p className="text-xl font-semibold text-primary">₹{perPerson}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Partial & Advance payment */}
-        <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2"><Percent className="h-4 w-4 text-warning" /><p className="text-sm font-semibold">Partial Payment</p></div>
-            <button onClick={() => setPartialEnabled(!partialEnabled)} className={`w-10 h-5 rounded-full transition-all ${partialEnabled ? "bg-primary" : "bg-muted"} relative`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card transition-all ${partialEnabled ? "left-5" : "left-0.5"}`} />
-            </button>
-          </div>
-          {partialEnabled && (
-            <>
-              <input type="number" placeholder={`Pay now (max ₹${grandTotal - 1})`} value={partialPayNow} onChange={e => setPartialPayNow(e.target.value)}
-                className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-sm" />
-              {quote.partialRemaining != null && <p className="text-xs text-warning">Remaining: ₹{quote.partialRemaining}</p>}
-            </>
-          )}
-          <div className="flex items-center justify-between pt-2 border-t border-border">
-            <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /><p className="text-sm font-semibold">Advance Payment</p></div>
-            <button onClick={() => setAdvanceEnabled(!advanceEnabled)} className={`w-10 h-5 rounded-full transition-all ${advanceEnabled ? "bg-primary" : "bg-muted"} relative`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card transition-all ${advanceEnabled ? "left-5" : "left-0.5"}`} />
-            </button>
-          </div>
-          {advanceEnabled && (
-            <>
-              <input type="number" placeholder="Advance amount" value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)}
-                className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-sm" />
-              {quote.balanceDue != null && <p className="text-xs text-primary">Balance due: ₹{quote.balanceDue}</p>}
-            </>
-          )}
-        </div>
-
-        {/* Favorites quick repeat */}
-        {favorites.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border p-4">
-            <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Heart className="h-4 w-4 text-primary" /> Repeat Favorite Meals</p>
-            <div className="space-y-2">
-              {favorites.map(f => (
-                <button key={f.menuItemId} onClick={() => repeatFavorite(f)} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted border border-border text-sm hover:border-primary">
-                  <span>{f.name}</span>
-                  <span className="text-primary text-xs">+ Add ₹{f.price}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Bill Summary */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3 flex items-center gap-2"><Receipt className="h-4 w-4 text-primary" /> Bill Summary</p>
-          <div className="space-y-2 text-sm">
+        {/* The total the guest is about to agree to, in full. */}
+        <GuestSection title="Bill">
+          <div className="rounded-md border border-border bg-card px-4 py-3 text-sm">
             {[
               { label: "Subtotal", value: `₹${subtotal}` },
               { label: "CGST (2.5%)", value: `₹${quote.gst.cgst}` },
@@ -633,83 +636,414 @@ export default function CartPage() {
               quote.advanceAmount != null && { label: "Advance", value: `₹${quote.advanceAmount}` },
               scheduleEnabled && scheduledAt && { label: "Scheduled for", value: new Date(scheduledAt).toLocaleString() },
             ].filter(Boolean).map((row: { label: string; value: string; green?: boolean }) => (
-              <div key={row.label} className="flex items-center justify-between">
+              <div key={row.label} className="flex items-center justify-between py-1">
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className={row.green ? "text-success font-semibold" : ""}>{row.value}</span>
+                <span className={row.green ? "font-semibold tabular-nums text-success" : "tabular-nums"}>{row.value}</span>
               </div>
             ))}
-            <div className="border-t border-border pt-2 mt-2 flex items-center justify-between font-semibold text-base">
+            <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-base font-semibold">
               <span>Total</span>
-              <span className="text-primary">₹{grandTotal}</span>
+              <span className="tabular-nums">₹{grandTotal}</span>
             </div>
+            {splitBilling && (
+              <p className="mt-1 text-right text-xs text-muted-foreground tabular-nums">
+                ₹{perPerson} each, split {splitCount} ways
+              </p>
+            )}
           </div>
-        </div>
+        </GuestSection>
 
-        {/* Payment */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-3">Payment Method</p>
-          <div className="space-y-2">
-            {paymentMethods(user?.walletTotal ?? user?.walletBalance).map(m => (
-              <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === m.id ? "bg-muted border-primary" : "bg-muted border-border"}`}>
-                <m.icon className={`h-5 w-5 ${paymentMethod === m.id ? "text-primary" : "text-muted-foreground"}`} />
-                <div className="text-left flex-1">
-                  <p className="text-sm font-semibold">{m.label}</p>
-                  <p className="text-xs text-muted-foreground">{m.sub}</p>
-                </div>
-                <div className={`h-4 w-4 rounded-full border-2 ${paymentMethod === m.id ? "border-primary bg-primary" : "border-border"}`} />
+        <GuestSection title="How you want it">
+          {activeTable && orderType === "dine-in" && (
+            <div className="mb-2 flex items-center gap-2 rounded-md border border-primary bg-accent px-3 py-2.5">
+              <Utensils className="h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-primary">Dine-in at your table</p>
+                <p className="text-[11px] text-muted-foreground">Table {activeTable} — staff will serve you here</p>
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {CART_PICKUP_ORDER_TYPES.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setOrderType(t.id)}
+                aria-pressed={orderType === t.id}
+                className={orderType === t.id
+                  ? "flex min-h-12 items-center gap-2 rounded-md border border-primary bg-accent px-3 py-2.5 text-xs font-semibold text-primary"
+                  : "flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2.5 text-xs font-medium text-muted-foreground"}
+              >
+                <GuestIcon id={t.id} className="h-4 w-4 shrink-0 text-primary" />
+                <span className="min-w-0 text-left leading-tight">{t.label}</span>
               </button>
             ))}
           </div>
-          <button onClick={() => navigate(withGuestQuery("/user/payment", venue, activeTable))} className="mt-3 w-full py-2.5 rounded-xl border border-primary text-primary text-xs font-semibold hover:bg-muted">
-            Advanced checkout — split, partial, invoices →
-          </button>
-        </div>
+          {activeTable && orderType !== "dine-in" && (
+            <button
+              type="button"
+              onClick={() => setOrderType("dine-in")}
+              className="mt-2 min-h-11 w-full rounded-md border border-primary bg-card text-xs font-medium text-primary"
+            >
+              Back to dine-in at Table {activeTable}
+            </button>
+          )}
+        </GuestSection>
 
-        {/* Guest details — so the order shows the guest's name & phone in every panel */}
-        <div className="rounded-2xl bg-card border border-border p-4">
-          <p className="text-sm font-semibold mb-1">Your details</p>
-          <p className="text-xs text-muted-foreground mb-3">Taaki staff aapko naam se serve kar sake aur zaroorat pade to call kar sake.</p>
+        <GuestSection title="Pay with">
+          {payCatalogKnown && !onlineCheckoutReady && (
+            <p role="status" className="mb-2 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+              Online payment is not live yet. Order goes to the kitchen — settle in cash at the table or counter.
+            </p>
+          )}
+          <GuestList>
+            {paymentMethods(user?.walletTotal ?? user?.walletBalance).map(m => {
+              const needsGateway = m.id !== "cash";
+              const blocked = needsGateway && !onlineCheckoutReady;
+              const detail = blocked
+                ? (m.id === "qr" ? "Scan-to-pay is not available yet" : "Not live yet — pay at the counter")
+                : (m.id === "cash" ? "Pay at table or counter after ordering" : m.sub);
+              return (
+                <GuestRow
+                  key={m.id}
+                  icon={<m.icon className={`h-4 w-4 ${blocked ? "opacity-40" : ""}`} />}
+                  title={m.label}
+                  detail={detail}
+                  onClick={blocked ? undefined : () => setPaymentMethod(m.id)}
+                  trailing={
+                    <span
+                      className={paymentMethod === m.id && !blocked
+                        ? "h-4 w-4 shrink-0 rounded-full border-4 border-primary"
+                        : "h-4 w-4 shrink-0 rounded-full border-2 border-border opacity-40"}
+                    />
+                  }
+                />
+              );
+            })}
+          </GuestList>
+        </GuestSection>
+
+        <GuestSection title="Your details">
+          <p className="mb-2 text-xs text-muted-foreground">
+            So staff can serve you by name and call you if they need to.
+          </p>
           <div className="space-y-2">
             <input
               value={guestName}
               onChange={e => setGuestName(e.target.value)}
               placeholder="Your name"
-              className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+              aria-label="Your name"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
             />
             <input
               value={guestPhone}
               onChange={e => setGuestPhone(e.target.value.replace(/[^\d+]/g, ""))}
               inputMode="tel"
               placeholder="Phone number"
-              className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+              aria-label="Phone number"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
             />
           </div>
-        </div>
-      </div>
+        </GuestSection>
 
-      <div className="guest-bottom-bar">
+        {/* Everything a venue offers that most diners never touch. Still here, one tap
+            away, instead of nine cards between the basket and the total. */}
+        <GuestSection title="Anything else">
+          <GuestList>
+            <GuestRow
+              icon={<Info className="h-4 w-4" />}
+              title="Allergies & special requests"
+              detail={allergyInstructions || specialFlags.length > 0 || specialRequest ? "Added" : "Tell the kitchen"}
+              onClick={() => setShowNotes(true)}
+            />
+            <GuestRow
+              icon={<Clock className="h-4 w-4" />}
+              title="Serving order, split, schedule, group"
+              detail={COURSE_TIMING_OPTIONS.find(o => o.id === courseTiming)?.label}
+              onClick={() => setShowOptions(true)}
+            />
+            {lastOrder && (
+              <GuestRow
+                icon={<RotateCcw className="h-4 w-4" />}
+                title="Reorder your last meal"
+                onClick={() => reorderFromOrder(lastOrder)}
+              />
+            )}
+            <GuestRow
+              icon={<Heart className="h-4 w-4" />}
+              title="Save this basket as a favourite"
+              onClick={saveFavoriteFromCart}
+            />
+            <GuestRow
+              icon={<Percent className="h-4 w-4" />}
+              title="Advanced checkout"
+              detail={onlineCheckoutReady ? "Split, partial payment, invoices" : "Tips, split & bill details · cash at counter"}
+              onClick={() => navigate(withGuestQuery("/user/payment", venue, activeTable))}
+            />
+          </GuestList>
+        </GuestSection>
+      </GuestBody>
+
+      <GuestActionBar>
         {placeError && (
-          <p role="alert" className="mb-2 text-xs text-danger bg-danger-subtle border border-danger-border rounded-xl px-3 py-2">
+          <p role="alert" className="mb-2 rounded-md border border-danger-border bg-danger-subtle px-3 py-2 text-xs text-danger">
             {placeError}
           </p>
         )}
-        {venueClosed && (
-          <p role="status" className="mb-2 text-xs text-warning bg-warning-subtle border border-warning-border rounded-xl px-3 py-2">
-            {venue.hours.message}
+        {clockClosed && (
+          <p role="status" className="mb-2 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+            {venue.hours.demoOpenMessage
+              ?? (orderingBlocked
+                ? venue.hours.message
+                : `Kitchen hours ${venue.hours.openTime ?? "?"}–${venue.hours.closeTime ?? "?"} (${venue.hours.timezone}). Demo ordering is still available.`)}
           </p>
         )}
-        <button onClick={handlePlaceOrder} disabled={placing || venueClosed} className="guest-btn-primary w-full py-4 text-base font-semibold disabled:opacity-60 disabled:transform-none">
-          {placing
-            ? <><div className="h-5 w-5 border-2 border-border border-t-white rounded-full animate-spin" /> Placing Order…</>
-            : venueClosed
-              ? <><ShoppingBag className="h-5 w-5" /> Opens at {venue.hours.openTime}</>
-              : <><ShoppingBag className="h-5 w-5" /> Place Order · ₹{grandTotal}</>}
-        </button>
-      </div>
-    </div>
-  );
-}
+        <GuestPrimaryButton onClick={handlePlaceOrder} disabled={placing || orderingBlocked}>
+          {placing ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Placing order…</>
+          ) : orderingBlocked ? (
+            <><ShoppingBag className="h-4 w-4" /> Opens at {venue.hours.openTime}</>
+          ) : paymentMethod === "cash" || !onlineCheckoutReady ? (
+            <><ShoppingBag className="h-4 w-4" /> Place order · pay ₹{grandTotal} at counter</>
+          ) : (
+            <><ShoppingBag className="h-4 w-4" /> Place order · ₹{grandTotal}</>
+          )}
+        </GuestPrimaryButton>
+      </GuestActionBar>
 
-function XIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>;
+      {/* Notes for the kitchen. */}
+      <GuestSheet
+        open={showNotes}
+        onClose={() => setShowNotes(false)}
+        title="Allergies & special requests"
+        description="Anything here reaches the kitchen with your order."
+        size="tall"
+        footer={
+          <GuestPrimaryButton onClick={() => setShowNotes(false)}>Done</GuestPrimaryButton>
+        }
+      >
+        {cartAllergens.length > 0 && (
+          <div className="mt-1 flex items-start gap-2 rounded-md border border-warning-border bg-warning-subtle p-3">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-warning">Already in this order: </span>
+              <span className="capitalize">{cartAllergens.join(", ")}</span>
+            </p>
+          </div>
+        )}
+
+        <SheetBlock title="Occasion" icon={<Sparkles className="h-4 w-4 text-primary" />}>
+          <div className="flex flex-wrap gap-2">
+            {SPECIAL_REQUEST_TAGS.map(tag => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => toggleFlag(tag.flag)}
+                aria-pressed={specialFlags.includes(tag.flag)}
+                className={specialFlags.includes(tag.flag)
+                  ? "min-h-9 rounded-pill border border-primary bg-primary px-3.5 text-xs font-medium text-primary-foreground"
+                  : "min-h-9 rounded-pill border border-border bg-card px-3.5 text-xs font-medium text-muted-foreground"}
+              >
+                {tag.label}
+              </button>
+            ))}
+          </div>
+        </SheetBlock>
+
+        <SheetBlock title="Allergies" icon={<Info className="h-4 w-4 text-warning" />}>
+          <textarea
+            rows={3}
+            value={allergyInstructions}
+            onChange={e => setAllergyInstructions(e.target.value)}
+            placeholder="List every allergen and how severe it is."
+            className="w-full resize-none rounded-md border border-input bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+          />
+        </SheetBlock>
+
+        <SheetBlock title="Anything else" icon={<Utensils className="h-4 w-4 text-primary" />}>
+          <textarea
+            rows={3}
+            value={specialRequest}
+            onChange={e => setSpecialRequest(e.target.value)}
+            placeholder="Birthday surprise, anniversary setup, candlelight…"
+            className="w-full resize-none rounded-md border border-input bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+          />
+        </SheetBlock>
+      </GuestSheet>
+
+      {/* Serving order, split, schedule, group — kept, moved out of the way. */}
+      <GuestSheet
+        open={showOptions}
+        onClose={() => setShowOptions(false)}
+        title="More options"
+        size="full"
+        footer={
+          <GuestPrimaryButton onClick={() => setShowOptions(false)}>Done</GuestPrimaryButton>
+        }
+      >
+        <SheetBlock title="Serving order" icon={<Clock className="h-4 w-4 text-primary" />}>
+          <div className="space-y-2">
+            {COURSE_TIMING_OPTIONS.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setCourseTiming(opt.id)}
+                aria-pressed={courseTiming === opt.id}
+                className={courseTiming === opt.id
+                  ? "w-full rounded-md border border-primary bg-accent px-3 py-2.5 text-left"
+                  : "w-full rounded-md border border-border bg-card px-3 py-2.5 text-left"}
+              >
+                <span className="block text-xs font-semibold">{opt.label}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
+        </SheetBlock>
+
+        <SheetBlock title="Split the bill" icon={<Users className="h-4 w-4 text-primary" />}>
+          <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
+            <span className="text-sm">Split between guests</span>
+            <Switch on={splitBilling} onChange={setSplitBilling} label="Split the bill" />
+          </div>
+          {splitBilling && (
+            <div className="mt-2 rounded-md border border-border bg-card p-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
+                  aria-label="Fewer people"
+                  className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="flex-1 text-center text-sm font-semibold tabular-nums">{splitCount} people</span>
+                <button
+                  type="button"
+                  onClick={() => setSplitCount(Math.min(10, splitCount + 1))}
+                  aria-label="More people"
+                  className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mt-2 text-center text-sm">
+                <span className="text-muted-foreground">Each person pays </span>
+                <span className="font-semibold tabular-nums">₹{perPerson}</span>
+              </p>
+            </div>
+          )}
+        </SheetBlock>
+
+        <SheetBlock title="Pay part of it now" icon={<Percent className="h-4 w-4 text-warning" />}>
+          <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
+            <span className="text-sm">Partial payment</span>
+            <Switch on={partialEnabled} onChange={setPartialEnabled} label="Partial payment" />
+          </div>
+          {partialEnabled && (
+            <div className="mt-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={partialPayNow}
+                onChange={e => setPartialPayNow(e.target.value)}
+                placeholder={`Pay now (max ₹${grandTotal - 1})`}
+                aria-label="Amount to pay now"
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:outline-none"
+              />
+              {quote.partialRemaining != null && (
+                <p className="mt-1 text-xs text-warning tabular-nums">Remaining: ₹{quote.partialRemaining}</p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
+            <span className="text-sm">Advance payment</span>
+            <Switch on={advanceEnabled} onChange={setAdvanceEnabled} label="Advance payment" />
+          </div>
+          {advanceEnabled && (
+            <div className="mt-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={advanceAmount}
+                onChange={e => setAdvanceAmount(e.target.value)}
+                placeholder="Advance amount"
+                aria-label="Advance amount"
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:outline-none"
+              />
+              {quote.balanceDue != null && (
+                <p className="mt-1 text-xs text-muted-foreground tabular-nums">Balance due: ₹{quote.balanceDue}</p>
+              )}
+            </div>
+          )}
+        </SheetBlock>
+
+        <SheetBlock title="Order for later" icon={<Calendar className="h-4 w-4 text-primary" />}>
+          <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2.5">
+            <span className="text-sm">Schedule this order</span>
+            <Switch on={scheduleEnabled} onChange={setScheduleEnabled} label="Schedule this order" />
+          </div>
+          {scheduleEnabled && (
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={e => setScheduledAt(e.target.value)}
+              aria-label="Scheduled time"
+              className="mt-2 h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:outline-none"
+            />
+          )}
+        </SheetBlock>
+
+        <SheetBlock title="Order together" icon={<Share2 className="h-4 w-4 text-primary" />}>
+          <button
+            type="button"
+            onClick={startGroupOrder}
+            className="min-h-11 w-full rounded-md border border-primary bg-card text-sm font-semibold text-primary"
+          >
+            Start a group order
+          </button>
+          {shareCode && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Share code: <strong className="text-foreground">{shareCode}</strong> — friends can join and add to this basket.
+            </p>
+          )}
+          <div className="mt-2 flex gap-2">
+            <input
+              value={groupCode}
+              onChange={e => setGroupCode(e.target.value.toUpperCase())}
+              placeholder="Enter a share code"
+              aria-label="Share code"
+              className="h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm uppercase placeholder:normal-case focus:border-ring focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={joinGroup}
+              className="h-11 shrink-0 rounded-md border border-border bg-card px-4 text-sm font-semibold"
+            >
+              Join
+            </button>
+          </div>
+          {groupError && <p className="mt-1.5 text-xs text-danger">{groupError}</p>}
+        </SheetBlock>
+
+        {favorites.length > 0 && (
+          <SheetBlock title="Repeat a favourite" icon={<Heart className="h-4 w-4 text-primary" />}>
+            <div className="space-y-2">
+              {favorites.map(f => (
+                <button
+                  key={f.menuItemId}
+                  type="button"
+                  onClick={() => repeatFavorite(f)}
+                  className="flex min-h-11 w-full items-center justify-between rounded-md border border-border bg-card px-3 text-sm"
+                >
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  <span className="shrink-0 text-xs font-semibold text-primary tabular-nums">+ ₹{f.price}</span>
+                </button>
+              ))}
+            </div>
+          </SheetBlock>
+        )}
+      </GuestSheet>
+    </GuestAppScreen>
+  );
 }

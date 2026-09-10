@@ -1,11 +1,9 @@
 import { Router, type IRouter, type Request } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, guestUsersTable, walletTransactionsTable } from "@workspace/db";
-import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
-import { hasLivePaymentGateway } from "../lib/payment-gateway.js";
 import {
   normalizeBuckets, bucketsToStorage, getWalletCatalog, buildCashbackSummary,
-  applyRecharge, applyTransfer, totalBalance, canTransfer,
+  applyTransfer, totalBalance, canTransfer,
   type WalletTypeId, WALLET_TYPE_IDS,
 } from "../lib/customerWalletLogic.js";
 
@@ -145,33 +143,13 @@ router.post("/public/me/wallet/recharge", async (req, res): Promise<void> => {
   const amount = parseNum(req.body.amount);
   if (amount <= 0) { res.status(400).json({ error: "Invalid amount" }); return; }
 
-  // This endpoint used to credit whatever amount was posted, with no payment of any
-  // kind — a guest could type ten lakh and spend it. Wallet money may only be created
-  // against a payment this server has confirmed, so until a gateway is connected there
-  // is no legitimate way to top up online and the endpoint refuses.
-  const settings = await getPlatformSettingsRaw();
-  if (!hasLivePaymentGateway(settings.integrations)) {
-    res.status(503).json({
-      error: "Online wallet top-up is not available yet. Please add money at the counter.",
-    });
-    return;
-  }
-
-  const balances = applyRecharge(normalizeBuckets(guest), amount);
-  await persistBalances(guest.id, balances);
-
-  await db.insert(walletTransactionsTable).values({
-    guestUserId: guest.id,
-    restaurantId: req.session.restaurantId ?? null,
-    type: "recharge",
-    walletType: "main",
-    amount: String(amount.toFixed(2)),
-    balanceAfter: String(balances.main.toFixed(2)),
-    description: req.body.method ? `Wallet recharge via ${req.body.method}` : "Wallet recharge",
-    metadata: { method: req.body.method ?? "upi" },
+  // Online top-up used to credit the wallet whenever any gateway had keys — with no
+  // capture, no signature, and no PaymentIntent check. Until a real recharge checkout
+  // is wired (intent → confirmed capture → credit), refuse rather than invent balance.
+  res.status(503).json({
+    error: "Online wallet top-up is not available yet. Please add money at the counter.",
+    code: "WALLET_TOPUP_NOT_CONNECTED",
   });
-
-  res.json({ balances, balance: balances.main, success: true });
 });
 
 router.post("/public/me/wallet/transfer", async (req, res): Promise<void> => {
