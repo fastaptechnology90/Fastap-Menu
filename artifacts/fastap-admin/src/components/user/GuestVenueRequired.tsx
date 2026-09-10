@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { GuestPage } from "@/components/user/GuestUI";
 import { GuestLoading, GuestError } from "@/components/user/GuestApiState";
-import { resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
+import { slugFromUrl, resolveGuestSlug, DEMO_SLUG } from "@/lib/guestDemo";
 import { entryParamsForVenue } from "@/lib/smartEntry";
 
 // Falls back to the scan-time context when the URL no longer carries
@@ -16,7 +16,9 @@ export function GuestVenueRequired({ children }: { children: React.ReactNode }) 
   // venue when there is no specific slug. We never list every venue on the platform —
   // that would expose all onboarded restaurants' names (a privacy leak). Reported by
   // the client during acceptance testing.
-  const slug = resolveGuestSlug(venue.restaurantSlug || undefined) ?? DEMO_SLUG;
+  // An explicit slug in the address bar wins over the saved scan — otherwise the
+  // demo link opens whichever venue this browser saw last.
+  const slug = slugFromUrl() ?? resolveGuestSlug(venue.restaurantSlug || undefined) ?? DEMO_SLUG;
 
   useEffect(() => {
     if (venue.restaurantId || venueLoading) return;

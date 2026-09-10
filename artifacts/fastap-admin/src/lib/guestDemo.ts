@@ -25,6 +25,32 @@ export function resolveGuestSlug(fallback?: string): string | null {
   return usableSlug(fallback);
 }
 
+/**
+ * The venue the CURRENT URL is asking for — demo alias included.
+ *
+ * `resolveGuestSlug` deliberately reports the demo alias as "no venue", so that
+ * screens needing a real venue fall back to a saved scan. That fallback is right
+ * for a reload that dropped its query string, and badly wrong for the demo link
+ * itself: `?slug=demo` was thrown away and whatever venue the browser had cached
+ * from an earlier scan was loaded in its place.
+ *
+ * The visible result was a landing-page "Try Demo Menu" that opened a real
+ * paying restaurant's menu, under its own name, with ordering switched on —
+ * because the venue on screen genuinely was a real one, so nothing downstream
+ * had any reason to stop it.
+ *
+ * An address bar that names a venue is not a hint. Callers that load a menu use
+ * this first and only fall back when the URL says nothing at all.
+ */
+export function slugFromUrl(): string | null {
+  const parsed = parseEntryFromUrl();
+  const fromUrl = parsed.slug?.trim();
+  if (fromUrl) return fromUrl;
+  if (typeof window === "undefined") return null;
+  const q = new URLSearchParams(window.location.search).get("slug")?.trim();
+  return q || null;
+}
+
 /** Append slug (and optional query) for guest routes opened from marketing pages */
 export function guestDemoPath(path: string, query = ""): string {
   const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);

@@ -25,7 +25,7 @@ import { publicApi } from "@/lib/api";
 import { TABLE_INTERACTION_REQUESTS } from "@/lib/smartDiningCatalog";
 import { useWaiterCalls, WaiterCallBanner, SERVICE_REQUEST_ICONS } from "@/components/user/WaiterCallStatus";
 import { GuestEmpty } from "@/components/user/GuestApiState";
-import { resolveGuestSlug, withGuestQuery } from "@/lib/guestDemo";
+import { slugFromUrl, resolveGuestSlug, withGuestQuery } from "@/lib/guestDemo";
 import { loadActiveOrders, removeActiveOrder } from "@/lib/activeOrder";
 import { MenuDishRow } from "@/components/user/MenuDishRow";
 import { MenuFilterSheet } from "@/components/user/MenuFilterSheet";
@@ -163,7 +163,9 @@ export default function MenuPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const slug = resolveGuestSlug(venue.restaurantSlug) || params.get("slug") || "";
+    // The URL wins. Resolving through the saved scan context first is what made
+    // "?slug=demo" open whatever venue this browser had visited before.
+    const slug = slugFromUrl() || resolveGuestSlug(venue.restaurantSlug) || "";
     if (!slug) {
       setLoading(false);
       setMenuError("no_venue");
