@@ -1,12 +1,24 @@
+/**
+ * Restaurant staff sign-in.
+ *
+ * Rebuilt on the public site's design language (`.fastap-site`) rather than the
+ * dark panel theme: this is a page people meet before they are inside the
+ * product, and it should look like the landing page they arrived from.
+ *
+ * A split layout — photograph on the left from `lg` up, form on the right. The
+ * form column is the only thing that exists below `lg`, because this gets opened
+ * on a phone at a counter with a queue behind it.
+ *
+ * The sign-in logic is unchanged: role picker, email/password or mobile OTP,
+ * multi-venue disambiguation, subscription gate, and the `?next=` return path.
+ */
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useRestaurant, type StaffRole } from "@/contexts/RestaurantContext";
 import { restaurantAuth } from "@/lib/api";
-import { Icon } from "@/components/shared/Icon";
-import { PanelLogo } from "@/components/shared/PanelLogo";
+import { SiteBrand } from "@/components/site/SiteBrand";
 import { ForgotPasswordModal } from "@/components/shared/ForgotPasswordModal";
-import { IMAGES } from "@/lib/media";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Store, Loader2 } from "lucide-react";
 import {
   RESTAURANT_LOGIN_ROLES,
   defaultPathForRole,
@@ -185,204 +197,290 @@ export default function RestaurantLogin() {
   }
 
   const activeRole = RESTAURANT_LOGIN_ROLES.find(r => r.role === selectedRole);
+  const primaryLabel = loginMethod === "otp" && step === "form"
+    ? "Send OTP"
+    : `Sign in as ${activeRole?.label ?? "staff"}`;
 
   return (
-    <div className="restaurant-panel min-h-screen flex flex-col lg:flex-row">
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <img src={IMAGES.heroKitchen} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(222,47%,5%)] via-[hsl(222,47%,5%)]/80 to-transparent" />
-        <div className="relative p-12 flex flex-col justify-end">
-          <PanelLogo panel="restaurant" size="lg" showLabel label="FastMenu" />
-          <h2 className="font-display text-3xl font-semibold mt-8 mb-3">Restaurant Manager Portal</h2>
-          <p className="text-muted-foreground max-w-md mb-6">12 staff roles — owner, manager, cashier, waiter, kitchen, reception, finance, and more. Each role sees only what they need.</p>
-          <div className="flex flex-wrap gap-2">
-            {RESTAURANT_LOGIN_ROLES.slice(0, 6).map(r => (
-              <span key={r.role} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border">{r.icon} {r.label}</span>
-            ))}
-            <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">+6 more</span>
+    <div className="fastap-site flex min-h-dvh flex-col lg:flex-row">
+      {/* ------------------------------------------------- artwork (lg only) */}
+      <aside className="relative isolate hidden overflow-hidden lg:flex lg:w-[44%] lg:shrink-0">
+        <img
+          src="/img/cafe-counter.webp"
+          alt=""
+          className="absolute inset-0 -z-10 h-full w-full object-cover object-center"
+        />
+        <div
+          className="absolute inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(12,10,10,0.78) 0%, rgba(12,10,10,0.70) 40%, rgba(12,10,10,0.92) 100%)",
+          }}
+        />
+        <div className="flex w-full flex-col justify-between p-12">
+          <Link href="/" className="inline-flex w-fit">
+            <SiteBrand size="lg" onDark />
+          </Link>
+
+          <div>
+            <h2 className="fs-display-xl text-4xl text-white xl:text-5xl">
+              Welcome back to
+              <br />
+              <span style={{ color: "#ff8a8f" }}>your counter.</span>
+            </h2>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-white/80">
+              Twelve roles, one sign-in. Everybody who works here gets the screen
+              they need and nothing they do not.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-2">
+              {RESTAURANT_LOGIN_ROLES.slice(0, 7).map(r => (
+                <span
+                  key={r.role}
+                  className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85 ring-1 ring-inset ring-white/15"
+                >
+                  {r.label}
+                </span>
+              ))}
+              <span className="rounded-full px-3 py-1.5 text-xs font-semibold text-white/55">
+                +{Math.max(0, RESTAURANT_LOGIN_ROLES.length - 7)} more
+              </span>
+            </div>
           </div>
+
+          <p className="text-xs text-white/45">
+            © {new Date().getFullYear()} Fastap OS
+          </p>
         </div>
-      </div>
+      </aside>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-8 overflow-y-auto">
-        <div className="w-full max-w-lg">
-          <div className="text-center mb-6 lg:hidden">
-            <div className="flex justify-center mb-4"><PanelLogo panel="restaurant" size="lg" /></div>
-            <h1 className="font-display text-2xl font-semibold">Staff Login</h1>
-            <p className="text-sm text-muted-foreground mt-1">Select your role, then sign in</p>
+      {/* ---------------------------------------------------------- the form */}
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+        <div className="w-full max-w-md">
+          <div className="mb-8 lg:hidden">
+            <Link href="/" className="inline-flex">
+              <SiteBrand />
+            </Link>
           </div>
 
-          {/* Role picker */}
-          <div className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Select your role</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[220px] overflow-y-auto pr-1">
+          <h1 className="fs-display text-3xl text-foreground sm:text-4xl">Sign in</h1>
+          <p className="mt-2 text-[0.9375rem] text-muted-foreground">
+            For everyone who works at the restaurant — owner, manager, counter and kitchen.
+          </p>
+
+          {/* Role picker. Determines the screen you land on, and pre-fills nothing
+              outside a dev build. */}
+          <div className="mt-7">
+            <span className="fs-label">Your role</span>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {RESTAURANT_LOGIN_ROLES.map(opt => (
                 <button
                   key={opt.role}
                   type="button"
                   onClick={() => pickRole(opt.role)}
-                  className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border text-center transition-colors ${
+                  aria-pressed={selectedRole === opt.role}
+                  className={`rounded-xl border-2 px-2 py-2.5 text-center text-xs font-semibold transition-colors ${
                     selectedRole === opt.role
-                      ? "border-primary/60 bg-primary/15"
-                      : "border-border bg-muted hover:border-border hover-elevate"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                   }`}
                 >
-                  <span className="text-xl leading-none">{opt.icon}</span>
-                  <span className="text-2xs sm:text-xs font-semibold text-foreground leading-tight">{opt.label}</span>
+                  {opt.label}
                 </button>
               ))}
             </div>
-            {activeRole && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                {activeRole.description}
-              </p>
+            {activeRole?.description && (
+              <p className="mt-2 text-xs text-muted-foreground">{activeRole.description}</p>
             )}
           </div>
 
+          {/* Same mobile number at more than one venue — say which. */}
           {venueOptions && venueOptions.length > 0 && (
-            <div className="mb-4 space-y-2">
-              <p className="text-xs text-primary font-semibold uppercase">Select your restaurant</p>
+            <div className="mt-6 space-y-2">
+              <span className="fs-label">Which restaurant?</span>
               {venueOptions.map(v => (
                 <button
                   key={v.id}
                   type="button"
                   onClick={() => { setSelectedRestaurantId(v.id); setVenueOptions(null); setError(""); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors ${selectedRestaurantId === v.id ? "border-primary/50 bg-primary/15" : "border-border bg-muted hover:border-border"}`}
+                  className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                    selectedRestaurantId === v.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-background hover:border-primary/40"
+                  }`}
                 >
-                  <Icon name="restaurant" size={20} className="text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{v.name}</p>
-                    {v.address && <p className="text-xs text-muted-foreground">{v.address}</p>}
-                  </div>
+                  <Store className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-foreground">{v.name}</span>
+                    {v.address && <span className="block truncate text-xs text-muted-foreground">{v.address}</span>}
+                  </span>
                 </button>
               ))}
             </div>
           )}
 
-          <div className="flex gap-1 bg-muted p-1 rounded-lg mb-4">
-            <button
-              type="button"
-              onClick={() => { setLoginMethod("password"); setStep("form"); setError(""); pickRole(selectedRole); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${loginMethod === "password" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Email & Password
-            </button>
-            <button
-              type="button"
-              onClick={() => { setLoginMethod("otp"); setStep("form"); setError(""); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${loginMethod === "otp" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Mobile OTP
-            </button>
+          {/* Method switch */}
+          <div className="mt-6 flex gap-1 rounded-full bg-muted p-1">
+            {([
+              ["password", "Email & password"],
+              ["otp", "Mobile OTP"],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setLoginMethod(id);
+                  setStep("form");
+                  setError("");
+                  if (id === "password") pickRole(selectedRole);
+                }}
+                className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors ${
+                  loginMethod === id
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          {step === "form" && loginMethod === "password" && (
-            <div className="space-y-3">
-              <input
-                className="w-full bg-muted border border-border rounded-lg px-4 py-3.5 text-sm focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground"
-                placeholder="Staff email address"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-              <div className="relative">
-                <input
-                  className="w-full bg-muted border border-border rounded-lg px-4 pr-11 py-3.5 text-sm focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground"
-                  placeholder="Password"
-                  type={showPass ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  <Icon name={showPass ? "visibility_off" : "visibility"} size={20} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === "form" && loginMethod === "otp" && (
-            <div className="flex rounded-lg border border-border bg-muted overflow-hidden focus-within:border-primary/50">
-              <select
-                value={countryCode}
-                onChange={e => setCountryCode(e.target.value)}
-                className="bg-transparent px-3 py-3.5 text-sm text-foreground border-r border-border focus:outline-none cursor-pointer max-w-[130px]"
-                aria-label="Country code"
-              >
-                {COUNTRY_CODES.map(c => (
-                  <option key={c.code + c.name} value={c.code} className="bg-muted text-foreground">
-                    {c.code} {c.iso}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="flex-1 min-w-0 bg-transparent px-4 py-3.5 text-sm focus:outline-none placeholder:text-muted-foreground"
-                placeholder="Registered mobile number"
-                inputMode="numeric"
-                value={mobile}
-                onChange={e => setMobile(e.target.value.replace(/\D/g, "").slice(0, 15))}
-                maxLength={15}
-              />
-            </div>
-          )}
-
-          {step === "otp-verify" && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Enter the OTP sent to {countryCode} {mobile.slice(0, 5)}xxxxx</p>
-              <div className="flex gap-1.5 sm:gap-2">
-                {otp.map((v, i) => (
-                  <input
-                    key={i}
-                    id={`r-otp-${i}`}
-                    className="h-12 min-w-0 flex-1 max-w-12 text-center text-lg font-semibold rounded-lg border border-border bg-muted focus:border-primary focus:outline-none"
-                    maxLength={1}
-                    inputMode="numeric"
-                    value={v}
-                    onChange={e => handleOtpChange(i, e.target.value)}
-                  />
-                ))}
-              </div>
-              <button type="button" onClick={() => setStep("form")} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />Change number</button>
-            </div>
-          )}
-
-          {error && <p className="text-xs text-danger mt-3 px-1">{error}</p>}
-
-          <button
-            type="button"
-            onClick={() => {
+          <form
+            className="mt-6"
+            onSubmit={e => {
+              e.preventDefault();
               if (loginMethod === "otp" && step === "form") void sendOtp();
               else void handleLogin();
             }}
-            disabled={loading}
-            className="w-full mt-4 py-4 rounded-lg bg-primary hover:bg-primary/90 disabled:opacity-40 font-semibold text-sm shadow-xl flex items-center justify-center gap-2"
           >
-            {loading ? (
-              <div className="h-5 w-5 border-2 border-border border-t-white rounded-full animate-spin" />
-            ) : loginMethod === "otp" && step === "form" ? (
-              "Send OTP"
-            ) : (
-              <><Icon name="login" size={18} /> Sign in as {activeRole?.label ?? "Staff"}</>
+            {step === "form" && loginMethod === "password" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="fs-label" htmlFor="r-email">Staff email address</label>
+                  <input
+                    id="r-email"
+                    className="fs-field"
+                    placeholder="you@yourrestaurant.com"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="fs-label" htmlFor="r-pass">Password</label>
+                  <div className="relative">
+                    <input
+                      id="r-pass"
+                      className="fs-field pr-12"
+                      placeholder="Your password"
+                      type={showPass ? "text" : "password"}
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass(!showPass)}
+                      aria-label={showPass ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setShowForgot(true)}
-            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-primary font-medium"
-          >
-            Forgot password?
-          </button>
+            {step === "form" && loginMethod === "otp" && (
+              <div>
+                <label className="fs-label" htmlFor="r-mobile">Registered mobile number</label>
+                <div className="flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={e => setCountryCode(e.target.value)}
+                    className="fs-field max-w-[7.5rem] cursor-pointer"
+                    aria-label="Country code"
+                  >
+                    {COUNTRY_CODES.map(c => (
+                      <option key={c.code + c.name} value={c.code}>{c.code} {c.iso}</option>
+                    ))}
+                  </select>
+                  <input
+                    id="r-mobile"
+                    className="fs-field flex-1"
+                    placeholder="98765 43210"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    value={mobile}
+                    onChange={e => setMobile(e.target.value.replace(/\D/g, "").slice(0, 15))}
+                    maxLength={15}
+                  />
+                </div>
+              </div>
+            )}
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            New restaurant?{" "}
-            <Link href="/restaurant/register" className="text-primary hover:text-primary font-semibold">
-              Register with KYC
-            </Link>
-          </p>
+            {step === "otp-verify" && (
+              <div>
+                <label className="fs-label">
+                  Enter the code sent to {countryCode} {mobile.slice(0, 5)}xxxxx
+                </label>
+                <div className="flex gap-2">
+                  {otp.map((v, i) => (
+                    <input
+                      key={i}
+                      id={`r-otp-${i}`}
+                      className="fs-field min-w-0 flex-1 px-0 text-center text-lg font-bold"
+                      maxLength={1}
+                      inputMode="numeric"
+                      autoComplete={i === 0 ? "one-time-code" : "off"}
+                      value={v}
+                      onChange={e => handleOtpChange(i, e.target.value)}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Change number
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <p role="alert" className="mt-4 rounded-xl border border-danger-border bg-danger-subtle px-3.5 py-2.5 text-sm text-danger">
+                {error}
+              </p>
+            )}
+
+            <button type="submit" disabled={loading} className="fs-cta mt-6 w-full disabled:opacity-50">
+              {loading
+                ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                : <>{primaryLabel} <ArrowRight className="h-5 w-5" aria-hidden="true" /></>}
+            </button>
+          </form>
+
+          <div className="mt-6 space-y-2.5 text-center text-sm">
+            <p>
+              <button
+                type="button"
+                onClick={() => setShowForgot(true)}
+                className="font-semibold text-primary underline underline-offset-2"
+              >
+                Forgotten your password?
+              </button>
+            </p>
+            <p className="text-muted-foreground">
+              No account yet?{" "}
+              <Link href="/restaurant/register" className="font-semibold text-primary underline underline-offset-2">
+                Register your restaurant
+              </Link>
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
 
       {showForgot && <ForgotPasswordModal scope="staff" accent="amber" onClose={() => setShowForgot(false)} />}
     </div>

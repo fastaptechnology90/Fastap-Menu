@@ -2108,58 +2108,60 @@ html:has(.menu-page)::-webkit-scrollbar-thumb:hover {
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
-/* ─── Landing page ────────────────────────────────────────────────────────────
-   The public home page is its own scope. It used to run on `.guest-page`, which
-   re-points the ramp to the dark guest theme — so the one screen a stranger sees
-   first was the same near-black as the in-venue phone UI.
 
-   This block is deliberately self-contained: it re-points both ramps to a warm
-   paper palette and nothing outside `.landing-page` reads it, so the 29 guest
-   screens, the restaurant panel and the admin panel are untouched. All the
-   guest-* component classes still work inside it — they read tokens, and the
-   tokens here are light. */
-.landing-page {
-  /* Warm neutral ramp. Paper, not screen-grey: a hospitality page wants the
-     temperature of a printed menu card, and a 35° cast does that without the
-     text losing contrast. */
-  --n-0:    40 50% 99%;
-  --n-25:   36 44% 97%;
-  --n-50:   35 38% 95%;
-  --n-100:  33 30% 91%;
-  --n-200:  30 24% 85%;
-  --n-300:  28 18% 72%;
-  --n-400:  26 12% 55%;
-  --n-500:  25 12% 44%;
-  --n-600:  25 14% 36%;
-  --n-700:  24 20% 24%;
-  --n-800:  22 26% 16%;
-  --n-900:  22 30% 11%;
+/* ─── Public site + restaurant sign-in ────────────────────────────────────────
+   `.fastap-site` is the scope for everything a stranger sees before they are
+   inside a panel: the landing page, restaurant sign-in, restaurant sign-up.
 
-  /* Terracotta rather than the product blue. Blue is the working accent inside
-     the panels, where it has to survive next to charts and status colours; the
-     public page has no such job and reads warmer for it. 5.9:1 on the paper
-     ground, so the same value is a fill and a link colour. */
-  --brand-50:  18 70% 95%;
-  --brand-100: 17 66% 88%;
-  --brand-200: 16 62% 76%;
-  --brand-500: 14 66% 46%;
-  --brand-600: 13 68% 41%;
-  --brand-700: 12 70% 33%;
+   It is deliberately its own world. The three panel scopes (.guest-page,
+   .restaurant-panel, .dark) re-point the ramp to the dark product theme, which
+   is right for a counter tablet at 11pm and wrong for the first page a venue
+   owner ever loads. Nothing outside this scope reads any of the values below,
+   so the 145 panel screens are untouched.
 
-  --success:        152 55% 28%;
-  --success-subtle: 152 40% 93%;
-  --success-border: 152 32% 76%;
+   The accent is a saturated food red rather than the product blue. Blue is the
+   working colour inside the panels, where it sits next to charts and status
+   chips and has to stay legible against them; the public page has no such job
+   and a consumer food brand is not blue. */
+.fastap-site {
+  /* Warm-neutral ramp. Off-white paper, never pure grey — grey next to a
+     saturated red reads as a wireframe someone forgot to finish. */
+  --n-0:    0 0% 100%;
+  --n-25:  20 33% 98%;
+  --n-50:  20 25% 96%;
+  --n-100: 20 18% 93%;
+  --n-200: 20 14% 87%;
+  --n-300: 18 11% 76%;
+  --n-400: 16  8% 58%;
+  --n-500: 15  8% 46%;
+  --n-600: 15  9% 38%;
+  --n-700: 14 12% 26%;
+  --n-800: 12 14% 15%;
+  --n-900: 10 16% 10%;
+
+  /* #e23744 and its neighbours, expressed on the same ramp shape as every other
+     accent in the file so the rest of the token set keeps working unchanged. */
+  --brand-50:  356 78% 96%;
+  --brand-100: 356 75% 91%;
+  --brand-200: 356 72% 82%;
+  --brand-500: 356 74% 55%;
+  --brand-600: 356 73% 55%;
+  --brand-700: 356 69% 45%;
+
+  --success:        152 58% 30%;
+  --success-subtle: 152 44% 94%;
+  --success-border: 152 36% 78%;
   --warning:         32 88% 33%;
-  --warning-subtle:  38 85% 93%;
-  --warning-border:  38 70% 74%;
-  --danger:           2 68% 42%;
-  --danger-subtle:    6 70% 95%;
-  --danger-border:    6 60% 83%;
-  --info:           200 70% 30%;
-  --info-subtle:    200 60% 93%;
-  --info-border:    200 50% 78%;
+  --warning-subtle:  38 88% 94%;
+  --warning-border:  38 74% 76%;
+  --danger:         356 69% 45%;
+  --danger-subtle:  356 78% 96%;
+  --danger-border:  356 60% 85%;
+  --info:           205 72% 32%;
+  --info-subtle:    205 62% 94%;
+  --info-border:    205 52% 79%;
 
-  --background: var(--n-25);
+  --background: var(--n-0);
   --foreground: var(--n-800);
   --border: var(--n-200);
   --card: var(--n-0);
@@ -2169,7 +2171,7 @@ html:has(.menu-page)::-webkit-scrollbar-thumb:hover {
   --popover-foreground: var(--n-800);
   --popover-border: var(--n-200);
   --primary: var(--brand-600);
-  --primary-foreground: 40 50% 99%;
+  --primary-foreground: 0 0% 100%;
   --secondary: var(--n-50);
   --secondary-foreground: var(--n-700);
   --muted: var(--n-50);
@@ -2177,101 +2179,139 @@ html:has(.menu-page)::-webkit-scrollbar-thumb:hover {
   --accent: var(--n-100);
   --accent-foreground: var(--n-800);
   --destructive: var(--danger);
-  --destructive-foreground: 40 50% 99%;
+  --destructive-foreground: 0 0% 100%;
   --input: var(--n-200);
   --ring: var(--brand-600);
 
-  /* The phone mockup and the logo are guest components; they read these three,
-     which carry literal dark values everywhere else. Re-pointed here so the
-     mockup shows the light guest shell instead of a black rectangle. */
-  --guest-bg: var(--n-25);
-  --guest-surface: var(--n-0);
-  --guest-elevated: var(--n-50);
-  --guest-accent: var(--brand-600);
-  --guest-accent-glow: var(--brand-600);
+  /* Warm-black shadows. Neutral black over an off-white ground reads as dirt. */
+  --elevation-0: 0 1px 1px hsl(12 20% 12% / 0.04);
+  --elevation-1: 0 1px 2px hsl(12 20% 12% / 0.06), 0 1px 3px hsl(12 20% 12% / 0.05);
+  --elevation-2: 0 2px 4px hsl(12 20% 12% / 0.06), 0 6px 14px hsl(12 20% 12% / 0.06);
+  --elevation-3: 0 4px 10px hsl(12 20% 12% / 0.07), 0 14px 32px hsl(12 20% 12% / 0.08);
+  --elevation-4: 0 10px 20px hsl(12 20% 12% / 0.08), 0 28px 56px hsl(12 20% 12% / 0.10);
 
-  /* Shadows go warm and stay soft. Neutral black at these opacities reads as
-     grime on a cream ground. */
-  --elevation-0: 0 1px 1px hsl(24 30% 20% / 0.04);
-  --elevation-1: 0 1px 2px hsl(24 30% 20% / 0.05), 0 1px 3px hsl(24 30% 20% / 0.04);
-  --elevation-2: 0 2px 4px hsl(24 30% 20% / 0.05), 0 4px 10px hsl(24 30% 20% / 0.05);
-  --elevation-3: 0 4px 8px hsl(24 30% 20% / 0.06), 0 12px 28px hsl(24 30% 20% / 0.07);
-  --elevation-4: 0 8px 16px hsl(24 30% 20% / 0.07), 0 24px 48px hsl(24 30% 20% / 0.08);
-
-  min-height: 100vh;
-  min-height: 100dvh;
+  font-family: 'Figtree', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Headings run on a serif. This is most of what stops the page reading as a
-   generated template — the geometric-sans-on-everything look is the tell. A
-   system serif is used on purpose: it needs no webfont round-trip, and Georgia
-   and Iowan are both text faces built for reading rather than display faces
-   built for logos. */
-.landing-serif {
-  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+/* Headlines. Poppins at 700/800 with the tracking pulled in — at 48px and up the
+   default letter-spacing is what makes a headline look unset. */
+.fs-display {
+  font-family: 'Poppins', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.fs-display-xl {
+  font-family: 'Poppins', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.032em;
+  line-height: 1.05;
 }
 
-/* An eyebrow with a rule running out of it, rather than the usual centred
-   all-caps label floating on its own. */
-.landing-eyebrow {
+/* The one red pill, used for every primary action on the site. Lifts a hair on
+   hover rather than changing colour — a fill this saturated has nowhere darker
+   to go that still reads as the same button. */
+.fs-cta {
   display: inline-flex;
+  min-height: 3rem;
   align-items: center;
-  gap: 0.625rem;
-  font-size: var(--text-xs);
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0 1.75rem;
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  color: #fff;
+  background: hsl(var(--brand-600));
+  box-shadow: 0 8px 20px hsl(356 73% 40% / 0.25);
+  transition: transform 150ms var(--ease-standard), background-color 150ms var(--ease-standard);
+}
+.fs-cta:hover { transform: translateY(-2px); background: hsl(var(--brand-700)); }
+.fs-cta:active { transform: translateY(0); }
+
+/* The quieter pill beside it. Takes its colour from whatever ground it is on,
+   so the same class works on the dark hero and on a white section. */
+.fs-cta-ghost {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  padding: 0 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color 150ms var(--ease-standard);
+}
+
+/* Small red pill for nav / secondary use. */
+.fs-pill-red {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: hsl(var(--brand-600));
+  transition: background-color 150ms var(--ease-standard);
+}
+.fs-pill-red:hover { background: hsl(var(--brand-700)); }
+
+/* An uppercase eyebrow over a section heading. */
+.fs-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: hsl(var(--brand-700));
 }
-.landing-eyebrow::after {
-  content: "";
-  height: 1px;
-  width: 2.5rem;
-  background: hsl(var(--brand-200));
+
+/* Big soft-cornered tile. 1.25rem, not the product's 6px — a marketing card and
+   a data table row should not share a radius. */
+.fs-tile {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
 }
 
-/* Paper: the flat ground a section sits on when it needs to separate from the
-   one above it without a hard border. */
-.landing-band {
-  background:
-    linear-gradient(hsl(var(--n-50)), hsl(var(--n-50)));
-  border-top: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-/* A quiet row rather than a boxed tile. Twenty identical bordered squares in a
-   4-column grid is the shape every generated marketing page arrives in; a ruled
-   list is how a menu actually presents a long set of things. */
-.landing-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.875rem;
+/* Form field on the auth screens. 48px tall because these get filled in on a
+   phone, standing up, in a hurry. */
+.fs-field {
   width: 100%;
-  padding: 0.875rem 0.5rem;
-  text-align: left;
-  border-bottom: 1px solid hsl(var(--border));
-  transition: background-color 150ms var(--ease-standard);
+  min-height: 3rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid hsl(var(--input));
+  background: hsl(var(--background));
+  padding: 0 0.875rem;
+  font-size: 0.9375rem;
+  color: hsl(var(--foreground));
+  transition: border-color 120ms var(--ease-standard), box-shadow 120ms var(--ease-standard);
 }
-.landing-row:hover {
-  background: hsl(var(--n-50));
+.fs-field::placeholder { color: hsl(var(--n-400)); }
+.fs-field:focus {
+  outline: none;
+  border-color: hsl(var(--brand-600));
+  box-shadow: 0 0 0 3px hsl(var(--brand-600) / 0.15);
 }
-.landing-row__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 2rem;
-  width: 2rem;
-  flex-shrink: 0;
-  border-radius: var(--radius-control);
-  background: hsl(var(--brand-50));
-  color: hsl(var(--brand-700));
+.fs-field:disabled { background: hsl(var(--n-50)); color: hsl(var(--n-400)); }
+
+.fs-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: hsl(var(--n-700));
 }
 
-.landing-rule {
-  height: 1px;
-  background: hsl(var(--border));
+/* The site scrollbar: thin, warm, and not the guest web's white-on-black. */
+html:has(.fastap-site) {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--n-300)) transparent;
 }
