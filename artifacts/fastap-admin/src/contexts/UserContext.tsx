@@ -127,6 +127,15 @@ export interface VenueContext {
    * `isOpen` stays true and no screen claims to know.
    */
   hours: VenueHours;
+  /**
+   * The marketing demo venue, as the server sees it.
+   *
+   * This used to be worked out in the browser by comparing slugs, which got it
+   * wrong for a guest who had scanned a real venue earlier in the same browser —
+   * they opened the demo link with ordering enabled. The server knows which row
+   * the demo alias resolves to; it says so, and the UI believes it.
+   */
+  isDemo: boolean;
 }
 
 export interface VenueHours {
@@ -241,6 +250,9 @@ const defaultVenue: VenueContext = {
   areas: [],
   areaGroups: [],
   hours: OPEN_UNTIL_TOLD_OTHERWISE,
+  // Assume demo until the server says otherwise: failing closed here means a load
+  // error can never leave ordering switched on against the wrong venue.
+  isDemo: true,
 };
 
 const UserContext = createContext<UserContextValue | null>(null);
@@ -346,6 +358,7 @@ function applyVenueFromApi(data: any, slug: string, params?: VenueLoadParams): {
       hours: data.hours && typeof data.hours === "object"
         ? { ...OPEN_UNTIL_TOLD_OTHERWISE, ...data.hours }
         : OPEN_UNTIL_TOLD_OTHERWISE,
+      isDemo: data.isDemo === true,
     },
     smartEntry,
   };

@@ -90,7 +90,8 @@ export default function MenuPage() {
   // diners into the read-only preview and told them ordering was disabled while they were
   // sitting at a table. resolveGuestSlug returns null only when neither the URL nor the
   // saved scan knows a real venue.
-  const isDemo = resolveGuestSlug(venue.restaurantSlug || undefined) === null;
+  // The server decides this, not the URL — see VenueContext.isDemo.
+  const isDemo = venue.isDemo;
   const clockClosed = venue.hours.hoursPublished && !venue.hours.isOpen;
   const orderingBlocked = clockClosed && venue.hours.ordersAllowed !== true;
 

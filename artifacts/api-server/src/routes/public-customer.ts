@@ -46,7 +46,7 @@ import {
   autoAssignRoomServiceRequest,
 } from "../lib/staff-auto-assignment.js";
 import { normalizeBuckets, totalBalance } from "../lib/customerWalletLogic.js";
-import { resolveVenueSlug } from "../lib/demo-venue.js";
+import { resolveVenueSlug, isDemoVenue } from "../lib/demo-venue.js";
 import { tierFromPoints, normalizeRewardsMeta } from "../lib/loyaltyMembershipLogic.js";
 import {
   parseDeviceInfo, recordDeviceLogin, removeDevice, trustDevice, markAlertsRead,
@@ -308,6 +308,11 @@ router.get("/public/venue/:slug", async (req, res): Promise<void> => {
   res.json({
     restaurant,
     hours: publicHoursPayload(restaurant),
+    // Said out loud rather than inferred. The guest web used to decide "is this the
+    // demo?" by inspecting the slug in the URL and the saved scan context — so a
+    // visitor who had scanned a real venue earlier in the same browser opened the
+    // demo link with ordering switched on, against this venue's id.
+    isDemo: isDemoVenue(restaurant),
     branch: detectedBranch,
     branches,
     areas: areas.map(a => ({

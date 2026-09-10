@@ -10,6 +10,7 @@ import { recordOrderPaymentInLedger, reverseOrderPaymentInLedger } from "../lib/
 import { priceMenuItem, resolveDiscount, redeemCoupon, taxRateFor, taxRatesFor, taxForOrderItems, computeBasketTax, clampTip, round2 } from "../lib/order-pricing.js";
 import { consumeStockForOrder, restoreStockForOrder } from "../lib/stock-consumption.js";
 import { canTransition } from "../lib/order-status.js";
+import { isDemoVenue } from "../lib/demo-venue.js";
 import { closedResponse, ordersAllowed } from "../lib/venue-hours.js";
 import {
   isRestaurantPublished,
@@ -310,6 +311,20 @@ router.post("/public/orders", async (req, res): Promise<void> => {
   // against an account nobody had checked.
   const [venue] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, restaurantId)).limit(1);
   if (!venue) { res.status(404).json({ error: "Restaurant not found" }); return; }
+
+  // The landing page's "Try Demo Menu" opens this venue's real menu. The guest web
+  // disables ordering there, but that was a browser-side check only — so a ticket
+  // could still be pushed onto a real kitchen's board by anyone who bypassed the UI,
+  // and the venue's dashboard filled with orders nobody was going to cook. Browsing
+  // the demo stays open; writing to it does not.
+  if (isDemoVenue(venue)) {
+    res.status(403).json({
+      error: "This is the demo menu — browse it freely, but orders cannot be placed here. Scan the code at your table to order.",
+      demoVenue: true,
+    });
+    return;
+  }
+
   if (!isRestaurantPublished(venue)) {
     const status = getPublicationStatus(venue);
     res.status(403).json({

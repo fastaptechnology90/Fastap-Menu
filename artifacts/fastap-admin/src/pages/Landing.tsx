@@ -254,8 +254,36 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="flex justify-center lg:col-span-5 lg:justify-end">
-              <PhoneMockup />
+            {/* A bare phone frame floating on the ground read as a stock asset dropped
+                onto the page. Sitting it against a real table shot — overlapping the
+                corner, at an angle — puts it somewhere: a guest, at a table, ordering. */}
+            <div className="lg:col-span-5">
+              <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+                <div className="overflow-hidden rounded-3xl shadow-xl">
+                  <img
+                    src="/img/table-scan.webp"
+                    alt="A guest scanning the code on their table"
+                    className="h-[22rem] w-full object-cover sm:h-[26rem]"
+                  />
+                </div>
+
+                <div className="pointer-events-none absolute -bottom-8 -left-2 hidden scale-[0.82] origin-bottom-left sm:block lg:-left-10">
+                  <div className="rotate-[-6deg]">
+                    <PhoneMockup />
+                  </div>
+                </div>
+
+                <div className="absolute -right-2 top-5 rounded-2xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur lg:-right-6">
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Table 12
+                  </p>
+                  <p className="fs-display mt-0.5 text-sm text-foreground">Order sent to kitchen</p>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-success" />
+                    <span className="text-xs text-muted-foreground">Preparing · 12 min</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
