@@ -8,7 +8,6 @@ import { UserProvider } from "@/contexts/UserContext";
 import { LocaleAccessibilityProvider } from "@/contexts/LocaleAccessibilityContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { PwaProvider } from "@/contexts/PwaContext";
-import { DigitalExperienceProvider } from "@/contexts/DigitalExperienceContext";
 import { RestaurantProvider, useRestaurant } from "@/contexts/RestaurantContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -29,26 +28,12 @@ import UserProfile from "@/pages/user/UserProfile";
 import Reservation from "@/pages/user/Reservation";
 import WaitlistQueue from "@/pages/user/WaitlistQueue";
 import HotelGuest from "@/pages/user/HotelGuest";
-import EventBanquetPage from "@/pages/user/EventBanquetPage";
-import SpaWellness from "@/pages/user/SpaWellness";
-import BarNightlifePage from "@/pages/user/BarNightlifePage";
-import CustomerWalletPage from "@/pages/user/CustomerWalletPage";
 import PaymentPage from "@/pages/user/PaymentPage";
-import LoyaltyMembershipPage from "@/pages/user/LoyaltyMembershipPage";
-import AIPersonalizationPage from "@/pages/user/AIPersonalizationPage";
 import UserSupport from "@/pages/user/UserSupport";
-import LanguageAccessibilityPage from "@/pages/user/LanguageAccessibilityPage";
 import OfflineModePage from "@/pages/user/OfflineModePage";
-import PwaExperiencePage from "@/pages/user/PwaExperiencePage";
-import SmartKioskPage from "@/pages/user/SmartKioskPage";
-import DigitalExperiencePage from "@/pages/user/DigitalExperiencePage";
-import SocialReviewPage from "@/pages/user/SocialReviewPage";
 import SmartEntryPage from "@/pages/user/SmartEntryPage";
 import VenueScanPage from "@/pages/user/VenueScanPage";
-import TableSeating from "@/pages/user/TableSeating";
 import SmartDiningPage from "@/pages/user/SmartDiningPage";
-import UserSecurityPage from "@/pages/user/UserSecurityPage";
-import FutureAIPage from "@/pages/user/FutureAIPage";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Blog from "@/pages/Blog";
@@ -74,40 +59,24 @@ import Analytics from "@/pages/Analytics";
 import Fraud from "@/pages/Fraud";
 import QRNFC from "@/pages/QRNFC";
 import Infrastructure from "@/pages/Infrastructure";
-import ApiControl from "@/pages/ApiControl";
 import WhiteLabel from "@/pages/WhiteLabel";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
-import Communications from "@/pages/Communications";
 import Security from "@/pages/Security";
-import Reconciliation from "@/pages/Reconciliation";
 import Penalties from "@/pages/Penalties";
 import Tasks from "@/pages/Tasks";
-import Announcements from "@/pages/Announcements";
 import ErrorLogs from "@/pages/ErrorLogs";
 import ExportCenter from "@/pages/ExportCenter";
 import SLAMonitoring from "@/pages/SLAMonitoring";
 import DocumentVault from "@/pages/DocumentVault";
 import Agreements from "@/pages/Agreements";
-import VendorCRM from "@/pages/VendorCRM";
 import Plans from "@/pages/Plans";
 import Users from "@/pages/Users";
 import LiveMonitoring from "@/pages/LiveMonitoring";
 import MasterSearch from "@/pages/MasterSearch";
-import Approvals from "@/pages/Approvals";
 import ReservationsControl from "@/pages/ReservationsControl";
 import VendorWallets from "@/pages/VendorWallets";
-import BillingEngine from "@/pages/BillingEngine";
-import AIInsights from "@/pages/AIInsights";
-import AlertEngine from "@/pages/AlertEngine";
-import Incidents from "@/pages/Incidents";
-import DisasterRecovery from "@/pages/DisasterRecovery";
-import LegalCompliance from "@/pages/LegalCompliance";
-import AdminSandbox from "@/pages/AdminSandbox";
-import DataArchival from "@/pages/DataArchival";
-import FeatureReleases from "@/pages/FeatureReleases";
 import RevenueLeakage from "@/pages/RevenueLeakage";
-import DormantVendors from "@/pages/DormantVendors";
 
 // Restaurant panel pages
 import RestaurantLogin from "@/pages/restaurant/RestaurantLogin";
@@ -288,25 +257,11 @@ function AppRoutes() {
       <Route path="/user/reserve">{() => <GuestRoute component={Reservation} />}</Route>
       <Route path="/user/table-service">{() => <GuestRoute component={SmartDiningPage} />}</Route>
       <Route path="/user/dining">{() => <GuestRoute component={SmartDiningPage} />}</Route>
-      <Route path="/user/seating">{() => <GuestRoute component={TableSeating} />}</Route>
       <Route path="/user/queue">{() => <GuestRoute component={WaitlistQueue} />}</Route>
       <Route path="/user/hotel">{() => <GuestRoute component={HotelGuest} />}</Route>
-      <Route path="/user/events">{() => <GuestRoute component={EventBanquetPage} />}</Route>
-      <Route path="/user/spa">{() => <GuestRoute component={SpaWellness} />}</Route>
-      <Route path="/user/bar">{() => <GuestRoute component={BarNightlifePage} />}</Route>
-      <Route path="/user/wallet">{() => <GuestRoute component={CustomerWalletPage} />}</Route>
       <Route path="/user/payment">{() => <GuestRoute component={PaymentPage} />}</Route>
-      <Route path="/user/loyalty">{() => <GuestRoute component={LoyaltyMembershipPage} />}</Route>
-      <Route path="/user/ai">{() => <GuestRoute component={AIPersonalizationPage} />}</Route>
-      <Route path="/user/future-ai">{() => <GuestRoute component={FutureAIPage} />}</Route>
-      <Route path="/user/security">{() => <GuestRoute component={UserSecurityPage} />}</Route>
       <Route path="/user/support">{() => <GuestRoute component={UserSupport} />}</Route>
-      <Route path="/user/language">{() => <GuestRoute component={LanguageAccessibilityPage} />}</Route>
       <Route path="/user/offline">{() => <GuestRoute component={OfflineModePage} />}</Route>
-      <Route path="/user/pwa">{() => <GuestRoute component={PwaExperiencePage} />}</Route>
-      <Route path="/user/kiosk">{() => <GuestRoute component={SmartKioskPage} />}</Route>
-      <Route path="/user/experience">{() => <GuestRoute component={DigitalExperiencePage} />}</Route>
-      <Route path="/user/reviews">{() => <GuestRoute component={SocialReviewPage} />}</Route>
 
       {/* ── Restaurant / Manager panel ─────────────────────────── */}
       <Route path="/restaurant">{() => <RestaurantHomeRedirect />}</Route>
@@ -396,39 +351,23 @@ function AppRoutes() {
       <Route path="/fraud">{() => <ProtectedRoute><Fraud /></ProtectedRoute>}</Route>
       <Route path="/qr-nfc">{() => <ProtectedRoute><QRNFC /></ProtectedRoute>}</Route>
       <Route path="/infrastructure">{() => <ProtectedRoute><Infrastructure /></ProtectedRoute>}</Route>
-      <Route path="/api-control">{() => <ProtectedRoute><ApiControl /></ProtectedRoute>}</Route>
       <Route path="/white-label">{() => <ProtectedRoute><WhiteLabel /></ProtectedRoute>}</Route>
       <Route path="/settings">{() => <ProtectedRoute><Settings /></ProtectedRoute>}</Route>
       <Route path="/notifications">{() => <ProtectedRoute><Notifications /></ProtectedRoute>}</Route>
-      <Route path="/communications">{() => <ProtectedRoute><Communications /></ProtectedRoute>}</Route>
       <Route path="/security">{() => <ProtectedRoute><Security /></ProtectedRoute>}</Route>
-      <Route path="/reconciliation">{() => <ProtectedRoute><Reconciliation /></ProtectedRoute>}</Route>
       <Route path="/penalties">{() => <ProtectedRoute><Penalties /></ProtectedRoute>}</Route>
       <Route path="/tasks">{() => <ProtectedRoute><Tasks /></ProtectedRoute>}</Route>
-      <Route path="/announcements">{() => <ProtectedRoute><Announcements /></ProtectedRoute>}</Route>
       <Route path="/blog">{() => <ProtectedRoute><Blog /></ProtectedRoute>}</Route>
       <Route path="/error-logs">{() => <ProtectedRoute><ErrorLogs /></ProtectedRoute>}</Route>
       <Route path="/export-center">{() => <ProtectedRoute><ExportCenter /></ProtectedRoute>}</Route>
       <Route path="/sla-monitoring">{() => <ProtectedRoute><SLAMonitoring /></ProtectedRoute>}</Route>
       <Route path="/document-vault">{() => <ProtectedRoute><DocumentVault /></ProtectedRoute>}</Route>
       <Route path="/agreements">{() => <ProtectedRoute><Agreements /></ProtectedRoute>}</Route>
-      <Route path="/vendor-crm">{() => <ProtectedRoute><VendorCRM /></ProtectedRoute>}</Route>
-      <Route path="/approvals">{() => <ProtectedRoute><Approvals /></ProtectedRoute>}</Route>
       <Route path="/reservations">{() => <ProtectedRoute><ReservationsControl /></ProtectedRoute>}</Route>
       <Route path="/vendor-wallets">{() => <ProtectedRoute><VendorWallets /></ProtectedRoute>}</Route>
-      <Route path="/billing-engine">{() => <ProtectedRoute><BillingEngine /></ProtectedRoute>}</Route>
-      <Route path="/ai-insights">{() => <ProtectedRoute><AIInsights /></ProtectedRoute>}</Route>
-      <Route path="/alert-engine">{() => <ProtectedRoute><AlertEngine /></ProtectedRoute>}</Route>
-      <Route path="/incidents">{() => <ProtectedRoute><Incidents /></ProtectedRoute>}</Route>
-      <Route path="/disaster-recovery">{() => <ProtectedRoute><DisasterRecovery /></ProtectedRoute>}</Route>
-      <Route path="/legal">{() => <ProtectedRoute><LegalCompliance /></ProtectedRoute>}</Route>
-      <Route path="/sandbox">{() => <ProtectedRoute><AdminSandbox /></ProtectedRoute>}</Route>
-      <Route path="/data-archival">{() => <ProtectedRoute><DataArchival /></ProtectedRoute>}</Route>
-      <Route path="/feature-releases">{() => <ProtectedRoute><FeatureReleases /></ProtectedRoute>}</Route>
       <Route path="/app-releases">{() => <ProtectedRoute><AppReleases /></ProtectedRoute>}</Route>
       <Route path="/revenue-leakage">{() => <ProtectedRoute><RevenueLeakage /></ProtectedRoute>}</Route>
       <Route path="/restaurant-revenues">{() => <ProtectedRoute><RestaurantRevenues /></ProtectedRoute>}</Route>
-      <Route path="/dormant-vendors">{() => <ProtectedRoute><DormantVendors /></ProtectedRoute>}</Route>
       <Route>{() => <Redirect to="/" />}</Route>
     </Switch>
     <GuestBottomNav />
@@ -445,7 +384,6 @@ export default function App() {
             <LocaleAccessibilityProvider>
             <OfflineProvider>
             <PwaProvider>
-            <DigitalExperienceProvider>
             <RestaurantProvider>
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                 {/* Keeps one failing page from blanking the entire app (BUG.md #23). */}
@@ -455,7 +393,6 @@ export default function App() {
               </WouterRouter>
               <Toaster />
             </RestaurantProvider>
-            </DigitalExperienceProvider>
             </PwaProvider>
             </OfflineProvider>
             </LocaleAccessibilityProvider>
