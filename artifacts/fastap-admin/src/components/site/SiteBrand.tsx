@@ -52,7 +52,7 @@ export function SiteBrand({
         <TapGlyph className={glyph} />
       </span>
       <span className={`fs-display ${word} ${onDark ? "text-white" : "text-foreground"}`}>
-        Fastap<span className={onDark ? "text-white/60" : "text-muted-foreground"}> OS</span>
+        FastMenu
       </span>
     </span>
   );

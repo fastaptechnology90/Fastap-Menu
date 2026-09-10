@@ -4,6 +4,7 @@ import { Icon } from "@/components/shared/Icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/hooks/useTheme";
 import { useLocation } from "wouter";
 import {
   DropdownMenu,
@@ -23,16 +24,9 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
-  const [isDark, setIsDark] = useState(
-    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
-  );
-
-  function toggleTheme() {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    try { localStorage.setItem("fastap-theme", next ? "dark" : "light"); } catch { /* ignore */ }
-  }
+  // Shared with the restaurant panel's switch and the Settings toggle, so all
+  // three move together instead of each holding its own copy of the answer.
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   async function handleLogout() {
     await logout();

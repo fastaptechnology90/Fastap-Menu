@@ -409,7 +409,13 @@
    app theme rather than the panel's. Default is dark, so it is only visible if an
    admin switches to light. */
 .dark,
-.restaurant-panel,
+/* The restaurant panel follows the app theme rather than pinning itself dark.
+   It used to sit on this selector unconditionally, which is why the Super Admin
+   theme switch appeared to do nothing once you were inside the restaurant panel —
+   the ramp was re-pointed to dark whatever the toggle said. Scoping it under
+   `.dark` lets one switch drive every panel. The guest web stays dark in both
+   themes: it is a phone surface in a dining room, not an operator's monitor. */
+.dark .restaurant-panel,
 .guest-page,
 .menu-page {
   /* A true dark grey-blue rather than near-black. The old 5–11% ground left the
@@ -2182,6 +2188,15 @@ html:has(.menu-page)::-webkit-scrollbar-thumb:hover {
   --destructive-foreground: 0 0% 100%;
   --input: var(--n-200);
   --ring: var(--brand-600);
+
+  /* The phone mockup on the hero is a guest component and reads these three, which
+     carry literal dark values everywhere else. Re-pointed here so it shows the
+     light guest shell instead of a black rectangle on a light page. */
+  --guest-bg: var(--n-25);
+  --guest-surface: var(--n-0);
+  --guest-elevated: var(--n-50);
+  --guest-accent: var(--brand-600);
+  --guest-accent-glow: var(--brand-600);
 
   /* Warm-black shadows. Neutral black over an off-white ground reads as dirt. */
   --elevation-0: 0 1px 1px hsl(12 20% 12% / 0.04);

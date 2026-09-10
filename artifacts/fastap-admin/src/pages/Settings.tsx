@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, Loader2, Globe, Shield, Flag, Clock, RefreshCw, Plug } from "lucide-react";
 import { api, type PlatformSettings, type FeatureFlag, type GeoRegion } from "@/lib/apiClient";
 import IntegrationsSettings from "@/components/admin/IntegrationsSettings";
+import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_CURRENCY, currencyDisplayLabel } from "@/lib/currency";
 import { useState, useEffect } from "react";
@@ -26,14 +27,8 @@ export default function Settings() {
   const [addRegionOpen, setAddRegionOpen] = useState(false);
   const [newRegion, setNewRegion] = useState<GeoRegion>({ country: "", currency: "INR", taxRate: "18%", timezone: "Asia/Kolkata", active: true });
   const { toast } = useToast();
-  const [isDark, setIsDark] = useState(
-    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
-  );
-  function applyTheme(dark: boolean) {
-    setIsDark(dark);
-    document.documentElement.classList.toggle("dark", dark);
-    try { localStorage.setItem("fastap-theme", dark ? "dark" : "light"); } catch { /* ignore */ }
-  }
+  // Same store as the two header switches, so changing it here moves those too.
+  const { isDark, setDark: applyTheme } = useTheme();
 
   useEffect(() => {
     if (settings) {

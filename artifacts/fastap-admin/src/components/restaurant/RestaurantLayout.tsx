@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useRestaurant } from "@/contexts/RestaurantContext";
 import { notificationsApi } from "@/lib/api";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Icon } from "@/components/shared/Icon";
 import { PanelLogo } from "@/components/shared/PanelLogo";
 import { restaurantNavGroups, ROLE_ICONS } from "@/config/restaurantNav";
@@ -237,6 +238,7 @@ export function RestaurantLayout({ children }: { children: React.ReactNode }) {
               <Icon name="schedule" size={14} />
               <span>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
+            <ThemeToggle className="bg-muted" />
             <div className="relative">
               <button type="button" onClick={() => setNotifOpen(!notifOpen)} className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center relative hover-elevate" aria-label="Notifications">
                 <Icon name="notifications" size={18} />
