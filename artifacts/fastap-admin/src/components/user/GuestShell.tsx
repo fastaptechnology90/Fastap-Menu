@@ -21,7 +21,7 @@ import {
 import { createPortal } from "react-dom";
 import { useAppLocation } from "@/hooks/useAppLocation";
 import { useUser } from "@/contexts/UserContext";
-import { resolveGuestSlug, withGuestQuery } from "@/lib/guestDemo";
+import { slugFromUrl, resolveGuestSlug, withGuestQuery } from "@/lib/guestDemo";
 import { useGuestBack } from "@/hooks/useGuestBack";
 import {
   ArrowLeft, ChevronRight, Home, UtensilsCrossed, ShoppingBag, CalendarDays, ShoppingCart, X,
@@ -37,7 +37,11 @@ const ABOVE_TAB_BAR = "bottom-[calc(3.5rem+env(safe-area-inset-bottom))]";
 
 /** Where the guest home is: the venue they scanned into, or the menu if we have no venue. */
 export function guestHomePath(venue?: { restaurantSlug?: string }, activeTable?: string): string {
-  const slug = resolveGuestSlug(venue?.restaurantSlug || undefined);
+  // The slug in the address bar wins, demo alias included. Resolving the saved scan
+  // first meant that on a demo page (?slug=demo) whose venue had not finished loading,
+  // the Home tab sent the diner to whatever real venue this browser had scanned before —
+  // the same crossover the menu loaders were already fixed against.
+  const slug = slugFromUrl() ?? resolveGuestSlug(venue?.restaurantSlug || undefined);
   if (!slug) return withGuestQuery("/user/menu", venue, activeTable);
   const current = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search)

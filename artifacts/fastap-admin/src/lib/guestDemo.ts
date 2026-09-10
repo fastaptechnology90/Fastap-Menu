@@ -74,7 +74,11 @@ export function withGuestQuery(
   const qIdx = path.indexOf("?");
   const base = qIdx >= 0 ? path.slice(0, qIdx) : path;
   const qs = new URLSearchParams(qIdx >= 0 ? path.slice(qIdx + 1) : "");
-  const slug = resolveGuestSlug(venue?.restaurantSlug || undefined);
+  // The slug in the current address bar wins — demo alias included. Resolving the saved
+  // scan first meant that navigating between tabs on a demo page (?slug=demo) rewrote the
+  // slug to whatever real venue this browser had scanned earlier, carrying the diner off
+  // the demo and onto a real restaurant's menu with ordering live.
+  const slug = slugFromUrl() ?? resolveGuestSlug(venue?.restaurantSlug || undefined);
   if (slug) qs.set("slug", slug);
   const table = current.get("table") || activeTable;
   if (table) qs.set("table", table);
