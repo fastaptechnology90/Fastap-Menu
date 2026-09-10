@@ -79,6 +79,7 @@ import featureModulesRouter, {
 } from "./feature-modules";
 import { requireAuth } from "../middlewares/auth";
 import { requireRestaurantSubscription } from "../middlewares/restaurant-subscription.js";
+import { blockDemoVenueWrites } from "../middlewares/demo-venue-readonly.js";
 import { requireTenantScope } from "../middlewares/tenant-scope.js";
 import { requireStaffPermission } from "../middlewares/staff-permissions.js";
 import { enforcePlanLimits } from "../middlewares/plan-limits.js";
@@ -103,6 +104,9 @@ router.use(countRequest);
 // Ownership is checked once, here, for every path that names a restaurant — so a new
 // route is covered the day it is written instead of relying on each one remembering.
 router.use(requireTenantScope);
+// Same idea for the guest surface: the demo venue on the landing page is a real
+// restaurant, and no public write may land on it. Reads pass straight through.
+router.use(blockDemoVenueWrites);
 // Then the venue's own role matrix. Tenant scoping keeps one restaurant out of another's
 // data; this keeps a waiter out of the finance ledger and the staff list within their own.
 router.use(requireStaffPermission);

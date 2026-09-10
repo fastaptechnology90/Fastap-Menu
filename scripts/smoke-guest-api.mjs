@@ -117,7 +117,15 @@ async function main() {
   }, 404);
   record("invalid coupon rejected", badCoupon.status === 404);
 
-  const corpQueue = await post("corporate queue GRANDSPICE", "/public/queue", {
+  // This suite runs against the venue the public demo link opens, and that venue is a
+  // real restaurant with real staff watching it. Every write here used to land on it —
+  // these queue calls were putting guests who do not exist into its waiting list.
+  //
+  // The demo is read-only now, so the assertion is the guarantee itself: a guest-facing
+  // write aimed at it is refused, and nothing is created. Queue behaviour (corporate
+  // priority, fake-code handling) belongs in a test with its own throwaway venue rather
+  // than one pointed at the shop window.
+  const demoQueue = await post("queue join refused on demo", "/public/queue", {
     restaurantId,
     guestName: "Test Corp",
     guestPhone: "+919999999999",
@@ -125,19 +133,8 @@ async function main() {
     queueType: "corporate",
     corporateCode: "GRANDSPICE",
     notifyVia: "app",
-  }, 201);
-  record("corporate priority", corpQueue.data?.priority === "corporate", corpQueue.data?.priority);
-
-  const badCorp = await post("queue join", "/public/queue", {
-    restaurantId,
-    guestName: "Test Normal",
-    guestPhone: "+919999999998",
-    partySize: 2,
-    queueType: "corporate",
-    corporateCode: "FAKECODE",
-    notifyVia: "app",
-  }, 201);
-  record("fake corp code = normal", badCorp.data?.priority !== "corporate", badCorp.data?.priority);
+  }, 403);
+  record("demo venue is read-only", demoQueue.data?.demoVenue === true, demoQueue.data?.error);
 
   const orders = await get("my orders", "/public/me/orders");
   const orderList = orders.data?.orders ?? orders.data ?? [];
