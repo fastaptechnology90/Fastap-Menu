@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, count } from "drizzle-orm";
-import { db, qrCodesTable, restaurantsTable, tablesMapTable, menuViewsTable } from "@workspace/db";
+import { db, qrCodesTable, restaurantsTable, tablesMapTable, menuViewsTable, hotelRoomsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { buildScanUrl } from "../lib/scan-urls.js";
 
@@ -36,6 +36,20 @@ router.post("/restaurants/:restaurantId/qrcodes", requireAuth, async (req, res):
   if (normalizedType === "room" && !normalizedRoom) {
     res.status(400).json({ error: "roomNumber is required for room QR codes" });
     return;
+  }
+
+  // A room QR is only useful if the room it names exists — the scan endpoint looks the
+  // room up in hotel_rooms and 404s when it is absent. Generating the QR used to write
+  // only the qr_codes row, so every "Add Room QR" produced a code that failed the moment
+  // a guest scanned it ("Room not found"). Create the room here if it is new, so the code
+  // works as soon as it is made.
+  if (normalizedRoom) {
+    const [existingRoom] = await db.select({ id: hotelRoomsTable.id }).from(hotelRoomsTable).where(
+      and(eq(hotelRoomsTable.restaurantId, restaurantId), eq(hotelRoomsTable.number, normalizedRoom)),
+    );
+    if (!existingRoom) {
+      await db.insert(hotelRoomsTable).values({ restaurantId, number: normalizedRoom });
+    }
   }
 
   const url = normalizedRoom
