@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRestaurant, type LiveOrder } from "@/contexts/RestaurantContext";
-import { orders as ordersApi, menu as menuApi, orderAdjustments, floorOps } from "@/lib/api";
+import { orders as ordersApi, menu as menuApi, orderAdjustments, floorOps, printing, openPrintWindow } from "@/lib/api";
 import { splitCustomizations } from "@/lib/orderItemExtras";
 import { toast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
@@ -200,6 +200,17 @@ export default function OrderManagement() {
       };
     });
   }, [filtered]);
+
+  // Print the kitchen ticket itself, not the screen. window.print() printed the whole
+  // order-management page; the server renders a real KOT document (reprint → { html })
+  // and openPrintWindow prints just that.
+  async function printKot() {
+    if (!restaurantId || !selectedOrder?.id) return;
+    try {
+      const r = await printing.reprint(restaurantId, Number(selectedOrder.id), "kot");
+      openPrintWindow(r.html, r.url);
+    } catch { /* the print window is best-effort; a failed reprint is not worth a modal here */ }
+  }
 
   // Advance only the laggard rounds sitting at the tab's current (least-advanced) stage.
   function advanceTab(tab: LiveOrder & { tabOrders?: LiveOrder[] }, target: LiveOrder["status"]) {
@@ -838,7 +849,7 @@ export default function OrderManagement() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => printKot()}
                   className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2"
                 >
                   <Printer className="h-3.5 w-3.5" aria-hidden /> Print KOT

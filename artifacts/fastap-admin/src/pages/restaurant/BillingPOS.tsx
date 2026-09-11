@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRestaurant } from "@/contexts/RestaurantContext";
-import { orders as ordersApi, orderAdjustments, restaurantApi } from "@/lib/api";
+import { orders as ordersApi, orderAdjustments, restaurantApi, printing, openPrintWindow } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { downloadText } from "@/lib/download";
 import type { RecentBill } from "@/lib/restaurant-types";
@@ -322,6 +322,26 @@ export default function BillingPOS() {
     downloadText(body, `${gstInvoice ? "gst-invoice" : "bill"}-${selectedOrder?.id || "order"}.txt`);
   }
 
+  // Print the actual bill/KOT document, not the screen. The buttons used to call
+  // window.print(), which prints whatever is on the panel — the sidebar, the tab list and
+  // a page-sized copy of the success tick. The server already renders a proper thermal
+  // bill (GET .../reprint → { html }); openPrintWindow opens just that and prints it.
+  async function printDoc(kind: "kot" | "bill") {
+    if (!restaurantId || !selectedOrder?.id) {
+      toast({ variant: "destructive", title: "Nothing to print", description: "Open a tab first." });
+      return;
+    }
+    try {
+      const r = await printing.reprint(restaurantId, Number(selectedOrder.id), kind);
+      const ok = openPrintWindow(r.html, r.url);
+      if (!ok) {
+        toast({ variant: "destructive", title: "Allow pop-ups to print", description: "The print window was blocked by the browser." });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Could not print", description: e instanceof Error ? e.message : "Try again." });
+    }
+  }
+
   const [paying, setPaying] = useState(false);
 
   async function handlePay() {
@@ -614,8 +634,8 @@ export default function BillingPOS() {
             </div>
             <div className="shrink-0 space-y-2 border-t border-border p-4">
               <div className="flex gap-2">
-                <button type="button" onClick={() => window.print()} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2">
-                  <Printer className="h-4 w-4" aria-hidden /> Print
+                <button type="button" onClick={() => printDoc("bill")} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2">
+                  <Printer className="h-4 w-4" aria-hidden /> Print bill
                 </button>
                 <button type="button" onClick={() => downloadInvoice(false)} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border border-border bg-card text-sm font-semibold hover-elevate active-elevate-2">
                   <Download className="h-4 w-4" aria-hidden /> Download
@@ -635,7 +655,7 @@ export default function BillingPOS() {
               </div>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => printDoc("kot")}
                 className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold hover-elevate active-elevate-2"
               >
                 <Printer className="h-3.5 w-3.5" aria-hidden /> KOT
@@ -831,7 +851,7 @@ export default function BillingPOS() {
               </PermissionGate>
 
               <div className="mt-2 flex gap-2">
-                <button type="button" onClick={() => window.print()} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2">
+                <button type="button" onClick={() => printDoc("bill")} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2">
                   <Printer className="h-3.5 w-3.5" aria-hidden /> Print bill
                 </button>
                 <button type="button" onClick={() => downloadInvoice(true)} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-card text-xs font-semibold hover-elevate active-elevate-2">

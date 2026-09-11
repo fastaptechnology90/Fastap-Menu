@@ -250,9 +250,15 @@ const defaultVenue: VenueContext = {
   areas: [],
   areaGroups: [],
   hours: OPEN_UNTIL_TOLD_OTHERWISE,
-  // Assume demo until the server says otherwise: failing closed here means a load
-  // error can never leave ordering switched on against the wrong venue.
-  isDemo: true,
+  // Not demo until the server says so. This defaulted to `true` "to fail closed", but
+  // the client flag guards nothing — the server refuses a real order to the demo venue
+  // on its own (isDemoVenue + blockDemoVenueWrites). All the default did was make every
+  // REAL venue read as a demo for the moment before its context loaded, and permanently
+  // whenever that call was slow or failed (MenuPage swallows the venue-load error) — so a
+  // guest at a real cafe saw "This is a demo menu — ordering is disabled" and could not
+  // order. The one true demo still shows view-only, because the server returns isDemo:true
+  // for it and the client picks that up once loaded.
+  isDemo: false,
 };
 
 const UserContext = createContext<UserContextValue | null>(null);
