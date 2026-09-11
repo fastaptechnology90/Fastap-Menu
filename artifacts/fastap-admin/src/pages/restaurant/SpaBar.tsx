@@ -4,6 +4,7 @@ import { useRestaurant } from "@/contexts/RestaurantContext";
 import { spa as spaApi, barApi, staff as staffApi, roomService as roomServiceApi } from "@/lib/api";
 import { FEATURES } from "@/lib/featureFlags";
 import { ModulePackages } from "@/components/restaurant/ModulePackages";
+import SpaPayments from "@/pages/restaurant/SpaPayments";
 
 type SpaBooking = {
   id: string; guest: string; room: string; service: string; therapist: string;
@@ -31,7 +32,7 @@ const CATEGORY_CFG: Record<string,{label:string;icon:any;color:string}> = {
   mocktail: {label:"Mocktails", icon:Droplets,    color:"text-success"},
 };
 
-type Tab = "spa-bookings"|"spa-packages"|"bar-orders"|"bar-inventory"|"recipes";
+type Tab = "spa-bookings"|"spa-packages"|"spa-payments"|"bar-orders"|"bar-inventory"|"recipes";
 
 // mode splits this into a standalone Spa panel (spa role) and Bar panel (bar role).
 // "both" keeps the legacy combined view for owner/manager (and the old /spa-bar route).
@@ -39,7 +40,14 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
   const { restaurantId } = useRestaurant();
   const showSpa = mode !== "bar";
   const showBar = mode !== "spa";
-  const [tab, setTab] = useState<Tab>(mode === "bar" ? "bar-orders" : "spa-bookings");
+  // ?tab=payments opens the Payments tab directly — the old /restaurant/spa-payments route
+  // redirects here, so its bookmarks and in-app links still land on payments.
+  const initialTab: Tab = mode === "bar"
+    ? "bar-orders"
+    : (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "payments")
+      ? "spa-payments"
+      : "spa-bookings";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [bookings, setBookings] = useState<SpaBooking[]>([]);
   const [packages, setPackages] = useState<SpaPackage[]>([]);
   const [barItems, setBarItems] = useState<BarItem[]>([]);
@@ -246,7 +254,7 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
       {/* Tabs */}
       <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit overflow-x-auto no-scrollbar">
         {(([
-          ...(showSpa ? [["spa-bookings","Spa Bookings"],["spa-packages","Packages & Therapists"]] : []),
+          ...(showSpa ? [["spa-bookings","Spa Bookings"],["spa-packages","Packages & Therapists"],["spa-payments","Payments"]] : []),
           ...(showBar ? [["bar-orders","Bar Orders"],["bar-inventory","Bar Inventory"],["recipes","Cocktail Recipes"]] : []),
         ]) as [Tab,string][]).map(([t,l])=>(
           <button key={t} onClick={()=>setTab(t)} className={`shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${tab===t?"bg-primary text-primary-foreground":"text-muted-foreground hover:text-foreground"}`}>{l}</button>
@@ -348,6 +356,11 @@ export default function SpaBar({ mode = "both" }: { mode?: "spa" | "bar" | "both
             })}
           </div>
         </div>
+      )}
+
+      {/* Payments live inside Spa, not as a second sidebar entry. */}
+      {tab==="spa-payments"&&(
+        <SpaPayments embedded />
       )}
 
       {tab==="bar-orders"&&(

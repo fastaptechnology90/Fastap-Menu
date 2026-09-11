@@ -27,7 +27,9 @@ function fmtDateTime(v: string | undefined) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function SpaPayments() {
+// `embedded` renders this inside the Spa page's own Payments tab — no page header and no
+// outer padding, so it sits under the shared Spa header instead of showing a second title.
+export default function SpaPayments({ embedded = false }: { embedded?: boolean }) {
   const { restaurantId, currentStaff } = useRestaurant();
   const qc = useQueryClient();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -96,11 +98,13 @@ export default function SpaPayments() {
   ];
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 text-foreground">
-      <div>
-        <h1 className="text-xl font-semibold flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" /> Spa Payments</h1>
-        <p className="text-xs text-muted-foreground">Collect payments for spa bookings, and view history and details.</p>
-      </div>
+    <div className={embedded ? "space-y-5 text-foreground" : "p-4 lg:p-6 space-y-5 text-foreground"}>
+      {!embedded && (
+        <div>
+          <h1 className="text-xl font-semibold flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" /> Spa Payments</h1>
+          <p className="text-xs text-muted-foreground">Collect payments for spa bookings, and view history and details.</p>
+        </div>
+      )}
 
       <RevenueByDate restaurantId={restaurantId} title="Spa Revenue" />
 
