@@ -61,6 +61,22 @@ export default function QRManagement() {
   const scanUrl = (opts: { table?: string; room?: string }) => `${origin}${buildScanUrl(venueSlug, opts)}`;
   const baseUrl = scanUrl({});
 
+  // The URL stored on a qr_codes row is built server-side, where the only address the
+  // server knows is its own — on Railway that is the *.up.railway.app host, which the
+  // custom domain replaced and which now 404s ("the train has not arrived"). So the
+  // printed code, the Copy button and the Download all pointed at a dead host. Keep the
+  // stored path and query (the table/room/entry the server chose) but force the origin to
+  // the domain the owner is actually on — the one their guests will use.
+  const onThisOrigin = (stored?: string): string | null => {
+    if (!stored) return null;
+    try {
+      const u = new URL(stored, origin || "http://localhost");
+      return `${origin}${u.pathname}${u.search}`;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     if (restaurant.slug) setVenueSlug(restaurant.slug);
   }, [restaurant.slug]);
@@ -311,19 +327,19 @@ export default function QRManagement() {
               const key = roomNum;
               return (
                 <div key={key} className="bg-muted rounded-lg border border-border p-4 flex flex-col items-center gap-3">
-                  <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={qr?.url || url} size={100} /></div>
+                  <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={onThisOrigin(qr?.url) || url} size={100} /></div>
                   <div className="text-center">
                     <div className="font-semibold text-foreground text-sm">Room {roomNum}</div>
                     <div className="text-xs text-muted-foreground">{qr ? `${qr.scans || 0} scans` : "Ready to print · scans not counted"}</div>
                   </div>
                   <div className="flex gap-2 w-full">
-                    <button onClick={() => handleCopy(qr?.url || url, qr?.id ?? roomNum.charCodeAt(0))} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
+                    <button onClick={() => handleCopy(onThisOrigin(qr?.url) || url, qr?.id ?? roomNum.charCodeAt(0))} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       {copied === (qr?.id ?? roomNum.charCodeAt(0)) ? "Copied!" : "Copy"}
                     </button>
                     <button onClick={() => handleGenerate(undefined, undefined, roomNum)} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors">
                       <QrCode className="h-3 w-3" /> {qr ? "Regen" : "Track"}
                     </button>
-                    <button title="Download QR" onClick={() => handleDownload(qr?.url || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
+                    <button title="Download QR" onClick={() => handleDownload(onThisOrigin(qr?.url) || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                       <Download className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -341,16 +357,16 @@ export default function QRManagement() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {generalQRs.map(qr => (
             <div key={qr.id} className="bg-muted rounded-lg border border-border p-4 flex flex-col items-center gap-3">
-              <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={qr.url || baseUrl} size={100} /></div>
+              <div className="bg-white p-2 rounded-lg shadow-sm"><QRCodeSVG value={onThisOrigin(qr.url) || baseUrl} size={100} /></div>
               <div className="text-center">
                 <div className="font-semibold text-foreground text-sm">{qr.label || qr.name}</div>
                 <div className="text-xs text-muted-foreground">{qr.scans || 0} scans</div>
               </div>
               <div className="flex gap-2 w-full">
-                <button onClick={() => handleCopy(qr.url || baseUrl, qr.id)} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors text-sm">
+                <button onClick={() => handleCopy(onThisOrigin(qr.url) || baseUrl, qr.id)} className="flex-1 py-1.5 rounded-lg bg-muted hover-elevate text-xs text-muted-foreground transition-colors text-sm">
                   {copied === qr.id ? "Copied!" : "Copy Link"}
                 </button>
-                <button title="Download QR" onClick={() => handleDownload(qr.url || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
+                <button title="Download QR" onClick={() => handleDownload(onThisOrigin(qr.url) || baseUrl, `${venueSlug || "restaurant"}-${(qr.label || qr.name || "qr").toString().replace(/\s+/g, "-")}-qr.png`)} className="py-1.5 px-3 rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => handleDelete(qr.id, qr.label || qr.name || "this code")} className="py-1.5 px-3 rounded-lg bg-danger-subtle hover-elevate text-danger transition-colors">
