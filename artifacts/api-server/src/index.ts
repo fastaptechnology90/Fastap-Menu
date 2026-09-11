@@ -47,6 +47,14 @@ async function ensureSchemaColumns() {
   const guards = [
     `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS room_number text`,
     `ALTER TABLE staff ADD COLUMN IF NOT EXISTS weekly_schedule jsonb DEFAULT '{}'::jsonb`,
+    // The settlement period columns were added to the schema but not to any live table,
+    // so Drizzle's SELECT * over platform_settlements named columns the database did not
+    // have — every read of it threw. That is what 500'd Finance & Wallet (finance/wallet
+    // reads settlements) and the super-admin settlement, escrow and vendor-payout pages,
+    // consistently, for every venue. Added here so a deploy heals the table with no db:push.
+    `ALTER TABLE platform_settlements ADD COLUMN IF NOT EXISTS period_start timestamptz`,
+    `ALTER TABLE platform_settlements ADD COLUMN IF NOT EXISTS period_end timestamptz`,
+    `ALTER TABLE platform_settlements ADD COLUMN IF NOT EXISTS released_at timestamptz`,
     // Staff-app distribution: super admin uploads an APK here, every restaurant
     // panel offers it for install. Created on boot so a deploy needs no db:push.
     `CREATE TABLE IF NOT EXISTS app_releases (
