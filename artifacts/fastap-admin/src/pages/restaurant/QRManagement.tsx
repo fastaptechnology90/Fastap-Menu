@@ -303,6 +303,11 @@ export default function QRManagement() {
                     <button title="Download QR" onClick={() => handleDownload(url, `${venueSlug || "restaurant"}-table-${table.name}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                       <Download className="h-3.5 w-3.5" />
                     </button>
+                    {qr && (
+                      <button title="Delete QR" onClick={() => handleDelete(qr.id, table.name)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-danger-subtle hover-elevate text-danger transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -342,6 +347,11 @@ export default function QRManagement() {
                     <button title="Download QR" onClick={() => handleDownload(onThisOrigin(qr?.url) || url, `${venueSlug || "restaurant"}-room-${roomNum}-qr.png`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-success-subtle hover-elevate text-success transition-colors">
                       <Download className="h-3.5 w-3.5" />
                     </button>
+                    {qr && (
+                      <button title="Delete QR" onClick={() => handleDelete(qr.id, `Room ${roomNum}`)} className="py-1.5 px-3 flex items-center justify-center rounded-lg bg-danger-subtle hover-elevate text-danger transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

@@ -19,7 +19,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     api.auth.me()
       .then(setUser)
-      .catch(() => setUser(null))
+      // Sign out only on a real 401. A network blip or a 5xx (the server restarting on a
+      // deploy) is not a logout — clearing the user on those logged the admin out every few
+      // minutes. On a transient error leave the current user in place and recover next call.
+      .catch((e) => { if ((e as { status?: number })?.status === 401) setUser(null); })
       .finally(() => setLoading(false));
   }, []);
 

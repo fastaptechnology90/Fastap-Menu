@@ -3,7 +3,7 @@
 // activate purge below) only when it sees the file change — so a static name meant clients
 // kept serving themselves the old app long after a deploy, which read as "the build didn't
 // run". Whenever a deploy has to be visible, change this.
-const CACHE = "fastmenu-guest-v6";
+const CACHE = "fastmenu-guest-v7";
 
 // Only cache small, stable helpers up front. We deliberately DO NOT pre-cache "/" or app
 // routes — navigations are network-first so the latest index.html (and its freshly-hashed

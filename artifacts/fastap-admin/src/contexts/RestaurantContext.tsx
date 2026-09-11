@@ -562,8 +562,14 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
         if (me.subscription) setSubscription(me.subscription);
         setRequiresSubscription(me.requiresSubscription ?? !me.subscription?.active);
         setCanSubscribe(Boolean(me.canSubscribe));
-      } catch {
-        if (!cancelled && bootGeneration === authGeneration.current) {
+      } catch (e) {
+        // Only a genuine 401 means the session is actually gone — clear it and sign out.
+        // A network blip, a timeout, or a 5xx (the server restarting on a deploy) is NOT a
+        // logout: clearing on those signed the owner out every few minutes, most visibly
+        // right after a deploy. On a transient error keep the last-known session (it is
+        // restored from localStorage) and let the next call recover.
+        const status = (e as { status?: number })?.status;
+        if (!cancelled && bootGeneration === authGeneration.current && status === 401) {
           setCurrentStaffState(null);
           setRestaurantIdState(null);
           localStorage.removeItem("fastap_restaurant_id");
