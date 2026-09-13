@@ -601,7 +601,7 @@ export default function BillingPOS() {
         />
       )}
       <aside
-        className={`${panelOpen ? "flex" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card lg:static lg:z-auto lg:flex lg:w-[23rem] lg:max-w-none xl:w-[26rem]`}
+        className={`${panelOpen ? "flex lg:static lg:z-auto lg:flex lg:w-[23rem] lg:max-w-none xl:w-[26rem]" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card`}
         aria-label="Bill"
       >
         {panelOpen && (

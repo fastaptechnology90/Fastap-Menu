@@ -817,7 +817,7 @@ export default function TableManagement() {
         />
       )}
       <aside
-        className={`${selected ? "flex" : "hidden lg:flex"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card lg:static lg:z-auto lg:w-[21rem] lg:max-w-none xl:w-[24rem]`}
+        className={`${selected ? "flex lg:static lg:z-auto lg:w-[21rem] lg:max-w-none xl:w-[24rem]" : "hidden"} fixed inset-y-0 right-0 z-40 w-full max-w-md flex-col border-l border-border bg-card`}
         aria-label="Table details"
       >
         {!selected || !detailCfg ? (
