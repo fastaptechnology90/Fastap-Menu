@@ -318,7 +318,7 @@ export default function UserAuth() {
           <div className="mb-5 flex justify-center">
             <GuestLogo size="lg" />
           </div>
-          <h1 className="font-display text-2xl font-semibold">Welcome to FastMenu</h1>
+          <h1 className="font-display text-2xl font-semibold">Welcome to Fastap OS</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {(smsUnavailable || (oauthReady && oauthReady.smsOtp === false && !import.meta.env.DEV))
               ? "Phone OTP is not set up yet — continue as guest or use email"
