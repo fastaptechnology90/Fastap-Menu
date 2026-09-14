@@ -1,5 +1,9 @@
-// Bump this on every strategy change so the activate step purges old caches.
-const CACHE = "fastmenu-guest-v3";
+// Bump this on every deploy that must reach returning browsers. The service worker file
+// only changes when this string does, and a browser reinstalls the worker (and so runs the
+// activate purge below) only when it sees the file change — so a static name meant clients
+// kept serving themselves the old app long after a deploy, which read as "the build didn't
+// run". Whenever a deploy has to be visible, change this.
+const CACHE = "fastap-os-guest-v8";
 
 // Only cache small, stable helpers up front. We deliberately DO NOT pre-cache "/" or app
 // routes — navigations are network-first so the latest index.html (and its freshly-hashed
@@ -66,7 +70,7 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "FastMenu", body: "You have an update" };
+  let data = { title: "Fastap OS", body: "You have an update" };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch { /* ignore */ }
@@ -76,7 +80,7 @@ self.addEventListener("push", (event) => {
       body: data.body,
       icon: "/favicon.svg",
       badge: "/favicon.svg",
-      tag: "fastmenu-push",
+      tag: "fastap-os-push",
       data: { url: "/user/menu?slug=spice-garden" },
     }),
   );
