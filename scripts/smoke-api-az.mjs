@@ -65,7 +65,7 @@ const STAFF_ROLES = [
 ];
 
 async function main() {
-  console.log(`\n=== FastMenu A–Z API smoke test ===\n${BASE}\n`);
+  console.log(`\n=== Fastap OS A–Z API smoke test ===\n${BASE}\n`);
 
   // ── A: Auth & health ──
   await get("A-Health", "health", "/health");
