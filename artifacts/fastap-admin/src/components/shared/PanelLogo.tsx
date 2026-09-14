@@ -36,7 +36,7 @@ export function PanelLogo({
       </div>
       {showLabel && (
         <div className="min-w-0">
-          <p className="font-display font-bold text-sm truncate">{label ?? "FastMenu"}</p>
+          <p className="font-display font-bold text-sm truncate">{label ?? "Fastap OS"}</p>
           <p className="text-[10px] text-muted-foreground truncate capitalize">{panel} panel</p>
         </div>
       )}
