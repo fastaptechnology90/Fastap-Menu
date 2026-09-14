@@ -150,7 +150,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
         body,
         icon: "/favicon.svg",
         badge: "/favicon.svg",
-        tag: "fastmenu-guest",
+        tag: "fastap-os-guest",
       });
     } else if ("Notification" in window) {
       new Notification(title, { body, icon: "/favicon.svg" });
