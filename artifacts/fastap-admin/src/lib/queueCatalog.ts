@@ -30,7 +30,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
   normal: "Standard",
 };
 
-export const DEMO_CORPORATE_HINT = "Try CORP2024, FASTMENU, or GRANDSPICE";
+export const DEMO_CORPORATE_HINT = "Try CORP2024, FASTAPOS, or GRANDSPICE";
 
 export interface QueueStats {
   queueLength: number;
