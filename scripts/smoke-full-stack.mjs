@@ -136,7 +136,7 @@ async function webRoutesSmoke() {
 }
 
 async function main() {
-  console.log(`\n=== FastMenu full-stack smoke ===`);
+  console.log(`\n=== Fastap OS full-stack smoke ===`);
   console.log(`API:    ${API_BASE}`);
   console.log(`Mobile: ${MOBILE_BASE}/api/v1`);
   console.log(`Web:    ${WEB_BASE}\n`);
