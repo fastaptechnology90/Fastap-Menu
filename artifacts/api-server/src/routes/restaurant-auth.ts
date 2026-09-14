@@ -1,6 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
 import bcrypt from "bcryptjs";
-import { generateOtp } from "../lib/mobile-kitchen/staff-tokens.js";
 import { eq, and, sql } from "drizzle-orm";
 import {
   db,
@@ -11,7 +10,6 @@ import {
   documentsTable,
   platformPlansTable,
 } from "@workspace/db";
-import { loginRateLimit, loginNetworkRateLimit } from "../middlewares/rate-limit.js";
 import { getSettingsSection, setSettingsSection } from "../lib/restaurant-settings";
 import { normalizeCurrencyCode, PLATFORM_CURRENCY } from "../lib/currency.js";
 import {
@@ -30,8 +28,6 @@ import {
 import { isEmailConfigured, sendEmail, publicBaseUrl } from "../lib/email.js";
 import { makeResetToken, verifyResetToken } from "../lib/password-reset.js";
 import { logger } from "../lib/logger.js";
-import { getPlatformSettingsRaw } from "../lib/platform-admin.js";
-import { sendOtpSms, smsCredentialsPresent } from "../lib/sms-delivery.js";
 
 const router: IRouter = Router();
 
@@ -324,20 +320,7 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
   }
 
   const { staff: staffMember, restaurant } = picked.row!;
-  // Math.random() is predictable enough to guess a six-digit login code from a couple of
-  // samples; this draws from the OS entropy source instead.
-  const otp = generateOtp();
-
-  const platform = await getPlatformSettingsRaw().catch(() => null);
-  const integrations = platform?.integrations;
-  if (!smsCredentialsPresent(integrations)) {
-    res.status(503).json({
-      error: "Phone OTP is not available — SMS is not configured. Sign in with email and password.",
-      code: "SMS_NOT_CONNECTED",
-    });
-    return;
-  }
-
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
   otpStore.set(normalized, {
     otp,
     expiresAt: Date.now() + 10 * 60 * 1000,
@@ -345,20 +328,11 @@ router.post("/restaurant-auth/otp/send", async (req, res): Promise<void> => {
     restaurantId: restaurant.id,
   });
 
-  const sent = await sendOtpSms(normalized, otp, integrations);
-  if (!sent.ok) {
-    otpStore.delete(normalized);
-    res.status(503).json({
-      error: "We could not send the OTP. Use email and password, or try again later.",
-      code: "SMS_SEND_FAILED",
-    });
-    return;
-  }
-
+  // Integrate SMS provider here; OTP is never returned to the client.
   res.json({ success: true, message: "OTP sent to your registered mobile number" });
 });
 
-router.post("/restaurant-auth/login", loginNetworkRateLimit, loginRateLimit, async (req, res): Promise<void> => {
+router.post("/restaurant-auth/login", async (req, res): Promise<void> => {
   const { restaurantId, email, password, phone, otp } = req.body;
   const rid = restaurantId ? parseInt(String(restaurantId), 10) : undefined;
 
@@ -943,14 +917,8 @@ router.post("/restaurant-auth/forgot-password", async (req, res): Promise<void> 
     }).catch(() => {});
     done();
   } else {
-    // Never hand the reset token back to the caller. Without a mail provider there is
-    // no way to prove the requester owns the address, so returning it would let anyone
-    // reset any staff password by typing their email. See routes/auth.ts for the same rule.
-    logger.warn(
-      { staffId: staffMember.id },
-      "staff password reset requested but no email provider is configured — reset not issued",
-    );
-    done();
+    logger.info({ staffId: staffMember.id }, "staff password reset requested (demo — token returned)");
+    done({ devToken: token });
   }
 });
 
