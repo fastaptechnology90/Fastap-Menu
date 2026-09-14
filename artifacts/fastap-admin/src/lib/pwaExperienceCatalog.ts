@@ -8,7 +8,7 @@ export type PwaFeatureId =
   | "fast_loading";
 
 export const PWA_FEATURES = [
-  { id: "install_app" as const, label: "Install as App", icon: "📲", desc: "Add FastMenu to home screen — works like a native app" },
+  { id: "install_app" as const, label: "Install as App", icon: "📲", desc: "Add Fastap OS to home screen — works like a native app" },
   { id: "push_notifications" as const, label: "Push Notifications", icon: "🔔", desc: "Order ready, waitlist called & offer alerts" },
   { id: "offline_support" as const, label: "Offline Support", icon: "📴", desc: "Browse cached menu & queue orders without internet" },
   { id: "home_shortcuts" as const, label: "Home Screen Shortcuts", icon: "⚡", desc: "Quick-launch menu, cart, wallet & room service" },
