@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS = {
   splashLogo: true,
   categoryScroll: "horizontal",
   showRecommended: true,
-  customBanner: "Welcome to FastMenu! Tap to Order.",
+  customBanner: "Welcome to Fastap OS! Tap to Order.",
   tipPrompt: true,
   tipOptions: [10, 20, 50],
   upsell: true,
@@ -367,7 +367,7 @@ export default function SelfOrderingKiosk() {
                 {previewStep==="splash"&&(
                   <div className="h-full flex flex-col items-center justify-center p-8 text-center" style={{background:`${settings.themeColor}22`}}>
                     <div className="h-20 w-20 rounded-lg mb-6 flex items-center justify-center text-4xl" style={{background:settings.themeColor}}><Zap className="h-9 w-9 text-background" /></div>
-                    <p className="text-2xl font-semibold mb-2">FastMenu</p>
+                    <p className="text-2xl font-semibold mb-2">Fastap OS</p>
                     <p className="text-sm text-muted-foreground mb-8">{settings.customBanner}</p>
                     <button onClick={()=>setPreviewStep("menu")} className="px-8 py-3.5 rounded-lg text-primary-foreground font-semibold text-lg" style={{background:settings.themeColor}}>Tap to Order</button>
                     {settings.multiLanguage&&<div className="flex gap-2 mt-6"><span className="text-xs bg-muted px-2 py-1 rounded-full">English</span><span className="text-xs bg-muted px-2 py-1 rounded-full">हिंदी</span><span className="text-xs bg-muted px-2 py-1 rounded-full">தமிழ்</span></div>}
