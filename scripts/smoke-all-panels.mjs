@@ -40,7 +40,7 @@ function record(name, ok, detail = "") {
 }
 
 async function main() {
-  console.log(`\n=== FastMenu 3-panel integration test ===\nAPI: ${BASE}\nWeb: ${WEB}\n`);
+  console.log(`\n=== Fastap OS 3-panel integration test ===\nAPI: ${BASE}\nWeb: ${WEB}\n`);
 
   // ── Health ──
   const health = await req("GET", "/health");
