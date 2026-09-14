@@ -1,6 +1,6 @@
 {
-  "name": "FastMenu Guest",
-  "short_name": "FastMenu",
+  "name": "Fastap OS Guest",
+  "short_name": "Fastap OS",
   "description": "Smart hospitality guest web — scan, order, track & pay",
   "start_url": "/user/menu?slug=spice-garden&table=T-12&entry=pwa",
   "scope": "/",
