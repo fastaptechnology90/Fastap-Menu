@@ -109,7 +109,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <button onClick={() => navigate("/")} className="flex shrink-0 items-center" aria-label="FastMenu home">
+            <button onClick={() => navigate("/")} className="flex shrink-0 items-center" aria-label="Fastap OS home">
               <SiteBrand />
             </button>
 
@@ -444,7 +444,7 @@ export default function Landing() {
             </div>
           </div>
           <p className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-            © {new Date().getFullYear()} FastMenu · Fastap Smart Hospitality OS. All rights reserved.
+            © {new Date().getFullYear()} Fastap OS · Fastap Smart Hospitality OS. All rights reserved.
           </p>
         </div>
       </footer>
